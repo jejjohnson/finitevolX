@@ -27,6 +27,9 @@ jaxtyping = "^0.2.15"
 beartype = "^0.13.1"
 jax = ">=0.4.10"
 jaxlib = ">=0.4.10"
+finitediffx = "^0.1.0"
+kernex = "^0.2.0"
+jupyter = "^1.0.0"
 
 
 [tool.poetry.group.dev.dependencies]

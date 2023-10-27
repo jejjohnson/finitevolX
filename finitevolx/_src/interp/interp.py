@@ -1,0 +1,56 @@
+from typing import Iterable, Optional, Callable
+from jaxtyping import Array
+import kernex as kex
+import jax.numpy as jnp
+
+
+def avg_pool(u: Array, kernel_size: tuple[int, ...], stride: tuple[int, ...], padding: Optional=None, mean_fn: str="arithmetic", **kwargs) -> Array:
+
+    # get mean function
+    mean_fn = get_mean_function(mean_fn=mean_fn)
+
+    # create mean kernel
+    @kex.kmap(kernel_size=kernel_size, strides=stride, padding=padding, **kwargs)
+    def kernel_fn(x):
+        return mean_fn(x)
+
+    # apply kernel function
+    return kernel_fn(u)
+
+
+def get_mean_function(mean_fn: str="arithmetic") -> Callable:
+
+    if mean_fn.lower() == "arithmetic":
+        fn = lambda x: jnp.mean(x)
+        return fn
+    elif mean_fn.lower() == "geometric":
+        fn = lambda x: jnp.exp(jnp.mean(jnp.log(x)))
+        return fn
+    elif mean_fn.lower() == "harmonic":
+        fn = lambda x: jnp.reciprocal(jnp.mean(jnp.reciprocal(x)))
+        return fn
+    elif mean_fn.lower() == "quadratic":
+        fn = lambda x: jnp.sqrt(jnp.mean(jnp.square(x)))
+        return fn
+    else:
+        msg = "Unrecognized function"
+        msg += f"\n{mean_fn}"
+        raise ValueError(msg)
+
+def avg_linear(x, y):
+    return 0.5 * (x + y )
+
+def avg_harmonic(x, y):
+    x_ = jnp.reciprocal(x)
+    y_ = jnp.reciprocal(y)
+    return jnp.reciprocal(avg_linear(x_, y_))
+
+def avg_geometric(x, y):
+    x_ = jnp.log(x)
+    y_ = jnp.log(y)
+    return jnp.exp(avg_linear(x_, y_))
+
+def avg_quadratic(x, y):
+    x_ = jnp.square(x)
+    y_ = jnp.square(y)
+    return jnp.sqrt(avg_linear(x_, y_))
