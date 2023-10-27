@@ -1,0 +1,129 @@
+[tool.poetry]
+name = "finitevolx"
+version = "0.0.1"
+description = "Finite Volume tools in JAX."
+authors = ["Juan Emmanuel Johnson <jemanjohnson34@gmail.com>", "Takaya Uchida"]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/jejjohnson/finitevolx"
+keywords = ["finite-volume", "arakawa", "jax"]
+classifiers = [
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.9",
+    "Operating System :: MACOS/Linux",
+    "Natural Language :: English",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Science/Research",
+    "Development Status :: 2 - Pre-Alpha copy",
+
+]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.12"
+jaxtyping = "^0.2.15"
+beartype = "^0.13.1"
+jax = ">=0.4.10"
+jaxlib = ">=0.4.10"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.3.1"
+pytest-cov = "^4.0.0"
+pre-commit = "^3.2.2"
+beartype = "^0.13.1"
+ruff = "^0.0.263"
+black = "^23.3.0"
+isort = "^5.12.0"
+
+
+[tool.poetry.group.exp.dependencies]
+wandb = "^0.15.0"
+loguru = "^0.7.0"
+hydra-core = "^1.3.2"
+matplotlib = "^3.7.1"
+seaborn = "^0.12.2"
+autoroot = "^1.0.0"
+
+
+[tool.poetry.group.jlab.dependencies]
+ipykernel = "^6.22.0"
+autoroot = "^1.0.0"
+
+
+[tool.poetry.group.jbook.dependencies]
+jupyter-book = "^0.15.1"
+ghp-import = "^2.1.0"
+sphinx-proof = "^0.1.3"
+jupytext = "^1.14.5"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.pytest.ini_options]
+testpaths = ["oceanbench"]
+
+
+[tool.ruff] # https://github.com/charliermarsh/ruff
+fix = true
+cache-dir = "~/.cache/ruff"
+dummy-variable-rgx = "^_$"
+exclude = ["docs/"]
+ignore-init-module-imports = true
+line-length = 88
+select = [
+    # pyflakes
+    "F",
+    # pycodestyle
+    "E",
+    "W",
+    # flake8-2020
+    "YTT",
+    # flake8-bugbear
+    "B",
+    # flake8-quotes
+    "Q",
+    # pylint
+    "PLE",
+    "PLR",
+    "PLW",
+    # misc lints
+    "PIE",
+    # flake8-pyi
+    "PYI",
+    # tidy imports
+    "TID",
+    # implicit string concatenation
+    "ISC",
+]
+ignore = [
+    # space before : (needed for how black formats slicing)
+    # "E203",  # not yet implemented
+    # module level import not at top of file
+    "E402",
+    # do not assign a lambda expression, use a def
+    "E731",
+    "E501",
+    "PGH001",
+    "RET504",
+    "S101",
+    "F722",
+    'PLR2004',
+    "PLR0913",
+]
+unfixable = ["ERA001", "F401", "F841", "T201", "T203"]
+src = ["finitevolx"]
+target-version = "py38"
+
+
+[tool.isort]
+profile = "black"
+combine_as_imports = true
+force_sort_within_sections = true
+force_grid_wrap = 2
+skip = 'docs'
