@@ -5,7 +5,7 @@ import functools as ft
 
 from finitevolx._src.reconstruct.upwind import upwind_1pt, plusminus, upwind_3pt, upwind_2pt_bnds, upwind_3pt_bnds, \
     upwind_1pt_bnds, upwind_5pt
-from finitevolx._src.masks.masks import VelocityMask
+from finitevolx._src.masks.masks import FaceMask
 
 
 
@@ -15,7 +15,7 @@ def tracer_flux_1pt(q: Array, u: Array, dim: int) -> Array:
     flux = u_pos * qi_left_1pt + u_neg * qi_right_1pt
     return flux
 
-def tracer_flux_1pt_mask(q: Array, u: Array, dim: int, u_mask: VelocityMask) -> Array:
+def tracer_flux_1pt_mask(q: Array, u: Array, dim: int, u_mask: FaceMask) -> Array:
     return u_mask.distbound1 * tracer_flux_1pt(q=q, u=u, dim=dim)
 
 
@@ -50,7 +50,7 @@ def tracer_flux_3pt_mask(
     q: Array,
     u: Array,
     dim: int,
-    u_mask: VelocityMask,
+    u_mask: FaceMask,
     method: str = "linear",
 ):
     # get padding
@@ -130,7 +130,7 @@ def tracer_flux_5pt_mask(
     q: Array,
     u: Array,
     dim: int,
-    u_mask: VelocityMask,
+    u_mask: FaceMask,
     method: str = "linear",
 ):
     """Tasks - ++"""
