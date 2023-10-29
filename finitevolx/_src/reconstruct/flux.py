@@ -5,6 +5,7 @@ import functools as ft
 
 from finitevolx._src.reconstruct.upwind import upwind_1pt, plusminus, upwind_3pt, upwind_2pt_bnds, upwind_3pt_bnds, \
     upwind_1pt_bnds, upwind_5pt
+from finitevolx._src.masks.masks import VelocityMask
 
 
 
@@ -14,8 +15,8 @@ def tracer_flux_1pt(q: Array, u: Array, dim: int) -> Array:
     flux = u_pos * qi_left_1pt + u_neg * qi_right_1pt
     return flux
 
-def tracer_flux_1pt_mask(q: Array, u: Array, dim: int, u_mask1: Array) -> Array:
-    return u_mask1 * tracer_flux_1pt(q=q, u=u, dim=dim)
+def tracer_flux_1pt_mask(q: Array, u: Array, dim: int, u_mask: VelocityMask) -> Array:
+    return u_mask.distbound1 * tracer_flux_1pt(q=q, u=u, dim=dim)
 
 
 def tracer_flux_3pt(q: Array, u: Array, dim: int, method: str = "linear") -> Array:
@@ -49,8 +50,7 @@ def tracer_flux_3pt_mask(
     q: Array,
     u: Array,
     dim: int,
-    u_mask1: Array,
-    u_mask2plus: Array,
+    u_mask: VelocityMask,
     method: str = "linear",
 ):
     # get padding
@@ -83,7 +83,7 @@ def tracer_flux_3pt_mask(
     flux_3pt = u_pos * qi_left_i_3pt + u_neg * qi_right_i_3pt
 
     # calculate total flux
-    flux = flux_1pt * u_mask1 + flux_3pt * u_mask2plus
+    flux = flux_1pt * u_mask.distbound1 + flux_3pt * u_mask.distbound2plus
 
     return flux
 
@@ -130,9 +130,7 @@ def tracer_flux_5pt_mask(
     q: Array,
     u: Array,
     dim: int,
-    u_mask1: Array,
-    u_mask2: Array,
-    u_mask3plus: Array,
+    u_mask: VelocityMask,
     method: str = "linear",
 ):
     """Tasks - ++"""
@@ -180,6 +178,10 @@ def tracer_flux_5pt_mask(
     flux_5pt = u_pos * qi_left_i_5pt + u_neg * qi_right_i_5pt
 
     # calculate total flux
-    flux = flux_1pt * u_mask1 + flux_3pt * u_mask2 + flux_5pt * u_mask3plus
+    flux = (
+            flux_1pt * u_mask.distbound1 +
+            flux_3pt * u_mask.distbound2 +
+            flux_5pt * u_mask.distbound3plus
+    )
 
     return flux
