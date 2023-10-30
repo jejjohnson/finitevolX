@@ -1,3 +1,4 @@
+"""None"""
 import pytest
 from finitevolx._src.masks.utils import init_mask_rect, init_mask_realish
 
