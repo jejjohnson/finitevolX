@@ -37,20 +37,20 @@ def get_mean_function(mean_fn: str="arithmetic") -> Callable:
         msg += f"\n{mean_fn}"
         raise ValueError(msg)
 
-def avg_linear(x, y):
+def avg_arithmetic(x, y):
     return 0.5 * (x + y )
 
 def avg_harmonic(x, y):
     x_ = jnp.reciprocal(x)
     y_ = jnp.reciprocal(y)
-    return jnp.reciprocal(avg_linear(x_, y_))
+    return jnp.reciprocal(avg_arithmetic(x_, y_))
 
 def avg_geometric(x, y):
     x_ = jnp.log(x)
     y_ = jnp.log(y)
-    return jnp.exp(avg_linear(x_, y_))
+    return jnp.exp(avg_arithmetic(x_, y_))
 
 def avg_quadratic(x, y):
     x_ = jnp.square(x)
     y_ = jnp.square(y)
-    return jnp.sqrt(avg_linear(x_, y_))
+    return jnp.sqrt(avg_arithmetic(x_, y_))

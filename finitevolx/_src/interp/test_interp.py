@@ -1,5 +1,5 @@
 import pytest
-from finitevolx._src.interp.interp import avg_pool, avg_linear, avg_geometric, avg_harmonic, avg_quadratic
+from finitevolx._src.interp.interp import avg_pool, avg_arithmetic, avg_geometric, avg_harmonic, avg_quadratic
 import jax.numpy as jnp
 import numpy as np
 import jax
@@ -38,7 +38,7 @@ def test_x_average_1D_arithmetic(u_1d_randn):
 
     u = u_1d_randn
 
-    u_on_x = avg_linear(u[1:], u[:-1])
+    u_on_x = avg_arithmetic(u[1:], u[:-1])
     u_on_x_ = avg_pool(u, kernel_size=(2,), stride=(1,), padding="valid", mean_fn="arithmetic")
 
     np.testing.assert_array_almost_equal(u_on_x, u_on_x_)
@@ -72,12 +72,12 @@ def test_xy_average_2D_arithmetic(u_2d_randn):
 
     u = u_2d_randn
 
-    u_on_x = avg_linear(u[1:], u[:-1])
+    u_on_x = avg_arithmetic(u[1:], u[:-1])
     u_on_x_ = avg_pool(u, kernel_size=(2,1), stride=(1,1), padding="valid", mean_fn="arithmetic")
 
     np.testing.assert_array_almost_equal(u_on_x, u_on_x_)
 
-    u_on_y = avg_linear(u[:,1:], u[:, :-1])
+    u_on_y = avg_arithmetic(u[:, 1:], u[:, :-1])
     u_on_y_ = avg_pool(u, kernel_size=(1,2), stride=(1,1), padding="valid", mean_fn="arithmetic")
 
     np.testing.assert_array_almost_equal(u_on_y, u_on_y_)
@@ -129,8 +129,8 @@ def test_center_average_2D_arithmetic(u_2d_randn):
 
     u = u_2d_randn
 
-    u_on_x = avg_linear(u[1:], u[:-1])
-    u_on_c = avg_linear(u_on_x[:, 1:], u_on_x[:, :-1])
+    u_on_x = avg_arithmetic(u[1:], u[:-1])
+    u_on_c = avg_arithmetic(u_on_x[:, 1:], u_on_x[:, :-1])
     u_on_c_ = avg_pool(u, kernel_size=(2,2), stride=(1,1), padding="valid", mean_fn="arithmetic")
 
     np.testing.assert_array_almost_equal(u_on_c, u_on_c_)

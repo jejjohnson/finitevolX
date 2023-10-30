@@ -4,13 +4,13 @@ from jaxtyping import Array
 import jax
 import jax.numpy as jnp
 from jax.nn import relu
-from finitevolx._src.reconstruct.weno import (
+from finitevolx._src.reconstructions.weno import (
     weno_3pts,
     weno_3pts_improved,
     weno_5pts,
     weno_5pts_improved,
 )
-from finitevolx._src.reconstruct.linear import (
+from finitevolx._src.reconstructions.linear import (
     linear_2pts,
     linear_3pts_left,
     linear_5pts_left,
@@ -18,7 +18,10 @@ from finitevolx._src.reconstruct.linear import (
 
 
 def plusminus(u: Array, way: int = 1) -> tp.Tuple[Array, Array]:
-    u_pos = relu(float(way) * u)
+    msg = "Way should be 1 or -1."
+    msg += f"\nWay: {way}"
+    assert way in [1, -1], msg
+    u_pos = float(way) * relu(float(way) * u)
     u_neg = u - u_pos
     return u_pos, u_neg
 
@@ -48,25 +51,6 @@ def upwind_1pt(q: Array, dim: int) -> tp.Tuple[Array, Array]:
     return qi_left, qi_right
 
 
-def upwind_1pt_bnds(q: Array, dim: int) -> tp.Tuple[Array, Array]:
-    # get number of points
-    num_pts = q.shape[dim]
-
-    # define slicers
-    dyn_slicer = ft.partial(jax.lax.dynamic_slice_in_dim, axis=dim)
-
-    # interior slices
-    q0_left_b = dyn_slicer(q, 0, 1)
-    q1_left_b = dyn_slicer(q, 1, 1)
-    q0_right_b = dyn_slicer(q, -1, 1)
-    q1_right_b = dyn_slicer(q, -2, 1)
-
-    # DO WENO Interpolation
-    qi_left_b = linear_2pts(q0_left_b, q1_left_b)
-    qi_right_b = linear_2pts(q0_right_b, q1_right_b)
-
-    return qi_left_b, qi_right_b
-
 
 def upwind_2pt_bnds(
     q: Array, dim: int, method: str = "linear"
@@ -82,9 +66,6 @@ def upwind_2pt_bnds(
         qi_right (Array): the spliced array on the left side
             shape[dim] = N-2
     """
-
-    # get number of points
-    num_pts = q.shape[dim]
 
     # define slicers
     dyn_slicer = ft.partial(jax.lax.dynamic_slice_in_dim, axis=dim)

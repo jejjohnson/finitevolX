@@ -1,5 +1,6 @@
 import typing as tp
 from jaxtyping import Array
+import jax
 import jax.numpy as jnp
 
 from finitevolx._src.interp.interp import avg_pool
@@ -11,6 +12,12 @@ class NodeMask(tp.NamedTuple):
     distbound1: Array
     irrbound_xids: Array
     irrbound_yids: Array
+    def __getitem__(self, item):
+
+        mask = jax.tree_util.tree_map(lambda x: x[item], self)
+
+        return mask
+
 
 class FaceMask(tp.NamedTuple):
     values: Array
@@ -19,12 +26,22 @@ class FaceMask(tp.NamedTuple):
     distbound2: Array
     distbound2plus: Array
     distbound3plus: Array
+    def __getitem__(self, item):
+
+        mask = jax.tree_util.tree_map(lambda x: x[item], self)
+
+        return mask
 
 class CenterMask(tp.NamedTuple):
     values: Array
     not_values: Array
     values_interior: Array
     distbound1: Array
+    def __getitem__(self, item):
+
+        mask = jax.tree_util.tree_map(lambda x: x[item], self)
+
+        return mask
 
 
 class MaskGrid(tp.NamedTuple):
