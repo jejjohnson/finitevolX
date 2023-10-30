@@ -144,9 +144,6 @@ def upwind_3pt_bnds(q: Array, dim: int, method: str = "weno") -> tp.Tuple[Array,
             shape[dim] = N-2
     """
 
-    # get number of points
-    num_pts = q.shape[dim]
-
     # define slicers
     dyn_slicer = ft.partial(jax.lax.dynamic_slice_in_dim, axis=dim)
 

@@ -163,7 +163,6 @@ def reconstruct_5pt(
 def _reconstruct_5pt_nomask(
     q: Array, u: Array, dim: int, method: str = "linear"
 ) -> Array:
-
     # define slicers
     dyn_slicer = ft.partial(jax.lax.dynamic_slice_in_dim, axis=dim)
 
