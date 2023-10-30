@@ -45,5 +45,11 @@ jobs:
       - name: Run Tests
         run: poetry run pytest -v --cov=./finitevolx --cov-report=xml:./coverage.xml
 
-      - name: Codecov
-        uses: codecov/codecov-action@v3.1.0
+      - name: Upload code coverage
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.xml
+          name: finitevolx
+          flags: unittests
+          env_vars: OS,PYTHON
