@@ -75,13 +75,15 @@ class MaskGrid(tp.NamedTuple):
         psi_irrbound_xids = jnp.where(psi_irrbound_xids)
 
         psi_distbound1 = jnp.logical_and(
-            avg_pool(node.astype(mtype), (3, 3), stride=(1, 1), padding=(1, 1)) < 17 / 18,
+            avg_pool(node.astype(mtype), (3, 3), stride=(1, 1), padding=(1, 1))
+            < 17 / 18,
             node,
         )
 
         # TRACER
         q_distbound1 = jnp.logical_and(
-            avg_pool(center, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)) < 17 / 18,
+            avg_pool(center, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+            < 17 / 18,
             center,
         )
         q_interior = jnp.logical_and(jnp.logical_not(psi_distbound1), node)
@@ -107,8 +109,12 @@ class MaskGrid(tp.NamedTuple):
             v_distbound2plus,
         )
 
-        u_distbound3plus = jnp.logical_and(jnp.logical_not(u_distbound2), u_distbound2plus)
-        v_distbound3plus = jnp.logical_and(jnp.logical_not(v_distbound2), v_distbound2plus)
+        u_distbound3plus = jnp.logical_and(
+            jnp.logical_not(u_distbound2), u_distbound2plus
+        )
+        v_distbound3plus = jnp.logical_and(
+            jnp.logical_not(v_distbound2), v_distbound2plus
+        )
 
         # create variable mask
         node = NodeMask(

@@ -48,12 +48,14 @@ def test_upwind_1pt():
     qi_left_, qi_right_ = U_RAND[:, :-1], U_RAND[:, 1:]
 
     np.testing.assert_array_equal(qi_left_, qi_left)
+    np.testing.assert_array_equal(qi_right_, qi_right)
 
     # Z-AXIS
     qi_left, qi_right = upwind_1pt(U_RAND, dim=2)
     qi_left_, qi_right_ = U_RAND[..., :-1], U_RAND[..., 1:]
 
     np.testing.assert_array_equal(qi_left_, qi_left)
+    np.testing.assert_array_equal(qi_right_, qi_right)
 
 
 @pytest.mark.parametrize("method, dim", METHOD_DIMS)

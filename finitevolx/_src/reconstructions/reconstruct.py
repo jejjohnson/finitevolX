@@ -37,7 +37,9 @@ def reconstruct(
         raise ValueError(msg)
 
 
-def reconstruct_1pt(q: Array, u: Array, dim: int, u_mask: Optional[FaceMask] = None) -> Array:
+def reconstruct_1pt(
+    q: Array, u: Array, dim: int, u_mask: Optional[FaceMask] = None
+) -> Array:
     qi_left_1pt, qi_right_1pt = upwind_1pt(q=q, dim=dim)
     u_pos, u_neg = plusminus(u)
     flux = u_pos * qi_left_1pt + u_neg * qi_right_1pt
@@ -59,7 +61,9 @@ def reconstruct_3pt(
         return _reconstruct_3pt_nomask(q=q, u=u, dim=dim, method=method)
 
 
-def _reconstruct_3pt_nomask(q: Array, u: Array, dim: int, method: str = "linear") -> Array:
+def _reconstruct_3pt_nomask(
+    q: Array, u: Array, dim: int, method: str = "linear"
+) -> Array:
     # get number of points
     num_pts = q.shape[dim]
 
@@ -156,9 +160,9 @@ def reconstruct_5pt(
         return _reconstruct_5pt_nomask(q=q, u=u, dim=dim, method=method)
 
 
-def _reconstruct_5pt_nomask(q: Array, u: Array, dim: int, method: str = "linear") -> Array:
-    # get number of points
-    num_pts = q.shape[dim]
+def _reconstruct_5pt_nomask(
+    q: Array, u: Array, dim: int, method: str = "linear"
+) -> Array:
 
     # define slicers
     dyn_slicer = ft.partial(jax.lax.dynamic_slice_in_dim, axis=dim)
@@ -179,8 +183,12 @@ def _reconstruct_5pt_nomask(q: Array, u: Array, dim: int, method: str = "linear"
     qi_left_0, qi_right_m = upwind_2pt_bnds(q=q, dim=dim)
 
     # concatenate
-    qi_left = jnp.concatenate([qi_left_0, qi_left_b0, qi_left_interior, qi_left_m], axis=dim)
-    qi_right = jnp.concatenate([qi_right_0, qi_right_interior, qi_right_bm, qi_right_m], axis=dim)
+    qi_left = jnp.concatenate(
+        [qi_left_0, qi_left_b0, qi_left_interior, qi_left_m], axis=dim
+    )
+    qi_right = jnp.concatenate(
+        [qi_right_0, qi_right_interior, qi_right_bm, qi_right_m], axis=dim
+    )
 
     # calculate +ve and -ve points
     u_pos, u_neg = plusminus(u)

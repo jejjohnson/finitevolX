@@ -7,7 +7,9 @@ from finitevolx._src.constants import GRAVITY
 from finitevolx._src.operators.operators import difference
 
 
-def geostrophic_gradient(u: Array, dx: float | Array, dy: float | Array) -> tuple[Array, Array]:
+def geostrophic_gradient(
+    u: Array, dx: float | Array, dy: float | Array
+) -> tuple[Array, Array]:
     """Calculates the geostrophic gradient for a staggered grid
 
     Equation:
@@ -89,9 +91,13 @@ def relative_vorticity(
             Size = [Nx-1,Ny-1]
     """
     # ∂xv
-    dv_dx: Float[Array, "Nx-1 Ny-1"] = difference(u=v, axis=0, step_size=dx, derivative=1)
+    dv_dx: Float[Array, "Nx-1 Ny-1"] = difference(
+        u=v, axis=0, step_size=dx, derivative=1
+    )
     # ∂yu
-    du_dy: Float[Array, "Nx-1 Ny-1"] = difference(u=u, axis=1, step_size=dy, derivative=1)
+    du_dy: Float[Array, "Nx-1 Ny-1"] = difference(
+        u=u, axis=1, step_size=dy, derivative=1
+    )
 
     return dv_dx - du_dy
 
