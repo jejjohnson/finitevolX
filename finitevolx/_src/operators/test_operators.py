@@ -1,8 +1,13 @@
-import pytest
-import numpy as np
-import jax.numpy as jnp
-from finitevolx._src.operators.operators import difference, laplacian
 import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
+
+from finitevolx._src.operators.operators import (
+    difference,
+    laplacian,
+)
+
 jax.config.update("jax_enable_x64", True)
 
 rng = np.random.RandomState(123)
@@ -158,4 +163,3 @@ def test_lap_random(u_2d_randn):
     lap_u = laplacian(u_2d_randn, step_size=step_size)
 
     np.testing.assert_array_almost_equal(lap_u_np, lap_u)
-

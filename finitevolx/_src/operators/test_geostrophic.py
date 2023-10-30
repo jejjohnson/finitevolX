@@ -1,11 +1,17 @@
-from finitevolx._src.operators.operators import difference
-from finitevolx._src.operators.geostrophic import  geostrophic_gradient, divergence, relative_vorticity
 import numpy as np
+
+from finitevolx._src.operators.geostrophic import (
+    divergence,
+    geostrophic_gradient,
+    relative_vorticity,
+)
+from finitevolx._src.operators.operators import difference
 
 rng = np.random.RandomState(123)
 
+
 def test_geostrophic_gradient():
-    psi = rng.randn(50,25)
+    psi = rng.randn(50, 25)
     dx, dy = 0.1, 0.2
 
     # gradient froms scratch
@@ -18,9 +24,10 @@ def test_geostrophic_gradient():
     np.testing.assert_array_almost_equal(u_, u)
     np.testing.assert_array_almost_equal(v_, v)
 
+
 def test_divergence():
-    u = rng.randn(50,25)
-    v = rng.randn(49,26)
+    u = rng.randn(50, 25)
+    v = rng.randn(49, 26)
 
     dx, dy = 0.1, 0.2
 
@@ -35,8 +42,8 @@ def test_divergence():
 
 
 def test_relative_vorticity():
-    u = rng.randn(50,26)
-    v = rng.randn(51,25)
+    u = rng.randn(50, 26)
+    v = rng.randn(51, 25)
 
     dx, dy = 0.1, 0.2
 
@@ -48,4 +55,3 @@ def test_relative_vorticity():
     vort_r = relative_vorticity(u, v, dx=dx, dy=dy)
 
     np.testing.assert_array_almost_equal(vort_r_, vort_r)
-

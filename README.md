@@ -1,5 +1,6 @@
 # Finite Volume Tools in JAX (In Progress)
-[![codecov](https://codecov.io/github/jejjohnson/finitevolx/branch/main/graph/badge.svg?token=VD45Y4HLWV)](https://codecov.io/github/jejjohnson/finitevolX) 
+[![CodeFactor](https://www.codefactor.io/repository/github/jejjohnson/finitevolx/badge)](https://www.codefactor.io/repository/github/jejjohnson/finitevolx)
+[![codecov](https://codecov.io/gh/jejjohnson/finitevolX/branch/main/graph/badge.svg?token=YGPQQEAK91)](https://codecov.io/gh/jejjohnson/finitevolX)
 
 > This package has some tools for finite volume methods in JAX.
 > We use the staggered grids (i.e. Arakawa Grids) to define variables an the nodes, faces, and centers.

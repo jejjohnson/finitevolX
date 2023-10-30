@@ -1,7 +1,8 @@
 import typing as tp
-from jaxtyping import Array
+
 import jax
 import jax.numpy as jnp
+from jaxtyping import Array
 
 from finitevolx._src.interp.interp import avg_pool
 
@@ -12,8 +13,8 @@ class NodeMask(tp.NamedTuple):
     distbound1: Array
     irrbound_xids: Array
     irrbound_yids: Array
-    def __getitem__(self, item):
 
+    def __getitem__(self, item):
         mask = jax.tree_util.tree_map(lambda x: x[item], self)
 
         return mask
@@ -26,19 +27,20 @@ class FaceMask(tp.NamedTuple):
     distbound2: Array
     distbound2plus: Array
     distbound3plus: Array
-    def __getitem__(self, item):
 
+    def __getitem__(self, item):
         mask = jax.tree_util.tree_map(lambda x: x[item], self)
 
         return mask
+
 
 class CenterMask(tp.NamedTuple):
     values: Array
     not_values: Array
     values_interior: Array
     distbound1: Array
-    def __getitem__(self, item):
 
+    def __getitem__(self, item):
         mask = jax.tree_util.tree_map(lambda x: x[item], self)
 
         return mask
@@ -52,7 +54,6 @@ class MaskGrid(tp.NamedTuple):
 
     @classmethod
     def init_mask(cls, mask: Array, location: str = "node"):
-
         mtype = mask.dtype
 
         if location == "center":
@@ -69,57 +70,45 @@ class MaskGrid(tp.NamedTuple):
         # VARIABLE
         psi_irrbound_xids = jnp.logical_and(
             not_psi[1:-1, 1:-1],
-            avg_pool(node, kernel_size=(3, 3), stride=(1, 1), padding=(0, 0)) > 1 / 18
+            avg_pool(node, kernel_size=(3, 3), stride=(1, 1), padding=(0, 0)) > 1 / 18,
         )
         psi_irrbound_xids = jnp.where(psi_irrbound_xids)
 
         psi_distbound1 = jnp.logical_and(
             avg_pool(node.astype(mtype), (3, 3), stride=(1, 1), padding=(1, 1)) < 17 / 18,
-            node
+            node,
         )
 
         # TRACER
         q_distbound1 = jnp.logical_and(
             avg_pool(center, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)) < 17 / 18,
-            center
+            center,
         )
         q_interior = jnp.logical_and(jnp.logical_not(psi_distbound1), node)
 
         u_distbound1 = jnp.logical_and(
             avg_pool(u, kernel_size=(3, 1), stride=(1, 1), padding=(1, 0)) < 5 / 6,
-            u
+            u,
         )
         v_distbound1 = jnp.logical_and(
             avg_pool(v, kernel_size=(1, 3), stride=(1, 1), padding=(0, 1)) < 5 / 6,
-            v
+            v,
         )
 
-        u_distbound2plus = jnp.logical_and(
-            jnp.logical_not(u_distbound1),
-            u
-        )
-        v_distbound2plus = jnp.logical_and(
-            jnp.logical_not(v_distbound1),
-            v
-        )
+        u_distbound2plus = jnp.logical_and(jnp.logical_not(u_distbound1), u)
+        v_distbound2plus = jnp.logical_and(jnp.logical_not(v_distbound1), v)
 
         u_distbound2 = jnp.logical_and(
             avg_pool(u, kernel_size=(5, 1), stride=(1, 1), padding=(2, 0)) < 9 / 10,
-            u_distbound2plus
+            u_distbound2plus,
         )
         v_distbound2 = jnp.logical_and(
             avg_pool(v, kernel_size=(1, 5), stride=(1, 1), padding=(0, 2)) < 9 / 10,
-            v_distbound2plus
+            v_distbound2plus,
         )
 
-        u_distbound3plus = jnp.logical_and(
-            jnp.logical_not(u_distbound2),
-            u_distbound2plus
-        )
-        v_distbound3plus = jnp.logical_and(
-            jnp.logical_not(v_distbound2),
-            v_distbound2plus
-        )
+        u_distbound3plus = jnp.logical_and(jnp.logical_not(u_distbound2), u_distbound2plus)
+        v_distbound3plus = jnp.logical_and(jnp.logical_not(v_distbound2), v_distbound2plus)
 
         # create variable mask
         node = NodeMask(
@@ -158,9 +147,9 @@ class MaskGrid(tp.NamedTuple):
             distbound3plus=v_distbound3plus.astype(mtype),
         )
 
-        return cls(
-            node=node, face_u=u, face_v=v, center=center
-        )
+        return cls(node=node, face_u=u, face_v=v, center=center)
+
+
 def init_masks_from_center(mask: Array):
     center = jnp.copy(mask)
 
@@ -169,7 +158,6 @@ def init_masks_from_center(mask: Array):
     face_v = avg_pool(center, kernel_size=(1, 2), stride=(1, 1), padding=(0, 1)) > 3 / 4
 
     return center, face_u, face_v, node
-
 
 
 def init_masks_from_node(mask: Array):

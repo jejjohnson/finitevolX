@@ -1,13 +1,21 @@
 import itertools
 
-import pytest
-import numpy as np
-import jax.numpy as jnp
-from finitevolx._src.reconstructions.reconstruct import (
-    reconstruct_1pt, reconstruct_3pt, reconstruct_5pt, reconstruct
-)
-from finitevolx._src.masks.utils import init_mask_rect, init_mask_realish
 import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
+
+from finitevolx._src.masks.utils import (
+    init_mask_realish,
+    init_mask_rect,
+)
+from finitevolx._src.reconstructions.reconstruct import (
+    reconstruct,
+    reconstruct_1pt,
+    reconstruct_3pt,
+    reconstruct_5pt,
+)
+
 jax.config.update("jax_enable_x64", True)
 
 MASKS_RECT = init_mask_rect(6, "node")
@@ -24,9 +32,6 @@ METHODS_DIMS = list(itertools.product(METHODS, DIMS))
 METHODS_NUMPTS = list(itertools.product(METHODS, NUM_PTS))
 
 
-
-
-
 def test_reconstruct_1pt_nomask():
     # take interior points
     u = U_ONES[1:-1]
@@ -35,6 +40,7 @@ def test_reconstruct_1pt_nomask():
 
     assert flux.shape == u.shape
     np.testing.assert_array_almost_equal(flux, np.ones_like(flux))
+
 
 def test_reconstruct_1pt_mask():
     # take interior points
@@ -48,9 +54,7 @@ def test_reconstruct_1pt_mask():
     np.testing.assert_array_almost_equal(flux, true_flux)
 
 
-@pytest.mark.parametrize(
-    "method", METHODS
-)
+@pytest.mark.parametrize("method", METHODS)
 def test_reconstruct_3pt_mask_u(method):
     # take interior points
     u = jax.lax.slice_in_dim(U_ONES, axis=0, start_index=1, limit_index=-1)
@@ -64,9 +68,8 @@ def test_reconstruct_3pt_mask_u(method):
     assert flux.shape == u.shape
     np.testing.assert_array_equal(flux, jnp.ones_like(flux))
 
-@pytest.mark.parametrize(
-    "method", METHODS
-)
+
+@pytest.mark.parametrize("method", METHODS)
 def test_reconstruct_3pt_mask_v(method):
     # take interior points
     v = jax.lax.slice_in_dim(V_ONES, axis=1, start_index=1, limit_index=-1)
@@ -80,10 +83,7 @@ def test_reconstruct_3pt_mask_v(method):
     np.testing.assert_array_equal(flux, jnp.ones_like(flux))
 
 
-@pytest.mark.parametrize(
-    "method",
-    ["linear","weno", "wenoz"]
-)
+@pytest.mark.parametrize("method", ["linear", "weno", "wenoz"])
 def test_reconstruct_3pt_nomask(method):
     # take interior points
     u = U_ONES[1:-1]
@@ -94,12 +94,9 @@ def test_reconstruct_3pt_nomask(method):
     assert flux.shape == u.shape
     np.testing.assert_array_equal(flux, jnp.ones_like(flux))
 
-@pytest.mark.parametrize(
-    "method",
-    ["linear","weno", "wenoz"]
-)
-def test_reconstruct_5pt_mask(method):
 
+@pytest.mark.parametrize("method", ["linear", "weno", "wenoz"])
+def test_reconstruct_5pt_mask(method):
     # take interior
     u = U_ONES[1:-1]
     u_mask = MASKS_RECT.face_u[1:-1]
@@ -111,12 +108,8 @@ def test_reconstruct_5pt_mask(method):
     np.testing.assert_array_equal(flux, jnp.ones_like(flux))
 
 
-@pytest.mark.parametrize(
-    "method",
-    ["linear","weno", "wenoz"]
-)
+@pytest.mark.parametrize("method", ["linear", "weno", "wenoz"])
 def test_reconstruct_5pt_nomask(method):
-
     # take interior
     u = U_ONES[1:-1]
 
@@ -127,10 +120,7 @@ def test_reconstruct_5pt_nomask(method):
     np.testing.assert_array_equal(flux, jnp.ones_like(flux))
 
 
-@pytest.mark.parametrize(
-    "method,num_pts",
-    METHODS_NUMPTS
-)
+@pytest.mark.parametrize("method,num_pts", METHODS_NUMPTS)
 def test_reconstruct_nomask_u(method, num_pts):
     # take interior points
     u = U_ONES.copy()
@@ -149,10 +139,8 @@ def test_reconstruct_nomask_u(method, num_pts):
     assert flux.shape == u.shape, msg
     np.testing.assert_array_equal(flux, jnp.ones_like(flux))
 
-@pytest.mark.parametrize(
-    "method,num_pts",
-    METHODS_NUMPTS
-)
+
+@pytest.mark.parametrize("method,num_pts", METHODS_NUMPTS)
 def test_reconstruct_nomask_v(method, num_pts):
     # take interior points
     v = V_ONES.copy()
@@ -171,10 +159,8 @@ def test_reconstruct_nomask_v(method, num_pts):
     assert flux.shape == v.shape, msg
     np.testing.assert_array_equal(flux, jnp.ones_like(flux))
 
-@pytest.mark.parametrize(
-    "method,num_pts",
-    METHODS_NUMPTS
-)
+
+@pytest.mark.parametrize("method,num_pts", METHODS_NUMPTS)
 def test_reconstruct_mask_u(method, num_pts):
     # take interior points
     u = U_ONES.copy()
@@ -193,10 +179,8 @@ def test_reconstruct_mask_u(method, num_pts):
     assert flux.shape == u.shape, msg
     np.testing.assert_array_equal(flux, true_flux)
 
-@pytest.mark.parametrize(
-    "method,num_pts",
-    METHODS_NUMPTS
-)
+
+@pytest.mark.parametrize("method,num_pts", METHODS_NUMPTS)
 def test_reconstruct_mask_v(method, num_pts):
     # take interior points
     v = V_ONES.copy()
@@ -216,8 +200,3 @@ def test_reconstruct_mask_v(method, num_pts):
     msg += f"Shape: {true_flux.shape} | {v.shape}"
     assert true_flux.shape == v.shape, msg
     np.testing.assert_array_equal(flux, true_flux)
-
-
-
-
-

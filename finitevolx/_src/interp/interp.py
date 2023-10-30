@@ -1,11 +1,22 @@
-from typing import Iterable, Optional, Callable
+from typing import (
+    Callable,
+    Iterable,
+    Optional,
+)
+
+import jax.numpy as jnp
 from jaxtyping import Array
 import kernex as kex
-import jax.numpy as jnp
 
 
-def avg_pool(u: Array, kernel_size: tuple[int, ...], stride: tuple[int, ...], padding: Optional=None, mean_fn: str="arithmetic", **kwargs) -> Array:
-
+def avg_pool(
+    u: Array,
+    kernel_size: tuple[int, ...],
+    stride: tuple[int, ...],
+    padding: Optional = None,
+    mean_fn: str = "arithmetic",
+    **kwargs,
+) -> Array:
     # get mean function
     mean_fn = get_mean_function(mean_fn=mean_fn)
 
@@ -18,8 +29,7 @@ def avg_pool(u: Array, kernel_size: tuple[int, ...], stride: tuple[int, ...], pa
     return kernel_fn(u)
 
 
-def get_mean_function(mean_fn: str="arithmetic") -> Callable:
-
+def get_mean_function(mean_fn: str = "arithmetic") -> Callable:
     if mean_fn.lower() == "arithmetic":
         fn = lambda x: jnp.mean(x)
         return fn
@@ -37,18 +47,22 @@ def get_mean_function(mean_fn: str="arithmetic") -> Callable:
         msg += f"\n{mean_fn}"
         raise ValueError(msg)
 
+
 def avg_arithmetic(x, y):
-    return 0.5 * (x + y )
+    return 0.5 * (x + y)
+
 
 def avg_harmonic(x, y):
     x_ = jnp.reciprocal(x)
     y_ = jnp.reciprocal(y)
     return jnp.reciprocal(avg_arithmetic(x_, y_))
 
+
 def avg_geometric(x, y):
     x_ = jnp.log(x)
     y_ = jnp.log(y)
     return jnp.exp(avg_arithmetic(x_, y_))
+
 
 def avg_quadratic(x, y):
     x_ = jnp.square(x)

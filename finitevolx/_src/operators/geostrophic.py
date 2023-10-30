@@ -1,6 +1,11 @@
-from jaxtyping import Array, Float
+from jaxtyping import (
+    Array,
+    Float,
+)
+
+from finitevolx._src.constants import GRAVITY
 from finitevolx._src.operators.operators import difference
-from finitevolx._src.constants import  GRAVITY
+
 
 def geostrophic_gradient(u: Array, dx: float | Array, dy: float | Array) -> tuple[Array, Array]:
     """Calculates the geostrophic gradient for a staggered grid
@@ -28,7 +33,7 @@ def geostrophic_gradient(u: Array, dx: float | Array, dy: float | Array) -> tupl
 
     du_dy = difference(u=u, axis=1, step_size=dy, derivative=1)
     dv_dx = difference(u=u, axis=0, step_size=dx, derivative=1)
-    return - du_dy, dv_dx
+    return -du_dy, dv_dx
 
 
 def divergence(u: Array, v: Array, dx: float, dy: float) -> Array:
@@ -58,7 +63,12 @@ def divergence(u: Array, v: Array, dx: float, dy: float) -> Array:
     return dudx + dvdx
 
 
-def relative_vorticity(u: Float[Array, "Nx Ny-1"], v: Float[Array, "Nx-1 Ny"], dx: float | Array, dy: float | Array) -> Array:
+def relative_vorticity(
+    u: Float[Array, "Nx Ny-1"],
+    v: Float[Array, "Nx-1 Ny"],
+    dx: float | Array,
+    dy: float | Array,
+) -> Array:
     """Calculates the relative vorticity by using
     finite difference in the y and x direction for the
     u and v velocities respectively

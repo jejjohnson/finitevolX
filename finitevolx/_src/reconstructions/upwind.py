@@ -1,19 +1,21 @@
-import typing as tp
 import functools as ft
-from jaxtyping import Array
+import typing as tp
+
 import jax
-import jax.numpy as jnp
 from jax.nn import relu
+import jax.numpy as jnp
+from jaxtyping import Array
+
+from finitevolx._src.reconstructions.linear import (
+    linear_2pts,
+    linear_3pts_left,
+    linear_5pts_left,
+)
 from finitevolx._src.reconstructions.weno import (
     weno_3pts,
     weno_3pts_improved,
     weno_5pts,
     weno_5pts_improved,
-)
-from finitevolx._src.reconstructions.linear import (
-    linear_2pts,
-    linear_3pts_left,
-    linear_5pts_left,
 )
 
 
@@ -51,10 +53,7 @@ def upwind_1pt(q: Array, dim: int) -> tp.Tuple[Array, Array]:
     return qi_left, qi_right
 
 
-
-def upwind_2pt_bnds(
-    q: Array, dim: int, method: str = "linear"
-) -> tp.Tuple[Array, Array]:
+def upwind_2pt_bnds(q: Array, dim: int, method: str = "linear") -> tp.Tuple[Array, Array]:
     """creates the stencils for the upwind scheme
     - 3 pts inside domain
     Args:
