@@ -11,8 +11,9 @@ from jaxtyping import Float, Array
 import numpy as np
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-from finitevolx import avg_pool, MaskGrid, difference
+from finitevolx import center_avg_2D, MaskGrid, difference
 import jax
+
 jax.config.update("jax_enable_x64", True)
 
 # set parameters
@@ -23,7 +24,7 @@ n_y = 101
 dy = 20e3
 
 gravity = 9.81
-depth = 100.
+depth = 100.0
 coriolis_param = 2e-4
 
 dt = 0.5 * min(dx, dy) / np.sqrt(gravity * depth)
@@ -37,16 +38,12 @@ plot_every = 2
 max_quivers = 21
 
 # grid setup
-x, y = (
-    np.arange(n_x) * dx,
-    np.arange(n_y) * dy
-)
-X, Y = np.meshgrid(x, y, indexing='ij')
+x, y = (np.arange(n_x) * dx, np.arange(n_y) * dy)
+X, Y = np.meshgrid(x, y, indexing="ij")
 
 # initial conditions
 h0 = depth + 1.0 * np.exp(
-    - (X - x[n_x // 2]) ** 2 / rossby_radius ** 2
-    - (Y - y[n_y - 2]) ** 2 / rossby_radius ** 2
+    -((X - x[n_x // 2]) ** 2) / rossby_radius**2 - (Y - y[n_y - 2]) ** 2 / rossby_radius**2
 )
 
 # mask
@@ -61,30 +58,26 @@ u0 = np.zeros_like(masks.face_u.values)
 v0 = np.zeros_like(masks.face_v.values)
 
 
-
 def prepare_plot():
     fig, ax = plt.subplots(1, 1, figsize=(8, 6))
     cs = update_plot(0, h0, u0, v0, ax)
-    plt.colorbar(cs, label='$\\eta$ (m)')
+    plt.colorbar(cs, label="$\\eta$ (m)")
     return fig, ax
 
 
 def update_plot(t, h, u, v, ax):
     eta = h - depth
 
-    quiver_stride = (
-        slice(1, -1, n_x // max_quivers),
-        slice(1, -1, n_y // max_quivers)
-    )
-
-
+    quiver_stride = (slice(1, -1, n_x // max_quivers), slice(1, -1, n_y // max_quivers))
 
     ax.clear()
     cs = ax.pcolormesh(
         x[1:-1] / 1e3,
         y[1:-1] / 1e3,
         eta[1:-1, 1:-1].T,
-        vmin=-plot_range, vmax=plot_range, cmap='RdBu_r'
+        vmin=-plot_range,
+        vmax=plot_range,
+        cmap="RdBu_r",
     )
 
     if np.any((u[quiver_stride] != 0) | (v[quiver_stride] != 0)):
@@ -93,23 +86,22 @@ def update_plot(t, h, u, v, ax):
             y[quiver_stride[1]] / 1e3,
             u[quiver_stride].T,
             v[quiver_stride].T,
-            clip_on=False
+            clip_on=False,
         )
 
-    ax.set_aspect('equal')
-    ax.set_xlabel('$x$ (km)')
-    ax.set_ylabel('$y$ (km)')
+    ax.set_aspect("equal")
+    ax.set_xlabel("$x$ (km)")
+    ax.set_ylabel("$y$ (km)")
     ax.set_xlim(x[1] / 1e3, x[-2] / 1e3)
     ax.set_ylim(y[1] / 1e3, y[-2] / 1e3)
     ax.set_title(
-        't=%5.2f days, R=%5.1f km, c=%5.1f m/s '
-        % (t / 86400, rossby_radius / 1e3, phase_speed)
+        "t=%5.2f days, R=%5.1f km, c=%5.1f m/s " % (t / 86400, rossby_radius / 1e3, phase_speed)
     )
     plt.pause(0.1)
     return cs
 
-def enforce_boundaries(u, variable: str="h"):
 
+def enforce_boundaries(u, variable: str = "h"):
     if variable == "h":
         pass
     elif variable == "u":
@@ -120,6 +112,7 @@ def enforce_boundaries(u, variable: str="h"):
         msg = "Unrecognized variable"
         raise ValueError(msg)
     return u
+
 
 def iterate_shallow_water():
     # allocate arrays
@@ -140,7 +133,7 @@ def iterate_shallow_water():
         # ================================
         # update zonal velocity, u
         # ================================
-        v_avg: Float[Array, "Nx-1 Ny"] = avg_pool(v, kernel_size=(2,2), stride=(1,1), padding="VALID", mean_fn="arithmetic")
+        v_avg: Float[Array, "Nx-1 Ny"] = center_avg_2D(v)
         dh_dx: Float[Array, "Nx-1 Ny"] = difference(h, step_size=dx, axis=0, derivative=1)
 
         u_rhs: Float[Array, "Nx-1 Ny"] = coriolis_param * v_avg - gravity * dh_dx
@@ -156,10 +149,10 @@ def iterate_shallow_water():
         # =================================
         # update meridional velocity, v
         # =================================
-        u_avg: Float[Array, "Nx Ny-1"] = avg_pool(u, kernel_size=(2,2), stride=(1,1), padding="VALID", mean_fn="arithmetic")
+        u_avg: Float[Array, "Nx Ny-1"] = center_avg_2D(u)
         dh_dy: Float[Array, "Nx Ny-1"] = difference(h, step_size=dy, axis=1, derivative=1)
 
-        v_rhs: Float[Array, "Nx Ny-1"] = - coriolis_param * u_avg - gravity * dh_dy
+        v_rhs: Float[Array, "Nx Ny-1"] = -coriolis_param * u_avg - gravity * dh_dy
 
         # apply masks
         v_rhs *= masks.face_v.values[:, 1:-1]
@@ -175,7 +168,7 @@ def iterate_shallow_water():
         du_dx: Float[Array, "Nx Ny"] = difference(u, step_size=dx, axis=0, derivative=1)
         dv_dy: Float[Array, "Nx Ny"] = difference(v, step_size=dy, axis=1, derivative=1)
 
-        h_rhs: Float[Array, "Nx Ny"] = - depth * (du_dx + dv_dy)
+        h_rhs: Float[Array, "Nx Ny"] = -depth * (du_dx + dv_dy)
 
         # apply masks
         h_rhs *= masks.center.values
@@ -188,16 +181,23 @@ def iterate_shallow_water():
         yield h, u, v
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     fig, ax = prepare_plot()
 
+    # create model generator
     model = iterate_shallow_water()
+
+    # iterate through steps
     for iteration, (h, u, v) in enumerate(model):
         if iteration % plot_every == 0:
             t = iteration * dt
 
-            u_on_h = avg_pool(u, kernel_size=(2, 1), stride=1, padding="VALID", mean_fn="arithmetic")
-            v_on_h = avg_pool(v, kernel_size=(1, 2), stride=1, padding="VALID", mean_fn="arithmetic")
+            # move face variables to center
+            # u,v --> h
+            u_on_h = center_avg_2D(u)
+            v_on_h = center_avg_2D(v)
+
+            # update plot
             update_plot(t, h, u_on_h, v_on_h, ax)
 
         # stop if user closes plot window

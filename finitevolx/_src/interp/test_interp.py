@@ -50,9 +50,7 @@ def test_x_average_1D_arithmetic(u_1d_randn):
     u = u_1d_randn
 
     u_on_x = avg_arithmetic(u[1:], u[:-1])
-    u_on_x_ = avg_pool(
-        u, kernel_size=(2,), stride=(1,), padding="valid", mean_fn="arithmetic"
-    )
+    u_on_x_ = avg_pool(u, kernel_size=(2,), stride=(1,), padding="valid", mean_fn="arithmetic")
 
     np.testing.assert_array_almost_equal(u_on_x, u_on_x_)
 
@@ -61,9 +59,7 @@ def test_x_average_1D_geometric(u_1d_randn):
     u = u_1d_randn
 
     u_on_x = avg_geometric(u[1:], u[:-1])
-    u_on_x_ = avg_pool(
-        u, kernel_size=(2,), stride=(1,), padding="valid", mean_fn="geometric"
-    )
+    u_on_x_ = avg_pool(u, kernel_size=(2,), stride=(1,), padding="valid", mean_fn="geometric")
 
     np.testing.assert_array_almost_equal(u_on_x, u_on_x_)
 
@@ -71,9 +67,7 @@ def test_x_average_1D_geometric(u_1d_randn):
 def test_x_average_1D_harmonic(u_1d_randn):
     u = u_1d_randn
     u_on_x = avg_harmonic(u[:-1], u[1:])
-    u_on_x_ = avg_pool(
-        u, kernel_size=(2,), stride=(1,), padding="valid", mean_fn="harmonic"
-    )
+    u_on_x_ = avg_pool(u, kernel_size=(2,), stride=(1,), padding="valid", mean_fn="harmonic")
 
     np.testing.assert_array_almost_equal(u_on_x, u_on_x_)
 
@@ -81,9 +75,7 @@ def test_x_average_1D_harmonic(u_1d_randn):
 def test_x_average_1D_quadratic(u_1d_randn):
     u = u_1d_randn
     u_on_x = avg_quadratic(u[:-1], u[1:])
-    u_on_x_ = avg_pool(
-        u, kernel_size=(2,), stride=(1,), padding="valid", mean_fn="quadratic"
-    )
+    u_on_x_ = avg_pool(u, kernel_size=(2,), stride=(1,), padding="valid", mean_fn="quadratic")
 
     np.testing.assert_array_almost_equal(u_on_x, u_on_x_)
 

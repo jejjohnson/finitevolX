@@ -53,9 +53,7 @@ def upwind_1pt(q: Array, dim: int) -> tp.Tuple[Array, Array]:
     return qi_left, qi_right
 
 
-def upwind_2pt_bnds(
-    q: Array, dim: int, method: str = "linear"
-) -> tp.Tuple[Array, Array]:
+def upwind_2pt_bnds(q: Array, dim: int, method: str = "linear") -> tp.Tuple[Array, Array]:
     """creates the stencils for the upwind scheme
     - 3 pts inside domain
     Args:

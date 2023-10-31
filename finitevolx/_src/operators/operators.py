@@ -3,9 +3,7 @@ import jax
 from jaxtyping import Array
 
 
-def difference(
-    u: Array, axis: int = 0, step_size: float = 1.0, derivative: int = 1
-) -> Array:
+def difference(u: Array, axis: int = 0, step_size: float = 1.0, derivative: int = 1) -> Array:
     if derivative == 1:
         du = fdx.difference(
             u,

@@ -1,3 +1,20 @@
+from finitevolx._src.interp.interp import (
+    avg_arithmetic,
+    avg_geometric,
+    avg_harmonic,
+    avg_pool,
+    avg_quadratic,
+    center_avg_2D,
+    x_avg_1D,
+    x_avg_2D,
+    y_avg_2D,
+)
+from finitevolx._src.masks.masks import (
+    CenterMask,
+    FaceMask,
+    MaskGrid,
+    NodeMask,
+)
 from finitevolx._src.operators.geostrophic import (
     divergence,
     geostrophic_gradient,
@@ -9,26 +26,18 @@ from finitevolx._src.operators.operators import (
     difference,
     laplacian,
 )
-from finitevolx._src.interp.interp import (
-    avg_pool,
-    avg_quadratic,
-    avg_geometric,
-    avg_harmonic,
-    avg_arithmetic,
-)
-from finitevolx._src.masks.masks import MaskGrid, NodeMask, CenterMask, FaceMask
 from finitevolx._src.reconstructions.reconstruct import (
     reconstruct,
-    reconstruct_5pt,
-    reconstruct_3pt,
     reconstruct_1pt,
+    reconstruct_3pt,
+    reconstruct_5pt,
 )
 from finitevolx._src.reconstructions.upwind import (
     upwind_1pt,
-    upwind_3pt,
-    upwind_5pt,
     upwind_2pt_bnds,
+    upwind_3pt,
     upwind_3pt_bnds,
+    upwind_5pt,
 )
 
 __all__ = [
@@ -57,4 +66,8 @@ __all__ = [
     "upwind_5pt",
     "upwind_3pt",
     "upwind_1pt",
+    "x_avg_1D",
+    "x_avg_2D",
+    "y_avg_2D",
+    "center_avg_2D",
 ]
