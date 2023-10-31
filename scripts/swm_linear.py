@@ -57,6 +57,8 @@ masks = MaskGrid.init_mask(mask, "center")
 u0 = np.zeros_like(masks.face_u.values)
 v0 = np.zeros_like(masks.face_v.values)
 
+print(u0.shape, v0.shape, h0.shape)
+
 
 def prepare_plot():
     fig, ax = plt.subplots(1, 1, figsize=(8, 6))
@@ -128,8 +130,10 @@ def iterate_shallow_water():
     u *= masks.face_u.values
     v *= masks.face_v.values
 
-    # time step equations
-    while True:
+
+
+    def equation_of_motion(h, u, v):
+
         # ================================
         # update zonal velocity, u
         # ================================
@@ -152,7 +156,7 @@ def iterate_shallow_water():
         u_avg: Float[Array, "Nx Ny-1"] = center_avg_2D(u)
         dh_dy: Float[Array, "Nx Ny-1"] = difference(h, step_size=dy, axis=1, derivative=1)
 
-        v_rhs: Float[Array, "Nx Ny-1"] = -coriolis_param * u_avg - gravity * dh_dy
+        v_rhs: Float[Array, "Nx Ny-1"] = - coriolis_param * u_avg - gravity * dh_dy
 
         # apply masks
         v_rhs *= masks.face_v.values[:, 1:-1]
@@ -168,7 +172,7 @@ def iterate_shallow_water():
         du_dx: Float[Array, "Nx Ny"] = difference(u, step_size=dx, axis=0, derivative=1)
         dv_dy: Float[Array, "Nx Ny"] = difference(v, step_size=dy, axis=1, derivative=1)
 
-        h_rhs: Float[Array, "Nx Ny"] = -depth * (du_dx + dv_dy)
+        h_rhs: Float[Array, "Nx Ny"] = - depth * (du_dx + dv_dy)
 
         # apply masks
         h_rhs *= masks.center.values
@@ -177,6 +181,17 @@ def iterate_shallow_water():
         h: Float[Array, "Nx Ny"] = h.at[:].add(dt * h_rhs)
 
         h = enforce_boundaries(h, "h")
+
+        return h, u, v
+
+    eom_fn = jax.jit(equation_of_motion)
+
+
+
+    # time step equations
+    while True:
+
+        h, u, v = eom_fn(h, u, v)
 
         yield h, u, v
 

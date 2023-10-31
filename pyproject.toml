@@ -2,7 +2,10 @@
 name = "finitevolx"
 version = "0.0.1"
 description = "Finite Volume tools in JAX."
-authors = ["Juan Emmanuel Johnson <jemanjohnson34@gmail.com>", "Takaya Uchida"]
+authors = [
+    "Juan Emmanuel Johnson <jemanjohnson34@gmail.com>",
+    "Takaya Uchida <roxyboy.guppy@gmail.com>"
+]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/jejjohnson/finitevolx"
