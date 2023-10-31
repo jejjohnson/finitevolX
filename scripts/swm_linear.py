@@ -130,6 +130,11 @@ def iterate_shallow_water():
     u: Float[Array, "Nx+1 Ny"] = u.at[:].set(u0)
     v: Float[Array, "Nx Ny+1"] = v.at[:].set(v0)
 
+    # apply masks
+    h *= masks.center.values
+    u *= masks.face_u.values
+    v *= masks.face_v.values
+
     # time step equations
     while True:
         # ================================
@@ -139,6 +144,9 @@ def iterate_shallow_water():
         dh_dx: Float[Array, "Nx-1 Ny"] = difference(h, step_size=dx, axis=0, derivative=1)
 
         u_rhs: Float[Array, "Nx-1 Ny"] = coriolis_param * v_avg - gravity * dh_dx
+
+        # apply masks
+        u_rhs *= masks.face_u.values[1:-1]
 
         # time step u
         u: Float[Array, "Nx+1 Ny"] = u.at[1:-1].add(dt * u_rhs)
@@ -153,6 +161,9 @@ def iterate_shallow_water():
 
         v_rhs: Float[Array, "Nx Ny-1"] = - coriolis_param * u_avg - gravity * dh_dy
 
+        # apply masks
+        v_rhs *= masks.face_v.values[:, 1:-1]
+
         # time step v
         v: Float[Array, "Nx Ny+1"] = v.at[:, 1:-1].add(dt * v_rhs)
 
@@ -166,7 +177,7 @@ def iterate_shallow_water():
 
         h_rhs: Float[Array, "Nx Ny"] = - depth * (du_dx + dv_dy)
 
-        # mask boundaries
+        # apply masks
         h_rhs *= masks.center.values
 
         # time step h
