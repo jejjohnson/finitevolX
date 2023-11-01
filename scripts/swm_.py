@@ -37,7 +37,7 @@ lateral_viscosity = 1e-3 * coriolis_f * dx ** 2
 
 # other parameters
 periodic_boundary_x = False
-linear_momentum_equation = False
+linear_momentum_equation = True
 
 adams_bashforth_a = 1.5 + 0.1
 adams_bashforth_b = -(0.5 + 0.1)
