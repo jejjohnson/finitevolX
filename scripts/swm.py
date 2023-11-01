@@ -184,8 +184,8 @@ def iterate_shallow_water():
     while True:
         # print(f"h: {h.shape}")
         h_pad: Float[Array, "Nx+2 Ny+2"] = jnp.pad(h, 1, "edge")
-        u_pad = enforce_boundaries(u, "u")
-        v_pad = enforce_boundaries(v, "v")
+        u = enforce_boundaries(u, "u")
+        v = enforce_boundaries(v, "v")
         u_pad: Float[Array, "Nx+3 Ny+2"] = jnp.pad(u, 1, "constant")
         v_pad: Float[Array, "Nx+2 Ny+3"] = jnp.pad(v, 1, "constant")
 
