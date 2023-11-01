@@ -50,7 +50,7 @@ gravity = 9.81
 depth = 100.
 coriolis_f = 2e-4
 coriolis_beta = 2e-11
-coriolis_param = coriolis_f + Y * coriolis_beta
+coriolis_param: Float[Array, "Nx Ny"] = coriolis_f + Y * coriolis_beta
 lateral_viscosity = 1e-3 * coriolis_f * dx ** 2
 
 # other parameters
@@ -157,9 +157,9 @@ def enforce_boundaries(u, grid: str="h"):
         u = u.at[0].set(u[-2])
         u = u.at[-1].set(u[1])
     elif grid == 'u':
-        u = u.at[-2, :].set(0.0)
+        u = u.at[-1, :].set(0.0)
     if grid == 'v':
-        u = u.at[:,-2].set(0.0)
+        u = u.at[:,-1].set(0.0)
     return u
 
 
@@ -183,8 +183,12 @@ def iterate_shallow_water():
     # time step equations
     while True:
         # print(f"h: {h.shape}")
-        hc = jnp.pad(h[1:-1, 1:-1], 1, 'edge')
-        hc = enforce_boundaries(hc, 'h')
+        h_pad: Float[Array, "Nx+2 Ny+2"] = jnp.pad(h, 1, "edge")
+        u_pad = enforce_boundaries(u, "u")
+        v_pad = enforce_boundaries(v, "v")
+        u_pad: Float[Array, "Nx+3 Ny+2"] = jnp.pad(u, 1, "constant")
+        v_pad: Float[Array, "Nx+2 Ny+3"] = jnp.pad(v, 1, "constant")
+
 
 
         # ===================================
@@ -192,60 +196,52 @@ def iterate_shallow_water():
         # ===================================
         # uh_flux: Float[Array, "Nx-1 Ny"] = reconstruct(q=hc, u=u[1:-1,:], u_mask=masks.face_u[1:-1,:], dim=0, num_pts=3, method="linear")
         # vh_flux: Float[Array, "Nx Ny-1"] = reconstruct(q=hc, u=v[:, 1:-1], u_mask=masks.face_v[:,1:-1], dim=1, num_pts=3, method="linear")
-        uh_flux: Float[Array, "Nx-1 Ny"] = x_avg_2D(h) * u[1:-1,:]
-        vh_flux: Float[Array, "Nx Ny-1"] = y_avg_2D(h) * v[:,1:-1]
+        uh_flux: Float[Array, "Nx+1 Ny+2"] = x_avg_2D(h_pad) * u_pad[1:-1,:]
+        vh_flux: Float[Array, "Nx+2 Ny+1"] = y_avg_2D(h_pad) * v_pad[:,1:-1]
 
-        uh_flux = jnp.pad(uh_flux, pad_width=((1,1),(0,0)))
-        vh_flux = jnp.pad(vh_flux, pad_width=((0,0),(1,1),))
-
-        uh_flux = enforce_boundaries(uh_flux, "u")
-        vh_flux = enforce_boundaries(vh_flux, "v")
+        # uh_flux = enforce_boundaries(uh_flux, "u")
+        # vh_flux = enforce_boundaries(vh_flux, "v")
 
 
         # =========================
         # RHS HEIGHT
         # =========================
-        dhu_flux: Float[Array, "Nx-2 Ny"] = difference(uh_flux[1:-1], axis=0, step_size=dx, derivative=1)
-        dhv_flux: Float[Array, "Nx Ny-2"] = difference(vh_flux[:,1:-1], axis=1, step_size=dy, derivative=1)
+        dhu_flux: Float[Array, "Nx Ny"] = difference(uh_flux[:, 1:-1], axis=0, step_size=dx, derivative=1)
+        dhv_flux: Float[Array, "Nx Ny"] = difference(vh_flux[1:-1,:], axis=1, step_size=dy, derivative=1)
         # print(f"h: {h.shape} | dh_dx: {dfe_dx.shape} | dh_dy: {dfn_dy.shape}")
-        h_rhs: Float[Array, "Nx-2 Ny-2"] = - (dhu_flux[:, 1:-1] + dhv_flux[1:-1, :])
-        h_rhs: Float[Array, "Nx Ny"] = jnp.pad(h_rhs, pad_width=1, mode="constant", constant_values=0.0)
+        h_rhs: Float[Array, "Nx Ny"] = - (dhu_flux + dhv_flux)
 
-        h_rhs *= masks.center.values
+        # h_rhs *= masks.center.values
 
         # ================================
         # update zonal velocity, u
         # ================================
-        v_avg: Float[Array, "Nx-1 Ny"] = center_avg_2D(v)
-        dh_dx: Float[Array, "Nx-1 Ny"] = difference(h, step_size=dx, axis=0, derivative=1)
+        v_avg: Float[Array, "Nx+1 Ny+2"] = center_avg_2D(v_pad)
+        dh_dx: Float[Array, "Nx+1 Ny+2"] = difference(h_pad, step_size=dx, axis=0, derivative=1)
 
         f0_on_u = x_avg_2D(coriolis_param)
-        u_rhs: Float[Array, "Nx-1 Ny"] = f0_on_u * v_avg - gravity * dh_dx
+        u_rhs: Float[Array, "Nx-1 Ny"] = f0_on_u * v_avg[1:-1, 1:-1] - gravity * dh_dx[1:-1, 1:-1]
 
         # apply masks
-        u_rhs *= masks.face_u.values[1:-1]
-
-        u_rhs = jnp.pad(u_rhs, pad_width=((1,1),(0,0)))
+        # u_rhs *= masks.face_u.values
+        
+        u_rhs: Float[Array, "Nx+1 Ny"] = jnp.pad(u_rhs, pad_width=((1,1),(0, 0),))
 
 
 
         # =================================
         # update meridional velocity, v
         # =================================
-        u_avg: Float[Array, "Nx Ny-1"] = center_avg_2D(u)
-        dh_dy: Float[Array, "Nx Ny-1"] = difference(h, step_size=dy, axis=1, derivative=1)
+        u_avg: Float[Array, "Nx+2 Ny+1"] = center_avg_2D(u_pad)
+        dh_dy: Float[Array, "Nx+2 Ny+1"] = difference(h_pad, step_size=dy, axis=1, derivative=1)
 
         f0_on_v = y_avg_2D(coriolis_param)
-        v_rhs: Float[Array, "Nx Ny-1"] = - f0_on_v * u_avg - gravity * dh_dy
+        v_rhs: Float[Array, "Nx Ny-1"] = - f0_on_v * u_avg[1:-1,1:-1] - gravity * dh_dy[1:-1,1:-1]
 
         # apply masks
-        v_rhs *= masks.face_v.values[:, 1:-1]
+        # v_rhs *= masks.face_v.values[:, 1:-1]
 
-        v_rhs = jnp.pad(v_rhs, pad_width=((0, 0),(1, 1)))
-
-        print(h_rhs.shape, u_rhs.shape, v_rhs.shape)
-
-
+        v_rhs: Float[Array, "Nx Ny+1"] = jnp.pad(v_rhs, pad_width=((0, 0),(1, 1)))
 
         # # ===================================
         # # kinetic energy
@@ -317,6 +313,9 @@ def iterate_shallow_water():
         # v_rhs: Float[Array, "Nx+1 Ny"] = jnp.pad(v_rhs, pad_width=1, mode="constant", constant_values=0.0)
         #
         # v_rhs *= masks.face_v.values
+        
+        print(h.shape, u.shape, v.shape)
+        print(h_rhs.shape, u_rhs.shape, v_rhs.shape)
 
         if first_step:
 
