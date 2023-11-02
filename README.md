@@ -34,7 +34,7 @@ For example, the flux found in the vector invariant formulation for the Shallow 
 Another example, the flux found in the advection term for the QG equations ([example](https://jejjohnson.github.io/jaxsw/qg-formulation#eq-qg-general)).
 
 ---
-## Installation
+## 🛠️ Installation<a id="installation"></a>
 
 We can install it directly through pip
 
@@ -50,6 +50,34 @@ cd finitevolX
 conda create -n finitevolx python=3.11 poetry
 poetry install
 ```
+
+
+---
+## ⏩ Examples<a id="examples"></a>
+
+> All of these examples go for correctness and readability.
+
+**Linear Shallow Water Model**. 
+
+In the scripts located in [`scripts/swm_linear.py`](./scripts/swm_linear.py), we have an example using a linear shallow water model. 
+This script was taken from [dionhaefner/shallow-water/shallow_water_simple.py](https://github.com/dionhaefner/shallow-water/tree/master).
+It has been rewritten with the `finitevolx` helper functions.
+
+**NonLinear Shallow Water Model**.
+
+In the scripts located in [`scripts/swm.py`](./scripts/swm.py), we have an example using a nonlinear shallow water model.
+This script was taken from [dionhaefner/shallow-water/shallow_water_nonlinear.py](https://github.com/dionhaefner/shallow-water/tree/master).
+This uses the [vector invariant formulation](https://jejjohnson.github.io/jaxsw/sw-formulation#vector-invariant-formulation) which involves the potential vorticity and kinetic energy.
+It has been rewritten with the `finitevolx` and `fieldx` helper functions.
+
+To run the scripts, run poetry and ensure that it installs with
+
+```bash
+poetry install --with exp
+```
+
+
+
 
 
 
