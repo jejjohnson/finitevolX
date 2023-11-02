@@ -2,7 +2,10 @@
 name = "finitevolx"
 version = "0.0.1"
 description = "Finite Volume tools in JAX."
-authors = ["Juan Emmanuel Johnson <jemanjohnson34@gmail.com>", "Takaya Uchida"]
+authors = [
+    "Juan Emmanuel Johnson <jemanjohnson34@gmail.com>",
+    "Takaya Uchida <roxyboy.guppy@gmail.com>"
+]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/jejjohnson/finitevolx"
@@ -38,9 +41,6 @@ pytest-pretty = "^1.1.1"
 pytest-xdist = "^3.2.1"
 networkx = "^3.0"
 coverage = "^7.2.2"
-absolufy-imports = "^0.3.1"
-xdoctest = "^1.1.1"
-mktestdocs = "^0.2.1"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.1.0"
@@ -60,38 +60,10 @@ interrogate = "^1.5.0"
 [tool.poetry.group.exp.dependencies]
 wandb = "^0.15.0"
 loguru = "^0.7.0"
-hydra-core = "^1.3.2"
 matplotlib = "^3.7.1"
 seaborn = "^0.12.2"
 autoroot = "^1.0.0"
-
-[tool.poetry.group.jlab.dependencies]
-ipykernel = "^6.22.0"
-autoroot = "^1.0.0"
-
-[tool.poetry.group.docs.dependencies]
-linkify-it-py = "^2.0.0"
-jinja2 = "^3.1.2"
-matplotlib = "^3.7.1"
-ipython = "^8.11.0"
-ipykernel = "^6.22.0"
-watermark = "^2.3.1"
-jupytext = "^1.14.5"
-mkdocs = "^1.4.2"
-mkdocs-material = "^9.1.8"
-pymdown-extensions = "^9.11"
-mknotebooks = "^0.7.1"
-pygments = "^2.15.1"
-mkdocs-bibtex = "^2.8.16"
-mkdocs-jupyter = "^0.24.1"
-mdx-truly-sane-lists = "^1.3"
-pytkdocs = "^0.16.1"
-mkdocs-gen-files = "^0.5.0"
-mkdocs-literate-nav = "^0.6.0"
-mkdocs-git-authors-plugin = "^0.7.0"
-mkdocstrings = { version = "^0.21.2", extras = ["python"] }
-markdown-katex = "^202112.1034"
-
+fieldx = { git = "https://github.com/jejjohnson/fieldx.git" }
 
 
 [build-system]
