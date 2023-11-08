@@ -21,7 +21,7 @@ from finitevolx._src.operators.operators import (
     laplacian,
     divergence,
     geostrophic_gradient,
-    relative_vorticity,
+    relative_vorticity, kinetic_energy, bernoulli_potential, absolute_vorticity
 )
 from finitevolx._src.reconstructions.reconstruct import (
     reconstruct,
@@ -43,8 +43,9 @@ __all__ = [
     "divergence",
     "relative_vorticity",
     "geostrophic_gradient",
-    "ssh_to_streamfn",
-    "streamfn_to_ssh",
+    "kinetic_energy",
+    "absolute_vorticity",
+    "bernoulli_potential",
     "avg_pool",
     "avg_arithmetic",
     "avg_harmonic",
