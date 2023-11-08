@@ -38,7 +38,8 @@ h_domain = Domain(xmin=(0.0, 0.0), xmax=(Lx, Ly), Lx=(Lx,Ly), Nx=(Nx,Ny), dx=(dx
 u_domain = Domain(xmin=(-0.5, 0.0), xmax=(Lx+0.5*dx, Ly), Lx=(Lx+dx,Ly), Nx=(Nx+1,Ny), dx=(dx,dy))
 v_domain = Domain(xmin=(0.0, -0.5), xmax=(Lx, Ly+0.5*dy), Lx=(Lx,Ly+0.5*dy), Nx=(Nx,Ny+1), dx=(dx,dy))
 q_domain = Domain(xmin=(-0.5,-0.5), xmax=(Lx+0.5*dx, Ly+0.5*dy), Lx=(Lx+dx,Ly+dy), Nx=(Nx+1,Ny+1), dx=(dx,dy))
-
+Nx, Ny = h_domain.Nx
+x, y = h_domain.coords_axis
 # ==============================
 # PARAMETERS
 # ==============================
@@ -69,8 +70,8 @@ max_quivers = 41
 
 
 # model params
-num_pts = 5
-method = "linear"
+num_pts = 3
+method = "wenoz"
 
 
 
@@ -135,15 +136,36 @@ class State(NamedTuple):
 # ==============================
 
 def enforce_boundaries(u, grid: str="h"):
-    assert grid in ('h', 'u', 'v')
-    if periodic_boundary_x:
-        u = u.at[0].set(u[-2])
-        u = u.at[-1].set(u[1])
-    elif grid == "u":
-        u = u.at[-1,:].set(0.0)
+    assert grid in ('h', 'u', 'v', 'q')
+    # if periodic_boundary_x:
+    #     u = u.at[0].set(u[-2])
+    #     u = u.at[-1].set(u[1])
+    if grid == "h":
+        u = fix_boundary_corners(u)
+    if grid == "u":
+        # wall boundaries at x=0=Lx
+        u = jnp.pad(u[1:-1], ((1,1),(0,0)), mode="constant")
+        # free-slip boundaries at y=0=Ly
+        u = jnp.pad(u[:,1:-1], ((0,0),(1,1)), mode="edge")
+        u = fix_boundary_corners(u)
     if grid == "v":
-        u = u.at[:,-1].set(0.0)
+        # free-slip boundaries
+        u = jnp.pad(u[:,1:-1], ((0,0),(1,1)), mode="constant")
+        # free-slip boundaries
+        u = jnp.pad(u[1:-1], ((1,1),(0,0)), mode="edge")
+        u = fix_boundary_corners(u)
+        
+    if grid == "q":
+        u = fix_boundary_corners(u)
     return u
+
+def fix_boundary_corners(field):
+    # # fix corners to be average of neighbours
+    field = field.at[0,0].set(0.5 * (field[0,1] + field[1,0]))
+    field = field.at[-1, 0].set(0.5 * (field[-2,0] + field[-1,1]))
+    field = field.at[0, -1].set(0.5 * (field[1,-1] + field[0,-2]))
+    field = field.at[-1, -1].set(0.5 * field[-1,-2] + field[-2,-1])
+    return field
 
 
 
@@ -163,8 +185,7 @@ def prepare_plot():
 def update_plot(t, h, u, v, ax):
     eta = h - depth
     
-    Nx, Ny = h_domain.Nx
-    x, y = h_domain.coords_axis
+
     quiver_stride = (slice(1, -1, Nx // max_quivers), slice(1, -1, Ny // max_quivers))
 
     ax.clear()
@@ -194,7 +215,7 @@ def update_plot(t, h, u, v, ax):
     ax.set_title(
         "t=%5.2f days, R=%5.1f km, c=%5.1f m/s " % (t / 86400, rossby_radius / 1e3, phase_speed)
     )
-    plt.pause(0.001)
+    plt.pause(0.00001)
     return cs
 
 # ####################################
@@ -202,13 +223,17 @@ def update_plot(t, h, u, v, ax):
 # ####################################
 
 linear_mass = False
-linear_momentum = False
+linear_momentum = True
 
 
 # ====================================
 # Nonlinear Terms
 # ====================================
-def calculate_uvh_flux(h, u, v):
+def calculate_uvh_flux(
+    h: Float[Array,"Nx Ny"], 
+    u: Float[Array,"Nx+1 Ny"],
+    v: Float[Array, "Nx Ny+1"]
+):
     """
     Eq: 
         (uh), (vh)
@@ -220,8 +245,14 @@ def calculate_uvh_flux(h, u, v):
     uh_flux: Float[Array, "Nx+1 Ny"] = reconstruct(q=h_pad[:,1:-1], u=u, u_mask=masks.face_u, dim=0, num_pts=num_pts, method=method)
     vh_flux: Float[Array, "Nx Ny+1"] = reconstruct(q=h_pad[1:-1,:], u=v, u_mask=masks.face_v, dim=1, num_pts=num_pts, method=method)
     
+    # apply mask
     uh_flux *= masks.face_u.values
     vh_flux *= masks.face_v.values
+    
+    # enforce boundaries
+    uh_flux = enforce_boundaries(uh_flux, "h")
+    uh_flux = enforce_boundaries(uh_flux, "h")
+
     
     return uh_flux, vh_flux
 
@@ -243,29 +274,39 @@ def kinetic_energy(u, v):
     
     return ke_on_h
 
-def potential_vorticity(h, u, v):
+def potential_vorticity(
+    h: Float[Array,"Nx Ny"], 
+    u: Float[Array,"Nx+1 Ny"],
+    v: Float[Array, "Nx Ny+1"]
+):
     """
     Eq: 
         ζ = ∂v/∂x - ∂u/∂y
         q = (ζ + f) / h
     """
-    # pad arrays
-    h_pad: Float[Array, "Nx+2 Ny+2"] = jnp.pad(h, pad_width=1, mode="edge")
-    u_pad: Float[Array, "Nx+1 Ny+2"] = jnp.pad(u, pad_width=((0,0),(1,1)), mode="constant")
-    v_pad: Float[Array, "Nx+2 Ny+1"] = jnp.pad(v, pad_width=((1,1),(0,0)), mode="constant")
+    # # pad arrays
+    # h_pad: Float[Array, "Nx+2 Ny+2"] = jnp.pad(h, pad_width=1, mode="edge")
+    # u_pad: Float[Array, "Nx+1 Ny+2"] = jnp.pad(u, pad_width=((0,0),(1,1)), mode="constant")
+    # v_pad: Float[Array, "Nx+2 Ny+1"] = jnp.pad(v, pad_width=((1,1),(0,0)), mode="constant")
     
     # planetary vorticity, f
     f_on_q: Float[Array, "Nx+1 Ny+1"] = coriolis_f + q_domain.grid_axis[1] * coriolis_beta
     
     # relative vorticity, ζ = dv/dx - du/dy
-    vort_r: Float[Array, "Nx+1 Ny+1"] = relative_vorticity(u=u_pad, v=v_pad, dx=v_domain.dx[0], dy=u_domain.dx[1])
+    vort_r: Float[Array, "Nx-1 Ny-1"] = relative_vorticity(u=u[1:-1], v=v[:,1:-1], dx=v_domain.dx[0], dy=u_domain.dx[1])
     
     # potential vorticity, q = (ζ + f) / h
-    h_on_q: Float[Array, "Nx+1 Ny+1"] = center_avg_2D(h_pad)
-    q: Float[Array, "Nx+1 Ny+1"] = (vort_r + f_on_q) / h_on_q
+    h_on_q: Float[Array, "Nx-1 Ny-1"] = center_avg_2D(h)
+    q: Float[Array, "Nx-1 Ny-1"] = (vort_r + f_on_q[1:-1,1:-1]) / h_on_q
+    
+    # pad array
+    q: Float[Array, "Nx+1 Ny+1"] = jnp.pad(q, pad_width=((1,1),(1,1)))
     
     # apply masks
     q *= masks.node.values
+    
+    # enforce boundaries
+    q = enforce_boundaries(q, "q")
     
     return q
 
@@ -371,7 +412,10 @@ def u_nonlinear_rhs(h, q, vh_flux, ke):
     dke_on_u: Float[Array, "Nx+1 Ny"] = difference(ke_pad, step_size=h_domain.dx[0], axis=0, derivative=1)
     
     # calculate u RHS
-    u_rhs: Float[Array, "Nx+1 Ny"] = - work + qhv_flux_on_u - dke_on_u
+    u_rhs: Float[Array, "Nx-1 Ny-2"] = - work[1:-1,1:-1] + qhv_flux_on_u[1:-1,1:-1] - dke_on_u[1:-1,1:-1]
+    
+    # pad array
+    u_rhs = jnp.pad(u_rhs, pad_width=1)
     
     # apply mask
     u_rhs *= masks.face_u.values
@@ -437,7 +481,10 @@ def v_nonlinear_rhs(h, q, uh_flux, ke):
     dke_on_v: Float[Array, "Nx Ny+1"] = difference(ke_pad, step_size=h_domain.dx[1], axis=1, derivative=1)
     
     # calculate u RHS
-    v_rhs: Float[Array, "Nx Ny+1"] = - work - qhu_flux_on_v - dke_on_v
+    v_rhs: Float[Array, "Nx-2 Ny-1"] = - work[1:-1,1:-1] - qhu_flux_on_v[1:-1,1:-1] - dke_on_v[1:-1,1:-1]
+    
+    # pad array
+    v_rhs = jnp.pad(v_rhs, pad_width=1)
     
     # apply masks
     v_rhs *= masks.face_v.values
@@ -555,7 +602,7 @@ if __name__ == "__main__":
             v_on_h = center_avg_2D(v)
 
             # update plot
-            update_plot(t, h, u_on_h, v_on_h, ax)
+            update_plot(t, np.asarray(h), np.asarray(u_on_h), np.asarray(v_on_h), ax)
 
         # stop if user closes plot window
         if not plt.fignum_exists(fig.number):

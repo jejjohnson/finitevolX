@@ -15,16 +15,13 @@ from finitevolx._src.masks.masks import (
     MaskGrid,
     NodeMask,
 )
-from finitevolx._src.operators.geostrophic import (
-    divergence,
-    geostrophic_gradient,
-    relative_vorticity,
-    ssh_to_streamfn,
-    streamfn_to_ssh,
-)
+
 from finitevolx._src.operators.operators import (
     difference,
     laplacian,
+    divergence,
+    geostrophic_gradient,
+    relative_vorticity,
 )
 from finitevolx._src.reconstructions.reconstruct import (
     reconstruct,
