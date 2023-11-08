@@ -18,7 +18,7 @@ from finitevolx._src.masks.masks import (
 
 from finitevolx._src.operators.operators import (
     difference,
-    laplacian_h,
+    laplacian,
     divergence,
     geostrophic_gradient,
     relative_vorticity,
@@ -39,7 +39,7 @@ from finitevolx._src.reconstructions.upwind import (
 
 __all__ = [
     "difference",
-    "laplacian_h",
+    "laplacian",
     "divergence",
     "relative_vorticity",
     "geostrophic_gradient",

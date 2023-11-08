@@ -33,7 +33,7 @@ def difference(u: Array, axis: int = 0, step_size: float = 1.0, derivative: int 
 
     return du
 
-def laplacian_h(u: Array, step_size: float | tuple[float, ...] | Array = 1) -> Array:
+def laplacian(u: Array, step_size: float | tuple[float, ...] | Array = 1) -> Array:
     msg = "Laplacian must be 2D or 3D"
     assert u.ndim in [2, 3], msg
     # calculate laplacian
@@ -205,7 +205,8 @@ def absolute_vorticity(
 
 def bernoulli_potential(
         h: Float[Array, "Nx Ny"],
-        ke: Float[Array, "Nx Ny"],
+        u: Float[Array, "Nx+1 Ny"],
+        v: Float[Array, "Nx Ny+1"],
         gravity: float=GRAVITY
 ) -> Float[Array, "Nx Ny"]:
     """Calculates the Bernoulli work
@@ -218,8 +219,10 @@ def bernoulli_potential(
     Args:
         h (Array): the height located at the center/nodes
             Size = [Nx, Ny]
-        ke (Array): the kinetic energy located at the center/nodes
-            Size = [Nx Ny]
+        u (Array): the velocity located on the east/north faces
+            Size = [Nx+1 Ny]
+        v (Array): the velocity located on the north/east faces
+            Size = [Nx Ny+1]
         gravity (float): the acceleration due to gravity constant
             Default = 9.81
 
@@ -228,7 +231,15 @@ def bernoulli_potential(
             Size = [Nx Ny]
     Example:
         >>> u, v, h = ...
-        >>> ke = kinetic_energy(u=u, v=v)
-        >>> p = bernoulli_work(h, ke)
+        >>> p = bernoulli_potential(h=h, u=u, v=v)
     """
-    return ke + gravity * h
+
+    # calculate kinetic energy
+    ke: Float[Array, "Nx Ny"] = kinetic_energy(u=u, v=v)
+
+
+
+    # calculate Berunoulli potential
+    p: Float[Array, "Nx Ny"] = ke + gravity * h
+
+    return p
