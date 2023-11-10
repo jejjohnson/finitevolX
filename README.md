@@ -36,11 +36,16 @@ Another example, the flux found in the advection term for the QG equations ([exa
 ---
 ## 🛠️ Installation<a id="installation"></a>
 
+
+### `pip`
 We can install it directly through pip
 
 ```bash
 pip install git+https://github.com/jejjohnson/finitevolX
 ```
+
+
+### `poetry`
 
 We also use poetry for the development environment.
 
@@ -49,6 +54,17 @@ git clone https://github.com/jejjohnson/finitevolX.git
 cd finitevolX
 conda create -n finitevolx python=3.11 poetry
 poetry install
+```
+
+### `conda`
+
+We can also use conda for the development environment.
+
+```bash
+git clone https://github.com/jejjohnson/finitevolX.git
+cd finitevolX
+conda env create -f environment.yaml
+conda activate finitevolx
 ```
 
 
@@ -70,14 +86,18 @@ This script was taken from [dionhaefner/shallow-water/shallow_water_nonlinear.py
 This uses the [vector invariant formulation](https://jejjohnson.github.io/jaxsw/sw-formulation#vector-invariant-formulation) which involves the potential vorticity and kinetic energy.
 It has been rewritten with the `finitevolx` and `fieldx` helper functions.
 
+*Note*: there is no lateral viscosity term. 
+It only uses an implicit diffusion reconstruction method, i.e. improved weno method, which prevents the simulation from blowing up.
+However, a 3 pt scheme is sufficient.
+The 5pt schemes results in weird oscillations along the boundaries.
+
 To run the scripts, run poetry and ensure that it installs with
 
 ```bash
 poetry install --with exp
 ```
 
-
-
+or alternatively we can simply use the conda environment from above.
 
 
 

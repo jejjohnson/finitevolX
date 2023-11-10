@@ -35,17 +35,23 @@ def x_avg_1D(u: Array, mean_fn: str = "arithmetic") -> Array:
 
 def x_avg_2D(u: Array, mean_fn: str = "arithmetic") -> Array:
     assert u.ndim == 2
-    return avg_pool(u, kernel_size=(2, 1), stride=(1, 1), padding="VALID", mean_fn=mean_fn)
+    return avg_pool(
+        u, kernel_size=(2, 1), stride=(1, 1), padding="VALID", mean_fn=mean_fn
+    )
 
 
 def y_avg_2D(u: Array, mean_fn: str = "arithmetic") -> Array:
     assert u.ndim == 2
-    return avg_pool(u, kernel_size=(1, 2), stride=(1, 1), padding="VALID", mean_fn=mean_fn)
+    return avg_pool(
+        u, kernel_size=(1, 2), stride=(1, 1), padding="VALID", mean_fn=mean_fn
+    )
 
 
 def center_avg_2D(u: Array, mean_fn: str = "arithmetic") -> Array:
     assert u.ndim == 2
-    return avg_pool(u, kernel_size=(2, 2), stride=(1, 1), padding="VALID", mean_fn=mean_fn)
+    return avg_pool(
+        u, kernel_size=(2, 2), stride=(1, 1), padding="VALID", mean_fn=mean_fn
+    )
 
 
 def get_mean_function(mean_fn: str = "arithmetic") -> Callable:

@@ -7,12 +7,20 @@ Script Taken from:
 
 """
 import autoroot
-from jaxtyping import Float, Array
-import numpy as np
-import jax.numpy as jnp
-import matplotlib.pyplot as plt
-from finitevolx import center_avg_2D, MaskGrid, difference
 import jax
+import jax.numpy as jnp
+from jaxtyping import (
+    Array,
+    Float,
+)
+import matplotlib.pyplot as plt
+import numpy as np
+
+from finitevolx import (
+    MaskGrid,
+    center_avg_2D,
+    difference,
+)
 
 jax.config.update("jax_enable_x64", True)
 
@@ -43,7 +51,8 @@ X, Y = np.meshgrid(x, y, indexing="ij")
 
 # initial conditions
 h0 = depth + 1.0 * np.exp(
-    -((X - x[n_x // 2]) ** 2) / rossby_radius**2 - (Y - y[n_y - 2]) ** 2 / rossby_radius**2
+    -((X - x[n_x // 2]) ** 2) / rossby_radius**2
+    - (Y - y[n_y - 2]) ** 2 / rossby_radius**2
 )
 
 # mask
@@ -97,7 +106,8 @@ def update_plot(t, h, u, v, ax):
     ax.set_xlim(x[1] / 1e3, x[-2] / 1e3)
     ax.set_ylim(y[1] / 1e3, y[-2] / 1e3)
     ax.set_title(
-        "t=%5.2f days, R=%5.1f km, c=%5.1f m/s " % (t / 86400, rossby_radius / 1e3, phase_speed)
+        "t=%5.2f days, R=%5.1f km, c=%5.1f m/s "
+        % (t / 86400, rossby_radius / 1e3, phase_speed)
     )
     plt.pause(0.1)
     return cs
@@ -130,15 +140,14 @@ def iterate_shallow_water():
     u *= masks.face_u.values
     v *= masks.face_v.values
 
-
-
     def equation_of_motion(h, u, v):
-
         # ================================
         # update zonal velocity, u
         # ================================
         v_avg: Float[Array, "Nx-1 Ny"] = center_avg_2D(v)
-        dh_dx: Float[Array, "Nx-1 Ny"] = difference(h, step_size=dx, axis=0, derivative=1)
+        dh_dx: Float[Array, "Nx-1 Ny"] = difference(
+            h, step_size=dx, axis=0, derivative=1
+        )
 
         u_rhs: Float[Array, "Nx-1 Ny"] = coriolis_param * v_avg - gravity * dh_dx
 
@@ -154,9 +163,11 @@ def iterate_shallow_water():
         # update meridional velocity, v
         # =================================
         u_avg: Float[Array, "Nx Ny-1"] = center_avg_2D(u)
-        dh_dy: Float[Array, "Nx Ny-1"] = difference(h, step_size=dy, axis=1, derivative=1)
+        dh_dy: Float[Array, "Nx Ny-1"] = difference(
+            h, step_size=dy, axis=1, derivative=1
+        )
 
-        v_rhs: Float[Array, "Nx Ny-1"] = - coriolis_param * u_avg - gravity * dh_dy
+        v_rhs: Float[Array, "Nx Ny-1"] = -coriolis_param * u_avg - gravity * dh_dy
 
         # apply masks
         v_rhs *= masks.face_v.values[:, 1:-1]
@@ -172,7 +183,7 @@ def iterate_shallow_water():
         du_dx: Float[Array, "Nx Ny"] = difference(u, step_size=dx, axis=0, derivative=1)
         dv_dy: Float[Array, "Nx Ny"] = difference(v, step_size=dy, axis=1, derivative=1)
 
-        h_rhs: Float[Array, "Nx Ny"] = - depth * (du_dx + dv_dy)
+        h_rhs: Float[Array, "Nx Ny"] = -depth * (du_dx + dv_dy)
 
         # apply masks
         h_rhs *= masks.center.values
@@ -186,11 +197,8 @@ def iterate_shallow_water():
 
     eom_fn = jax.jit(equation_of_motion)
 
-
-
     # time step equations
     while True:
-
         h, u, v = eom_fn(h, u, v)
 
         yield h, u, v
