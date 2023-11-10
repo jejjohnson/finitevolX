@@ -1,12 +1,20 @@
-from jaxtyping import Array, Float
 import finitediffx as fdx
 import jax
-from jaxtyping import Array
-from finitevolx._src.interp.interp import x_avg_2D, y_avg_2D
+from jaxtyping import (
+    Array,
+    Float,
+)
+
 from finitevolx._src.constants import GRAVITY
+from finitevolx._src.interp.interp import (
+    x_avg_2D,
+    y_avg_2D,
+)
 
 
-def difference(u: Array, axis: int = 0, step_size: float = 1.0, derivative: int = 1) -> Array:
+def difference(
+    u: Array, axis: int = 0, step_size: float = 1.0, derivative: int = 1
+) -> Array:
     if derivative == 1:
         du = fdx.difference(
             u,
@@ -33,6 +41,7 @@ def difference(u: Array, axis: int = 0, step_size: float = 1.0, derivative: int 
 
     return du
 
+
 def laplacian(u: Array, step_size: float | tuple[float, ...] | Array = 1) -> Array:
     msg = "Laplacian must be 2D or 3D"
     assert u.ndim in [2, 3], msg
@@ -47,10 +56,11 @@ def laplacian(u: Array, step_size: float | tuple[float, ...] | Array = 1) -> Arr
 
     return lap_u
 
+
 def geostrophic_gradient(
-        u: Float[Array, "Nx Ny"],
-        dx: float | Array,
-        dy: float | Array,
+    u: Float[Array, "Nx Ny"],
+    dx: float | Array,
+    dy: float | Array,
 ) -> tuple[Float[Array, "Nx Ny-1"], Float[Array, "Nx-1 Ny"]]:
     """Calculates the geostrophic gradient for a staggered grid
 
@@ -78,6 +88,7 @@ def geostrophic_gradient(
     du_dy = difference(u=u, axis=1, step_size=dy, derivative=1)
     dv_dx = difference(u=u, axis=0, step_size=dx, derivative=1)
     return -du_dy, dv_dx
+
 
 def divergence(u: Array, v: Array, dx: float, dy: float) -> Array:
     """Calculates the divergence for a staggered grid
@@ -132,16 +143,20 @@ def relative_vorticity(
             Size = [Nx-1,Ny-1]
     """
     # ∂xv
-    dv_dx: Float[Array, "Nx-1 Ny-1"] = difference(u=v, axis=0, step_size=dx, derivative=1)
+    dv_dx: Float[Array, "Nx-1 Ny-1"] = difference(
+        u=v, axis=0, step_size=dx, derivative=1
+    )
     # ∂yu
-    du_dy: Float[Array, "Nx-1 Ny-1"] = difference(u=u, axis=1, step_size=dy, derivative=1)
+    du_dy: Float[Array, "Nx-1 Ny-1"] = difference(
+        u=u, axis=1, step_size=dy, derivative=1
+    )
 
     return dv_dx - du_dy
 
 
 def kinetic_energy(
-        u: Float[Array, "Nx+1 Ny"],
-        v: Float[Array, "Nx Ny+1"],
+    u: Float[Array, "Nx+1 Ny"],
+    v: Float[Array, "Nx Ny+1"],
 ) -> Float[Array, "Nx Ny"]:
     """Calculates the kinetic energy on the
     center points
@@ -196,18 +211,22 @@ def absolute_vorticity(
             Size = [Nx-1,Ny-1]
     """
     # ∂xv
-    dv_dx: Float[Array, "Nx-1 Ny-1"] = difference(u=v, axis=0, step_size=dx, derivative=1)
+    dv_dx: Float[Array, "Nx-1 Ny-1"] = difference(
+        u=v, axis=0, step_size=dx, derivative=1
+    )
     # ∂yu
-    du_dy: Float[Array, "Nx-1 Ny-1"] = difference(u=u, axis=1, step_size=dy, derivative=1)
+    du_dy: Float[Array, "Nx-1 Ny-1"] = difference(
+        u=u, axis=1, step_size=dy, derivative=1
+    )
 
     return dv_dx + du_dy
 
 
 def bernoulli_potential(
-        h: Float[Array, "Nx Ny"],
-        u: Float[Array, "Nx+1 Ny"],
-        v: Float[Array, "Nx Ny+1"],
-        gravity: float=GRAVITY
+    h: Float[Array, "Nx Ny"],
+    u: Float[Array, "Nx+1 Ny"],
+    v: Float[Array, "Nx Ny+1"],
+    gravity: float = GRAVITY,
 ) -> Float[Array, "Nx Ny"]:
     """Calculates the Bernoulli work
 
@@ -236,8 +255,6 @@ def bernoulli_potential(
 
     # calculate kinetic energy
     ke: Float[Array, "Nx Ny"] = kinetic_energy(u=u, v=v)
-
-
 
     # calculate Berunoulli potential
     p: Float[Array, "Nx Ny"] = ke + gravity * h

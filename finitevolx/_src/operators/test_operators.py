@@ -3,17 +3,21 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx import x_avg_2D, y_avg_2D
-from finitevolx._src.operators.operators import (
-    difference,
-    laplacian,
-    divergence,
-    relative_vorticity,
-    geostrophic_gradient,
-    kinetic_energy,
-    bernoulli_potential, absolute_vorticity
+from finitevolx import (
+    x_avg_2D,
+    y_avg_2D,
 )
 from finitevolx._src.constants import GRAVITY
+from finitevolx._src.operators.operators import (
+    absolute_vorticity,
+    bernoulli_potential,
+    difference,
+    divergence,
+    geostrophic_gradient,
+    kinetic_energy,
+    laplacian,
+    relative_vorticity,
+)
 
 jax.config.update("jax_enable_x64", True)
 
@@ -28,19 +32,20 @@ Nx_node, Ny_node = Nx_center + 1, Ny_center + 1
 # list of methods
 
 
-
-
 @pytest.fixture()
 def u_1d_ones():
     return jnp.ones(Nx_face_u)
+
 
 @pytest.fixture()
 def u_1d_randn():
     return rng.randn(Nx_face_u)
 
+
 @pytest.fixture()
 def v_1d_ones():
     return jnp.ones(Nx_face_v)
+
 
 @pytest.fixture()
 def v_1d_randn():
@@ -51,13 +56,16 @@ def v_1d_randn():
 def center_1d_ones():
     return jnp.ones(Nx_center)
 
+
 @pytest.fixture()
 def center_1d_randn():
     return rng.randn(Nx_center)
 
+
 @pytest.fixture()
 def node_1d_ones():
     return jnp.ones(Nx_center)
+
 
 @pytest.fixture()
 def node_1d_randn():
@@ -68,6 +76,7 @@ def node_1d_randn():
 def u_2d_ones():
     return jnp.ones((Nx_face_u, Ny_face_u))
 
+
 @pytest.fixture()
 def u_2d_randn():
     return rng.randn(Nx_face_u, Ny_face_u)
@@ -76,6 +85,7 @@ def u_2d_randn():
 @pytest.fixture()
 def v_2d_ones():
     return jnp.ones((Nx_face_v, Ny_face_v))
+
 
 @pytest.fixture()
 def v_2d_randn():
@@ -86,13 +96,16 @@ def v_2d_randn():
 def center_2d_ones():
     return jnp.ones((Nx_center, Ny_center))
 
+
 @pytest.fixture()
 def center_2d_randn():
     return rng.randn(Nx_center, Ny_center)
 
+
 @pytest.fixture()
 def node_2d_ones():
     return jnp.ones((Nx_node, Ny_node))
+
 
 @pytest.fixture()
 def node_2d_randn():
@@ -230,6 +243,7 @@ def test_lap_random(u_2d_randn):
 
     np.testing.assert_array_almost_equal(lap_u_np, lap_u)
 
+
 def test_divergence():
     u = rng.randn(50, 25)
     v = rng.randn(49, 26)
@@ -260,6 +274,7 @@ def test_relative_vorticity():
     vort_r = relative_vorticity(u, v, dx=dx, dy=dy)
 
     np.testing.assert_array_almost_equal(vort_r_, vort_r)
+
 
 def test_absolute_vorticity():
     u = rng.randn(50, 26)
@@ -293,7 +308,6 @@ def test_geostrophic_gradient():
 
 
 def test_kinetic_energy_2d_ones(u_2d_ones, v_2d_ones, center_2d_ones):
-
     u = u_2d_ones
     v = v_2d_ones
     h = center_2d_ones
@@ -308,8 +322,8 @@ def test_kinetic_energy_2d_ones(u_2d_ones, v_2d_ones, center_2d_ones):
     assert ke.shape == h.shape
     np.testing.assert_array_almost_equal(ke, ke_)
 
-def test_bernoulli_potential_2d_ones(u_2d_ones, v_2d_ones, center_2d_ones):
 
+def test_bernoulli_potential_2d_ones(u_2d_ones, v_2d_ones, center_2d_ones):
     u = u_2d_ones
     v = v_2d_ones
     h = center_2d_ones

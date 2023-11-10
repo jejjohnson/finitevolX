@@ -15,13 +15,15 @@ from finitevolx._src.masks.masks import (
     MaskGrid,
     NodeMask,
 )
-
 from finitevolx._src.operators.operators import (
+    absolute_vorticity,
+    bernoulli_potential,
     difference,
-    laplacian,
     divergence,
     geostrophic_gradient,
-    relative_vorticity, kinetic_energy, bernoulli_potential, absolute_vorticity
+    kinetic_energy,
+    laplacian,
+    relative_vorticity,
 )
 from finitevolx._src.reconstructions.reconstruct import (
     reconstruct,
