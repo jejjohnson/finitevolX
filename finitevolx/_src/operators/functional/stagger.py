@@ -1,12 +1,7 @@
 import functools as ft
 import typing as tp
 
-import jax
-import jax.numpy as jnp
-from jaxtyping import Array
-
 from finitevolx import Domain
-from finitevolx._src.domain.domain import init_domain_from_bounds_and_step
 
 # # from jaxsw._src.domain import base_v2 as domain_utils
 # from fieldx._src.field.field import Field

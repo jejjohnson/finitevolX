@@ -3,10 +3,7 @@ from operator import (
     sub,
 )
 
-import pytest
-
 from finitevolx._src.domain.domain import Domain
-from finitevolx._src.field.field import Field
 from finitevolx._src.operators.functional.stagger import (
     batch_domain_limits_transform,
     domain_limits_transform,
@@ -21,6 +18,37 @@ xmin, ymin = 0.0, 0.0
 H_DOMAIN = Domain(
     xmin=(xmin, ymin), xmax=(Lx, Ly), Lx=(Lx, Ly), Nx=(Nx, Ny), dx=(dx, dy)
 )
+
+
+def test_limits_transform_null():
+    xmin, ymin = H_DOMAIN.xmin
+    xmax, ymax = H_DOMAIN.xmax
+    Lx, Ly = H_DOMAIN.Lx
+    Nx, Ny = H_DOMAIN.Nx
+
+    # Case I: None | no stagger
+    direction = None
+    stagger = False
+    xmin_, xmax_, Nx_, Lx_ = domain_limits_transform(
+        xmin=xmin, xmax=xmax, dx=dx, Lx=Lx, Nx=Nx, direction=direction, stagger=stagger
+    )
+
+    assert Nx == Nx_
+    assert Lx == Lx_
+    assert xmin == xmin_
+    assert xmax == xmax_
+
+    # Case II: None | stagger
+    direction = None
+    stagger = True
+    xmin_, xmax_, Nx_, Lx_ = domain_limits_transform(
+        xmin=xmin, xmax=xmax, dx=dx, Lx=Lx, Nx=Nx, direction=direction, stagger=stagger
+    )
+
+    assert Nx == Nx_
+    assert Lx == Lx_
+    assert xmin == xmin_
+    assert xmax == xmax_
 
 
 def test_limits_transform_no_stagger():
@@ -131,6 +159,44 @@ def test_limits_transform_stagger():
     assert Lx_ == Lx + dx
     assert xmin_ == xmin - 0.5 * dx
     assert xmax_ == xmax + 0.5 * dx
+
+
+def test_batch_limits_transform_nnull():
+    # Case I: None | no stagger
+    direction = (None, None)
+    stagger = (False, False)
+    xmin_, xmax_, Nx_, Lx_ = batch_domain_limits_transform(
+        xmin=H_DOMAIN.xmin,
+        xmax=H_DOMAIN.xmax,
+        dx=H_DOMAIN.dx,
+        Lx=H_DOMAIN.Lx,
+        Nx=H_DOMAIN.Nx,
+        direction=direction,
+        stagger=stagger,
+    )
+
+    assert Nx_ == H_DOMAIN.Nx
+    assert Lx_ == H_DOMAIN.Lx
+    assert xmin_ == H_DOMAIN.xmin
+    assert xmax_ == H_DOMAIN.xmax
+
+    # Case II: None | stagger
+    direction = (None, None)
+    stagger = (True, True)
+    xmin_, xmax_, Nx_, Lx_ = batch_domain_limits_transform(
+        xmin=H_DOMAIN.xmin,
+        xmax=H_DOMAIN.xmax,
+        dx=H_DOMAIN.dx,
+        Lx=H_DOMAIN.Lx,
+        Nx=H_DOMAIN.Nx,
+        direction=direction,
+        stagger=stagger,
+    )
+
+    assert Nx_ == H_DOMAIN.Nx
+    assert Lx_ == H_DOMAIN.Lx
+    assert xmin_ == H_DOMAIN.xmin
+    assert xmax_ == H_DOMAIN.xmax
 
 
 def test_batch_limits_transform_no_stagger():
@@ -358,3 +424,23 @@ def test_stagger_domain():
     assert u_domain.xmax == tuple(
         map(lambda x: x[0] + 0.5 * x[1], list(zip(H_DOMAIN.xmax, H_DOMAIN.dx)))
     )
+
+    # Case V: None | no stagger
+    direction = (None, None)
+    stagger = (False, False)
+    u_domain = stagger_domain(domain=H_DOMAIN, direction=direction, stagger=stagger)
+
+    assert u_domain.Nx == H_DOMAIN.Nx
+    assert u_domain.Lx == H_DOMAIN.Lx
+    assert u_domain.xmin == H_DOMAIN.xmin
+    assert u_domain.xmax == H_DOMAIN.xmax
+
+    # Case VI: None | stagger
+    direction = (None, None)
+    stagger = (True, True)
+    u_domain = stagger_domain(domain=H_DOMAIN, direction=direction, stagger=stagger)
+
+    assert u_domain.Nx == H_DOMAIN.Nx
+    assert u_domain.Lx == H_DOMAIN.Lx
+    assert u_domain.xmin == H_DOMAIN.xmin
+    assert u_domain.xmax == H_DOMAIN.xmax

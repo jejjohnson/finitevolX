@@ -16,7 +16,6 @@ from finitevolx._src.masks.masks import (
     MaskGrid,
     NodeMask,
 )
-from finitevolx._src.operators.functional.pad import pad_field
 from finitevolx._src.operators.operators import (
     absolute_vorticity,
     bernoulli_potential,

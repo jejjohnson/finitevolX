@@ -1,43 +1,47 @@
 import jax.numpy as jnp
-import numpy as np
 import pytest
 
-# from field._src.domain.domain import Domain
-# from fieldx._src.field.field import Field
+from finitevolx._src.domain.domain import Domain
+from finitevolx._src.field.field import Field
+
 # from fieldx._src.field.utils import DiscretizationError, check_discretization
 
-#
-# @pytest.fixture
-# def domain_1d_params():
-#     xmin = (0.0,)
-#     xmax = (2.0,)
-#     nx = (21,)
-#     return xmin, xmax, nx
-#
-#
-# @pytest.fixture
-# def domain_1d(domain_1d_params):
-#     domain = Domain.from_numpoints(
-#         xmin=domain_1d_params[0],
-#         xmax=domain_1d_params[1],
-#         N=domain_1d_params[2],
-#     )
-#     return domain
-#
-#
-# @pytest.fixture
-# def field_1d(domain_1d):
-#     domain = domain_1d
-#
-#     u = jnp.ones_like(domain.grid.squeeze())
-#
-#     u = u.at[int(0.5 / domain.dx[0]) : int(1 / domain.dx[0] + 1)].set(2.0)
-#
-#     u = Field(u, domain)
-#
-#     return u
-#
-#
+
+@pytest.fixture
+def domain_1d_params():
+    xmin = (0.0,)
+    xmax = (2.0,)
+    nx = (21,)
+    dx = (5,)
+    lx = (nx[0] - 1,) / dx[0]
+    return xmin, xmax, nx, dx, lx
+
+
+@pytest.fixture
+def domain_1d(domain_1d_params):
+    domain = Domain.from_numpoints(
+        xmin=domain_1d_params[0],
+        xmax=domain_1d_params[1],
+        Nx=domain_1d_params[2],
+        dx=domain_1d_params[3],
+        Lx=domain_1d_params[4],
+    )
+    return domain
+
+
+@pytest.fixture
+def field_1d(domain_1d):
+    domain = domain_1d
+
+    u = jnp.ones_like(domain.grid.squeeze())
+
+    u = u.at[int(0.5 / domain.dx[0]) : int(1 / domain.dx[0] + 1)].set(2.0)
+
+    u = Field(u, domain)
+
+    return u
+
+
 # def test_passes(domain_1d):
 #     domain1 = domain_1d
 #     xmin = 0.0

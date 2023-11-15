@@ -1,5 +1,4 @@
 from functools import reduce
-import math
 from operator import mul
 import typing as tp
 
@@ -12,7 +11,6 @@ from finitevolx._src.domain.utils import (
     bounds_and_points_to_step,
     bounds_and_step_to_points,
     bounds_to_length,
-    create_meshgrid_coordinates,
     make_coords,
     make_grid_coords,
     make_grid_from_coords,
@@ -20,22 +18,26 @@ from finitevolx._src.domain.utils import (
 
 
 def check_inputs_types(x, name: str):
-    if isinstance(x, float) or isinstance(x, int):
+    if isinstance(x, (int, float)):
         return tuple([x])
     elif isinstance(x, list):
         return tuple(x)
     elif isinstance(x, tuple):
         return x
-    elif isinstance(x, jnp.ndarray) or isinstance(x, np.ndarray):
+    elif isinstance(x, (np.ndarray, jnp.ndarray)):
         return tuple(map(lambda x: float(x), x))
     raise ValueError(f"Unexpected type for {name}, got {x}.")
 
 
-def check_inputs(xmin, xmax, Nx, Lx, dx):
+def _check_inputs(xmin, xmax, Nx, Lx, dx):
     # check (xmax - xmin) == Lx
     assert bounds_to_length(xmin=xmin, xmax=xmax) == Lx
-    # check (xmax - xmin) / Nx
+    # check (xmax - xmin) / (Nx - 1)
     assert bounds_and_points_to_step(xmin=xmin, xmax=xmax, Nx=Nx) == dx
+
+
+def _batch_check_inputs(xmin, xmax, Nx, Lx, dx):
+    pass
 
 
 class Domain(eqx.Module):
@@ -73,6 +75,7 @@ class Domain(eqx.Module):
         Nx = check_inputs_types(Nx, name="Nx")
         Lx = check_inputs_types(Lx, name="Lx")
         assert len(xmin) == len(xmax) == len(dx) == len(Nx) == len(Lx)
+        # check_inputs(xmin=xmin, xmax=xmax, dx=dx, Nx=Nx, Lx=Lx)
         self.xmin = xmin
         self.xmax = xmax
         self.dx = dx

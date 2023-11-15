@@ -3,17 +3,8 @@ import functools as ft
 import jax.numpy as jnp
 from jaxtyping import Array
 
-from finitevolx._src.domain.domain import (
-    Domain,
-    init_domain_from_bounds_and_step,
-)
+from finitevolx._src.domain.domain import Domain
 from finitevolx._src.field.field import Field
-from finitevolx._src.masks.masks import (
-    CenterMask,
-    FaceMask,
-    MaskGrid,
-    NodeMask,
-)
 
 PADDING = {
     "both": (1, 1),
@@ -23,7 +14,7 @@ PADDING = {
 }
 
 
-def pad_array(u: Array, pad_width, *args, **kwargs):
+def pad_array(u: Array, pad_width, **kwargs):
     # check lengths
     assert len(pad_width) <= u.ndim
 
@@ -33,7 +24,7 @@ def pad_array(u: Array, pad_width, *args, **kwargs):
         for ipad in pad_width
     ]
 
-    return jnp.pad(u, pad_width=pad_width, *args, **kwargs)
+    return jnp.pad(u, pad_width=pad_width, **kwargs)
 
 
 def pad_domain(domain: Domain, pad_width):
@@ -75,9 +66,9 @@ def pad_domain(domain: Domain, pad_width):
     return domain
 
 
-def pad_field(u: Field, pad_width, *args, **kwargs) -> Field:
+def pad_field(u: Field, pad_width, **kwargs) -> Field:
     # values
-    u_values = pad_array(u.values, pad_width=pad_width, *args, **kwargs)
+    u_values = pad_array(u.values, pad_width=pad_width, **kwargs)
     # domain
     domain = pad_domain(u.domain, pad_width=pad_width)
     return Field(values=u_values, domain=domain)
