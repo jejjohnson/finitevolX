@@ -175,7 +175,6 @@ def test_reconstruct_mask_v(method, num_pts):
     v = jax.lax.slice_in_dim(v, axis=1, start_index=1, limit_index=-1)
     v_mask = MASKS_RECT.face_v[:, 1:-1]
 
-
     # do flux
     flux = reconstruct(q=q, u=v, u_mask=v_mask, dim=1, method=method, num_pts=num_pts)
 

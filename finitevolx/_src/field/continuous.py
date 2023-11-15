@@ -1,10 +1,12 @@
 import typing as tp
-from finitevolx._src.field.field import Field
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array
+
 from finitevolx import Domain
+from finitevolx._src.field.field import Field
 
 
 class ContinuousField(Field):

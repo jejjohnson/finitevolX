@@ -1,9 +1,9 @@
 import typing as tp
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array
-import equinox as eqx
 
 from finitevolx._src.interp.interp import avg_pool
 
@@ -26,8 +26,13 @@ class NodeMask(eqx.Module):
         irrbound_xids = self.irrbound_xids[item]
         irrbound_yids = self.irrbound_yids[item]
 
-        return NodeMask(values=values, not_values=not_values, distbound1=distbound1, irrbound_xids=irrbound_xids, irrbound_yids=irrbound_yids)
-
+        return NodeMask(
+            values=values,
+            not_values=not_values,
+            distbound1=distbound1,
+            irrbound_xids=irrbound_xids,
+            irrbound_yids=irrbound_yids,
+        )
 
 
 class FaceMask(eqx.Module):
@@ -50,7 +55,14 @@ class FaceMask(eqx.Module):
         distbound2plus = self.distbound2plus[item]
         distbound3plus = self.distbound3plus[item]
 
-        return FaceMask(values=values, not_values=not_values, distbound2=distbound2, distbound1=distbound1, distbound2plus=distbound2plus, distbound3plus=distbound3plus)
+        return FaceMask(
+            values=values,
+            not_values=not_values,
+            distbound2=distbound2,
+            distbound1=distbound1,
+            distbound2plus=distbound2plus,
+            distbound3plus=distbound3plus,
+        )
 
 
 class CenterMask(eqx.Module):
@@ -69,7 +81,12 @@ class CenterMask(eqx.Module):
         distbound1 = self.distbound1[item]
         values_interior = self.values_interior[item]
 
-        return CenterMask(values=values, not_values=not_values, values_interior=values_interior, distbound1=distbound1)
+        return CenterMask(
+            values=values,
+            not_values=not_values,
+            values_interior=values_interior,
+            distbound1=distbound1,
+        )
 
 
 class MaskGrid(tp.NamedTuple):
@@ -80,7 +97,6 @@ class MaskGrid(tp.NamedTuple):
 
     @classmethod
     def init_mask(cls, mask: Array, location: str = "node"):
-
         mtype = mask.dtype
 
         if location == "center":

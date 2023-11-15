@@ -1,3 +1,4 @@
+from finitevolx._src.domain.domain import Domain
 from finitevolx._src.interp.interp import (
     avg_arithmetic,
     avg_geometric,
@@ -15,6 +16,7 @@ from finitevolx._src.masks.masks import (
     MaskGrid,
     NodeMask,
 )
+from finitevolx._src.operators.functional.pad import pad_field
 from finitevolx._src.operators.operators import (
     absolute_vorticity,
     bernoulli_potential,
@@ -38,10 +40,6 @@ from finitevolx._src.reconstructions.upwind import (
     upwind_3pt_bnds,
     upwind_5pt,
 )
-
-
-from finitevolx._src.domain.domain import Domain
-from finitevolx._src.operators.functional.pad import pad_field
 
 __all__ = [
     "Domain",

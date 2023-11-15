@@ -1,15 +1,22 @@
+from functools import reduce
 import math
+from operator import mul
 import typing as tp
+
 import equinox as eqx
 import jax.numpy as jnp
-import numpy as np
-from finitevolx._src.domain.utils import (
-    make_coords, make_grid_from_coords, make_grid_coords, create_meshgrid_coordinates, bounds_to_length, bounds_and_points_to_step,
-bounds_and_step_to_points)
-
 from jaxtyping import Array
-from functools import reduce
-from operator import mul
+import numpy as np
+
+from finitevolx._src.domain.utils import (
+    bounds_and_points_to_step,
+    bounds_and_step_to_points,
+    bounds_to_length,
+    create_meshgrid_coordinates,
+    make_coords,
+    make_grid_coords,
+    make_grid_from_coords,
+)
 
 
 def check_inputs_types(x, name: str):
@@ -25,12 +32,10 @@ def check_inputs_types(x, name: str):
 
 
 def check_inputs(xmin, xmax, Nx, Lx, dx):
-
     # check (xmax - xmin) == Lx
     assert bounds_to_length(xmin=xmin, xmax=xmax) == Lx
     # check (xmax - xmin) / Nx
     assert bounds_and_points_to_step(xmin=xmin, xmax=xmax, Nx=Nx) == dx
-
 
 
 class Domain(eqx.Module):
@@ -103,9 +108,9 @@ class Domain(eqx.Module):
             values = list(values)
 
         if Ellipsis in values:
-            raise ValueError(f"Ellipsis not allowed. MUST be explicit.")
+            raise ValueError("Ellipsis not allowed. MUST be explicit.")
 
-        msg = f"Incompatible slice. MUST be explicit"
+        msg = "Incompatible slice. MUST be explicit"
         assert len(values) == len(self.coords_axis), msg
 
         # get sliced coordinates
@@ -146,7 +151,9 @@ class Domain(eqx.Module):
         return Domain(xmin=xmin, xmax=xmax, dx=dx, Nx=Nx, Lx=Lx)
 
 
-def init_domain_from_bounds_and_numpoints(xmin: float = 0.0, xmax: float = 1.0, Nx: int = 50):
+def init_domain_from_bounds_and_numpoints(
+    xmin: float = 0.0, xmax: float = 1.0, Nx: int = 50
+):
     """initialize 1d domain from bounds and number of points
     Eqs:
         dx = (x_max - x_min) / (Nx - 1)

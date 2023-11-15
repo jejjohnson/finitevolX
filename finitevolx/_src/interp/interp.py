@@ -3,11 +3,15 @@ from typing import (
     Optional,
 )
 
-import jax.numpy as jnp
-from jaxtyping import Array, Float
-import kernex as kex
 from interpax import Interpolator2D
+import jax.numpy as jnp
 from jaxinterp2d import CartesianGrid
+from jaxtyping import (
+    Array,
+    Float,
+)
+import kernex as kex
+
 from finitevolx._src.domain.domain import Domain
 
 
@@ -99,11 +103,11 @@ def avg_quadratic(x, y):
 
 
 def domain_interpolation_2D(
-        u: Float[Array, "Nx Ny"],
-        source_domain: Domain,
-        target_domain: Domain,
-        method: str = "linear",
-        extrap: bool = True
+    u: Float[Array, "Nx Ny"],
+    source_domain: Domain,
+    target_domain: Domain,
+    method: str = "linear",
+    extrap: bool = True,
 ) -> Array:
     """This function will interpolate the values
     from one domain to a target domain
@@ -127,7 +131,7 @@ def domain_interpolation_2D(
         y=source_domain.coords_axis[1],
         f=u,
         method=method,
-        extrap=extrap
+        extrap=extrap,
     )
 
     # get coordinates of target grid
@@ -143,11 +147,11 @@ def domain_interpolation_2D(
 
 
 def cartesian_interpolator_2D(
-        u: Float[Array, "Nx Ny"],
-        source_domain: Domain,
-        target_domain: Domain,
-        mode: str = "constant",
-        cval: float = 0.0
+    u: Float[Array, "Nx Ny"],
+    source_domain: Domain,
+    target_domain: Domain,
+    mode: str = "constant",
+    cval: float = 0.0,
 ) -> Array:
     """This function will interpolate the values
     from one domain to a target domain assuming a
@@ -172,11 +176,7 @@ def cartesian_interpolator_2D(
     ylims = (source_domain.xmin[1], source_domain.xmax[1])
 
     # initialize interpolator
-    interpolator = CartesianGrid(
-        limits=(xlims, ylims),
-        values=u,
-        mode=mode, cval=cval
-    )
+    interpolator = CartesianGrid(limits=(xlims, ylims), values=u, mode=mode, cval=cval)
 
     # get coordinates of target grid
     X, Y = target_domain.grid_axis

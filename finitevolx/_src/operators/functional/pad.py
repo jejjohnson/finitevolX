@@ -1,12 +1,19 @@
-from finitevolx._src.masks.masks import MaskGrid, NodeMask, FaceMask, CenterMask
-from jaxtyping import Array
-import jax.numpy as jnp
-from finitevolx._src.domain.domain import Domain, init_domain_from_bounds_and_step
-from finitevolx._src.field.field import Field
-from jaxtyping import Array
 import functools as ft
 
+import jax.numpy as jnp
+from jaxtyping import Array
 
+from finitevolx._src.domain.domain import (
+    Domain,
+    init_domain_from_bounds_and_step,
+)
+from finitevolx._src.field.field import Field
+from finitevolx._src.masks.masks import (
+    CenterMask,
+    FaceMask,
+    MaskGrid,
+    NodeMask,
+)
 
 PADDING = {
     "both": (1, 1),
@@ -16,13 +23,15 @@ PADDING = {
 }
 
 
-
 def pad_array(u: Array, pad_width, *args, **kwargs):
     # check lengths
     assert len(pad_width) <= u.ndim
 
     # convert to tuple if necessary
-    pad_width = [PADDING[ipad] if isinstance(ipad, (str, type(None))) else ipad for ipad in pad_width]
+    pad_width = [
+        PADDING[ipad] if isinstance(ipad, (str, type(None))) else ipad
+        for ipad in pad_width
+    ]
 
     return jnp.pad(u, pad_width=pad_width, *args, **kwargs)
 
@@ -32,11 +41,13 @@ def pad_domain(domain: Domain, pad_width):
     assert len(pad_width) <= len(domain.Nx)
 
     # convert to tuple if necessary
-    pad_width = [PADDING[ipad] if isinstance(ipad, (str, type(None))) else ipad for ipad in pad_width]
+    pad_width = [
+        PADDING[ipad] if isinstance(ipad, (str, type(None))) else ipad
+        for ipad in pad_width
+    ]
 
     # check if axis is used
     axis = [1 if sum(ipad) > 0 else 0 for ipad in pad_width]
-
 
     xmin = [
         xmin - pad_width[i][0] * domain.dx[i] if axis else xmin
@@ -47,14 +58,12 @@ def pad_domain(domain: Domain, pad_width):
         for i, xmax in enumerate(domain.xmax)
     ]
 
-    Nx = [
-        iNx + sum(ipad) for ipad, iNx in zip(pad_width, domain.Nx)
-    ]
+    Nx = [iNx + sum(ipad) for ipad, iNx in zip(pad_width, domain.Nx)]
 
     Lx = [
-        iLx + (pad_width[i][0] * domain.dx[i] + pad_width[i][1] * domain.dx[i]) for i, (ipad, iLx) in enumerate(zip(pad_width, domain.Lx))
+        iLx + (pad_width[i][0] * domain.dx[i] + pad_width[i][1] * domain.dx[i])
+        for i, (ipad, iLx) in enumerate(zip(pad_width, domain.Lx))
     ]
-
 
     domains = [
         Domain(xmin=ixmin, xmax=ixmax, dx=idx, Lx=iLx, Nx=iNx)

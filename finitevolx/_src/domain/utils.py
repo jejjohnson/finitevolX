@@ -1,9 +1,10 @@
+import math
 import typing as tp
-import numpy as np
+
+import einops
 import jax.numpy as jnp
 from jaxtyping import Array
-import einops
-import math
+import numpy as np
 
 
 def make_coords(xmin, xmax, nx):

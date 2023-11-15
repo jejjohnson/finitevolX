@@ -1,10 +1,13 @@
-import typing as tp
 import functools as ft
+import typing as tp
+
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array
+
 from finitevolx import Domain
 from finitevolx._src.domain.domain import init_domain_from_bounds_and_step
+
 # # from jaxsw._src.domain import base_v2 as domain_utils
 # from fieldx._src.field.field import Field
 # # from jaxsw._src.operators.functional import grid as F_grid
@@ -35,7 +38,6 @@ PADDING = {
     "left": (1, 0),
     None: (0, 0),
 }
-
 
 
 def domain_limits_transform(
@@ -120,7 +122,6 @@ def stagger_domain(
         domain.xmin, domain.xmax, domain.dx, domain.Lx, domain.Nx, direction, stagger
     )
 
-
     domains = [
         Domain(xmin=ixmin, xmax=ixmax, dx=idx, Lx=iLx, Nx=iNx)
         for ixmin, ixmax, idx, iLx, iNx in zip(xmin, xmax, domain.dx, Lx, Nx)
@@ -134,4 +135,3 @@ def stagger_domain(
     # domain = Domain(xmin=xmin, xmax=xmax, dx=domain.dx)
 
     return domain
-

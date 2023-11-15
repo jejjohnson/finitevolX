@@ -1,11 +1,15 @@
 import typing as tp
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
-import equinox as eqx
-from jaxtyping import Array, Float
+from jaxtyping import (
+    Array,
+    Float,
+)
 
 from finitevolx import Domain
+
 from .utils import check_discretization
 
 # TODO: add power operation
