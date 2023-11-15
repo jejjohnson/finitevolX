@@ -39,7 +39,12 @@ from finitevolx._src.reconstructions.upwind import (
     upwind_5pt,
 )
 
+
+from finitevolx._src.domain.domain import Domain
+from finitevolx._src.operators.functional.pad import pad_field
+
 __all__ = [
+    "Domain",
     "difference",
     "laplacian",
     "divergence",

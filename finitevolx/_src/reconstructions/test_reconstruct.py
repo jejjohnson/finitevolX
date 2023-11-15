@@ -58,9 +58,7 @@ def test_reconstruct_1pt_mask():
 def test_reconstruct_3pt_mask_u(method):
     # take interior points
     u = jax.lax.slice_in_dim(U_ONES, axis=0, start_index=1, limit_index=-1)
-    fn = lambda x: jax.lax.slice_in_dim(x, axis=0, start_index=1, limit_index=-1)
-    u_mask = jax.tree_util.tree_map(fn, MASKS_RECT.face_u)
-    # u_mask = MASKS_RECT.face_u[1:-1]
+    u_mask = MASKS_RECT.face_u[1:-1]
 
     # do flux
     flux = reconstruct_3pt(q=Q_ONES, u=u, u_mask=u_mask, dim=0, method=method)
@@ -73,8 +71,7 @@ def test_reconstruct_3pt_mask_u(method):
 def test_reconstruct_3pt_mask_v(method):
     # take interior points
     v = jax.lax.slice_in_dim(V_ONES, axis=1, start_index=1, limit_index=-1)
-    fn = lambda x: jax.lax.slice_in_dim(x, axis=1, start_index=1, limit_index=-1)
-    v_mask = jax.tree_util.tree_map(fn, MASKS_RECT.face_v)
+    v_mask = MASKS_RECT.face_v[:, 1:-1]
 
     # do flux
     flux = reconstruct_3pt(q=Q_ONES, u=v, u_mask=v_mask, dim=1, method=method)
@@ -126,10 +123,6 @@ def test_reconstruct_nomask_u(method, num_pts):
     u = U_ONES.copy()
     q = Q_ONES.copy()
     u = jax.lax.slice_in_dim(u, axis=0, start_index=1, limit_index=-1)
-    fn = lambda x: jax.lax.slice_in_dim(x, axis=0, start_index=1, limit_index=-1)
-    u_mask = MASKS_RECT.face_u
-    u_mask = jax.tree_util.tree_map(fn, u_mask)
-    # u_mask = MASKS_RECT.face_u[1:-1]
 
     # do flux
     flux = reconstruct(q=q, u=u, u_mask=None, dim=0, method=method, num_pts=num_pts)
@@ -146,10 +139,6 @@ def test_reconstruct_nomask_v(method, num_pts):
     v = V_ONES.copy()
     q = Q_ONES.copy()
     v = jax.lax.slice_in_dim(v, axis=1, start_index=1, limit_index=-1)
-    fn = lambda x: jax.lax.slice_in_dim(x, axis=1, start_index=1, limit_index=-1)
-    v_mask = MASKS_RECT.face_v
-    v_mask = jax.tree_util.tree_map(fn, v_mask)
-    # u_mask = MASKS_RECT.face_u[1:-1]
 
     # do flux
     flux = reconstruct(q=q, u=v, u_mask=None, dim=1, method=method, num_pts=num_pts)
@@ -166,9 +155,7 @@ def test_reconstruct_mask_u(method, num_pts):
     u = U_ONES.copy()
     q = Q_ONES.copy()
     u = jax.lax.slice_in_dim(u, axis=0, start_index=1, limit_index=-1)
-    fn = lambda x: jax.lax.slice_in_dim(x, axis=0, start_index=1, limit_index=-1)
-    u_mask = MASKS_RECT.face_u
-    u_mask = jax.tree_util.tree_map(fn, u_mask)
+    u_mask = MASKS_RECT.face_u[1:-1]
 
     # do flux
     flux = reconstruct(q=q, u=u, u_mask=u_mask, dim=0, method=method, num_pts=num_pts)
@@ -186,10 +173,8 @@ def test_reconstruct_mask_v(method, num_pts):
     v = V_ONES.copy()
     q = Q_ONES.copy()
     v = jax.lax.slice_in_dim(v, axis=1, start_index=1, limit_index=-1)
-    fn = lambda x: jax.lax.slice_in_dim(x, axis=1, start_index=1, limit_index=-1)
-    v_mask = MASKS_RECT.face_v
-    v_mask = jax.tree_util.tree_map(fn, v_mask)
-    # u_mask = MASKS_RECT.face_u[1:-1]
+    v_mask = MASKS_RECT.face_v[:, 1:-1]
+
 
     # do flux
     flux = reconstruct(q=q, u=v, u_mask=v_mask, dim=1, method=method, num_pts=num_pts)
