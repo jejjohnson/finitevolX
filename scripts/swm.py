@@ -186,6 +186,7 @@ def prepare_plot():
 
 
 def update_plot(t, h, u, v, ax):
+    h, u, v = list(map(np.asarray, [h, u, v]))
     eta = h - depth
 
     quiver_stride = (slice(1, -1, Nx // max_quivers), slice(1, -1, Ny // max_quivers))
@@ -607,8 +608,10 @@ if __name__ == "__main__":
             u_on_h = center_avg_2D(u)
             v_on_h = center_avg_2D(v)
 
+
+
             # update plot
-            update_plot(t, np.asarray(h), np.asarray(u_on_h), np.asarray(v_on_h), ax)
+            update_plot(t, h, u_on_h, v_on_h, ax)
 
         # stop if user closes plot window
         if not plt.fignum_exists(fig.number):
