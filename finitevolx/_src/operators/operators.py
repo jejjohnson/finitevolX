@@ -13,7 +13,7 @@ from finitevolx._src.interp.interp import (
 
 
 def difference(
-    u: Array, axis: int = 0, step_size: float = 1.0, derivative: int = 1
+    u: Array, axis: int = 0, step_size: float = 1.0, derivative: int = 1, method: string = "central",
 ) -> Array:
     if derivative == 1:
         du = fdx.difference(
@@ -22,7 +22,7 @@ def difference(
             axis=axis,
             accuracy=1,
             derivative=derivative,
-            method="backward",
+            method=method,
         )
         du = jax.lax.slice_in_dim(du, axis=axis, start_index=1, limit_index=None)
     elif derivative == 2:
@@ -32,7 +32,7 @@ def difference(
             axis=axis,
             accuracy=1,
             derivative=derivative,
-            method="central",
+            method=method,
         )
         du = jax.lax.slice_in_dim(du, axis=axis, start_index=1, limit_index=-1)
     else:
@@ -61,6 +61,7 @@ def geostrophic_gradient(
     u: Float[Array, "Nx Ny"],
     dx: float | Array,
     dy: float | Array,
+    method: string = "central",
 ) -> tuple[Float[Array, "Nx Ny-1"], Float[Array, "Nx-1 Ny"]]:
     """Calculates the geostrophic gradient for a staggered grid
 
@@ -85,12 +86,12 @@ def geostrophic_gradient(
         derivative in the x-direction by negative 1.
     """
 
-    du_dy = difference(u=u, axis=1, step_size=dy, derivative=1)
-    dv_dx = difference(u=u, axis=0, step_size=dx, derivative=1)
+    du_dy = difference(u=u, axis=1, step_size=dy, derivative=1, method=method)
+    dv_dx = difference(u=u, axis=0, step_size=dx, derivative=1, method=method)
     return -du_dy, dv_dx
 
 
-def divergence(u: Array, v: Array, dx: float, dy: float) -> Array:
+def divergence(u: Array, v: Array, dx: float, dy: float, method: string = "central") -> Array:
     """Calculates the divergence for a staggered grid
 
     Equation:
@@ -110,9 +111,9 @@ def divergence(u: Array, v: Array, dx: float, dy: float) -> Array:
 
     """
     # ∂xu
-    dudx = difference(u=u, axis=0, step_size=dx, derivative=1)
+    dudx = difference(u=u, axis=0, step_size=dx, derivative=1, method=method)
     # ∂yv
-    dvdx = difference(u=v, axis=1, step_size=dy, derivative=1)
+    dvdx = difference(u=v, axis=1, step_size=dy, derivative=1, method=method)
 
     return dudx + dvdx
 
@@ -122,6 +123,7 @@ def relative_vorticity(
     v: Float[Array, "Nx-1 Ny"],
     dx: float | Array,
     dy: float | Array,
+    method: string = "central",
 ) -> Float[Array, "Nx-1 Ny-1"]:
     """Calculates the relative vorticity by using
     finite difference in the y and x direction for the
@@ -144,11 +146,11 @@ def relative_vorticity(
     """
     # ∂xv
     dv_dx: Float[Array, "Nx-1 Ny-1"] = difference(
-        u=v, axis=0, step_size=dx, derivative=1
+        u=v, axis=0, step_size=dx, derivative=1, method=method
     )
     # ∂yu
     du_dy: Float[Array, "Nx-1 Ny-1"] = difference(
-        u=u, axis=1, step_size=dy, derivative=1
+        u=u, axis=1, step_size=dy, derivative=1, method=method
     )
 
     return dv_dx - du_dy
@@ -190,6 +192,7 @@ def absolute_vorticity(
     v: Float[Array, "Nx-1 Ny"],
     dx: float | Array,
     dy: float | Array,
+    method: string = "central",
 ) -> Float[Array, "Nx-1 Ny-1"]:
     """Calculates the relative vorticity by using
     finite difference in the y and x direction for the
@@ -212,11 +215,11 @@ def absolute_vorticity(
     """
     # ∂xv
     dv_dx: Float[Array, "Nx-1 Ny-1"] = difference(
-        u=v, axis=0, step_size=dx, derivative=1
+        u=v, axis=0, step_size=dx, derivative=1, method=method
     )
     # ∂yu
     du_dy: Float[Array, "Nx-1 Ny-1"] = difference(
-        u=u, axis=1, step_size=dy, derivative=1
+        u=u, axis=1, step_size=dy, derivative=1, method=method
     )
 
     return dv_dx + du_dy
