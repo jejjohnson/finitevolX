@@ -255,7 +255,7 @@ def test_divergence():
     dv_dy_ = difference(v, axis=1, step_size=dy, derivative=1, method="backward")
     div_ = du_dx_ + dv_dy_
     # convenience function
-    div = divergence(u, v, dx=dx, dy=dy)
+    div = divergence(u, v, dx=dx, dy=dy, method="backward")
 
     np.testing.assert_array_almost_equal(div_, div)
 
@@ -271,7 +271,7 @@ def test_relative_vorticity():
     dv_dx_ = difference(v, axis=0, step_size=dx, derivative=1, method="backward")
     vort_r_ = dv_dx_ - du_dy_
     # convenience function
-    vort_r = relative_vorticity(u, v, dx=dx, dy=dy)
+    vort_r = relative_vorticity(u, v, dx=dx, dy=dy, method="backward")
 
     np.testing.assert_array_almost_equal(vort_r_, vort_r)
 
@@ -287,7 +287,7 @@ def test_absolute_vorticity():
     dv_dx_ = difference(v, axis=0, step_size=dx, derivative=1, method="backward")
     vort_r_ = dv_dx_ + du_dy_
     # convenience function
-    vort_r = absolute_vorticity(u, v, dx=dx, dy=dy)
+    vort_r = absolute_vorticity(u, v, dx=dx, dy=dy, method="backward")
 
     np.testing.assert_array_almost_equal(vort_r_, vort_r)
 
@@ -301,7 +301,7 @@ def test_geostrophic_gradient():
     v_ = difference(psi, axis=0, step_size=dx, derivative=1, method="backward")
 
     # convenience function
-    u, v = geostrophic_gradient(psi, dx=dx, dy=dy)
+    u, v = geostrophic_gradient(psi, dx=dx, dy=dy, method="backward")
 
     np.testing.assert_array_almost_equal(u_, u)
     np.testing.assert_array_almost_equal(v_, v)
