@@ -13,7 +13,7 @@ from finitevolx._src.interp.interp import (
 
 
 def difference(
-    u: Array, axis: int = 0, step_size: float = 1.0, derivative: int = 1, method: string = "central",
+    u: Array, axis: int = 0, step_size: float = 1.0, derivative: int = 1, method: str = "central",
 ) -> Array:
     if derivative == 1:
         du = fdx.difference(
@@ -61,7 +61,7 @@ def geostrophic_gradient(
     u: Float[Array, "Nx Ny"],
     dx: float | Array,
     dy: float | Array,
-    method: string = "central",
+    method: str = "central",
 ) -> tuple[Float[Array, "Nx Ny-1"], Float[Array, "Nx-1 Ny"]]:
     """Calculates the geostrophic gradient for a staggered grid
 
@@ -91,7 +91,7 @@ def geostrophic_gradient(
     return -du_dy, dv_dx
 
 
-def divergence(u: Array, v: Array, dx: float, dy: float, method: string = "central") -> Array:
+def divergence(u: Array, v: Array, dx: float, dy: float, method: str = "central") -> Array:
     """Calculates the divergence for a staggered grid
 
     Equation:
@@ -123,7 +123,7 @@ def relative_vorticity(
     v: Float[Array, "Nx-1 Ny"],
     dx: float | Array,
     dy: float | Array,
-    method: string = "central",
+    method: str = "central",
 ) -> Float[Array, "Nx-1 Ny-1"]:
     """Calculates the relative vorticity by using
     finite difference in the y and x direction for the
@@ -192,7 +192,7 @@ def absolute_vorticity(
     v: Float[Array, "Nx-1 Ny"],
     dx: float | Array,
     dy: float | Array,
-    method: string = "central",
+    method: str = "central",
 ) -> Float[Array, "Nx-1 Ny-1"]:
     """Calculates the relative vorticity by using
     finite difference in the y and x direction for the
