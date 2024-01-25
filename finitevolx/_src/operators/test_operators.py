@@ -117,7 +117,7 @@ def test_difference_1d_order1_ones(u_1d_ones):
 
     # classic difference
     du_dx_np = jnp.diff(u_1d_ones, n=1, axis=0) / step_size
-    du_dx = difference(u_1d_ones, axis=0, step_size=step_size, method='backward')
+    du_dx = difference(u_1d_ones, axis=0, step_size=step_size, method="backward")
 
     np.testing.assert_array_equal(du_dx_np, du_dx)
 
@@ -127,7 +127,7 @@ def test_difference_1d_order1_random(u_1d_randn):
 
     # classic difference
     du_dx_np = jnp.diff(u_1d_randn, n=1, axis=0) / step_size
-    du_dx = difference(u_1d_randn, axis=0, step_size=step_size, method='backward')
+    du_dx = difference(u_1d_randn, axis=0, step_size=step_size, method="backward")
 
     np.testing.assert_array_equal(du_dx_np, du_dx)
 
@@ -137,13 +137,13 @@ def test_difference_2d_order1_ones(u_2d_ones):
 
     # classic difference
     du_dx_np = jnp.diff(u_2d_ones, n=1, axis=0) / step_size
-    du_dx = difference(u_2d_ones, axis=0, step_size=step_size)
+    du_dx = difference(u_2d_ones, axis=0, step_size=step_size, method="backward")
 
     np.testing.assert_array_equal(du_dx_np, du_dx)
 
     # classic difference
     du_dy_np = jnp.diff(u_2d_ones, n=1, axis=1) / step_size
-    du_dy = difference(u_2d_ones, axis=1, step_size=step_size)
+    du_dy = difference(u_2d_ones, axis=1, step_size=step_size, method="backward")
 
     np.testing.assert_array_equal(du_dy_np, du_dy)
 
@@ -153,12 +153,12 @@ def test_difference_2d_order1_random(u_2d_randn):
 
     # classic difference
     du_dx_np = jnp.diff(u_2d_randn, n=1, axis=0) / step_size
-    du_dx = difference(u_2d_randn, axis=0, step_size=step_size)
+    du_dx = difference(u_2d_randn, axis=0, step_size=step_size, method="backward")
 
     np.testing.assert_array_equal(du_dx_np, du_dx)
 
     du_dy_np = jnp.diff(u_2d_randn, n=1, axis=1) / step_size
-    du_dy = difference(u_2d_randn, axis=1, step_size=step_size)
+    du_dy = difference(u_2d_randn, axis=1, step_size=step_size, method="backward")
 
     np.testing.assert_array_equal(du_dy_np, du_dy)
 
@@ -169,7 +169,7 @@ def test_difference_1d_order2_ones(u_1d_ones):
 
     # classic difference
     du_dx_np = jnp.diff(u_1d_ones, n=2, axis=0) / step_size**derivative
-    du_dx = difference(u_1d_ones, axis=0, step_size=step_size, derivative=derivative, method='backward')
+    du_dx = difference(u_1d_ones, axis=0, step_size=step_size, derivative=derivative, method="backward")
 
     np.testing.assert_array_almost_equal(du_dx_np, du_dx)
 
@@ -180,7 +180,7 @@ def test_difference_1d_order2_random(u_1d_randn):
 
     # classic difference
     du_dx_np = jnp.diff(u_1d_randn, n=2, axis=0) / step_size**derivative
-    du_dx = difference(u_1d_randn, axis=0, step_size=step_size, derivative=derivative, method='backward')
+    du_dx = difference(u_1d_randn, axis=0, step_size=step_size, derivative=derivative, method="backward")
 
     np.testing.assert_array_almost_equal(du_dx_np, du_dx)
 
@@ -191,13 +191,13 @@ def test_difference_2d_order2_ones(u_2d_ones):
 
     # classic difference
     du_dx_np = jnp.diff(u_2d_ones, n=derivative, axis=0) / step_size**derivative
-    du_dx = difference(u_2d_ones, axis=0, step_size=step_size, derivative=derivative)
+    du_dx = difference(u_2d_ones, axis=0, step_size=step_size, derivative=derivative, method="backward")
 
     np.testing.assert_array_almost_equal(du_dx_np, du_dx)
 
     # classic difference
     du_dy_np = jnp.diff(u_2d_ones, n=derivative, axis=1) / step_size**derivative
-    du_dy = difference(u_2d_ones, axis=1, step_size=step_size, derivative=derivative)
+    du_dy = difference(u_2d_ones, axis=1, step_size=step_size, derivative=derivative, method="backward")
 
     np.testing.assert_array_almost_equal(du_dy_np, du_dy)
 
@@ -207,12 +207,12 @@ def test_difference_2d_order2_random(u_2d_randn):
     derivative = 2
     # classic difference
     du_dx_np = jnp.diff(u_2d_randn, n=derivative, axis=0) / step_size**derivative
-    du_dx = difference(u_2d_randn, axis=0, step_size=step_size, derivative=derivative)
+    du_dx = difference(u_2d_randn, axis=0, step_size=step_size, derivative=derivative, method="backward")
 
     np.testing.assert_array_almost_equal(du_dx_np, du_dx)
 
     du_dy_np = jnp.diff(u_2d_randn, n=derivative, axis=1) / step_size**derivative
-    du_dy = difference(u_2d_randn, axis=1, step_size=step_size, derivative=derivative)
+    du_dy = difference(u_2d_randn, axis=1, step_size=step_size, derivative=derivative, method="backward")
 
     np.testing.assert_array_almost_equal(du_dy_np, du_dy)
 
@@ -251,8 +251,8 @@ def test_divergence():
     dx, dy = 0.1, 0.2
 
     # gradient froms scratch
-    du_dx_ = difference(u, axis=0, step_size=dx, derivative=1, method='backward')
-    dv_dy_ = difference(v, axis=1, step_size=dy, derivative=1, method='backward')
+    du_dx_ = difference(u, axis=0, step_size=dx, derivative=1, method="backward")
+    dv_dy_ = difference(v, axis=1, step_size=dy, derivative=1, method="backward")
     div_ = du_dx_ + dv_dy_
     # convenience function
     div = divergence(u, v, dx=dx, dy=dy)
@@ -267,8 +267,8 @@ def test_relative_vorticity():
     dx, dy = 0.1, 0.2
 
     # gradient froms scratch
-    du_dy_ = difference(u, axis=1, step_size=dy, derivative=1, method='backward')
-    dv_dx_ = difference(v, axis=0, step_size=dx, derivative=1, method='backward')
+    du_dy_ = difference(u, axis=1, step_size=dy, derivative=1, method="backward")
+    dv_dx_ = difference(v, axis=0, step_size=dx, derivative=1, method="backward")
     vort_r_ = dv_dx_ - du_dy_
     # convenience function
     vort_r = relative_vorticity(u, v, dx=dx, dy=dy)
@@ -283,8 +283,8 @@ def test_absolute_vorticity():
     dx, dy = 0.1, 0.2
 
     # gradient froms scratch
-    du_dy_ = difference(u, axis=1, step_size=dy, derivative=1, method='backward')
-    dv_dx_ = difference(v, axis=0, step_size=dx, derivative=1, method='backward')
+    du_dy_ = difference(u, axis=1, step_size=dy, derivative=1, method="backward")
+    dv_dx_ = difference(v, axis=0, step_size=dx, derivative=1, method="backward")
     vort_r_ = dv_dx_ + du_dy_
     # convenience function
     vort_r = absolute_vorticity(u, v, dx=dx, dy=dy)
@@ -297,8 +297,8 @@ def test_geostrophic_gradient():
     dx, dy = 0.1, 0.2
 
     # gradient froms scratch
-    u_ = -difference(psi, axis=1, step_size=dy, derivative=1, method='backward')
-    v_ = difference(psi, axis=0, step_size=dx, derivative=1, method='backward')
+    u_ = -difference(psi, axis=1, step_size=dy, derivative=1, method="backward")
+    v_ = difference(psi, axis=0, step_size=dx, derivative=1, method="backward")
 
     # convenience function
     u, v = geostrophic_gradient(psi, dx=dx, dy=dy)
