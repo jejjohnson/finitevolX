@@ -85,8 +85,8 @@ def geostrophic_gradient(
         derivative in the x-direction by negative 1.
     """
 
-    dp_dy = difference(p=p, axis=1, step_size=dy, derivative=1)
-    dp_dx = difference(p=p, axis=0, step_size=dx, derivative=1)
+    dp_dy = difference(u=p, axis=1, step_size=dy, derivative=1)
+    dp_dx = difference(u=p, axis=0, step_size=dx, derivative=1)
     return -dp_dy, dp_dx
 
 
