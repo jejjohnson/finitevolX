@@ -58,7 +58,7 @@ def laplacian(u: Array, step_size: float | tuple[float, ...] | Array = 1) -> Arr
 
 
 def geostrophic_gradient(
-    u: Float[Array, "Nx Ny"],
+    p: Float[Array, "Nx Ny"],
     dx: float | Array,
     dy: float | Array,
 ) -> tuple[Float[Array, "Nx Ny-1"], Float[Array, "Nx-1 Ny"]]:
@@ -69,15 +69,15 @@ def geostrophic_gradient(
         v = ∂xΨ
 
     Args:
-        u (Array): the input variable
+        p (Array): the input variable
             Size = [Nx,Ny]
         dx (float | Array): the stepsize for the x-direction
         dy (float | Array): the stepsize for the y-direction
 
     Returns:
-        du_dy (Array): the geostrophic velocity in the y-direction
+        dp_dy (Array): the geostrophic velocity in the y-direction
             Size = [Nx,Ny-1]
-        du_dx (Array): the geostrophic velocity in the x-direction
+        dp_dx (Array): the geostrophic velocity in the x-direction
             Size = [Nx-1,Ny]
 
     Note:
@@ -85,9 +85,9 @@ def geostrophic_gradient(
         derivative in the x-direction by negative 1.
     """
 
-    du_dy = difference(u=u, axis=1, step_size=dy, derivative=1)
-    dv_dx = difference(u=u, axis=0, step_size=dx, derivative=1)
-    return -du_dy, dv_dx
+    dp_dy = difference(p=p, axis=1, step_size=dy, derivative=1)
+    dp_dx = difference(p=p, axis=0, step_size=dx, derivative=1)
+    return -dp_dy, dp_dx
 
 
 def divergence(u: Array, v: Array, dx: float, dy: float) -> Array:
