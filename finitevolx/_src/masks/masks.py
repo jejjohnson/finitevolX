@@ -1,49 +1,91 @@
 import typing as tp
 
-import jax
+import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array
 
 from finitevolx._src.interp.interp import avg_pool
 
 
-class NodeMask(tp.NamedTuple):
-    values: Array
-    not_values: Array
-    distbound1: Array
-    irrbound_xids: Array
-    irrbound_yids: Array
+class NodeMask(eqx.Module):
+    values: Array = eqx.field(static=True)
+    not_values: Array = eqx.field(static=True)
+    distbound1: Array = eqx.field(static=True)
+    irrbound_xids: Array = eqx.field(static=True)
+    irrbound_yids: Array = eqx.field(static=True)
+
+    @property
+    def shape(self):
+        return self.values.shape
 
     def __getitem__(self, item):
-        mask = jax.tree_util.tree_map(lambda x: x[item], self)
+        values = self.values[item]
+        not_values = self.not_values[item]
+        distbound1 = self.distbound1[item]
+        irrbound_xids = self.irrbound_xids[item]
+        irrbound_yids = self.irrbound_yids[item]
 
-        return mask
+        return NodeMask(
+            values=values,
+            not_values=not_values,
+            distbound1=distbound1,
+            irrbound_xids=irrbound_xids,
+            irrbound_yids=irrbound_yids,
+        )
 
 
-class FaceMask(tp.NamedTuple):
-    values: Array
-    not_values: Array
-    distbound1: Array
-    distbound2: Array
-    distbound2plus: Array
-    distbound3plus: Array
+class FaceMask(eqx.Module):
+    values: Array = eqx.field(static=True)
+    not_values: Array = eqx.field(static=True)
+    distbound1: Array = eqx.field(static=True)
+    distbound2: Array = eqx.field(static=True)
+    distbound2plus: Array = eqx.field(static=True)
+    distbound3plus: Array = eqx.field(static=True)
+
+    @property
+    def shape(self):
+        return self.values.shape
 
     def __getitem__(self, item):
-        mask = jax.tree_util.tree_map(lambda x: x[item], self)
+        values = self.values[item]
+        not_values = self.not_values[item]
+        distbound1 = self.distbound1[item]
+        distbound2 = self.distbound2[item]
+        distbound2plus = self.distbound2plus[item]
+        distbound3plus = self.distbound3plus[item]
 
-        return mask
+        return FaceMask(
+            values=values,
+            not_values=not_values,
+            distbound2=distbound2,
+            distbound1=distbound1,
+            distbound2plus=distbound2plus,
+            distbound3plus=distbound3plus,
+        )
 
 
-class CenterMask(tp.NamedTuple):
-    values: Array
-    not_values: Array
-    values_interior: Array
-    distbound1: Array
+class CenterMask(eqx.Module):
+    values: Array = eqx.field(static=True)
+    not_values: Array = eqx.field(static=True)
+    values_interior: Array = eqx.field(static=True)
+    distbound1: Array = eqx.field(static=True)
+
+    @property
+    def shape(self):
+        return self.values.shape
 
     def __getitem__(self, item):
-        mask = jax.tree_util.tree_map(lambda x: x[item], self)
+        values = self.values[item]
+        not_values = self.not_values[item]
+        distbound1 = self.distbound1[item]
+        values_interior = self.values_interior[item]
 
-        return mask
+        return CenterMask(
+            values=values,
+            not_values=not_values,
+            values_interior=values_interior,
+            distbound1=distbound1,
+        )
 
 
 class MaskGrid(tp.NamedTuple):

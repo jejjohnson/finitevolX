@@ -1,3 +1,4 @@
+from finitevolx._src.domain.domain import Domain
 from finitevolx._src.interp.interp import (
     avg_arithmetic,
     avg_geometric,
@@ -40,6 +41,7 @@ from finitevolx._src.reconstructions.upwind import (
 )
 
 __all__ = [
+    "Domain",
     "difference",
     "laplacian",
     "divergence",

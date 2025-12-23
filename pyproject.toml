@@ -32,6 +32,8 @@ jaxlib = ">=0.4.10"
 finitediffx = "^0.1.0"
 kernex = "^0.2.0"
 jupyter = "^1.0.0"
+interpax = "^0.2.3"
+jaxinterp2d = {git = "https://github.com/adam-coogan/jaxinterp2d.git"}
 
 
 [tool.poetry.group.test.dependencies]
