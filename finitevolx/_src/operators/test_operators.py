@@ -306,6 +306,10 @@ def test_geostrophic_gradient():
     np.testing.assert_array_almost_equal(u_, u)
     np.testing.assert_array_almost_equal(v_, v)
 
+    div = divergence(u, v, dx=dx, dy=dy)
+
+    np.testing.assert_array_almost_equal(np.zeros_like(div), div)
+
 
 def test_kinetic_energy_2d_ones(u_2d_ones, v_2d_ones, center_2d_ones):
     u = u_2d_ones
