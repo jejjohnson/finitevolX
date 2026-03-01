@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.masks.cgrid_mask import ArakawaCGridMask
 from finitevolx._src.reconstruction import (
     Reconstruction1D,
     Reconstruction2D,
@@ -513,4 +514,255 @@ class TestReconstruction3D:
         h = 7.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         v = -jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         result = recon.wenoz3_y(h, v)
+        np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], -7.0, rtol=1e-5)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Mask-aware reconstruction tests
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def all_ocean_mask_2d():
+    """All-ocean (no coastlines) 10x10 mask — masked methods match non-masked."""
+    return ArakawaCGridMask.from_dimensions(10, 10)
+
+
+@pytest.fixture
+def coastal_mask_2d():
+    """10x10 mask with a 2-cell-wide land block in the centre.
+
+    The land block forces near-boundary cells to use lower-order stencils.
+    """
+    import numpy as np
+
+    h = np.ones((10, 10), dtype=bool)
+    # Place land at interior columns 4-5 (all rows) to create a barrier
+    h[:, 4:6] = False
+    return ArakawaCGridMask.from_mask(h)
+
+
+@pytest.fixture
+def all_ocean_mask_3d():
+    """All-ocean mask for 3D tests (8x8 horizontal grid)."""
+    return ArakawaCGridMask.from_dimensions(8, 8)
+
+
+class TestReconstruction2DMasked:
+    # --- weno5_x_masked ---
+
+    def test_weno5_x_masked_output_shape(self, grid2d, all_ocean_mask_2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.weno5_x_masked(h, u, all_ocean_mask_2d)
+        assert result.shape == (grid2d.Ny, grid2d.Nx)
+
+    def test_weno5_x_masked_all_ocean_matches_weno5(self, grid2d, all_ocean_mask_2d):
+        """All-ocean mask: masked method must equal unmasked weno5_x."""
+        recon = Reconstruction2D(grid=grid2d)
+        h = 3.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        masked = recon.weno5_x_masked(h, u, all_ocean_mask_2d)
+        unmasked = recon.weno5_x(h, u)
+        np.testing.assert_allclose(masked[1:-1, 1:-1], unmasked[1:-1, 1:-1], rtol=1e-5)
+
+    def test_weno5_x_masked_constant_field(self, grid2d, all_ocean_mask_2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 2.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.weno5_x_masked(h, u, all_ocean_mask_2d)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 2.0, rtol=1e-5)
+
+    def test_weno5_x_masked_negative_flow_constant(self, grid2d, all_ocean_mask_2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 2.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = -jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.weno5_x_masked(h, u, all_ocean_mask_2d)
+        np.testing.assert_allclose(result[1:-1, 1:-1], -2.0, rtol=1e-5)
+
+    def test_weno5_x_masked_ghost_zero(self, grid2d, all_ocean_mask_2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.weno5_x_masked(h, u, all_ocean_mask_2d)
+        np.testing.assert_array_equal(result[0, :], 0.0)
+        np.testing.assert_array_equal(result[-1, :], 0.0)
+
+    def test_weno5_x_masked_coastal_fallback(self, coastal_mask_2d):
+        """Coastal mask: near-land cells use lower-order stencil with non-constant field.
+
+        Verifies that (1) the masked reconstruction produces finite values everywhere,
+        and (2) cells immediately adjacent to the land block produce different flux
+        values from the unmasked WENO-5 for both flow signs, confirming that stencil
+        fallback is actually being applied near the coastline.
+        """
+        grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+        recon = Reconstruction2D(grid=grid)
+
+        # Non-constant field varying in x so different stencils produce distinct values.
+        x_indices = jnp.arange(grid.Nx, dtype=float)
+        h = jnp.broadcast_to(x_indices, (grid.Ny, grid.Nx))
+
+        for sign in (1.0, -1.0):
+            u = sign * jnp.ones((grid.Ny, grid.Nx))
+
+            ref = recon.weno5_x(h, u)
+            masked = recon.weno5_x_masked(h, u, coastal_mask_2d)
+
+            assert jnp.all(jnp.isfinite(masked)).item()
+
+            # Columns 3 and 6 (0-based) are immediately adjacent to the land block
+            # (land at cols 4-5) and lack sufficient stencil for even WENO3, so the
+            # mask forces 1st-order upwind. For a non-constant h this differs from
+            # the WENO-5 result produced by the unmasked method.
+            row_slice = slice(2, 8)
+            diffs_found = jnp.any(
+                masked[row_slice, 3] != ref[row_slice, 3]
+            ) | jnp.any(masked[row_slice, 6] != ref[row_slice, 6])
+            assert diffs_found.item()
+
+    # --- weno5_y_masked ---
+
+    def test_weno5_y_masked_constant_field(self, grid2d, all_ocean_mask_2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 5.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.weno5_y_masked(h, v, all_ocean_mask_2d)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 5.0, rtol=1e-5)
+
+    def test_weno5_y_masked_negative_flow_constant(self, grid2d, all_ocean_mask_2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 5.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = -jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.weno5_y_masked(h, v, all_ocean_mask_2d)
+        np.testing.assert_allclose(result[1:-1, 1:-1], -5.0, rtol=1e-5)
+
+    def test_weno5_y_masked_all_ocean_matches_weno5(self, grid2d, all_ocean_mask_2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 4.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((grid2d.Ny, grid2d.Nx))
+        masked = recon.weno5_y_masked(h, v, all_ocean_mask_2d)
+        unmasked = recon.weno5_y(h, v)
+        np.testing.assert_allclose(masked[1:-1, 1:-1], unmasked[1:-1, 1:-1], rtol=1e-5)
+
+    # --- wenoz5_x_masked ---
+
+    def test_wenoz5_x_masked_constant_field(self, grid2d, all_ocean_mask_2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 8.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.wenoz5_x_masked(h, u, all_ocean_mask_2d)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 8.0, rtol=1e-5)
+
+    def test_wenoz5_x_masked_negative_flow_constant(self, grid2d, all_ocean_mask_2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 8.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = -jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.wenoz5_x_masked(h, u, all_ocean_mask_2d)
+        np.testing.assert_allclose(result[1:-1, 1:-1], -8.0, rtol=1e-5)
+
+    def test_wenoz5_x_masked_all_ocean_matches_wenoz5(self, grid2d, all_ocean_mask_2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 7.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        masked = recon.wenoz5_x_masked(h, u, all_ocean_mask_2d)
+        unmasked = recon.wenoz5_x(h, u)
+        np.testing.assert_allclose(masked[1:-1, 1:-1], unmasked[1:-1, 1:-1], rtol=1e-5)
+
+    # --- wenoz5_y_masked ---
+
+    def test_wenoz5_y_masked_constant_field(self, grid2d, all_ocean_mask_2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 9.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.wenoz5_y_masked(h, v, all_ocean_mask_2d)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 9.0, rtol=1e-5)
+
+    def test_wenoz5_y_masked_negative_flow_constant(self, grid2d, all_ocean_mask_2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 9.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = -jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.wenoz5_y_masked(h, v, all_ocean_mask_2d)
+        np.testing.assert_allclose(result[1:-1, 1:-1], -9.0, rtol=1e-5)
+
+    def test_wenoz5_y_masked_coastal_fallback(self, coastal_mask_2d):
+        grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+        recon = Reconstruction2D(grid=grid)
+        h = jnp.ones((grid.Ny, grid.Nx))
+        v = jnp.ones((grid.Ny, grid.Nx))
+        result = recon.wenoz5_y_masked(h, v, coastal_mask_2d)
+        assert jnp.all(jnp.isfinite(result)).item()
+
+
+class TestReconstruction3DMasked:
+    # --- weno5_x_masked ---
+
+    def test_weno5_x_masked_output_shape(self, grid3d, all_ocean_mask_3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        u = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = recon.weno5_x_masked(h, u, all_ocean_mask_3d)
+        assert result.shape == (grid3d.Nz, grid3d.Ny, grid3d.Nx)
+
+    def test_weno5_x_masked_constant_field(self, grid3d, all_ocean_mask_3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = 4.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        u = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = recon.weno5_x_masked(h, u, all_ocean_mask_3d)
+        np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], 4.0, rtol=1e-5)
+
+    def test_weno5_x_masked_negative_flow_constant(self, grid3d, all_ocean_mask_3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = 4.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        u = -jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = recon.weno5_x_masked(h, u, all_ocean_mask_3d)
+        np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], -4.0, rtol=1e-5)
+
+    # --- weno5_y_masked ---
+
+    def test_weno5_y_masked_constant_field(self, grid3d, all_ocean_mask_3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = 5.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        v = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = recon.weno5_y_masked(h, v, all_ocean_mask_3d)
+        np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], 5.0, rtol=1e-5)
+
+    def test_weno5_y_masked_negative_flow_constant(self, grid3d, all_ocean_mask_3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = 5.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        v = -jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = recon.weno5_y_masked(h, v, all_ocean_mask_3d)
+        np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], -5.0, rtol=1e-5)
+
+    # --- wenoz5_x_masked ---
+
+    def test_wenoz5_x_masked_constant_field(self, grid3d, all_ocean_mask_3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = 6.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        u = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = recon.wenoz5_x_masked(h, u, all_ocean_mask_3d)
+        np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], 6.0, rtol=1e-5)
+
+    def test_wenoz5_x_masked_negative_flow_constant(self, grid3d, all_ocean_mask_3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = 6.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        u = -jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = recon.wenoz5_x_masked(h, u, all_ocean_mask_3d)
+        np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], -6.0, rtol=1e-5)
+
+    # --- wenoz5_y_masked ---
+
+    def test_wenoz5_y_masked_constant_field(self, grid3d, all_ocean_mask_3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = 7.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        v = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = recon.wenoz5_y_masked(h, v, all_ocean_mask_3d)
+        np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], 7.0, rtol=1e-5)
+
+    def test_wenoz5_y_masked_negative_flow_constant(self, grid3d, all_ocean_mask_3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = 7.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        v = -jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = recon.wenoz5_y_masked(h, v, all_ocean_mask_3d)
         np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], -7.0, rtol=1e-5)
