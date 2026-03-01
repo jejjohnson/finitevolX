@@ -673,44 +673,25 @@ class Reconstruction2D(eqx.Module):
         Float[Array, "Ny Nx"]
             East-face flux with zero ghost ring.
         """
-        out = jnp.zeros_like(h)
         amasks = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4, 6))
         m5 = amasks[6]  # WENO5 stencil available
         m3 = amasks[4]  # WENO3 stencil available (but not WENO5)
-        # --- WENO5 face values ---
-        h5_pos_int = _weno5(
-            h[1:-1, :-4], h[1:-1, 1:-3], h[1:-1, 2:-2], h[1:-1, 3:-1], h[1:-1, 4:]
-        )
-        h3_pos_first = _weno3(h[1:-1, 0:1], h[1:-1, 1:2], h[1:-1, 2:3])
-        h3_pos_last = _weno3(h[1:-1, -3:-2], h[1:-1, -2:-1], h[1:-1, -1:])
-        h_pos_w5 = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=1)
-        h5_neg_int = _weno5(
-            h[1:-1, 4:], h[1:-1, 3:-1], h[1:-1, 2:-2], h[1:-1, 1:-3], h[1:-1, :-4]
-        )
-        h3_neg_first = _weno3(h[1:-1, 3:4], h[1:-1, 2:3], h[1:-1, 1:2])
-        h_neg_w5 = jnp.concatenate([h3_neg_first, h5_neg_int, h[1:-1, -1:]], axis=1)
-        # --- WENO3 face values ---
-        h_pos_w3 = _weno3(h[1:-1, :-2], h[1:-1, 1:-1], h[1:-1, 2:])
-        h_neg_w3_int = _weno3(h[1:-1, 3:], h[1:-1, 2:-1], h[1:-1, 1:-2])
-        h_neg_w3 = jnp.concatenate([h_neg_w3_int, h[1:-1, -1:]], axis=1)
-        # --- 1st-order upwind face values ---
-        h_pos_u1 = h[1:-1, 1:-1]
-        h_neg_u1 = h[1:-1, 2:]
-        # --- Mask-aware selection ---
-        # Positive flow: upwind cell is (j, i) → mask at [1:-1, 1:-1]
-        h_pos = jnp.where(
-            m5[1:-1, 1:-1],
-            h_pos_w5,
-            jnp.where(m3[1:-1, 1:-1], h_pos_w3, h_pos_u1),
-        )
+        fe_w5 = self.weno5_x(h, u)
+        fe_w3 = self.weno3_x(h, u)
+        fe_u1 = self.upwind1_x(h, u)
+        # Select tier based on upwind-cell stencil capability
+        # Positive flow: upwind cell is (j, i)   → mask at [1:-1, 1:-1]
         # Negative flow: upwind cell is (j, i+1) → mask at [1:-1, 2:]
-        h_neg = jnp.where(
-            m5[1:-1, 2:],
-            h_neg_w5,
-            jnp.where(m3[1:-1, 2:], h_neg_w3, h_neg_u1),
+        pos_flow = u[1:-1, 1:-1] >= 0.0
+        use_w5 = jnp.where(pos_flow, m5[1:-1, 1:-1], m5[1:-1, 2:])
+        use_w3 = jnp.where(pos_flow, m3[1:-1, 1:-1], m3[1:-1, 2:])
+        selected = jnp.where(
+            use_w5,
+            fe_w5[1:-1, 1:-1],
+            jnp.where(use_w3, fe_w3[1:-1, 1:-1], fe_u1[1:-1, 1:-1]),
         )
-        h_face = jnp.where(u[1:-1, 1:-1] >= 0.0, h_pos, h_neg)
-        out = out.at[1:-1, 1:-1].set(h_face * u[1:-1, 1:-1])
+        out = jnp.zeros_like(h)
+        out = out.at[1:-1, 1:-1].set(selected)
         return out
 
     def weno5_y_masked(
@@ -740,44 +721,25 @@ class Reconstruction2D(eqx.Module):
         Float[Array, "Ny Nx"]
             North-face flux with zero ghost ring.
         """
-        out = jnp.zeros_like(h)
         amasks = mask.get_adaptive_masks(direction="y", stencil_sizes=(2, 4, 6))
         m5 = amasks[6]
         m3 = amasks[4]
-        # --- WENO5 face values ---
-        h5_pos_int = _weno5(
-            h[:-4, 1:-1], h[1:-3, 1:-1], h[2:-2, 1:-1], h[3:-1, 1:-1], h[4:, 1:-1]
-        )
-        h3_pos_first = _weno3(h[0:1, 1:-1], h[1:2, 1:-1], h[2:3, 1:-1])
-        h3_pos_last = _weno3(h[-3:-2, 1:-1], h[-2:-1, 1:-1], h[-1:, 1:-1])
-        h_pos_w5 = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=0)
-        h5_neg_int = _weno5(
-            h[4:, 1:-1], h[3:-1, 1:-1], h[2:-2, 1:-1], h[1:-3, 1:-1], h[:-4, 1:-1]
-        )
-        h3_neg_first = _weno3(h[3:4, 1:-1], h[2:3, 1:-1], h[1:2, 1:-1])
-        h_neg_w5 = jnp.concatenate([h3_neg_first, h5_neg_int, h[-1:, 1:-1]], axis=0)
-        # --- WENO3 face values ---
-        h_pos_w3 = _weno3(h[:-2, 1:-1], h[1:-1, 1:-1], h[2:, 1:-1])
-        h_neg_w3_int = _weno3(h[3:, 1:-1], h[2:-1, 1:-1], h[1:-2, 1:-1])
-        h_neg_w3 = jnp.concatenate([h_neg_w3_int, h[-1:, 1:-1]], axis=0)
-        # --- 1st-order upwind face values ---
-        h_pos_u1 = h[1:-1, 1:-1]
-        h_neg_u1 = h[2:, 1:-1]
-        # --- Mask-aware selection ---
-        # Positive flow: upwind cell is (j, i) → mask at [1:-1, 1:-1]
-        h_pos = jnp.where(
-            m5[1:-1, 1:-1],
-            h_pos_w5,
-            jnp.where(m3[1:-1, 1:-1], h_pos_w3, h_pos_u1),
-        )
+        fn_w5 = self.weno5_y(h, v)
+        fn_w3 = self.weno3_y(h, v)
+        fn_u1 = self.upwind1_y(h, v)
+        # Select tier based on upwind-cell stencil capability
+        # Positive flow: upwind cell is (j, i)   → mask at [1:-1, 1:-1]
         # Negative flow: upwind cell is (j+1, i) → mask at [2:, 1:-1]
-        h_neg = jnp.where(
-            m5[2:, 1:-1],
-            h_neg_w5,
-            jnp.where(m3[2:, 1:-1], h_neg_w3, h_neg_u1),
+        pos_flow = v[1:-1, 1:-1] >= 0.0
+        use_w5 = jnp.where(pos_flow, m5[1:-1, 1:-1], m5[2:, 1:-1])
+        use_w3 = jnp.where(pos_flow, m3[1:-1, 1:-1], m3[2:, 1:-1])
+        selected = jnp.where(
+            use_w5,
+            fn_w5[1:-1, 1:-1],
+            jnp.where(use_w3, fn_w3[1:-1, 1:-1], fn_u1[1:-1, 1:-1]),
         )
-        h_face = jnp.where(v[1:-1, 1:-1] >= 0.0, h_pos, h_neg)
-        out = out.at[1:-1, 1:-1].set(h_face * v[1:-1, 1:-1])
+        out = jnp.zeros_like(h)
+        out = out.at[1:-1, 1:-1].set(selected)
         return out
 
     def wenoz5_x_masked(
@@ -807,42 +769,22 @@ class Reconstruction2D(eqx.Module):
         Float[Array, "Ny Nx"]
             East-face flux with zero ghost ring.
         """
-        out = jnp.zeros_like(h)
         amasks = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4, 6))
         m5 = amasks[6]
         m3 = amasks[4]
-        # --- WENO-Z-5 face values ---
-        h5_pos_int = _wenoz5(
-            h[1:-1, :-4], h[1:-1, 1:-3], h[1:-1, 2:-2], h[1:-1, 3:-1], h[1:-1, 4:]
+        fe_w5 = self.wenoz5_x(h, u)
+        fe_w3 = self.wenoz3_x(h, u)
+        fe_u1 = self.upwind1_x(h, u)
+        pos_flow = u[1:-1, 1:-1] >= 0.0
+        use_w5 = jnp.where(pos_flow, m5[1:-1, 1:-1], m5[1:-1, 2:])
+        use_w3 = jnp.where(pos_flow, m3[1:-1, 1:-1], m3[1:-1, 2:])
+        selected = jnp.where(
+            use_w5,
+            fe_w5[1:-1, 1:-1],
+            jnp.where(use_w3, fe_w3[1:-1, 1:-1], fe_u1[1:-1, 1:-1]),
         )
-        h3_pos_first = _wenoz3(h[1:-1, 0:1], h[1:-1, 1:2], h[1:-1, 2:3])
-        h3_pos_last = _wenoz3(h[1:-1, -3:-2], h[1:-1, -2:-1], h[1:-1, -1:])
-        h_pos_w5 = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=1)
-        h5_neg_int = _wenoz5(
-            h[1:-1, 4:], h[1:-1, 3:-1], h[1:-1, 2:-2], h[1:-1, 1:-3], h[1:-1, :-4]
-        )
-        h3_neg_first = _wenoz3(h[1:-1, 3:4], h[1:-1, 2:3], h[1:-1, 1:2])
-        h_neg_w5 = jnp.concatenate([h3_neg_first, h5_neg_int, h[1:-1, -1:]], axis=1)
-        # --- WENO-Z-3 face values ---
-        h_pos_w3 = _wenoz3(h[1:-1, :-2], h[1:-1, 1:-1], h[1:-1, 2:])
-        h_neg_w3_int = _wenoz3(h[1:-1, 3:], h[1:-1, 2:-1], h[1:-1, 1:-2])
-        h_neg_w3 = jnp.concatenate([h_neg_w3_int, h[1:-1, -1:]], axis=1)
-        # --- 1st-order upwind face values ---
-        h_pos_u1 = h[1:-1, 1:-1]
-        h_neg_u1 = h[1:-1, 2:]
-        # --- Mask-aware selection ---
-        h_pos = jnp.where(
-            m5[1:-1, 1:-1],
-            h_pos_w5,
-            jnp.where(m3[1:-1, 1:-1], h_pos_w3, h_pos_u1),
-        )
-        h_neg = jnp.where(
-            m5[1:-1, 2:],
-            h_neg_w5,
-            jnp.where(m3[1:-1, 2:], h_neg_w3, h_neg_u1),
-        )
-        h_face = jnp.where(u[1:-1, 1:-1] >= 0.0, h_pos, h_neg)
-        out = out.at[1:-1, 1:-1].set(h_face * u[1:-1, 1:-1])
+        out = jnp.zeros_like(h)
+        out = out.at[1:-1, 1:-1].set(selected)
         return out
 
     def wenoz5_y_masked(
@@ -872,42 +814,22 @@ class Reconstruction2D(eqx.Module):
         Float[Array, "Ny Nx"]
             North-face flux with zero ghost ring.
         """
-        out = jnp.zeros_like(h)
         amasks = mask.get_adaptive_masks(direction="y", stencil_sizes=(2, 4, 6))
         m5 = amasks[6]
         m3 = amasks[4]
-        # --- WENO-Z-5 face values ---
-        h5_pos_int = _wenoz5(
-            h[:-4, 1:-1], h[1:-3, 1:-1], h[2:-2, 1:-1], h[3:-1, 1:-1], h[4:, 1:-1]
+        fn_w5 = self.wenoz5_y(h, v)
+        fn_w3 = self.wenoz3_y(h, v)
+        fn_u1 = self.upwind1_y(h, v)
+        pos_flow = v[1:-1, 1:-1] >= 0.0
+        use_w5 = jnp.where(pos_flow, m5[1:-1, 1:-1], m5[2:, 1:-1])
+        use_w3 = jnp.where(pos_flow, m3[1:-1, 1:-1], m3[2:, 1:-1])
+        selected = jnp.where(
+            use_w5,
+            fn_w5[1:-1, 1:-1],
+            jnp.where(use_w3, fn_w3[1:-1, 1:-1], fn_u1[1:-1, 1:-1]),
         )
-        h3_pos_first = _wenoz3(h[0:1, 1:-1], h[1:2, 1:-1], h[2:3, 1:-1])
-        h3_pos_last = _wenoz3(h[-3:-2, 1:-1], h[-2:-1, 1:-1], h[-1:, 1:-1])
-        h_pos_w5 = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=0)
-        h5_neg_int = _wenoz5(
-            h[4:, 1:-1], h[3:-1, 1:-1], h[2:-2, 1:-1], h[1:-3, 1:-1], h[:-4, 1:-1]
-        )
-        h3_neg_first = _wenoz3(h[3:4, 1:-1], h[2:3, 1:-1], h[1:2, 1:-1])
-        h_neg_w5 = jnp.concatenate([h3_neg_first, h5_neg_int, h[-1:, 1:-1]], axis=0)
-        # --- WENO-Z-3 face values ---
-        h_pos_w3 = _wenoz3(h[:-2, 1:-1], h[1:-1, 1:-1], h[2:, 1:-1])
-        h_neg_w3_int = _wenoz3(h[3:, 1:-1], h[2:-1, 1:-1], h[1:-2, 1:-1])
-        h_neg_w3 = jnp.concatenate([h_neg_w3_int, h[-1:, 1:-1]], axis=0)
-        # --- 1st-order upwind face values ---
-        h_pos_u1 = h[1:-1, 1:-1]
-        h_neg_u1 = h[2:, 1:-1]
-        # --- Mask-aware selection ---
-        h_pos = jnp.where(
-            m5[1:-1, 1:-1],
-            h_pos_w5,
-            jnp.where(m3[1:-1, 1:-1], h_pos_w3, h_pos_u1),
-        )
-        h_neg = jnp.where(
-            m5[2:, 1:-1],
-            h_neg_w5,
-            jnp.where(m3[2:, 1:-1], h_neg_w3, h_neg_u1),
-        )
-        h_face = jnp.where(v[1:-1, 1:-1] >= 0.0, h_pos, h_neg)
-        out = out.at[1:-1, 1:-1].set(h_face * v[1:-1, 1:-1])
+        out = jnp.zeros_like(h)
+        out = out.at[1:-1, 1:-1].set(selected)
         return out
 
 
@@ -1081,6 +1003,182 @@ class Reconstruction3D(eqx.Module):
         out = out.at[1:-1, 1:-1, 1:-1].set(h_face * v[1:-1, 1:-1, 1:-1])
         return out
 
+    def weno5_x(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        u: Float[Array, "Nz Ny Nx"],
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """5-point WENO east-face flux over all z-levels with sign-dependent fallbacks.
+
+        Positive flow:  fe[k,j,i+1/2] = WENO5(h[k,j,i-2..i+2]) * u
+            for i = 2..Nx-3; WENO3 fallback at i = 1 and i = Nx-2.
+        Negative flow:  fe[k,j,i+1/2] = WENO5(h[k,j,i+3..i-1]) * u
+            for i = 2..Nx-3; WENO3 fallback at i = 1; 1st-order upwind at i = Nx-2.
+        """
+        out = jnp.zeros_like(h)
+        h5_pos_int = _weno5(
+            h[1:-1, 1:-1, :-4],
+            h[1:-1, 1:-1, 1:-3],
+            h[1:-1, 1:-1, 2:-2],
+            h[1:-1, 1:-1, 3:-1],
+            h[1:-1, 1:-1, 4:],
+        )
+        h3_pos_first = _weno3(
+            h[1:-1, 1:-1, 0:1], h[1:-1, 1:-1, 1:2], h[1:-1, 1:-1, 2:3]
+        )
+        h3_pos_last = _weno3(
+            h[1:-1, 1:-1, -3:-2], h[1:-1, 1:-1, -2:-1], h[1:-1, 1:-1, -1:]
+        )
+        h_pos = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=2)
+        h5_neg_int = _weno5(
+            h[1:-1, 1:-1, 4:],
+            h[1:-1, 1:-1, 3:-1],
+            h[1:-1, 1:-1, 2:-2],
+            h[1:-1, 1:-1, 1:-3],
+            h[1:-1, 1:-1, :-4],
+        )
+        h3_neg_first = _weno3(
+            h[1:-1, 1:-1, 3:4], h[1:-1, 1:-1, 2:3], h[1:-1, 1:-1, 1:2]
+        )
+        h_neg = jnp.concatenate(
+            [h3_neg_first, h5_neg_int, h[1:-1, 1:-1, -1:]], axis=2
+        )
+        h_face = jnp.where(u[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
+        out = out.at[1:-1, 1:-1, 1:-1].set(h_face * u[1:-1, 1:-1, 1:-1])
+        return out
+
+    def weno5_y(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        v: Float[Array, "Nz Ny Nx"],
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """5-point WENO north-face flux over all z-levels with sign-dependent fallbacks.
+
+        Positive flow:  fn[k,j+1/2,i] = WENO5(h[k,j-2..j+2,i]) * v
+            for j = 2..Ny-3; WENO3 fallback at j = 1 and j = Ny-2.
+        Negative flow:  fn[k,j+1/2,i] = WENO5(h[k,j+3..j-1,i]) * v
+            for j = 2..Ny-3; WENO3 fallback at j = 1; 1st-order upwind at j = Ny-2.
+        """
+        out = jnp.zeros_like(h)
+        h5_pos_int = _weno5(
+            h[1:-1, :-4, 1:-1],
+            h[1:-1, 1:-3, 1:-1],
+            h[1:-1, 2:-2, 1:-1],
+            h[1:-1, 3:-1, 1:-1],
+            h[1:-1, 4:, 1:-1],
+        )
+        h3_pos_first = _weno3(
+            h[1:-1, 0:1, 1:-1], h[1:-1, 1:2, 1:-1], h[1:-1, 2:3, 1:-1]
+        )
+        h3_pos_last = _weno3(
+            h[1:-1, -3:-2, 1:-1], h[1:-1, -2:-1, 1:-1], h[1:-1, -1:, 1:-1]
+        )
+        h_pos = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=1)
+        h5_neg_int = _weno5(
+            h[1:-1, 4:, 1:-1],
+            h[1:-1, 3:-1, 1:-1],
+            h[1:-1, 2:-2, 1:-1],
+            h[1:-1, 1:-3, 1:-1],
+            h[1:-1, :-4, 1:-1],
+        )
+        h3_neg_first = _weno3(
+            h[1:-1, 3:4, 1:-1], h[1:-1, 2:3, 1:-1], h[1:-1, 1:2, 1:-1]
+        )
+        h_neg = jnp.concatenate(
+            [h3_neg_first, h5_neg_int, h[1:-1, -1:, 1:-1]], axis=1
+        )
+        h_face = jnp.where(v[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
+        out = out.at[1:-1, 1:-1, 1:-1].set(h_face * v[1:-1, 1:-1, 1:-1])
+        return out
+
+    def wenoz5_x(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        u: Float[Array, "Nz Ny Nx"],
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """5-point WENO-Z east-face flux over all z-levels with sign-dependent fallbacks.
+
+        Positive flow:  fe[k,j,i+1/2] = WENOZ5(h[k,j,i-2..i+2]) * u
+            for i = 2..Nx-3; WENO-Z-3 fallback at i = 1 and i = Nx-2.
+        Negative flow:  fe[k,j,i+1/2] = WENOZ5(h[k,j,i+3..i-1]) * u
+            for i = 2..Nx-3; WENO-Z-3 fallback at i = 1; 1st-order upwind at i = Nx-2.
+        """
+        out = jnp.zeros_like(h)
+        h5_pos_int = _wenoz5(
+            h[1:-1, 1:-1, :-4],
+            h[1:-1, 1:-1, 1:-3],
+            h[1:-1, 1:-1, 2:-2],
+            h[1:-1, 1:-1, 3:-1],
+            h[1:-1, 1:-1, 4:],
+        )
+        h3_pos_first = _wenoz3(
+            h[1:-1, 1:-1, 0:1], h[1:-1, 1:-1, 1:2], h[1:-1, 1:-1, 2:3]
+        )
+        h3_pos_last = _wenoz3(
+            h[1:-1, 1:-1, -3:-2], h[1:-1, 1:-1, -2:-1], h[1:-1, 1:-1, -1:]
+        )
+        h_pos = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=2)
+        h5_neg_int = _wenoz5(
+            h[1:-1, 1:-1, 4:],
+            h[1:-1, 1:-1, 3:-1],
+            h[1:-1, 1:-1, 2:-2],
+            h[1:-1, 1:-1, 1:-3],
+            h[1:-1, 1:-1, :-4],
+        )
+        h3_neg_first = _wenoz3(
+            h[1:-1, 1:-1, 3:4], h[1:-1, 1:-1, 2:3], h[1:-1, 1:-1, 1:2]
+        )
+        h_neg = jnp.concatenate(
+            [h3_neg_first, h5_neg_int, h[1:-1, 1:-1, -1:]], axis=2
+        )
+        h_face = jnp.where(u[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
+        out = out.at[1:-1, 1:-1, 1:-1].set(h_face * u[1:-1, 1:-1, 1:-1])
+        return out
+
+    def wenoz5_y(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        v: Float[Array, "Nz Ny Nx"],
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """5-point WENO-Z north-face flux over all z-levels with sign-dependent fallbacks.
+
+        Positive flow:  fn[k,j+1/2,i] = WENOZ5(h[k,j-2..j+2,i]) * v
+            for j = 2..Ny-3; WENO-Z-3 fallback at j = 1 and j = Ny-2.
+        Negative flow:  fn[k,j+1/2,i] = WENOZ5(h[k,j+3..j-1,i]) * v
+            for j = 2..Ny-3; WENO-Z-3 fallback at j = 1; 1st-order upwind at j = Ny-2.
+        """
+        out = jnp.zeros_like(h)
+        h5_pos_int = _wenoz5(
+            h[1:-1, :-4, 1:-1],
+            h[1:-1, 1:-3, 1:-1],
+            h[1:-1, 2:-2, 1:-1],
+            h[1:-1, 3:-1, 1:-1],
+            h[1:-1, 4:, 1:-1],
+        )
+        h3_pos_first = _wenoz3(
+            h[1:-1, 0:1, 1:-1], h[1:-1, 1:2, 1:-1], h[1:-1, 2:3, 1:-1]
+        )
+        h3_pos_last = _wenoz3(
+            h[1:-1, -3:-2, 1:-1], h[1:-1, -2:-1, 1:-1], h[1:-1, -1:, 1:-1]
+        )
+        h_pos = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=1)
+        h5_neg_int = _wenoz5(
+            h[1:-1, 4:, 1:-1],
+            h[1:-1, 3:-1, 1:-1],
+            h[1:-1, 2:-2, 1:-1],
+            h[1:-1, 1:-3, 1:-1],
+            h[1:-1, :-4, 1:-1],
+        )
+        h3_neg_first = _wenoz3(
+            h[1:-1, 3:4, 1:-1], h[1:-1, 2:3, 1:-1], h[1:-1, 1:2, 1:-1]
+        )
+        h_neg = jnp.concatenate(
+            [h3_neg_first, h5_neg_int, h[1:-1, -1:, 1:-1]], axis=1
+        )
+        h_face = jnp.where(v[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
+        out = out.at[1:-1, 1:-1, 1:-1].set(h_face * v[1:-1, 1:-1, 1:-1])
+        return out
+
     def weno5_x_masked(
         self,
         h: Float[Array, "Nz Ny Nx"],
@@ -1107,58 +1205,25 @@ class Reconstruction3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             East-face flux with zero ghost ring.
         """
-        out = jnp.zeros_like(h)
         amasks = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4, 6))
         m5 = amasks[6]  # (Ny, Nx)
         m3 = amasks[4]
-        # --- WENO5 face values ---
-        h5_pos_int = _weno5(
-            h[1:-1, 1:-1, :-4],
-            h[1:-1, 1:-1, 1:-3],
-            h[1:-1, 1:-1, 2:-2],
-            h[1:-1, 1:-1, 3:-1],
-            h[1:-1, 1:-1, 4:],
+        fe_w5 = self.weno5_x(h, u)
+        fe_w3 = self.weno3_x(h, u)
+        fe_u1 = self.upwind1_x(h, u)
+        # Select tier based on upwind-cell stencil capability, broadcast mask over z
+        # Positive flow: upwind cell is (j, i)   → mask at [1:-1, 1:-1]
+        # Negative flow: upwind cell is (j, i+1) → mask at [1:-1, 2:]
+        pos_flow = u[1:-1, 1:-1, 1:-1] >= 0.0
+        use_w5 = jnp.where(pos_flow, m5[None, 1:-1, 1:-1], m5[None, 1:-1, 2:])
+        use_w3 = jnp.where(pos_flow, m3[None, 1:-1, 1:-1], m3[None, 1:-1, 2:])
+        selected = jnp.where(
+            use_w5,
+            fe_w5[1:-1, 1:-1, 1:-1],
+            jnp.where(use_w3, fe_w3[1:-1, 1:-1, 1:-1], fe_u1[1:-1, 1:-1, 1:-1]),
         )
-        h3_pos_first = _weno3(
-            h[1:-1, 1:-1, 0:1], h[1:-1, 1:-1, 1:2], h[1:-1, 1:-1, 2:3]
-        )
-        h3_pos_last = _weno3(
-            h[1:-1, 1:-1, -3:-2], h[1:-1, 1:-1, -2:-1], h[1:-1, 1:-1, -1:]
-        )
-        h_pos_w5 = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=2)
-        h5_neg_int = _weno5(
-            h[1:-1, 1:-1, 4:],
-            h[1:-1, 1:-1, 3:-1],
-            h[1:-1, 1:-1, 2:-2],
-            h[1:-1, 1:-1, 1:-3],
-            h[1:-1, 1:-1, :-4],
-        )
-        h3_neg_first = _weno3(
-            h[1:-1, 1:-1, 3:4], h[1:-1, 1:-1, 2:3], h[1:-1, 1:-1, 1:2]
-        )
-        h_neg_w5 = jnp.concatenate(
-            [h3_neg_first, h5_neg_int, h[1:-1, 1:-1, -1:]], axis=2
-        )
-        # --- WENO3 face values ---
-        h_pos_w3 = _weno3(
-            h[1:-1, 1:-1, :-2], h[1:-1, 1:-1, 1:-1], h[1:-1, 1:-1, 2:]
-        )
-        h_neg_w3_int = _weno3(
-            h[1:-1, 1:-1, 3:], h[1:-1, 1:-1, 2:-1], h[1:-1, 1:-1, 1:-2]
-        )
-        h_neg_w3 = jnp.concatenate([h_neg_w3_int, h[1:-1, 1:-1, -1:]], axis=2)
-        # --- 1st-order upwind face values ---
-        h_pos_u1 = h[1:-1, 1:-1, 1:-1]
-        h_neg_u1 = h[1:-1, 1:-1, 2:]
-        # --- Mask-aware selection (broadcast 2D mask over z) ---
-        m5_pos = m5[None, 1:-1, 1:-1]  # (1, Ny-2, Nx-2)
-        m3_pos = m3[None, 1:-1, 1:-1]
-        h_pos = jnp.where(m5_pos, h_pos_w5, jnp.where(m3_pos, h_pos_w3, h_pos_u1))
-        m5_neg = m5[None, 1:-1, 2:]
-        m3_neg = m3[None, 1:-1, 2:]
-        h_neg = jnp.where(m5_neg, h_neg_w5, jnp.where(m3_neg, h_neg_w3, h_neg_u1))
-        h_face = jnp.where(u[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
-        out = out.at[1:-1, 1:-1, 1:-1].set(h_face * u[1:-1, 1:-1, 1:-1])
+        out = jnp.zeros_like(h)
+        out = out.at[1:-1, 1:-1, 1:-1].set(selected)
         return out
 
     def weno5_y_masked(
@@ -1187,58 +1252,25 @@ class Reconstruction3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             North-face flux with zero ghost ring.
         """
-        out = jnp.zeros_like(h)
         amasks = mask.get_adaptive_masks(direction="y", stencil_sizes=(2, 4, 6))
         m5 = amasks[6]
         m3 = amasks[4]
-        # --- WENO5 face values ---
-        h5_pos_int = _weno5(
-            h[1:-1, :-4, 1:-1],
-            h[1:-1, 1:-3, 1:-1],
-            h[1:-1, 2:-2, 1:-1],
-            h[1:-1, 3:-1, 1:-1],
-            h[1:-1, 4:, 1:-1],
+        fn_w5 = self.weno5_y(h, v)
+        fn_w3 = self.weno3_y(h, v)
+        fn_u1 = self.upwind1_y(h, v)
+        # Select tier based on upwind-cell stencil capability, broadcast mask over z
+        # Positive flow: upwind cell is (j, i)   → mask at [1:-1, 1:-1]
+        # Negative flow: upwind cell is (j+1, i) → mask at [2:, 1:-1]
+        pos_flow = v[1:-1, 1:-1, 1:-1] >= 0.0
+        use_w5 = jnp.where(pos_flow, m5[None, 1:-1, 1:-1], m5[None, 2:, 1:-1])
+        use_w3 = jnp.where(pos_flow, m3[None, 1:-1, 1:-1], m3[None, 2:, 1:-1])
+        selected = jnp.where(
+            use_w5,
+            fn_w5[1:-1, 1:-1, 1:-1],
+            jnp.where(use_w3, fn_w3[1:-1, 1:-1, 1:-1], fn_u1[1:-1, 1:-1, 1:-1]),
         )
-        h3_pos_first = _weno3(
-            h[1:-1, 0:1, 1:-1], h[1:-1, 1:2, 1:-1], h[1:-1, 2:3, 1:-1]
-        )
-        h3_pos_last = _weno3(
-            h[1:-1, -3:-2, 1:-1], h[1:-1, -2:-1, 1:-1], h[1:-1, -1:, 1:-1]
-        )
-        h_pos_w5 = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=1)
-        h5_neg_int = _weno5(
-            h[1:-1, 4:, 1:-1],
-            h[1:-1, 3:-1, 1:-1],
-            h[1:-1, 2:-2, 1:-1],
-            h[1:-1, 1:-3, 1:-1],
-            h[1:-1, :-4, 1:-1],
-        )
-        h3_neg_first = _weno3(
-            h[1:-1, 3:4, 1:-1], h[1:-1, 2:3, 1:-1], h[1:-1, 1:2, 1:-1]
-        )
-        h_neg_w5 = jnp.concatenate(
-            [h3_neg_first, h5_neg_int, h[1:-1, -1:, 1:-1]], axis=1
-        )
-        # --- WENO3 face values ---
-        h_pos_w3 = _weno3(
-            h[1:-1, :-2, 1:-1], h[1:-1, 1:-1, 1:-1], h[1:-1, 2:, 1:-1]
-        )
-        h_neg_w3_int = _weno3(
-            h[1:-1, 3:, 1:-1], h[1:-1, 2:-1, 1:-1], h[1:-1, 1:-2, 1:-1]
-        )
-        h_neg_w3 = jnp.concatenate([h_neg_w3_int, h[1:-1, -1:, 1:-1]], axis=1)
-        # --- 1st-order upwind face values ---
-        h_pos_u1 = h[1:-1, 1:-1, 1:-1]
-        h_neg_u1 = h[1:-1, 2:, 1:-1]
-        # --- Mask-aware selection (broadcast 2D mask over z) ---
-        m5_pos = m5[None, 1:-1, 1:-1]
-        m3_pos = m3[None, 1:-1, 1:-1]
-        h_pos = jnp.where(m5_pos, h_pos_w5, jnp.where(m3_pos, h_pos_w3, h_pos_u1))
-        m5_neg = m5[None, 2:, 1:-1]
-        m3_neg = m3[None, 2:, 1:-1]
-        h_neg = jnp.where(m5_neg, h_neg_w5, jnp.where(m3_neg, h_neg_w3, h_neg_u1))
-        h_face = jnp.where(v[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
-        out = out.at[1:-1, 1:-1, 1:-1].set(h_face * v[1:-1, 1:-1, 1:-1])
+        out = jnp.zeros_like(h)
+        out = out.at[1:-1, 1:-1, 1:-1].set(selected)
         return out
 
     def wenoz5_x_masked(
@@ -1267,58 +1299,22 @@ class Reconstruction3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             East-face flux with zero ghost ring.
         """
-        out = jnp.zeros_like(h)
         amasks = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4, 6))
         m5 = amasks[6]
         m3 = amasks[4]
-        # --- WENO-Z-5 face values ---
-        h5_pos_int = _wenoz5(
-            h[1:-1, 1:-1, :-4],
-            h[1:-1, 1:-1, 1:-3],
-            h[1:-1, 1:-1, 2:-2],
-            h[1:-1, 1:-1, 3:-1],
-            h[1:-1, 1:-1, 4:],
+        fe_w5 = self.wenoz5_x(h, u)
+        fe_w3 = self.wenoz3_x(h, u)
+        fe_u1 = self.upwind1_x(h, u)
+        pos_flow = u[1:-1, 1:-1, 1:-1] >= 0.0
+        use_w5 = jnp.where(pos_flow, m5[None, 1:-1, 1:-1], m5[None, 1:-1, 2:])
+        use_w3 = jnp.where(pos_flow, m3[None, 1:-1, 1:-1], m3[None, 1:-1, 2:])
+        selected = jnp.where(
+            use_w5,
+            fe_w5[1:-1, 1:-1, 1:-1],
+            jnp.where(use_w3, fe_w3[1:-1, 1:-1, 1:-1], fe_u1[1:-1, 1:-1, 1:-1]),
         )
-        h3_pos_first = _wenoz3(
-            h[1:-1, 1:-1, 0:1], h[1:-1, 1:-1, 1:2], h[1:-1, 1:-1, 2:3]
-        )
-        h3_pos_last = _wenoz3(
-            h[1:-1, 1:-1, -3:-2], h[1:-1, 1:-1, -2:-1], h[1:-1, 1:-1, -1:]
-        )
-        h_pos_w5 = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=2)
-        h5_neg_int = _wenoz5(
-            h[1:-1, 1:-1, 4:],
-            h[1:-1, 1:-1, 3:-1],
-            h[1:-1, 1:-1, 2:-2],
-            h[1:-1, 1:-1, 1:-3],
-            h[1:-1, 1:-1, :-4],
-        )
-        h3_neg_first = _wenoz3(
-            h[1:-1, 1:-1, 3:4], h[1:-1, 1:-1, 2:3], h[1:-1, 1:-1, 1:2]
-        )
-        h_neg_w5 = jnp.concatenate(
-            [h3_neg_first, h5_neg_int, h[1:-1, 1:-1, -1:]], axis=2
-        )
-        # --- WENO-Z-3 face values ---
-        h_pos_w3 = _wenoz3(
-            h[1:-1, 1:-1, :-2], h[1:-1, 1:-1, 1:-1], h[1:-1, 1:-1, 2:]
-        )
-        h_neg_w3_int = _wenoz3(
-            h[1:-1, 1:-1, 3:], h[1:-1, 1:-1, 2:-1], h[1:-1, 1:-1, 1:-2]
-        )
-        h_neg_w3 = jnp.concatenate([h_neg_w3_int, h[1:-1, 1:-1, -1:]], axis=2)
-        # --- 1st-order upwind face values ---
-        h_pos_u1 = h[1:-1, 1:-1, 1:-1]
-        h_neg_u1 = h[1:-1, 1:-1, 2:]
-        # --- Mask-aware selection (broadcast 2D mask over z) ---
-        m5_pos = m5[None, 1:-1, 1:-1]
-        m3_pos = m3[None, 1:-1, 1:-1]
-        h_pos = jnp.where(m5_pos, h_pos_w5, jnp.where(m3_pos, h_pos_w3, h_pos_u1))
-        m5_neg = m5[None, 1:-1, 2:]
-        m3_neg = m3[None, 1:-1, 2:]
-        h_neg = jnp.where(m5_neg, h_neg_w5, jnp.where(m3_neg, h_neg_w3, h_neg_u1))
-        h_face = jnp.where(u[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
-        out = out.at[1:-1, 1:-1, 1:-1].set(h_face * u[1:-1, 1:-1, 1:-1])
+        out = jnp.zeros_like(h)
+        out = out.at[1:-1, 1:-1, 1:-1].set(selected)
         return out
 
     def wenoz5_y_masked(
@@ -1347,56 +1343,20 @@ class Reconstruction3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             North-face flux with zero ghost ring.
         """
-        out = jnp.zeros_like(h)
         amasks = mask.get_adaptive_masks(direction="y", stencil_sizes=(2, 4, 6))
         m5 = amasks[6]
         m3 = amasks[4]
-        # --- WENO-Z-5 face values ---
-        h5_pos_int = _wenoz5(
-            h[1:-1, :-4, 1:-1],
-            h[1:-1, 1:-3, 1:-1],
-            h[1:-1, 2:-2, 1:-1],
-            h[1:-1, 3:-1, 1:-1],
-            h[1:-1, 4:, 1:-1],
+        fn_w5 = self.wenoz5_y(h, v)
+        fn_w3 = self.wenoz3_y(h, v)
+        fn_u1 = self.upwind1_y(h, v)
+        pos_flow = v[1:-1, 1:-1, 1:-1] >= 0.0
+        use_w5 = jnp.where(pos_flow, m5[None, 1:-1, 1:-1], m5[None, 2:, 1:-1])
+        use_w3 = jnp.where(pos_flow, m3[None, 1:-1, 1:-1], m3[None, 2:, 1:-1])
+        selected = jnp.where(
+            use_w5,
+            fn_w5[1:-1, 1:-1, 1:-1],
+            jnp.where(use_w3, fn_w3[1:-1, 1:-1, 1:-1], fn_u1[1:-1, 1:-1, 1:-1]),
         )
-        h3_pos_first = _wenoz3(
-            h[1:-1, 0:1, 1:-1], h[1:-1, 1:2, 1:-1], h[1:-1, 2:3, 1:-1]
-        )
-        h3_pos_last = _wenoz3(
-            h[1:-1, -3:-2, 1:-1], h[1:-1, -2:-1, 1:-1], h[1:-1, -1:, 1:-1]
-        )
-        h_pos_w5 = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=1)
-        h5_neg_int = _wenoz5(
-            h[1:-1, 4:, 1:-1],
-            h[1:-1, 3:-1, 1:-1],
-            h[1:-1, 2:-2, 1:-1],
-            h[1:-1, 1:-3, 1:-1],
-            h[1:-1, :-4, 1:-1],
-        )
-        h3_neg_first = _wenoz3(
-            h[1:-1, 3:4, 1:-1], h[1:-1, 2:3, 1:-1], h[1:-1, 1:2, 1:-1]
-        )
-        h_neg_w5 = jnp.concatenate(
-            [h3_neg_first, h5_neg_int, h[1:-1, -1:, 1:-1]], axis=1
-        )
-        # --- WENO-Z-3 face values ---
-        h_pos_w3 = _wenoz3(
-            h[1:-1, :-2, 1:-1], h[1:-1, 1:-1, 1:-1], h[1:-1, 2:, 1:-1]
-        )
-        h_neg_w3_int = _wenoz3(
-            h[1:-1, 3:, 1:-1], h[1:-1, 2:-1, 1:-1], h[1:-1, 1:-2, 1:-1]
-        )
-        h_neg_w3 = jnp.concatenate([h_neg_w3_int, h[1:-1, -1:, 1:-1]], axis=1)
-        # --- 1st-order upwind face values ---
-        h_pos_u1 = h[1:-1, 1:-1, 1:-1]
-        h_neg_u1 = h[1:-1, 2:, 1:-1]
-        # --- Mask-aware selection (broadcast 2D mask over z) ---
-        m5_pos = m5[None, 1:-1, 1:-1]
-        m3_pos = m3[None, 1:-1, 1:-1]
-        h_pos = jnp.where(m5_pos, h_pos_w5, jnp.where(m3_pos, h_pos_w3, h_pos_u1))
-        m5_neg = m5[None, 2:, 1:-1]
-        m3_neg = m3[None, 2:, 1:-1]
-        h_neg = jnp.where(m5_neg, h_neg_w5, jnp.where(m3_neg, h_neg_w3, h_neg_u1))
-        h_face = jnp.where(v[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
-        out = out.at[1:-1, 1:-1, 1:-1].set(h_face * v[1:-1, 1:-1, 1:-1])
+        out = jnp.zeros_like(h)
+        out = out.at[1:-1, 1:-1, 1:-1].set(selected)
         return out

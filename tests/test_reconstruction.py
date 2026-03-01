@@ -590,13 +590,37 @@ class TestReconstruction2DMasked:
         np.testing.assert_array_equal(result[-1, :], 0.0)
 
     def test_weno5_x_masked_coastal_fallback(self, coastal_mask_2d):
-        """Coastal mask: cells near land should not raise an error and return finite values."""
+        """Coastal mask: near-land cells use lower-order stencil with non-constant field.
+
+        Verifies that (1) the masked reconstruction produces finite values everywhere,
+        and (2) cells immediately adjacent to the land block produce different flux
+        values from the unmasked WENO-5 for both flow signs, confirming that stencil
+        fallback is actually being applied near the coastline.
+        """
         grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
         recon = Reconstruction2D(grid=grid)
-        h = jnp.ones((grid.Ny, grid.Nx))
-        u = jnp.ones((grid.Ny, grid.Nx))
-        result = recon.weno5_x_masked(h, u, coastal_mask_2d)
-        assert jnp.all(jnp.isfinite(result))
+
+        # Non-constant field varying in x so different stencils produce distinct values.
+        x_indices = jnp.arange(grid.Nx, dtype=float)
+        h = jnp.broadcast_to(x_indices, (grid.Ny, grid.Nx))
+
+        for sign in (1.0, -1.0):
+            u = sign * jnp.ones((grid.Ny, grid.Nx))
+
+            ref = recon.weno5_x(h, u)
+            masked = recon.weno5_x_masked(h, u, coastal_mask_2d)
+
+            assert jnp.all(jnp.isfinite(masked)).item()
+
+            # Columns 3 and 6 (0-based) are immediately adjacent to the land block
+            # (land at cols 4-5) and lack sufficient stencil for even WENO3, so the
+            # mask forces 1st-order upwind. For a non-constant h this differs from
+            # the WENO-5 result produced by the unmasked method.
+            row_slice = slice(2, 8)
+            diffs_found = jnp.any(
+                masked[row_slice, 3] != ref[row_slice, 3]
+            ) | jnp.any(masked[row_slice, 6] != ref[row_slice, 6])
+            assert diffs_found.item()
 
     # --- weno5_y_masked ---
 
@@ -668,7 +692,7 @@ class TestReconstruction2DMasked:
         h = jnp.ones((grid.Ny, grid.Nx))
         v = jnp.ones((grid.Ny, grid.Nx))
         result = recon.wenoz5_y_masked(h, v, coastal_mask_2d)
-        assert jnp.all(jnp.isfinite(result))
+        assert jnp.all(jnp.isfinite(result)).item()
 
 
 class TestReconstruction3DMasked:
