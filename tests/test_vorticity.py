@@ -1,4 +1,5 @@
 """Tests for Vorticity2D and Vorticity3D."""
+
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -83,9 +84,9 @@ class TestVorticity2D:
         q = jnp.ones((grid2d.Ny, grid2d.Nx))
         u = 2.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
         v = 3.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
-        qu_e, qv_e = vort.pv_flux_energy_conserving(q, u, v)
-        qu_s, qv_s = vort.pv_flux_enstrophy_conserving(q, u, v)
-        qu_al, qv_al = vort.pv_flux_arakawa_lamb(q, u, v, alpha=1.0 / 3.0)
+        qu_e, _qv_e = vort.pv_flux_energy_conserving(q, u, v)
+        qu_s, _qv_s = vort.pv_flux_enstrophy_conserving(q, u, v)
+        qu_al, _qv_al = vort.pv_flux_arakawa_lamb(q, u, v, alpha=1.0 / 3.0)
         np.testing.assert_allclose(
             qu_al, 1.0 / 3.0 * qu_e + 2.0 / 3.0 * qu_s, rtol=1e-5
         )

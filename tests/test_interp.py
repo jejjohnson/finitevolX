@@ -1,10 +1,15 @@
 """Tests for Interpolation1D, Interpolation2D, Interpolation3D."""
+
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
 from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
-from finitevolx._src.interpolation import Interpolation1D, Interpolation2D, Interpolation3D
+from finitevolx._src.interpolation import (
+    Interpolation1D,
+    Interpolation2D,
+    Interpolation3D,
+)
 
 
 @pytest.fixture
@@ -128,10 +133,18 @@ class TestInterpolation2D:
         interp = Interpolation2D(grid=grid2d)
         h = jnp.ones((grid2d.Ny, grid2d.Nx))
         for method in [
-            interp.T_to_U, interp.T_to_V, interp.T_to_X,
-            interp.U_to_T, interp.V_to_T, interp.X_to_T,
-            interp.U_to_X, interp.V_to_X, interp.X_to_U, interp.X_to_V,
-            interp.U_to_V, interp.V_to_U,
+            interp.T_to_U,
+            interp.T_to_V,
+            interp.T_to_X,
+            interp.U_to_T,
+            interp.V_to_T,
+            interp.X_to_T,
+            interp.U_to_X,
+            interp.V_to_X,
+            interp.X_to_U,
+            interp.X_to_V,
+            interp.U_to_V,
+            interp.V_to_U,
         ]:
             assert method(h).shape == (grid2d.Ny, grid2d.Nx)
 

@@ -1,7 +1,7 @@
 """Tests for boundary condition helpers."""
+
 import jax.numpy as jnp
 import numpy as np
-import pytest
 
 from finitevolx._src.boundary import enforce_periodic, pad_interior
 
@@ -44,29 +44,37 @@ class TestEnforcePeriodic:
 
     def test_south_ghost_equals_north_interior(self):
         # row 0 should equal row Ny-2
-        f = jnp.zeros((6, 6)).at[1:-1, 1:-1].set(
-            jnp.arange(16, dtype=float).reshape(4, 4)
+        f = (
+            jnp.zeros((6, 6))
+            .at[1:-1, 1:-1]
+            .set(jnp.arange(16, dtype=float).reshape(4, 4))
         )
         result = enforce_periodic(f)
         np.testing.assert_array_equal(result[0, :], result[-2, :])
 
     def test_north_ghost_equals_south_interior(self):
-        f = jnp.zeros((6, 6)).at[1:-1, 1:-1].set(
-            jnp.arange(16, dtype=float).reshape(4, 4)
+        f = (
+            jnp.zeros((6, 6))
+            .at[1:-1, 1:-1]
+            .set(jnp.arange(16, dtype=float).reshape(4, 4))
         )
         result = enforce_periodic(f)
         np.testing.assert_array_equal(result[-1, :], result[1, :])
 
     def test_west_ghost_equals_east_interior(self):
-        f = jnp.zeros((6, 6)).at[1:-1, 1:-1].set(
-            jnp.arange(16, dtype=float).reshape(4, 4)
+        f = (
+            jnp.zeros((6, 6))
+            .at[1:-1, 1:-1]
+            .set(jnp.arange(16, dtype=float).reshape(4, 4))
         )
         result = enforce_periodic(f)
         np.testing.assert_array_equal(result[:, 0], result[:, -2])
 
     def test_east_ghost_equals_west_interior(self):
-        f = jnp.zeros((6, 6)).at[1:-1, 1:-1].set(
-            jnp.arange(16, dtype=float).reshape(4, 4)
+        f = (
+            jnp.zeros((6, 6))
+            .at[1:-1, 1:-1]
+            .set(jnp.arange(16, dtype=float).reshape(4, 4))
         )
         result = enforce_periodic(f)
         np.testing.assert_array_equal(result[:, -1], result[:, 1])

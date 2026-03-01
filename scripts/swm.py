@@ -1,4 +1,4 @@
-""" swm.py
+"""swm.py
 
 2D shallow water model with:
 
@@ -10,9 +10,9 @@
     * mass term: h --> u,v
     * momentum term: q --> uh,vh
 """
+
 from typing import NamedTuple
 
-import autoroot
 from fieldx._src.domain.domain import Domain
 import jax
 import jax.numpy as jnp
@@ -215,8 +215,7 @@ def update_plot(t, h, u, v, ax):
     ax.set_xlim(x[1] / 1e3, x[-2] / 1e3)
     ax.set_ylim(y[1] / 1e3, y[-2] / 1e3)
     ax.set_title(
-        "t=%5.2f days, R=%5.1f km, c=%5.1f m/s "
-        % (t / 86400, rossby_radius / 1e3, phase_speed)
+        f"t={t / 86400:5.2f} days, R={rossby_radius / 1e3:5.1f} km, c={phase_speed:5.1f} m/s "
     )
     plt.pause(0.00001)
     return cs
@@ -582,11 +581,6 @@ def iterate_shallow_water():
         # h = enforce_boundaries(h, 'h')
         # u = enforce_boundaries(u, 'u')
         # v = enforce_boundaries(v, 'v')
-
-        # rotate quantities
-        h_rhs_old = h_rhs
-        v_rhs_old = v_rhs
-        u_rhs_old = u_rhs
 
         yield h, u, v
 

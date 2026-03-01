@@ -1,4 +1,5 @@
 """Tests for Difference1D, Difference2D, Difference3D."""
+
 import jax.numpy as jnp
 import numpy as np
 import pytest

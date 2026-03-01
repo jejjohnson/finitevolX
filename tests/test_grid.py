@@ -1,5 +1,7 @@
 """Tests for ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D."""
+
 import pytest
+
 from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
 
 
@@ -50,7 +52,6 @@ class TestArakawaCGrid3D:
 
     def test_direct_construction(self):
         g = ArakawaCGrid3D(
-            Nx=4, Ny=4, Nz=4, Lx=1.0, Ly=1.0, Lz=1.0,
-            dx=0.5, dy=0.5, dz=0.5
+            Nx=4, Ny=4, Nz=4, Lx=1.0, Ly=1.0, Lz=1.0, dx=0.5, dy=0.5, dz=0.5
         )
         assert g.Nz == 4

@@ -1,4 +1,5 @@
 """Tests for Advection1D, Advection2D, Advection3D."""
+
 import jax.numpy as jnp
 import numpy as np
 import pytest
