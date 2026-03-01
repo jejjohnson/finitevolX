@@ -308,8 +308,8 @@ class ArakawaCGridMask(eqx.Module):
     w_valid: Bool[Array, "Ny Nx"]
 
     # ── irregular boundary indices (dynamic shape — do not use inside jit) ───
-    psi_irrbound_xids: Int[Array, Nirr]
-    psi_irrbound_yids: Int[Array, Nirr]
+    psi_irrbound_xids: Int[Array, "Nirr"]
+    psi_irrbound_yids: Int[Array, "Nirr"]
 
     # ── land/coast classification ─────────────────────────────────────────────
     classification: Int[Array, "Ny Nx"]
