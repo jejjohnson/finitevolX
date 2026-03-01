@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.6](https://github.com/jejjohnson/finitevolX/compare/v0.0.5...v0.0.6) (2026-03-01)
+
+
+### Bug Fixes
+
+* move operator tests to tests/ directory per AGENTS.md ([5b74582](https://github.com/jejjohnson/finitevolX/commit/5b74582cd63a4dc7fb54ab022cc359553ec08ac6))
+* use lazy import for finitediffx in operators.py ([fe0b5f8](https://github.com/jejjohnson/finitevolX/commit/fe0b5f8b9482cec288696f43927ff315e0e92c9c))
+
 ## [0.0.5](https://github.com/jejjohnson/finitevolX/compare/v0.0.4...v0.0.5) (2026-03-01)
 
 
