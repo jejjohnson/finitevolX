@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.4](https://github.com/jejjohnson/finitevolX/compare/v0.0.3...v0.0.4) (2026-03-01)
+
+
+### Features
+
+* add unified `ArakawaCGridMask`; remove legacy `MaskGrid`/`FaceMask`/`NodeMask`/`CenterMask` ([d11b995](https://github.com/jejjohnson/finitevolX/commit/d11b9951eaced1205c9a1de6fe6a8d4c5b515ac4))
+
+
+### Bug Fixes
+
+* add missing quotes around Nirr in jaxtyping annotations ([fdd4ef6](https://github.com/jejjohnson/finitevolX/commit/fdd4ef61d5463d81dec6a5862541166218f43614))
+
 ## [0.0.3](https://github.com/jejjohnson/finitevolX/compare/v0.0.2...v0.0.3) (2026-03-01)
 
 
