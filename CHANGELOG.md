@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.7](https://github.com/jejjohnson/finitevolX/compare/v0.0.6...v0.0.7) (2026-03-01)
+
+
+### Features
+
+* add mask-aware reconstruction methods to Reconstruction2D and Reconstruction3D ([35442d0](https://github.com/jejjohnson/finitevolX/commit/35442d0583e7e8c9a8f91cb9e4cd02ada23227f1))
+* add mask-aware WENO5/WENOZ5 reconstruction to Reconstruction2D and Reconstruction3D ([ef39e9f](https://github.com/jejjohnson/finitevolX/commit/ef39e9fba7129a883d9e41bb7e492c348e2445d7))
+
 ## [0.0.6](https://github.com/jejjohnson/finitevolX/compare/v0.0.5...v0.0.6) (2026-03-01)
 
 
