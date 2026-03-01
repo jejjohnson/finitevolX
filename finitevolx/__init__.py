@@ -7,6 +7,7 @@ from finitevolx._src.interpolation import (
     Interpolation2D,
     Interpolation3D,
 )
+from finitevolx._src.masks.cgrid_mask import ArakawaCGridMask, StencilCapability
 from finitevolx._src.reconstruction import (
     Reconstruction1D,
     Reconstruction2D,
@@ -25,12 +26,6 @@ try:
         x_avg_1D,
         x_avg_2D,
         y_avg_2D,
-    )
-    from finitevolx._src.masks.masks import (
-        CenterMask,
-        FaceMask,
-        MaskGrid,
-        NodeMask,
     )
     from finitevolx._src.operators.operators import (
         absolute_vorticity,
@@ -68,6 +63,7 @@ __all__ = [
     "ArakawaCGrid1D",
     "ArakawaCGrid2D",
     "ArakawaCGrid3D",
+    "ArakawaCGridMask",
     "Difference1D",
     "Difference2D",
     "Difference3D",
@@ -79,6 +75,7 @@ __all__ = [
     "Reconstruction1D",
     "Reconstruction2D",
     "Reconstruction3D",
+    "StencilCapability",
     "Vorticity2D",
     "Vorticity3D",
     # Legacy API
@@ -90,15 +87,11 @@ __all__ = [
     "avg_quadratic",
     "bernoulli_potential",
     "center_avg_2D",
-    "CenterMask",
     "difference",
     "divergence",
-    "FaceMask",
     "geostrophic_gradient",
     "kinetic_energy",
     "laplacian",
-    "MaskGrid",
-    "NodeMask",
     "reconstruct",
     "reconstruct_1pt",
     "reconstruct_3pt",
