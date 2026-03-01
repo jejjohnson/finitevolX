@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.5](https://github.com/jejjohnson/finitevolX/compare/v0.0.4...v0.0.5) (2026-03-01)
+
+
+### Bug Fixes
+
+* **cgrid_mask:** define Nirr type alias to resolve ty check error on Python 3.13 ([caa558b](https://github.com/jejjohnson/finitevolX/commit/caa558bb3628c64a1a8e77ee53756a92ce9c3a07))
+
 ## [0.0.4](https://github.com/jejjohnson/finitevolX/compare/v0.0.3...v0.0.4) (2026-03-01)
 
 
