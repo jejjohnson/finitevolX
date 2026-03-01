@@ -88,10 +88,9 @@ class Vorticity2D(eqx.Module):
         h_on_q = self.interp.T_to_X(h)  # h interpolated to X-points
         out = jnp.zeros_like(h)
         # q[j+1/2, i+1/2] = (zeta + f) / h  at X-points
-        out = out.at[1:-1, 1:-1].set(
-            (zeta[1:-1, 1:-1] + f_on_q[1:-1, 1:-1])
-            / (h_on_q[1:-1, 1:-1] + 1e-12)  # small epsilon for stability
-        )
+        num = zeta[1:-1, 1:-1] + f_on_q[1:-1, 1:-1]
+        den = h_on_q[1:-1, 1:-1]
+        out = out.at[1:-1, 1:-1].set(jnp.where(den == 0, jnp.nan, num / den))
         return out
 
     def pv_flux_energy_conserving(

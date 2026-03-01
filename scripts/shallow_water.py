@@ -157,7 +157,7 @@ def run():
         h, u, v = step_jit(h, u, v)
         if i % (nsteps // 10) == 0:
             ke = 0.5 * jnp.mean(h[1:-1, 1:-1] * (u[1:-1, 1:-1]**2 + v[1:-1, 1:-1]**2))
-            print(f"  step {i:5d}/{nsteps}  KE={ke:.4e}  h_max={h.max():.4f}")
+            print(f"  step {i:5d}/{nsteps}  KE={float(ke):.4e}  h_max={float(h.max()):.4f}")
 
     print("Done.")
     return h, u, v

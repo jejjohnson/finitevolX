@@ -57,8 +57,8 @@ class TestAdvection1D:
         h = jnp.ones(grid1d.Nx)
         u = jnp.ones(grid1d.Nx)
         result = adv(h, u)
-        assert result[0] == 0.0
-        assert result[-1] == 0.0
+        np.testing.assert_allclose(result[0], 0.0)
+        np.testing.assert_allclose(result[-1], 0.0)
 
 
 class TestAdvection2D:

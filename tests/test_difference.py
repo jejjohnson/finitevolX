@@ -32,8 +32,8 @@ class TestDifference1D:
         # interior should be ~c
         np.testing.assert_allclose(result[1:-1], c, rtol=1e-5)
         # ghost cells should be zero
-        assert result[0] == 0.0
-        assert result[-1] == 0.0
+        np.testing.assert_allclose(result[0], 0.0)
+        np.testing.assert_allclose(result[-1], 0.0)
 
     def test_diff_x_U_to_T_constant(self, grid1d):
         diff = Difference1D(grid=grid1d)
