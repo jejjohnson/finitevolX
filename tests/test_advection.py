@@ -57,7 +57,10 @@ class TestAdvection1D:
         h = jnp.ones(grid1d.Nx)
         u = jnp.ones(grid1d.Nx)
         result = adv(h, u)
+        # Ghost ring and boundary layer stay zero
         np.testing.assert_allclose(result[0], 0.0)
+        np.testing.assert_allclose(result[1], 0.0)
+        np.testing.assert_allclose(result[-2], 0.0)
         np.testing.assert_allclose(result[-1], 0.0)
 
 
@@ -93,8 +96,15 @@ class TestAdvection2D:
         u = jnp.ones((grid2d.Ny, grid2d.Nx))
         v = jnp.ones((grid2d.Ny, grid2d.Nx))
         result = adv(h, u, v)
+        # Ghost ring and boundary layers stay zero
         np.testing.assert_array_equal(result[0, :], 0.0)
+        np.testing.assert_array_equal(result[1, :], 0.0)
+        np.testing.assert_array_equal(result[-2, :], 0.0)
         np.testing.assert_array_equal(result[-1, :], 0.0)
+        np.testing.assert_array_equal(result[:, 0], 0.0)
+        np.testing.assert_array_equal(result[:, 1], 0.0)
+        np.testing.assert_array_equal(result[:, -2], 0.0)
+        np.testing.assert_array_equal(result[:, -1], 0.0)
 
     def test_unknown_method_raises(self, grid2d):
         adv = Advection2D(grid=grid2d)

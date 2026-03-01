@@ -57,11 +57,65 @@ class TestReconstruction1D:
         u = jnp.ones(grid1d.Nx)
         assert recon.upwind2_x(h, u).shape == (grid1d.Nx,)
 
+    def test_upwind2_positive_flow(self, grid1d):
+        recon = Reconstruction1D(grid=grid1d)
+        # Linear field h = i  =>  upwind2 positive should give ~h[i]*u
+        h = jnp.arange(grid1d.Nx, dtype=float)
+        u = jnp.ones(grid1d.Nx)
+        result = recon.upwind2_x(h, u)
+        # For positive flow, h_face[i+1/2] = 3/2*h[i] - 1/2*h[i-1]
+        # Interior faces should match the 2nd-order formula
+        expected_interior = 1.5 * h[1:-2] - 0.5 * h[:-3]
+        np.testing.assert_allclose(
+            result[2:-1] / u[2:-1], expected_interior, rtol=1e-5
+        )
+
+    def test_upwind2_negative_flow(self, grid1d):
+        recon = Reconstruction1D(grid=grid1d)
+        h = jnp.arange(grid1d.Nx, dtype=float)
+        u = -jnp.ones(grid1d.Nx)
+        result = recon.upwind2_x(h, u)
+        # For negative flow, h_face[i+1/2] = 3/2*h[i+1] - 1/2*h[i+2]
+        # Interior faces (except last) should use 2nd-order
+        expected_interior = 1.5 * h[2:-2] - 0.5 * h[3:-1]
+        np.testing.assert_allclose(
+            result[1:-2] / (-u[1:-2]), expected_interior, rtol=1e-5
+        )
+
     def test_upwind3_output_shape(self, grid1d):
         recon = Reconstruction1D(grid=grid1d)
         h = jnp.ones(grid1d.Nx)
         u = jnp.ones(grid1d.Nx)
         assert recon.upwind3_x(h, u).shape == (grid1d.Nx,)
+
+    def test_upwind3_positive_flow(self, grid1d):
+        recon = Reconstruction1D(grid=grid1d)
+        # Quadratic field to test 3rd-order accuracy
+        x = jnp.arange(grid1d.Nx, dtype=float)
+        h = x**2
+        u = jnp.ones(grid1d.Nx)
+        result = recon.upwind3_x(h, u)
+        # For positive flow, h_face = -1/6*h[i-1] + 5/6*h[i] + 1/3*h[i+1]
+        expected = (-1.0 / 6.0 * h[:-2] + 5.0 / 6.0 * h[1:-1] + 1.0 / 3.0 * h[2:]) * u[
+            1:-1
+        ]
+        np.testing.assert_allclose(result[1:-1], expected, rtol=1e-5)
+
+    def test_upwind3_negative_flow(self, grid1d):
+        recon = Reconstruction1D(grid=grid1d)
+        x = jnp.arange(grid1d.Nx, dtype=float)
+        h = x**2
+        u = -jnp.ones(grid1d.Nx)
+        result = recon.upwind3_x(h, u)
+        # For negative flow, interior uses 3rd-order, boundary uses 1st-order
+        # Interior (except last): h_face = 1/3*h[i] + 5/6*h[i+1] - 1/6*h[i+2]
+        expected_interior = (
+            1.0 / 3.0 * h[1:-2] + 5.0 / 6.0 * h[2:-1] - 1.0 / 6.0 * h[3:]
+        ) * u[1:-2]
+        np.testing.assert_allclose(result[1:-2], expected_interior, rtol=1e-5)
+        # Last interior face uses 1st-order fallback: h_face = h[i+1]
+        expected_boundary = h[-1] * u[-2]
+        np.testing.assert_allclose(result[-2], expected_boundary, rtol=1e-5)
 
     def test_ghost_zero(self, grid1d):
         recon = Reconstruction1D(grid=grid1d)
