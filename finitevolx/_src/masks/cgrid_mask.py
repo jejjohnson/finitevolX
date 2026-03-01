@@ -203,7 +203,7 @@ class StencilCapability(eqx.Module):
     y_neg: Int[Array, "Ny Nx"]
 
     @classmethod
-    def from_mask(cls, h: Bool[Array, "Ny Nx"]) -> StencilCapability:
+    def from_mask(cls, h: np.ndarray | Bool[Array, "Ny Nx"]) -> StencilCapability:
         """Build stencil capability from a wet/dry mask.
 
         Construction uses numpy; stored arrays are JAX int32.
@@ -443,7 +443,7 @@ class ArakawaCGridMask(eqx.Module):
     @classmethod
     def from_mask(
         cls,
-        mask_hgrid: Bool[Array, "Ny Nx"],
+        mask_hgrid: np.ndarray | Bool[Array, "Ny Nx"],
         sponge_width: int | None = None,
         k_bottom: Array | None = None,
     ) -> ArakawaCGridMask:
