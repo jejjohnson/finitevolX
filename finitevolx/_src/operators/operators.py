@@ -1,4 +1,3 @@
-import finitediffx as fdx
 import jax
 from jaxtyping import (
     Array,
@@ -11,6 +10,8 @@ from finitevolx._src.constants import GRAVITY
 def difference(
     u: Array, axis: int = 0, step_size: float | Array = 1.0, derivative: int = 1
 ) -> Array:
+    import finitediffx as fdx
+
     if derivative == 1:
         du = fdx.difference(
             u,
@@ -39,6 +40,8 @@ def difference(
 
 
 def laplacian(u: Array, step_size: float | tuple[float, ...] | Array = 1) -> Array:
+    import finitediffx as fdx
+
     msg = "Laplacian must be 2D or 3D"
     assert u.ndim in [2, 3], msg
     # calculate laplacian
