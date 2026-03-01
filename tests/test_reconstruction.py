@@ -127,6 +127,99 @@ class TestReconstruction1D:
         np.testing.assert_allclose(result[0], 0.0)
         np.testing.assert_allclose(result[-1], 0.0)
 
+    # --- WENO-3 tests ---
+
+    def test_weno3_output_shape(self, grid1d):
+        recon = Reconstruction1D(grid=grid1d)
+        h = jnp.ones(grid1d.Nx)
+        u = jnp.ones(grid1d.Nx)
+        assert recon.weno3_x(h, u).shape == (grid1d.Nx,)
+
+    def test_weno3_constant_field(self, grid1d):
+        recon = Reconstruction1D(grid=grid1d)
+        h = 3.0 * jnp.ones(grid1d.Nx)
+        u = jnp.ones(grid1d.Nx)
+        result = recon.weno3_x(h, u)
+        # Constant field => WENO collapses to h*u = 3
+        np.testing.assert_allclose(result[1:-1], 3.0, rtol=1e-5)
+
+    def test_weno3_ghost_zero(self, grid1d):
+        recon = Reconstruction1D(grid=grid1d)
+        h = jnp.ones(grid1d.Nx)
+        u = jnp.ones(grid1d.Nx)
+        result = recon.weno3_x(h, u)
+        np.testing.assert_allclose(result[0], 0.0)
+        np.testing.assert_allclose(result[-1], 0.0)
+
+    def test_weno3_positive_negative_match_upwind3_smooth(self, grid1d):
+        # On a constant field both WENO-3 and upwind3 must give h*u exactly
+        recon = Reconstruction1D(grid=grid1d)
+        h = 3.0 * jnp.ones(grid1d.Nx)
+        u = jnp.ones(grid1d.Nx)
+        weno = recon.weno3_x(h, u)
+        upw3 = recon.upwind3_x(h, u)
+        np.testing.assert_allclose(weno[1:-1], upw3[1:-1], rtol=1e-5)
+
+    # --- WENO-Z-3 tests ---
+
+    def test_wenoz3_output_shape(self, grid1d):
+        recon = Reconstruction1D(grid=grid1d)
+        h = jnp.ones(grid1d.Nx)
+        u = jnp.ones(grid1d.Nx)
+        assert recon.wenoz3_x(h, u).shape == (grid1d.Nx,)
+
+    def test_wenoz3_constant_field(self, grid1d):
+        recon = Reconstruction1D(grid=grid1d)
+        h = 5.0 * jnp.ones(grid1d.Nx)
+        u = jnp.ones(grid1d.Nx)
+        result = recon.wenoz3_x(h, u)
+        np.testing.assert_allclose(result[1:-1], 5.0, rtol=1e-5)
+
+    # --- WENO-5 tests ---
+
+    def test_weno5_output_shape(self, grid1d):
+        recon = Reconstruction1D(grid=grid1d)
+        h = jnp.ones(grid1d.Nx)
+        u = jnp.ones(grid1d.Nx)
+        assert recon.weno5_x(h, u).shape == (grid1d.Nx,)
+
+    def test_weno5_constant_field(self, grid1d):
+        recon = Reconstruction1D(grid=grid1d)
+        h = 2.0 * jnp.ones(grid1d.Nx)
+        u = jnp.ones(grid1d.Nx)
+        result = recon.weno5_x(h, u)
+        np.testing.assert_allclose(result[1:-1], 2.0, rtol=1e-5)
+
+    def test_weno5_ghost_zero(self, grid1d):
+        recon = Reconstruction1D(grid=grid1d)
+        h = jnp.ones(grid1d.Nx)
+        u = jnp.ones(grid1d.Nx)
+        result = recon.weno5_x(h, u)
+        np.testing.assert_allclose(result[0], 0.0)
+        np.testing.assert_allclose(result[-1], 0.0)
+
+    def test_weno5_negative_flow_constant(self, grid1d):
+        recon = Reconstruction1D(grid=grid1d)
+        h = 4.0 * jnp.ones(grid1d.Nx)
+        u = -jnp.ones(grid1d.Nx)
+        result = recon.weno5_x(h, u)
+        np.testing.assert_allclose(result[1:-1], -4.0, rtol=1e-5)
+
+    # --- WENO-Z-5 tests ---
+
+    def test_wenoz5_output_shape(self, grid1d):
+        recon = Reconstruction1D(grid=grid1d)
+        h = jnp.ones(grid1d.Nx)
+        u = jnp.ones(grid1d.Nx)
+        assert recon.wenoz5_x(h, u).shape == (grid1d.Nx,)
+
+    def test_wenoz5_constant_field(self, grid1d):
+        recon = Reconstruction1D(grid=grid1d)
+        h = 7.0 * jnp.ones(grid1d.Nx)
+        u = jnp.ones(grid1d.Nx)
+        result = recon.wenoz5_x(h, u)
+        np.testing.assert_allclose(result[1:-1], 7.0, rtol=1e-5)
+
 
 class TestReconstruction2D:
     def test_naive_x_constant(self, grid2d):
@@ -180,6 +273,90 @@ class TestReconstruction2D:
         np.testing.assert_array_equal(result[0, :], 0.0)
         np.testing.assert_array_equal(result[-1, :], 0.0)
 
+    # --- WENO-3 tests ---
+
+    def test_weno3_x_output_shape(self, grid2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        assert recon.weno3_x(h, u).shape == (grid2d.Ny, grid2d.Nx)
+
+    def test_weno3_x_constant(self, grid2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 3.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.weno3_x(h, u)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 3.0, rtol=1e-5)
+
+    def test_weno3_y_constant(self, grid2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 4.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.weno3_y(h, v)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 4.0, rtol=1e-5)
+
+    def test_weno3_x_ghost_zero(self, grid2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.weno3_x(h, u)
+        np.testing.assert_array_equal(result[0, :], 0.0)
+        np.testing.assert_array_equal(result[-1, :], 0.0)
+
+    # --- WENO-Z-3 tests ---
+
+    def test_wenoz3_x_constant(self, grid2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 6.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.wenoz3_x(h, u)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 6.0, rtol=1e-5)
+
+    def test_wenoz3_y_constant(self, grid2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 7.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.wenoz3_y(h, v)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 7.0, rtol=1e-5)
+
+    # --- WENO-5 tests ---
+
+    def test_weno5_x_output_shape(self, grid2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        assert recon.weno5_x(h, u).shape == (grid2d.Ny, grid2d.Nx)
+
+    def test_weno5_x_constant(self, grid2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 2.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.weno5_x(h, u)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 2.0, rtol=1e-5)
+
+    def test_weno5_y_constant(self, grid2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 5.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.weno5_y(h, v)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 5.0, rtol=1e-5)
+
+    # --- WENO-Z-5 tests ---
+
+    def test_wenoz5_x_constant(self, grid2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 8.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.wenoz5_x(h, u)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 8.0, rtol=1e-5)
+
+    def test_wenoz5_y_constant(self, grid2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 9.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.wenoz5_y(h, v)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 9.0, rtol=1e-5)
+
 
 class TestReconstruction3D:
     def test_naive_x_shape(self, grid3d):
@@ -201,3 +378,41 @@ class TestReconstruction3D:
         v = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         result = recon.upwind1_y(h, v)
         np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], 2.0)
+
+    # --- WENO-3 tests ---
+
+    def test_weno3_x_constant(self, grid3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = 4.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        u = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = recon.weno3_x(h, u)
+        np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], 4.0, rtol=1e-5)
+
+    def test_weno3_y_constant(self, grid3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = 5.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        v = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = recon.weno3_y(h, v)
+        np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], 5.0, rtol=1e-5)
+
+    def test_weno3_x_shape(self, grid3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        u = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        assert recon.weno3_x(h, u).shape == (grid3d.Nz, grid3d.Ny, grid3d.Nx)
+
+    # --- WENO-Z-3 tests ---
+
+    def test_wenoz3_x_constant(self, grid3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = 6.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        u = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = recon.wenoz3_x(h, u)
+        np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], 6.0, rtol=1e-5)
+
+    def test_wenoz3_y_constant(self, grid3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = 7.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        v = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = recon.wenoz3_y(h, v)
+        np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], 7.0, rtol=1e-5)
