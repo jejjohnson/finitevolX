@@ -6,10 +6,6 @@ from jaxtyping import (
 )
 
 from finitevolx._src.constants import GRAVITY
-from finitevolx._src.interp.interp import (
-    x_avg_2D,
-    y_avg_2D,
-)
 
 
 def difference(
@@ -176,9 +172,22 @@ def kinetic_energy(
             Size = [Nx Ny]
     """
 
-    # calculate squared components on cell centers
-    u2_on_center: Float[Array, "Nx-1 Ny-1"] = x_avg_2D(u**2)
-    v2_on_center: Float[Array, "Nx-1 Ny-1"] = y_avg_2D(v**2)
+    # Calculate squared components on cell centers via averaging
+    # For u: u is at U-points [Nx+1, Ny], we need to average in x-direction to get to T-points
+    # u²_on_center[i] = 0.5 * (u²[i] + u²[i+1]) where i goes from 0 to Nx-1
+    # This gives us shape [Nx, Ny]
+    u2 = u**2
+    u2_on_center = 0.5 * (
+        u2[:-1, :] + u2[1:, :]
+    )  # Average consecutive x-faces -> centers
+
+    # For v: v is at V-points [Nx, Ny+1], we need to average in y-direction to get to T-points
+    # v²_on_center[j] = 0.5 * (v²[j] + v²[j+1]) where j goes from 0 to Ny-1
+    # This gives us shape [Nx, Ny]
+    v2 = v**2
+    v2_on_center = 0.5 * (
+        v2[:, :-1] + v2[:, 1:]
+    )  # Average consecutive y-faces -> centers
 
     # calculate kinetic energy
     ke = 0.5 * (u2_on_center + v2_on_center)
@@ -247,16 +256,16 @@ def bernoulli_potential(
 
     Returns:
         p (Array): the Bernoulli work
-            Size = [Nx Ny]
+            Size = [Nx, Ny]
     Example:
         >>> u, v, h = ...
         >>> p = bernoulli_potential(h=h, u=u, v=v)
     """
 
-    # calculate kinetic energy
+    # calculate kinetic energy (returns [Nx, Ny])
     ke: Float[Array, "Nx Ny"] = kinetic_energy(u=u, v=v)
 
-    # calculate Berunoulli potential
+    # calculate Bernoulli potential
     p: Float[Array, "Nx Ny"] = ke + gravity * h
 
     return p

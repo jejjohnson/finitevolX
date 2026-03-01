@@ -3,10 +3,6 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx import (
-    x_avg_2D,
-    y_avg_2D,
-)
 from finitevolx._src.constants import GRAVITY
 from finitevolx._src.operators.operators import (
     absolute_vorticity,
@@ -316,15 +312,15 @@ def test_kinetic_energy_2d_ones(u_2d_ones, v_2d_ones, center_2d_ones):
     v = v_2d_ones
     h = center_2d_ones
 
-    # move u, v to h center
-    u_c = x_avg_2D(u**2)
-    v_c = y_avg_2D(v**2)
-    ke_ = 0.5 * (u_c + v_c)
-
+    # Test that kinetic_energy returns the correct shape
     ke = kinetic_energy(u=u, v=v)
 
+    # For constant velocity u=v=1, ke should be 0.5 * (1² + 1²) = 1.0 everywhere
+    expected_ke = 1.0
+
+    # kinetic_energy should return shape [Nx, Ny]
     assert ke.shape == h.shape
-    np.testing.assert_array_almost_equal(ke, ke_)
+    np.testing.assert_array_almost_equal(ke, expected_ke)
 
 
 def test_bernoulli_potential_2d_ones(u_2d_ones, v_2d_ones, center_2d_ones):
@@ -332,11 +328,13 @@ def test_bernoulli_potential_2d_ones(u_2d_ones, v_2d_ones, center_2d_ones):
     v = v_2d_ones
     h = center_2d_ones
 
-    # calculate work
-    p_ = kinetic_energy(u=u, v=v)
-    p_ += GRAVITY * h
-
+    # Test that bernoulli_potential returns the correct shape
     p = bernoulli_potential(h=h, u=u, v=v)
 
+    # For constant u=v=1 and h=1, p should be ke + g*h
+    # ke = 1.0 (from test above), h = 1.0, so p = 1.0 + 9.81*1.0 = 10.81
+    expected_p = 1.0 + GRAVITY * 1.0
+
+    # bernoulli_potential should return shape [Nx, Ny]
     assert p.shape == h.shape
-    np.testing.assert_array_almost_equal(p, p_)
+    np.testing.assert_array_almost_equal(p, expected_p)
