@@ -262,11 +262,12 @@ class Reconstruction1D(eqx.Module):
         h: Float[Array, "Nx"],
         u: Float[Array, "Nx"],
     ) -> Float[Array, "Nx"]:
-        """5-point WENO east-face flux with boundary fallback.
+        """5-point WENO east-face flux with sign-dependent boundary fallbacks.
 
         Positive flow:  h_face[i+1/2] = WENO5(h[i-2], h[i-1], h[i], h[i+1], h[i+2])
+            for i = 2..Nx-3; WENO3 fallback at i = 1 and i = Nx-2.
         Negative flow:  h_face[i+1/2] = WENO5(h[i+3], h[i+2], h[i+1], h[i], h[i-1])
-        Falls back to WENO3 on first interior face and 1st-order on east boundary.
+            for i = 2..Nx-3; WENO3 fallback at i = 1; 1st-order upwind at i = Nx-2.
         """
         out = jnp.zeros_like(h)
         # WENO-5 positive: valid for interior faces i=2..Nx-3 (needs h[i-2..i+2])
@@ -292,11 +293,12 @@ class Reconstruction1D(eqx.Module):
         h: Float[Array, "Nx"],
         u: Float[Array, "Nx"],
     ) -> Float[Array, "Nx"]:
-        """5-point WENO-Z east-face flux with boundary fallback.
+        """5-point WENO-Z east-face flux with sign-dependent boundary fallbacks.
 
         Positive flow:  h_face[i+1/2] = WENOZ5(h[i-2], h[i-1], h[i], h[i+1], h[i+2])
+            for i = 2..Nx-3; WENO-Z-3 fallback at i = 1 and i = Nx-2.
         Negative flow:  h_face[i+1/2] = WENOZ5(h[i+3], h[i+2], h[i+1], h[i], h[i-1])
-        Falls back to WENO-Z-3 on first interior face and 1st-order on east boundary.
+            for i = 2..Nx-3; WENO-Z-3 fallback at i = 1; 1st-order upwind at i = Nx-2.
         """
         out = jnp.zeros_like(h)
         # WENO-Z-5 positive: valid for interior faces i=2..Nx-3
@@ -601,11 +603,12 @@ class Reconstruction2D(eqx.Module):
         h: Float[Array, "Ny Nx"],
         u: Float[Array, "Ny Nx"],
     ) -> Float[Array, "Ny Nx"]:
-        """5-point WENO east-face flux with boundary fallback.
+        """5-point WENO east-face flux with sign-dependent boundary fallbacks.
 
         Positive flow:  fe[j,i+1/2] = WENO5(h[j,i-2..i+2]) * u
+            for i = 2..Nx-3; WENO3 fallback at i = 1 and i = Nx-2.
         Negative flow:  fe[j,i+1/2] = WENO5(h[j,i+3..i-1]) * u
-        Falls back to WENO3 on first interior column and 1st-order on east boundary.
+            for i = 2..Nx-3; WENO3 fallback at i = 1; 1st-order upwind at i = Nx-2.
         """
         out = jnp.zeros_like(h)
         # WENO-5 positive: valid for i=2..Nx-3
@@ -635,11 +638,12 @@ class Reconstruction2D(eqx.Module):
         h: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
     ) -> Float[Array, "Ny Nx"]:
-        """5-point WENO north-face flux with boundary fallback.
+        """5-point WENO north-face flux with sign-dependent boundary fallbacks.
 
         Positive flow:  fn[j+1/2,i] = WENO5(h[j-2..j+2,i]) * v
+            for j = 2..Ny-3; WENO3 fallback at j = 1 and j = Ny-2.
         Negative flow:  fn[j+1/2,i] = WENO5(h[j+3..j-1,i]) * v
-        Falls back to WENO3 on first interior row and 1st-order on north boundary.
+            for j = 2..Ny-3; WENO3 fallback at j = 1; 1st-order upwind at j = Ny-2.
         """
         out = jnp.zeros_like(h)
         # WENO-5 positive: valid for j=2..Ny-3
@@ -669,11 +673,12 @@ class Reconstruction2D(eqx.Module):
         h: Float[Array, "Ny Nx"],
         u: Float[Array, "Ny Nx"],
     ) -> Float[Array, "Ny Nx"]:
-        """5-point WENO-Z east-face flux with boundary fallback.
+        """5-point WENO-Z east-face flux with sign-dependent boundary fallbacks.
 
         Positive flow:  fe[j,i+1/2] = WENOZ5(h[j,i-2..i+2]) * u
+            for i = 2..Nx-3; WENO-Z-3 fallback at i = 1 and i = Nx-2.
         Negative flow:  fe[j,i+1/2] = WENOZ5(h[j,i+3..i-1]) * u
-        Falls back to WENO-Z-3 on first interior column and 1st-order on east boundary.
+            for i = 2..Nx-3; WENO-Z-3 fallback at i = 1; 1st-order upwind at i = Nx-2.
         """
         out = jnp.zeros_like(h)
         # WENO-Z-5 positive: valid for i=2..Nx-3
@@ -703,11 +708,12 @@ class Reconstruction2D(eqx.Module):
         h: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
     ) -> Float[Array, "Ny Nx"]:
-        """5-point WENO-Z north-face flux with boundary fallback.
+        """5-point WENO-Z north-face flux with sign-dependent boundary fallbacks.
 
         Positive flow:  fn[j+1/2,i] = WENOZ5(h[j-2..j+2,i]) * v
+            for j = 2..Ny-3; WENO-Z-3 fallback at j = 1 and j = Ny-2.
         Negative flow:  fn[j+1/2,i] = WENOZ5(h[j+3..j-1,i]) * v
-        Falls back to WENO-Z-3 on first interior row and 1st-order on north boundary.
+            for j = 2..Ny-3; WENO-Z-3 fallback at j = 1; 1st-order upwind at j = Ny-2.
         """
         out = jnp.zeros_like(h)
         # WENO-Z-5 positive: valid for j=2..Ny-3
