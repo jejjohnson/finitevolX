@@ -16,12 +16,13 @@ from finitevolx._src.reconstructions.reconstruct import (
 # The legacy reconstruct_* functions require u.shape[dim] == q.shape[dim] - 1.
 # U_ONES/V_ONES are sliced accordingly for dim=0 and dim=1.
 Q_ONES = jnp.ones((6, 6))
-U_ONES = jnp.ones((5, 6))   # shape[0] = q.shape[0] - 1 for dim=0
-V_ONES = jnp.ones((6, 5))   # shape[1] = q.shape[1] - 1 for dim=1
+U_ONES = jnp.ones((5, 6))  # shape[0] = q.shape[0] - 1 for dim=0
+V_ONES = jnp.ones((6, 5))  # shape[1] = q.shape[1] - 1 for dim=1
 
 METHODS = ["linear", "weno", "wenoz"]
 NUM_PTS = [1, 3, 5]
 METHODS_NUMPTS = list(itertools.product(METHODS, NUM_PTS))
+
 
 class _DummyMask(tp.NamedTuple):
     """Minimal duck-typed mask with distbound* attributes for testing."""
@@ -123,7 +124,9 @@ def test_reconstruct_5pt_mask(method):
 @pytest.mark.parametrize("method,num_pts", METHODS_NUMPTS)
 def test_reconstruct_nomask_u(method, num_pts):
     u = jax.lax.slice_in_dim(jnp.ones((6, 6)), axis=0, start_index=0, limit_index=5)
-    flux = reconstruct(q=Q_ONES, u=u, u_mask=None, dim=0, method=method, num_pts=num_pts)
+    flux = reconstruct(
+        q=Q_ONES, u=u, u_mask=None, dim=0, method=method, num_pts=num_pts
+    )
     assert flux.shape == u.shape, f"Shape: {flux.shape} | {u.shape}"
     np.testing.assert_allclose(flux, np.ones_like(np.asarray(flux)), atol=1e-5)
 
@@ -131,6 +134,8 @@ def test_reconstruct_nomask_u(method, num_pts):
 @pytest.mark.parametrize("method,num_pts", METHODS_NUMPTS)
 def test_reconstruct_nomask_v(method, num_pts):
     v = jax.lax.slice_in_dim(jnp.ones((6, 6)), axis=1, start_index=0, limit_index=5)
-    flux = reconstruct(q=Q_ONES, u=v, u_mask=None, dim=1, method=method, num_pts=num_pts)
+    flux = reconstruct(
+        q=Q_ONES, u=v, u_mask=None, dim=1, method=method, num_pts=num_pts
+    )
     assert flux.shape == v.shape, f"Shape: {flux.shape} | {v.shape}"
     np.testing.assert_allclose(flux, np.ones_like(np.asarray(flux)), atol=1e-5)

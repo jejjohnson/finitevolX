@@ -58,9 +58,7 @@ from scipy.ndimage import binary_dilation
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def _pool2d_bool(
-    h: np.ndarray, ky: int, kx: int, threshold: float
-) -> np.ndarray:
+def _pool2d_bool(h: np.ndarray, ky: int, kx: int, threshold: float) -> np.ndarray:
     """2-D average-pool of a mask with top/left zero-padding.
 
     Pads ``(ky-1)`` rows at the top and ``(kx-1)`` cols at the left so the
@@ -106,9 +104,7 @@ def _dilate2d(mask: np.ndarray) -> np.ndarray:
     return binary_dilation(mask.astype(bool), structure=struct, border_value=0)
 
 
-def _count_contiguous(
-    h: np.ndarray, axis: int, forward: bool
-) -> np.ndarray:
+def _count_contiguous(h: np.ndarray, axis: int, forward: bool) -> np.ndarray:
     """Count contiguous wet cells from each point along one axis.
 
     For each cell (j, i) the result is the number of consecutive wet cells
@@ -488,15 +484,15 @@ class ArakawaCGridMask(eqx.Module):
         # For w[j, i] (SW corner of h[j, i]):
         #   y-adjacent u-faces: u[j, i] and u[j+1, i]  (shift u up by one)
         #   x-adjacent v-faces: v[j, i] and v[j, i+1]  (shift v left by one)
-        u_up = np.pad(u_np[1:, :], ((0, 1), (0, 0)))   # u[j+1, i], pad bottom
-        v_left = np.pad(v_np[:, 1:], ((0, 0), (0, 1))) # v[j, i+1], pad right
+        u_up = np.pad(u_np[1:, :], ((0, 1), (0, 0)))  # u[j+1, i], pad bottom
+        v_left = np.pad(v_np[:, 1:], ((0, 0), (0, 1)))  # v[j, i+1], pad right
 
         # vertical boundary: w wet AND at least one y-adjacent u-face dry
         w_vb = w_np & (~u_np | ~u_up)
         # horizontal boundary: w wet AND at least one x-adjacent v-face dry
         w_hb = w_np & (~v_np | ~v_left)
-        w_co = w_vb & w_hb                              # corner-out: both
-        w_va = w_np & u_np & u_up & v_np & v_left       # valid interior
+        w_co = w_vb & w_hb  # corner-out: both
+        w_va = w_np & u_np & u_up & v_np & v_left  # valid interior
 
         # ── irregular psi boundary indices ────────────────────────────────
         # Dry psi cells in [1:-1, 1:-1] with >=1 wet psi cell in 3x3 hood.
@@ -517,10 +513,10 @@ class ArakawaCGridMask(eqx.Module):
         # 0 = land, 1 = coast (ocean adj. to land), 2 = near-coast, 3 = ocean
         land = ~h_np
         land_d1 = _dilate2d(land)
-        coast = h_np & land_d1                       # first ring of ocean
+        coast = h_np & land_d1  # first ring of ocean
         land_d2 = _dilate2d(land_d1)
-        near_coast = h_np & land_d2 & ~coast         # second ring
-        open_ocean = h_np & ~land_d2                 # interior ocean
+        near_coast = h_np & land_d2 & ~coast  # second ring
+        open_ocean = h_np & ~land_d2  # interior ocean
 
         classification = np.zeros((Ny, Nx), dtype=np.int32)
         classification[coast] = 1
@@ -609,9 +605,7 @@ class ArakawaCGridMask(eqx.Module):
         -------
         ArakawaCGridMask
         """
-        return cls.from_mask(
-            np.ones((ny, nx), dtype=bool), sponge_width=sponge_width
-        )
+        return cls.from_mask(np.ones((ny, nx), dtype=bool), sponge_width=sponge_width)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -652,8 +646,9 @@ def visualize_masks(
     }
     fig, axes = plt.subplots(2, 3, figsize=figsize)
     for ax, (title, data) in zip(axes.ravel(), fields.items(), strict=True):
-        ax.imshow(np.asarray(data), origin="lower", interpolation="nearest",
-                  cmap="viridis")
+        ax.imshow(
+            np.asarray(data), origin="lower", interpolation="nearest", cmap="viridis"
+        )
         ax.set_title(title)
         ax.axis("off")
     fig.suptitle("ArakawaCGridMask", fontsize=14)

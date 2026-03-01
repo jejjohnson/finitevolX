@@ -13,7 +13,6 @@ from finitevolx._src.masks.cgrid_mask import (
     _pool2d_bool,
 )
 
-
 # ── fixtures ──────────────────────────────────────────────────────────────────
 
 
@@ -220,6 +219,7 @@ class TestConstruction:
 
     def test_top_level_import(self):
         from finitevolx import ArakawaCGridMask as ACM, StencilCapability as SC
+
         assert ACM is not None
         assert SC is not None
 
@@ -270,8 +270,9 @@ class TestVorticityBoundary:
     def test_cornerout_is_intersection(self, rect_cgrid):
         m = rect_cgrid
         expected = m.w_vertical_bound & m.w_horizontal_bound
-        np.testing.assert_array_equal(np.asarray(m.w_cornerout_bound),
-                                       np.asarray(expected))
+        np.testing.assert_array_equal(
+            np.asarray(m.w_cornerout_bound), np.asarray(expected)
+        )
 
 
 # ── irregular boundary indices ────────────────────────────────────────────────
@@ -312,14 +313,18 @@ class TestClassification:
 
     def test_accessor_consistency(self, rect_cgrid):
         m = rect_cgrid
-        np.testing.assert_array_equal(np.asarray(m.ind_land),
-                                       np.asarray(m.classification) == 0)
-        np.testing.assert_array_equal(np.asarray(m.ind_coast),
-                                       np.asarray(m.classification) == 1)
-        np.testing.assert_array_equal(np.asarray(m.ind_near_coast),
-                                       np.asarray(m.classification) == 2)
-        np.testing.assert_array_equal(np.asarray(m.ind_ocean),
-                                       np.asarray(m.classification) == 3)
+        np.testing.assert_array_equal(
+            np.asarray(m.ind_land), np.asarray(m.classification) == 0
+        )
+        np.testing.assert_array_equal(
+            np.asarray(m.ind_coast), np.asarray(m.classification) == 1
+        )
+        np.testing.assert_array_equal(
+            np.asarray(m.ind_near_coast), np.asarray(m.classification) == 2
+        )
+        np.testing.assert_array_equal(
+            np.asarray(m.ind_ocean), np.asarray(m.classification) == 3
+        )
 
     def test_all_ocean_no_land(self, all_ocean):
         assert bool(jnp.all(all_ocean.classification > 0))
