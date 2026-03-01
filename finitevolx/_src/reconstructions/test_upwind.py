@@ -1,6 +1,7 @@
 from itertools import product
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 import pytest
 
@@ -15,7 +16,7 @@ jax.config.update("jax_enable_x64", True)
 
 RNG = np.random.RandomState(123)
 
-U_RAND = RNG.randn(50, 25, 10)
+U_RAND = jnp.array(RNG.randn(50, 25, 10))
 
 METHODS = ["linear", "weno", "wenoz"]
 DIMS = [0, 1, 2]

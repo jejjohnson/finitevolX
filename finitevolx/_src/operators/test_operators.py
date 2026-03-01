@@ -245,8 +245,8 @@ def test_lap_random(u_2d_randn):
 
 
 def test_divergence():
-    u = rng.randn(50, 25)
-    v = rng.randn(49, 26)
+    u = jnp.array(rng.randn(50, 25))
+    v = jnp.array(rng.randn(49, 26))
 
     dx, dy = 0.1, 0.2
 
@@ -261,8 +261,8 @@ def test_divergence():
 
 
 def test_relative_vorticity():
-    u = rng.randn(50, 26)
-    v = rng.randn(51, 25)
+    u = jnp.array(rng.randn(50, 26))
+    v = jnp.array(rng.randn(51, 25))
 
     dx, dy = 0.1, 0.2
 
@@ -277,8 +277,8 @@ def test_relative_vorticity():
 
 
 def test_absolute_vorticity():
-    u = rng.randn(50, 26)
-    v = rng.randn(51, 25)
+    u = jnp.array(rng.randn(50, 26))
+    v = jnp.array(rng.randn(51, 25))
 
     dx, dy = 0.1, 0.2
 
@@ -293,7 +293,7 @@ def test_absolute_vorticity():
 
 
 def test_geostrophic_gradient():
-    psi = rng.randn(50, 25)
+    psi = jnp.array(rng.randn(50, 25))
     dx, dy = 0.1, 0.2
 
     # gradient froms scratch
