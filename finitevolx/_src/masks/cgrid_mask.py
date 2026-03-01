@@ -312,8 +312,8 @@ class ArakawaCGridMask(eqx.Module):
     w_valid: Bool[Array, "Ny Nx"]
 
     # ── irregular boundary indices (dynamic shape — do not use inside jit) ───
-    psi_irrbound_xids: Int[Array, " Nirr"]
-    psi_irrbound_yids: Int[Array, " Nirr"]
+    psi_irrbound_xids: Int[Array, Nirr]
+    psi_irrbound_yids: Int[Array, Nirr]
 
     # ── land/coast classification ─────────────────────────────────────────────
     classification: Int[Array, "Ny Nx"]
@@ -351,12 +351,12 @@ class ArakawaCGridMask(eqx.Module):
     def ind_boundary(self) -> Bool[Array, "Ny Nx"]:
         """Boolean mask: outermost domain-boundary ring."""
         Ny, Nx = self.h.shape
-        bnd = np.zeros((Ny, Nx), dtype=bool)
-        bnd[0, :] = True
-        bnd[-1, :] = True
-        bnd[:, 0] = True
-        bnd[:, -1] = True
-        return jnp.asarray(bnd)
+        bnd = jnp.zeros((Ny, Nx), dtype=bool)
+        bnd = bnd.at[0, :].set(True)
+        bnd = bnd.at[-1, :].set(True)
+        bnd = bnd.at[:, 0].set(True)
+        bnd = bnd.at[:, -1].set(True)
+        return bnd
 
     # ── adaptive WENO stencil masks ───────────────────────────────────────────
 
@@ -501,14 +501,17 @@ class ArakawaCGridMask(eqx.Module):
         # ── irregular psi boundary indices ────────────────────────────────
         # Dry psi cells in [1:-1, 1:-1] with >=1 wet psi cell in 3x3 hood.
         psif = psi_np.astype(np.float32)
-        pool3 = np.zeros((Ny - 2, Nx - 2), dtype=np.float32)
-        for di in range(3):
-            for dj in range(3):
-                pool3 += psif[di : Ny - 2 + di, dj : Nx - 2 + dj]
-        pool3 /= 9.0
-
-        irrbound = (~psi_np[1:-1, 1:-1]) & (pool3 > 1.0 / 18.0)
-        rows, cols = np.where(irrbound)
+        if Ny >= 3 and Nx >= 3:
+            pool3 = np.zeros((Ny - 2, Nx - 2), dtype=np.float32)
+            for di in range(3):
+                for dj in range(3):
+                    pool3 += psif[di : Ny - 2 + di, dj : Nx - 2 + dj]
+            pool3 /= 9.0
+            irrbound = (~psi_np[1:-1, 1:-1]) & (pool3 > 1.0 / 18.0)
+            rows, cols = np.where(irrbound)
+        else:
+            rows = np.empty(0, dtype=np.int32)
+            cols = np.empty(0, dtype=np.int32)
 
         # ── land / coast classification ───────────────────────────────────
         # 0 = land, 1 = coast (ocean adj. to land), 2 = near-coast, 3 = ocean
@@ -528,11 +531,14 @@ class ArakawaCGridMask(eqx.Module):
         sc = StencilCapability.from_mask(h_np)
 
         # ── sponge layer ──────────────────────────────────────────────────
-        sponge_np = (
-            _make_sponge(Ny, Nx, sponge_width)
-            if sponge_width is not None
-            else np.ones((Ny, Nx), dtype=np.float32)
-        )
+        if sponge_width is None or sponge_width == 0:
+            sponge_np = np.ones((Ny, Nx), dtype=np.float32)
+        else:
+            if sponge_width < 0:
+                raise ValueError(
+                    f"sponge_width must be non-negative; got {sponge_width!r}"
+                )
+            sponge_np = _make_sponge(Ny, Nx, sponge_width)
 
         return cls(
             h=jnp.asarray(h_np),

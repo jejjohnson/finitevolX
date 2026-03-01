@@ -42,7 +42,7 @@ def reconstruct_1pt(
     qi_left_1pt, qi_right_1pt = upwind_1pt(q=q, dim=dim)
     u_pos, u_neg = plusminus(u)
     flux = u_pos * qi_left_1pt + u_neg * qi_right_1pt
-    if u_mask:
+    if u_mask is not None:
         flux *= u_mask.distbound1
     return flux
 
@@ -54,7 +54,7 @@ def reconstruct_3pt(
     u_mask: tp.Any | None = None,
     method: str = "weno",
 ) -> Array:
-    if u_mask:
+    if u_mask is not None:
         return _reconstruct_3pt_mask(q=q, u=u, dim=dim, u_mask=u_mask, method=method)
     else:
         return _reconstruct_3pt_nomask(q=q, u=u, dim=dim, method=method)

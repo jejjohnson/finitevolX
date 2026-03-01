@@ -26,6 +26,11 @@
 * Initialise output with `jnp.zeros_like(input)` then use `.at[1:-1, 1:-1].set(...)`.
 * The caller is responsible for boundary conditions (pad, enforce_periodic, etc.).
 
+## Masks
+* Use `ArakawaCGridMask.from_mask(h)` to derive all staggered masks from a binary h-grid mask.
+* Construction uses **numpy / scipy** (masks are built once, not traced through JAX JIT).
+* When branching on an optional mask argument, always use `if mask is not None:` — never bare `if mask:`, which raises `ValueError` for JAX arrays.
+
 ## Testing
 * One test per operator per dimension.
 * Use fixtures for different grid sizes.
