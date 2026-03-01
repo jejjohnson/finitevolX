@@ -61,17 +61,21 @@ class Reconstruction1D(eqx.Module):
         h: Float[Array, "Nx"],
         u: Float[Array, "Nx"],
     ) -> Float[Array, "Nx"]:
-        """2nd-order upwind reconstruction at east face.
+        """2nd-order upwind reconstruction at east face with boundary fallback.
 
         Positive flow:  h_face[i+1/2] = 3/2*h[i]   - 1/2*h[i-1]
         Negative flow:  h_face[i+1/2] = 3/2*h[i+1] - 1/2*h[i+2]
-        Boundary cells (i=1) fall back to 1st-order upwind.
+        Falls back to 1st-order upwind on east boundary where i+2 unavailable.
         """
         out = jnp.zeros_like(h)
         # h_face_pos[i+1/2] = 3/2*h[i] - 1/2*h[i-1]
         h_pos = 1.5 * h[1:-1] - 0.5 * h[:-2]
         # h_face_neg[i+1/2] = 3/2*h[i+1] - 1/2*h[i+2]
-        h_neg = 1.5 * h[2:] - 0.5 * jnp.concatenate([h[3:], h[-1:]])
+        # Use 2nd-order where i+2 is available (all except last interior face)
+        h_neg_interior = 1.5 * h[2:-1] - 0.5 * h[3:]
+        # Use 1st-order upwind on east boundary face (h_face = h[i+1])
+        h_neg_boundary = h[-1:]
+        h_neg = jnp.concatenate([h_neg_interior, h_neg_boundary])
         h_face = jnp.where(u[1:-1] >= 0.0, h_pos, h_neg)
         out = out.at[1:-1].set(h_face * u[1:-1])
         return out
@@ -81,25 +85,29 @@ class Reconstruction1D(eqx.Module):
         h: Float[Array, "Nx"],
         u: Float[Array, "Nx"],
     ) -> Float[Array, "Nx"]:
-        """3rd-order upwind reconstruction at east face.
+        """3rd-order upwind reconstruction at east face with boundary fallback.
 
         Positive flow:  h_face = -1/6*h[i-1] + 5/6*h[i]   + 1/3*h[i+1]
         Negative flow:  h_face =  1/3*h[i]   + 5/6*h[i+1] - 1/6*h[i+2]
-        Falls back to upwind1 at boundaries.
+        Falls back to 1st-order upwind on east boundary where i+2 unavailable.
         """
         out = jnp.zeros_like(h)
-        # 3rd-order positive stencil
+        # 3rd-order positive stencil (valid for all interior faces)
         h_pos = (
             -1.0 / 6.0 * h[:-2]  # h[i-1]
             + 5.0 / 6.0 * h[1:-1]  # h[i  ]
             + 1.0 / 3.0 * h[2:]  # h[i+1]
         )
-        # 3rd-order negative stencil
-        h_neg = (
-            1.0 / 3.0 * h[1:-1]  # h[i  ]
-            + 5.0 / 6.0 * h[2:]  # h[i+1]
-            - 1.0 / 6.0 * jnp.concatenate([h[3:], h[-1:]])  # h[i+2]
+        # 3rd-order negative stencil (valid only where h[i+2] exists)
+        # For all interior faces except the last one
+        h_neg_interior = (
+            1.0 / 3.0 * h[1:-2]  # h[i  ]
+            + 5.0 / 6.0 * h[2:-1]  # h[i+1]
+            - 1.0 / 6.0 * h[3:]  # h[i+2]
         )
+        # 1st-order upwind fallback at east boundary: h_face = h[i+1]
+        h_neg_boundary = h[-1:]
+        h_neg = jnp.concatenate([h_neg_interior, h_neg_boundary])
         h_face = jnp.where(u[1:-1] >= 0.0, h_pos, h_neg)
         out = out.at[1:-1].set(h_face * u[1:-1])
         return out
@@ -188,14 +196,17 @@ class Reconstruction2D(eqx.Module):
 
         Positive: h_face = 3/2*h[j,i] - 1/2*h[j,i-1]
         Negative: h_face = 3/2*h[j,i+1] - 1/2*h[j,i+2]
+        Falls back to 1st-order upwind on east boundary where i+2 unavailable.
         """
         out = jnp.zeros_like(h)
         # 2nd-order positive stencil (uses h[j,i-1])
         h_pos = 1.5 * h[1:-1, 1:-1] - 0.5 * h[1:-1, :-2]
         # 2nd-order negative stencil (uses h[j,i+2])
-        h_neg = 1.5 * h[1:-1, 2:] - 0.5 * jnp.concatenate(
-            [h[1:-1, 3:], h[1:-1, -1:]], axis=1
-        )
+        # Use 2nd-order where i+2 is available (all except last interior column)
+        h_neg_interior = 1.5 * h[1:-1, 2:-1] - 0.5 * h[1:-1, 3:]
+        # Use 1st-order upwind on east boundary column (h_face = h[j,i+1])
+        h_neg_boundary = h[1:-1, -1:]
+        h_neg = jnp.concatenate([h_neg_interior, h_neg_boundary], axis=1)
         h_face = jnp.where(u[1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = out.at[1:-1, 1:-1].set(h_face * u[1:-1, 1:-1])
         return out
@@ -209,14 +220,17 @@ class Reconstruction2D(eqx.Module):
 
         Positive: h_face = 3/2*h[j,i] - 1/2*h[j-1,i]
         Negative: h_face = 3/2*h[j+1,i] - 1/2*h[j+2,i]
+        Falls back to 1st-order upwind on north boundary where j+2 unavailable.
         """
         out = jnp.zeros_like(h)
         # 2nd-order positive stencil (uses h[j-1,i])
         h_pos = 1.5 * h[1:-1, 1:-1] - 0.5 * h[:-2, 1:-1]
         # 2nd-order negative stencil (uses h[j+2,i])
-        h_neg = 1.5 * h[2:, 1:-1] - 0.5 * jnp.concatenate(
-            [h[3:, 1:-1], h[-1:, 1:-1]], axis=0
-        )
+        # Use 2nd-order where j+2 is available (all except last interior row)
+        h_neg_interior = 1.5 * h[2:-1, 1:-1] - 0.5 * h[3:, 1:-1]
+        # Use 1st-order upwind on north boundary row (h_face = h[j+1,i])
+        h_neg_boundary = h[-1:, 1:-1]
+        h_neg = jnp.concatenate([h_neg_interior, h_neg_boundary], axis=0)
         h_face = jnp.where(v[1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = out.at[1:-1, 1:-1].set(h_face * v[1:-1, 1:-1])
         return out
@@ -226,26 +240,29 @@ class Reconstruction2D(eqx.Module):
         h: Float[Array, "Ny Nx"],
         u: Float[Array, "Ny Nx"],
     ) -> Float[Array, "Ny Nx"]:
-        """3rd-order upwind east-face flux.
+        """3rd-order upwind east-face flux with boundary fallback.
 
         Positive: h_face = -1/6*h[j,i-1] + 5/6*h[j,i]   + 1/3*h[j,i+1]
         Negative: h_face =  1/3*h[j,i]   + 5/6*h[j,i+1] - 1/6*h[j,i+2]
+        Falls back to 1st-order upwind on east boundary where i+2 unavailable.
         """
         out = jnp.zeros_like(h)
-        # 3rd-order positive stencil
+        # 3rd-order positive stencil (valid for all interior faces)
         h_pos = (
             -1.0 / 6.0 * h[1:-1, :-2]  # h[j, i-1]
             + 5.0 / 6.0 * h[1:-1, 1:-1]  # h[j, i  ]
             + 1.0 / 3.0 * h[1:-1, 2:]  # h[j, i+1]
         )
-        # 3rd-order negative stencil
-        h_neg = (
-            1.0 / 3.0 * h[1:-1, 1:-1]  # h[j, i  ]
-            + 5.0 / 6.0 * h[1:-1, 2:]  # h[j, i+1]
-            - 1.0
-            / 6.0
-            * jnp.concatenate([h[1:-1, 3:], h[1:-1, -1:]], axis=1)  # h[j, i+2]
+        # 3rd-order negative stencil (valid only where h[j,i+2] exists)
+        # For all interior columns except the last one
+        h_neg_interior = (
+            1.0 / 3.0 * h[1:-1, 1:-2]  # h[j, i  ]
+            + 5.0 / 6.0 * h[1:-1, 2:-1]  # h[j, i+1]
+            - 1.0 / 6.0 * h[1:-1, 3:]  # h[j, i+2]
         )
+        # 1st-order upwind fallback at east boundary: h_face = h[j,i+1]
+        h_neg_boundary = h[1:-1, -1:]
+        h_neg = jnp.concatenate([h_neg_interior, h_neg_boundary], axis=1)
         h_face = jnp.where(u[1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = out.at[1:-1, 1:-1].set(h_face * u[1:-1, 1:-1])
         return out
@@ -255,26 +272,29 @@ class Reconstruction2D(eqx.Module):
         h: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
     ) -> Float[Array, "Ny Nx"]:
-        """3rd-order upwind north-face flux.
+        """3rd-order upwind north-face flux with boundary fallback.
 
         Positive: h_face = -1/6*h[j-1,i] + 5/6*h[j,i]   + 1/3*h[j+1,i]
         Negative: h_face =  1/3*h[j,i]   + 5/6*h[j+1,i] - 1/6*h[j+2,i]
+        Falls back to 1st-order upwind on north boundary where j+2 unavailable.
         """
         out = jnp.zeros_like(h)
-        # 3rd-order positive stencil
+        # 3rd-order positive stencil (valid for all interior faces)
         h_pos = (
             -1.0 / 6.0 * h[:-2, 1:-1]  # h[j-1, i]
             + 5.0 / 6.0 * h[1:-1, 1:-1]  # h[j,   i]
             + 1.0 / 3.0 * h[2:, 1:-1]  # h[j+1, i]
         )
-        # 3rd-order negative stencil
-        h_neg = (
-            1.0 / 3.0 * h[1:-1, 1:-1]  # h[j,   i]
-            + 5.0 / 6.0 * h[2:, 1:-1]  # h[j+1, i]
-            - 1.0
-            / 6.0
-            * jnp.concatenate([h[3:, 1:-1], h[-1:, 1:-1]], axis=0)  # h[j+2, i]
+        # 3rd-order negative stencil (valid only where h[j+2,i] exists)
+        # For all interior rows except the last one
+        h_neg_interior = (
+            1.0 / 3.0 * h[1:-2, 1:-1]  # h[j,   i]
+            + 5.0 / 6.0 * h[2:-1, 1:-1]  # h[j+1, i]
+            - 1.0 / 6.0 * h[3:, 1:-1]  # h[j+2, i]
         )
+        # 1st-order upwind fallback at north boundary: h_face = h[j+1,i]
+        h_neg_boundary = h[-1:, 1:-1]
+        h_neg = jnp.concatenate([h_neg_interior, h_neg_boundary], axis=0)
         h_face = jnp.where(v[1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = out.at[1:-1, 1:-1].set(h_face * v[1:-1, 1:-1])
         return out
