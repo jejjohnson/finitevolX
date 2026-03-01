@@ -35,3 +35,27 @@
 * One test per operator per dimension.
 * Use fixtures for different grid sizes.
 * Tests live in `tests/` at the repo root.
+
+## CI/CD Requirements
+* **ALWAYS** ensure tests, type checks, format, and lint pass before committing.
+* Run `make test` to validate tests pass.
+* Run `make uv-lint` to ensure type checks and linting pass.
+* Run `make uv-format` to format code properly.
+* Never commit code that breaks CI checks.
+
+## Conventional Commits
+* **ALWAYS** use conventional commit format for all PR titles and commit messages.
+* Format: `<type>: <description>`
+* Required types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
+* Description must start with a lowercase letter.
+* Examples:
+  - `feat: add support for 3D vorticity calculations`
+  - `fix: correct boundary handling in upwind reconstruction`
+  - `refactor: remove legacy reconstruction modules`
+  - `chore: update dependencies`
+
+## PR Workflow
+* **PR Title**: Never change the original PR title in subsequent sessions.
+* **PR Description**: Keep the original description intact; only add incremental updates at the end.
+* Use the format: `## Updates - [date]` to append new work completed in each session.
+* This ensures a complete history of all changes made to the PR.
