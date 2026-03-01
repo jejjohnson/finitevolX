@@ -1,5 +1,5 @@
+from collections.abc import Callable
 from typing import (
-    Callable,
     Optional,
 )
 
@@ -12,17 +12,17 @@ def avg_pool(
     u: Array,
     kernel_size: tuple[int, ...],
     stride: tuple[int, ...],
-    padding: Optional = None,
+    padding: Optional[str | tuple[int, ...]] = None,
     mean_fn: str = "arithmetic",
     **kwargs,
 ) -> Array:
     # get mean function
-    mean_fn = get_mean_function(mean_fn=mean_fn)
+    mean_fn_callable = get_mean_function(mean_fn=mean_fn)
 
     # create mean kernel
     @kex.kmap(kernel_size=kernel_size, strides=stride, padding=padding, **kwargs)
     def kernel_fn(x):
-        return mean_fn(x)
+        return mean_fn_callable(x)
 
     # apply kernel function
     return kernel_fn(u)
@@ -56,8 +56,7 @@ def center_avg_2D(u: Array, mean_fn: str = "arithmetic") -> Array:
 
 def get_mean_function(mean_fn: str = "arithmetic") -> Callable:
     if mean_fn.lower() == "arithmetic":
-        fn = lambda x: jnp.mean(x)
-        return fn
+        return jnp.mean
     elif mean_fn.lower() == "geometric":
         fn = lambda x: jnp.exp(jnp.mean(jnp.log(x)))
         return fn

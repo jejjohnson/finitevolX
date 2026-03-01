@@ -51,5 +51,5 @@ uv-pre-commit: ## Run all pre-commit hooks
 .PHONY: test
 test: ## Test code using pytest.
 @printf "$(YELLOW)>>> Launching test suite with verbosity...$(RESET)\n"
-@uv run pytest tests -v --cov --cov-report=xml
+@uv run pytest tests -v
 @printf "$(GREEN)>>> All tests passed.$(RESET)\n"

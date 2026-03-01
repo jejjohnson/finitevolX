@@ -68,9 +68,7 @@ class Advection1D(eqx.Module):
 
         out = jnp.zeros_like(h)
         # dh[i] = -(fe[i+1/2] - fe[i-1/2]) / dx
-        out = out.at[1:-1].set(
-            -(fe[1:-1] - fe[:-2]) / self.grid.dx
-        )
+        out = out.at[1:-1].set(-(fe[1:-1] - fe[:-2]) / self.grid.dx)
         return out
 
 

@@ -65,8 +65,8 @@ def enforce_periodic(
         Array with periodic ghost cells.
     """
     out = field
-    out = out.at[0, :].set(out[-2, :])   # ghost south  <- interior south
-    out = out.at[-1, :].set(out[1, :])   # ghost north  <- interior north
-    out = out.at[:, 0].set(out[:, -2])   # ghost west   <- interior east
-    out = out.at[:, -1].set(out[:, 1])   # ghost east   <- interior west
+    out = out.at[0, :].set(out[-2, :])  # ghost south  <- interior south
+    out = out.at[-1, :].set(out[1, :])  # ghost north  <- interior north
+    out = out.at[:, 0].set(out[:, -2])  # ghost west   <- interior east
+    out = out.at[:, -1].set(out[:, 1])  # ghost east   <- interior west
     return out

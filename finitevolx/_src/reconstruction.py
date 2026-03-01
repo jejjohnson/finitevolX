@@ -90,14 +90,14 @@ class Reconstruction1D(eqx.Module):
         out = jnp.zeros_like(h)
         # 3rd-order positive stencil
         h_pos = (
-            -1.0 / 6.0 * h[:-2]   # h[i-1]
-            + 5.0 / 6.0 * h[1:-1] # h[i  ]
-            + 1.0 / 3.0 * h[2:]   # h[i+1]
+            -1.0 / 6.0 * h[:-2]  # h[i-1]
+            + 5.0 / 6.0 * h[1:-1]  # h[i  ]
+            + 1.0 / 3.0 * h[2:]  # h[i+1]
         )
         # 3rd-order negative stencil
         h_neg = (
-            1.0 / 3.0 * h[1:-1]   # h[i  ]
-            + 5.0 / 6.0 * h[2:]   # h[i+1]
+            1.0 / 3.0 * h[1:-1]  # h[i  ]
+            + 5.0 / 6.0 * h[2:]  # h[i+1]
             - 1.0 / 6.0 * jnp.concatenate([h[3:], h[-1:]])  # h[i+2]
         )
         h_face = jnp.where(u[1:-1] >= 0.0, h_pos, h_neg)
@@ -234,17 +234,17 @@ class Reconstruction2D(eqx.Module):
         out = jnp.zeros_like(h)
         # 3rd-order positive stencil
         h_pos = (
-            -1.0 / 6.0 * h[1:-1, :-2]    # h[j, i-1]
+            -1.0 / 6.0 * h[1:-1, :-2]  # h[j, i-1]
             + 5.0 / 6.0 * h[1:-1, 1:-1]  # h[j, i  ]
-            + 1.0 / 3.0 * h[1:-1, 2:]    # h[j, i+1]
+            + 1.0 / 3.0 * h[1:-1, 2:]  # h[j, i+1]
         )
         # 3rd-order negative stencil
         h_neg = (
-            1.0 / 3.0 * h[1:-1, 1:-1]    # h[j, i  ]
-            + 5.0 / 6.0 * h[1:-1, 2:]    # h[j, i+1]
-            - 1.0 / 6.0 * jnp.concatenate(
-                [h[1:-1, 3:], h[1:-1, -1:]], axis=1
-            )  # h[j, i+2]
+            1.0 / 3.0 * h[1:-1, 1:-1]  # h[j, i  ]
+            + 5.0 / 6.0 * h[1:-1, 2:]  # h[j, i+1]
+            - 1.0
+            / 6.0
+            * jnp.concatenate([h[1:-1, 3:], h[1:-1, -1:]], axis=1)  # h[j, i+2]
         )
         h_face = jnp.where(u[1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = out.at[1:-1, 1:-1].set(h_face * u[1:-1, 1:-1])
@@ -263,17 +263,17 @@ class Reconstruction2D(eqx.Module):
         out = jnp.zeros_like(h)
         # 3rd-order positive stencil
         h_pos = (
-            -1.0 / 6.0 * h[:-2, 1:-1]    # h[j-1, i]
+            -1.0 / 6.0 * h[:-2, 1:-1]  # h[j-1, i]
             + 5.0 / 6.0 * h[1:-1, 1:-1]  # h[j,   i]
-            + 1.0 / 3.0 * h[2:, 1:-1]    # h[j+1, i]
+            + 1.0 / 3.0 * h[2:, 1:-1]  # h[j+1, i]
         )
         # 3rd-order negative stencil
         h_neg = (
-            1.0 / 3.0 * h[1:-1, 1:-1]    # h[j,   i]
-            + 5.0 / 6.0 * h[2:, 1:-1]    # h[j+1, i]
-            - 1.0 / 6.0 * jnp.concatenate(
-                [h[3:, 1:-1], h[-1:, 1:-1]], axis=0
-            )  # h[j+2, i]
+            1.0 / 3.0 * h[1:-1, 1:-1]  # h[j,   i]
+            + 5.0 / 6.0 * h[2:, 1:-1]  # h[j+1, i]
+            - 1.0
+            / 6.0
+            * jnp.concatenate([h[3:, 1:-1], h[-1:, 1:-1]], axis=0)  # h[j+2, i]
         )
         h_face = jnp.where(v[1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = out.at[1:-1, 1:-1].set(h_face * v[1:-1, 1:-1])

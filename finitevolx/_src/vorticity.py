@@ -83,9 +83,9 @@ class Vorticity2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Potential vorticity at X-points.
         """
-        zeta = self.relative_vorticity(u, v)       # zeta at X-points
-        f_on_q = self.interp.T_to_X(f)             # f interpolated to X-points
-        h_on_q = self.interp.T_to_X(h)             # h interpolated to X-points
+        zeta = self.relative_vorticity(u, v)  # zeta at X-points
+        f_on_q = self.interp.T_to_X(f)  # f interpolated to X-points
+        h_on_q = self.interp.T_to_X(h)  # h interpolated to X-points
         out = jnp.zeros_like(h)
         # q[j+1/2, i+1/2] = (zeta + f) / h  at X-points
         out = out.at[1:-1, 1:-1].set(
@@ -121,8 +121,8 @@ class Vorticity2D(eqx.Module):
         tuple
             (qu at U-points, qv at V-points)
         """
-        q_on_u = self.interp.X_to_U(q)   # q_on_u[j, i+1/2] = avg in y
-        q_on_v = self.interp.X_to_V(q)   # q_on_v[j+1/2, i] = avg in x
+        q_on_u = self.interp.X_to_U(q)  # q_on_u[j, i+1/2] = avg in y
+        q_on_v = self.interp.X_to_V(q)  # q_on_v[j+1/2, i] = avg in x
         qu = jnp.zeros_like(u)
         qv = jnp.zeros_like(v)
         # qu[j, i+1/2] = q_on_u[j, i+1/2] * u[j, i+1/2]
@@ -158,22 +158,18 @@ class Vorticity2D(eqx.Module):
         tuple
             (qu at U-points, qv at V-points)
         """
-        u_on_q = self.interp.U_to_X(u)   # u_on_q[j+1/2, i+1/2]
-        v_on_q = self.interp.V_to_X(v)   # v_on_q[j+1/2, i+1/2]
+        u_on_q = self.interp.U_to_X(u)  # u_on_q[j+1/2, i+1/2]
+        v_on_q = self.interp.V_to_X(v)  # v_on_q[j+1/2, i+1/2]
         # Multiply at corners
         qu_at_q = jnp.zeros_like(q)
         qv_at_q = jnp.zeros_like(q)
         # qu_at_q[j+1/2, i+1/2] = q[j+1/2, i+1/2] * u_on_q[j+1/2, i+1/2]
-        qu_at_q = qu_at_q.at[1:-1, 1:-1].set(
-            q[1:-1, 1:-1] * u_on_q[1:-1, 1:-1]
-        )
+        qu_at_q = qu_at_q.at[1:-1, 1:-1].set(q[1:-1, 1:-1] * u_on_q[1:-1, 1:-1])
         # qv_at_q[j+1/2, i+1/2] = q[j+1/2, i+1/2] * v_on_q[j+1/2, i+1/2]
-        qv_at_q = qv_at_q.at[1:-1, 1:-1].set(
-            q[1:-1, 1:-1] * v_on_q[1:-1, 1:-1]
-        )
+        qv_at_q = qv_at_q.at[1:-1, 1:-1].set(q[1:-1, 1:-1] * v_on_q[1:-1, 1:-1])
         # Interpolate back to faces
-        qu = self.interp.X_to_U(qu_at_q)   # qu[j, i+1/2]
-        qv = self.interp.X_to_V(qv_at_q)   # qv[j+1/2, i]
+        qu = self.interp.X_to_U(qu_at_q)  # qu[j, i+1/2]
+        qv = self.interp.X_to_V(qv_at_q)  # qv[j+1/2, i]
         return qu, qv
 
     def pv_flux_arakawa_lamb(
@@ -245,8 +241,10 @@ class Vorticity3D(eqx.Module):
         """
         out = jnp.zeros_like(u)
         # zeta[k, j+1/2, i+1/2] = dv/dx - du/dy
-        out = out.at[1:-1, 1:-1, 1:-1].set(
-            (v[1:-1, 1:-1, 2:] - v[1:-1, 1:-1, 1:-1]) / self.grid.dx    # dv/dx
+        out = out.at[
+            1:-1, 1:-1, 1:-1
+        ].set(
+            (v[1:-1, 1:-1, 2:] - v[1:-1, 1:-1, 1:-1]) / self.grid.dx  # dv/dx
             - (u[1:-1, 2:, 1:-1] - u[1:-1, 1:-1, 1:-1]) / self.grid.dy  # du/dy
         )
         return out

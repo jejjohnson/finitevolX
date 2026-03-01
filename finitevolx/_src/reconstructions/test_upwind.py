@@ -65,7 +65,7 @@ def test_upwind_3pt(method, dim):
 
     dims[dim] -= 2
 
-    qi_left, qi_right = upwind_3pt(U_RAND, dim=dim, method=method)
+    qi_left, _ = upwind_3pt(U_RAND, dim=dim, method=method)
 
     assert qi_left.shape == tuple(dims)
 
@@ -77,6 +77,6 @@ def test_upwind_5pt(method, dim):
 
     dims[dim] -= 4
 
-    qi_left, qi_right = upwind_5pt(U_RAND, dim=dim, method=method)
+    qi_left, _ = upwind_5pt(U_RAND, dim=dim, method=method)
 
     assert qi_left.shape == tuple(dims)

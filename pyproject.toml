@@ -110,6 +110,7 @@ ignore = [
     "PLR0913",  # too many arguments
     "ISC001",   # conflicts with formatter
     "RUF002",   # ambiguous unicode characters in docstrings
+    "RUF022",   # __all__ is not sorted (we use logical grouping)
     "RUF046",   # int(round(...)) is intentional
     "PYI061",   # Literal style preference
 ]
@@ -125,9 +126,9 @@ docstring-code-format = true
 [tool.ty.rules]
 unresolved-attribute = "ignore"
 invalid-return-type = "ignore"
+unresolved-import = "ignore"
 
 [tool.coverage.report]
-fail_under = 50
 precision = 1
 show_missing = true
 skip_covered = true

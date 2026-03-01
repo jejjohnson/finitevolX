@@ -201,6 +201,4 @@ class ArakawaCGrid3D(eqx.Module):
         dx = Lx / nx_interior
         dy = Ly / ny_interior
         dz = Lz / nz_interior
-        return cls(
-            Nx=Nx, Ny=Ny, Nz=Nz, Lx=Lx, Ly=Ly, Lz=Lz, dx=dx, dy=dy, dz=dz
-        )
+        return cls(Nx=Nx, Ny=Ny, Nz=Nz, Lx=Lx, Ly=Ly, Lz=Lz, dx=dx, dy=dy, dz=dz)

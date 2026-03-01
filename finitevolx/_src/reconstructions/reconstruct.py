@@ -1,5 +1,4 @@
 import functools as ft
-from typing import Optional
 
 import jax
 import jax.numpy as jnp
@@ -20,7 +19,7 @@ def reconstruct(
     q: Array,
     u: Array,
     dim: int,
-    u_mask: Optional[FaceMask] = None,
+    u_mask: FaceMask | None = None,
     method: str = "wenoz",
     num_pts: int = 5,
 ):
@@ -38,7 +37,7 @@ def reconstruct(
 
 
 def reconstruct_1pt(
-    q: Array, u: Array, dim: int, u_mask: Optional[FaceMask] = None
+    q: Array, u: Array, dim: int, u_mask: FaceMask | None = None
 ) -> Array:
     qi_left_1pt, qi_right_1pt = upwind_1pt(q=q, dim=dim)
     u_pos, u_neg = plusminus(u)
@@ -52,7 +51,7 @@ def reconstruct_3pt(
     q: Array,
     u: Array,
     dim: int,
-    u_mask: Optional[FaceMask] = None,
+    u_mask: FaceMask | None = None,
     method: str = "weno",
 ) -> Array:
     if u_mask:
@@ -105,8 +104,8 @@ def _reconstruct_3pt_mask(
 
     # get padding
     extra_dims_pad = ((0, 0),) * (num_dims - 1)
-    pad_left_3pt = extra_dims_pad + ((1, 0),)
-    pad_right_3pt = extra_dims_pad + ((0, 1),)
+    pad_left_3pt = (*extra_dims_pad, (1, 0))
+    pad_right_3pt = (*extra_dims_pad, (0, 1))
 
     # 1 point flux
     qi_left_i_1pt, qi_right_i_1pt = upwind_1pt(q=q, dim=-1)
@@ -139,7 +138,7 @@ def reconstruct_5pt(
     q: Array,
     u: Array,
     dim: int,
-    u_mask: Optional[FaceMask] = None,
+    u_mask: FaceMask | None = None,
     method: str = "wenoz",
 ) -> Array:
     if u_mask is not None:
@@ -204,10 +203,10 @@ def _reconstruct_5pt_mask(
 
     # get padding
     extra_dims_pad = ((0, 0),) * (num_dims - 1)
-    pad_left_3pt = extra_dims_pad + ((1, 0),)
-    pad_right_3pt = extra_dims_pad + ((0, 1),)
-    pad_left_5pt = extra_dims_pad + ((2, 1),)
-    pad_right_5pt = extra_dims_pad + ((1, 2),)
+    pad_left_3pt = (*extra_dims_pad, (1, 0))
+    pad_right_3pt = (*extra_dims_pad, (0, 1))
+    pad_left_5pt = (*extra_dims_pad, (2, 1))
+    pad_right_5pt = (*extra_dims_pad, (1, 2))
 
     # 1 point flux
     qi_left_i_1pt, qi_right_i_1pt = upwind_1pt(q=q, dim=-1)
