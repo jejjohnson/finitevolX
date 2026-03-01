@@ -1,6 +1,7 @@
 from itertools import product
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 import pytest
 
@@ -15,7 +16,7 @@ jax.config.update("jax_enable_x64", True)
 
 RNG = np.random.RandomState(123)
 
-U_RAND = RNG.randn(50, 25, 10)
+U_RAND = jnp.array(RNG.randn(50, 25, 10))
 
 METHODS = ["linear", "weno", "wenoz"]
 DIMS = [0, 1, 2]
@@ -65,7 +66,7 @@ def test_upwind_3pt(method, dim):
 
     dims[dim] -= 2
 
-    qi_left, qi_right = upwind_3pt(U_RAND, dim=dim, method=method)
+    qi_left, _ = upwind_3pt(U_RAND, dim=dim, method=method)
 
     assert qi_left.shape == tuple(dims)
 
@@ -77,6 +78,6 @@ def test_upwind_5pt(method, dim):
 
     dims[dim] -= 4
 
-    qi_left, qi_right = upwind_5pt(U_RAND, dim=dim, method=method)
+    qi_left, _ = upwind_5pt(U_RAND, dim=dim, method=method)
 
     assert qi_left.shape == tuple(dims)

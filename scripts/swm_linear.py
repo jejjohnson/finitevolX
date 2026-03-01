@@ -1,4 +1,4 @@
-""" swm_linear.py
+"""swm_linear.py
 
 2D shallow water model with Coriolis force (f-plane).
 
@@ -6,7 +6,7 @@ Script Taken from:
     https://github.com/dionhaefner/shallow-water/blob/master/shallow_water_simple.py
 
 """
-import autoroot
+
 import jax
 import jax.numpy as jnp
 from jaxtyping import (
@@ -106,8 +106,7 @@ def update_plot(t, h, u, v, ax):
     ax.set_xlim(x[1] / 1e3, x[-2] / 1e3)
     ax.set_ylim(y[1] / 1e3, y[-2] / 1e3)
     ax.set_title(
-        "t=%5.2f days, R=%5.1f km, c=%5.1f m/s "
-        % (t / 86400, rossby_radius / 1e3, phase_speed)
+        f"t={t / 86400:5.2f} days, R={rossby_radius / 1e3:5.1f} km, c={phase_speed:5.1f} m/s "
     )
     plt.pause(0.1)
     return cs

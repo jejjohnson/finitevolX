@@ -1,4 +1,5 @@
 """None"""
+
 import pytest
 
 from finitevolx._src.masks.utils import (

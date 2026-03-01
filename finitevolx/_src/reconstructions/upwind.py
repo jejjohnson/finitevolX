@@ -1,5 +1,4 @@
 import functools as ft
-import typing as tp
 
 import jax
 from jax.nn import relu
@@ -19,7 +18,7 @@ from finitevolx._src.reconstructions.weno import (
 )
 
 
-def plusminus(u: Array, way: int = 1) -> tp.Tuple[Array, Array]:
+def plusminus(u: Array, way: int = 1) -> tuple[Array, Array]:
     msg = "Way should be 1 or -1."
     msg += f"\nWay: {way}"
     assert way in [1, -1], msg
@@ -28,7 +27,7 @@ def plusminus(u: Array, way: int = 1) -> tp.Tuple[Array, Array]:
     return u_pos, u_neg
 
 
-def upwind_1pt(q: Array, dim: int) -> tp.Tuple[Array, Array]:
+def upwind_1pt(q: Array, dim: int) -> tuple[Array, Array]:
     """creates the stencils for the upwind scheme
     - 1 pts inside domain & boundary
     Args:
@@ -53,9 +52,7 @@ def upwind_1pt(q: Array, dim: int) -> tp.Tuple[Array, Array]:
     return qi_left, qi_right
 
 
-def upwind_2pt_bnds(
-    q: Array, dim: int, method: str = "linear"
-) -> tp.Tuple[Array, Array]:
+def upwind_2pt_bnds(q: Array, dim: int, method: str = "linear") -> tuple[Array, Array]:
     """creates the stencils for the upwind scheme
     - 3 pts inside domain
     Args:
@@ -89,7 +86,7 @@ def upwind_2pt_bnds(
     return qi_left_interior, qi_right_interior
 
 
-def upwind_3pt(q: Array, dim: int, method: str = "weno") -> tp.Tuple[Array, Array]:
+def upwind_3pt(q: Array, dim: int, method: str = "weno") -> tuple[Array, Array]:
     """creates the stencils for the upwind scheme
     - 3 pts inside domain
     Args:
@@ -131,7 +128,7 @@ def upwind_3pt(q: Array, dim: int, method: str = "weno") -> tp.Tuple[Array, Arra
     return qi_left_interior, qi_right_interior
 
 
-def upwind_3pt_bnds(q: Array, dim: int, method: str = "weno") -> tp.Tuple[Array, Array]:
+def upwind_3pt_bnds(q: Array, dim: int, method: str = "weno") -> tuple[Array, Array]:
     """creates the stencils for the upwind scheme
     - 3 pts inside domain
     Args:
@@ -170,7 +167,7 @@ def upwind_3pt_bnds(q: Array, dim: int, method: str = "weno") -> tp.Tuple[Array,
     return qi_left_interior, qi_right_interior
 
 
-def upwind_5pt(q: Array, dim: int, method: str = "weno") -> tp.Tuple[Array, Array]:
+def upwind_5pt(q: Array, dim: int, method: str = "weno") -> tuple[Array, Array]:
     """creates the stencils for the upwind scheme
     - 5 pts inside domain
     Args:
