@@ -68,9 +68,11 @@ class Advection1D(eqx.Module):
 
         out = jnp.zeros_like(h)
         # dh[i] = -(fe[i+1/2] - fe[i-1/2]) / dx
+        # fe[i] represents the flux at the east face of cell i (at i+1/2)
+        # For cell i, we need fe[i] (east) and fe[i-1] (west)
         # Only use face fluxes that are defined by the reconstruction scheme,
         # avoiding the ghost-ring entries fe[0] and fe[-1].
-        out = out.at[2:-2].set(-(fe[2:-1] - fe[1:-2]) / self.grid.dx)
+        out = out.at[2:-2].set(-(fe[2:-2] - fe[1:-3]) / self.grid.dx)
         return out
 
 
@@ -135,12 +137,15 @@ class Advection2D(eqx.Module):
         out = jnp.zeros_like(h)
         # dh[j, i] = -( (fe[j, i+1/2] - fe[j, i-1/2])/dx
         #             + (fn[j+1/2, i] - fn[j-1/2, i])/dy )
+        # fe[j,i] is flux at east face of cell [j,i], fn[j,i] is flux at north face
+        # For cell [j,i], we need fe[j,i] (east) and fe[j,i-1] (west),
+        #                      and fn[j,i] (north) and fn[j-1,i] (south)
         # Only use face fluxes that are defined by the reconstruction scheme,
         # avoiding ghost-ring flux entries.
         out = out.at[2:-2, 2:-2].set(
             -(
-                (fe[2:-2, 2:-1] - fe[2:-2, 1:-2]) / self.grid.dx
-                + (fn[2:-1, 2:-2] - fn[1:-2, 2:-2]) / self.grid.dy
+                (fe[2:-2, 2:-2] - fe[2:-2, 1:-3]) / self.grid.dx
+                + (fn[2:-2, 2:-2] - fn[1:-3, 2:-2]) / self.grid.dy
             )
         )
         return out
