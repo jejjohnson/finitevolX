@@ -14,105 +14,12 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
-
-
-# ---------------------------------------------------------------------------
-# Private WENO stencil helpers (module-level, no class overhead)
-# ---------------------------------------------------------------------------
-
-
-def _weno3(qm: Array, q0: Array, qp: Array) -> Array:
-    """3-point WENO left-biased stencil.
-
-    qi[i+1/2] ~ WENO(q[i-1], q[i], q[i+1])
-
-    Jiang & Shu, J. Comput. Phys. 126, 202-228 (1996).
-    """
-    eps = 1e-8
-    # sub-stencil candidates
-    qi1 = -0.5 * qm + 1.5 * q0
-    qi2 = 0.5 * (q0 + qp)
-    # smoothness indicators
-    b1 = (q0 - qm) ** 2
-    b2 = (qp - q0) ** 2
-    # ideal weights
-    g1, g2 = 1.0 / 3.0, 2.0 / 3.0
-    w1 = g1 / (b1 + eps) ** 2
-    w2 = g2 / (b2 + eps) ** 2
-    return (w1 * qi1 + w2 * qi2) / (w1 + w2)
-
-
-def _wenoz3(qm: Array, q0: Array, qp: Array) -> Array:
-    """3-point WENO-Z left-biased stencil.
-
-    qi[i+1/2] ~ WENO-Z(q[i-1], q[i], q[i+1])
-
-    Borges et al., J. Comput. Phys. 227, (2008).
-    """
-    eps = 1e-14
-    # sub-stencil candidates
-    qi1 = -0.5 * qm + 1.5 * q0
-    qi2 = 0.5 * (q0 + qp)
-    # smoothness indicators
-    b1 = (q0 - qm) ** 2
-    b2 = (qp - q0) ** 2
-    tau = jnp.abs(b2 - b1)
-    # ideal weights
-    g1, g2 = 1.0 / 3.0, 2.0 / 3.0
-    w1 = g1 * (1.0 + tau / (b1 + eps))
-    w2 = g2 * (1.0 + tau / (b2 + eps))
-    return (w1 * qi1 + w2 * qi2) / (w1 + w2)
-
-
-def _weno5(qmm: Array, qm: Array, q0: Array, qp: Array, qpp: Array) -> Array:
-    """5-point WENO left-biased stencil.
-
-    qi[i+1/2] ~ WENO(q[i-2], q[i-1], q[i], q[i+1], q[i+2])
-
-    Jiang & Shu, J. Comput. Phys. 126, 202-228 (1996).
-    """
-    eps = 1e-8
-    # sub-stencil candidates
-    qi1 = 1.0 / 3.0 * qmm - 7.0 / 6.0 * qm + 11.0 / 6.0 * q0
-    qi2 = -1.0 / 6.0 * qm + 5.0 / 6.0 * q0 + 1.0 / 3.0 * qp
-    qi3 = 1.0 / 3.0 * q0 + 5.0 / 6.0 * qp - 1.0 / 6.0 * qpp
-    # smoothness indicators
-    k1, k2 = 13.0 / 12.0, 0.25
-    b1 = k1 * (qmm - 2.0 * qm + q0) ** 2 + k2 * (qmm - 4.0 * qm + 3.0 * q0) ** 2
-    b2 = k1 * (qm - 2.0 * q0 + qp) ** 2 + k2 * (qm - qp) ** 2
-    b3 = k1 * (q0 - 2.0 * qp + qpp) ** 2 + k2 * (3.0 * q0 - 4.0 * qp + qpp) ** 2
-    # ideal weights
-    g1, g2, g3 = 0.1, 0.6, 0.3
-    w1 = g1 / (b1 + eps) ** 2
-    w2 = g2 / (b2 + eps) ** 2
-    w3 = g3 / (b3 + eps) ** 2
-    return (w1 * qi1 + w2 * qi2 + w3 * qi3) / (w1 + w2 + w3)
-
-
-def _wenoz5(qmm: Array, qm: Array, q0: Array, qp: Array, qpp: Array) -> Array:
-    """5-point WENO-Z left-biased stencil.
-
-    qi[i+1/2] ~ WENO-Z(q[i-2], q[i-1], q[i], q[i+1], q[i+2])
-
-    Borges et al., J. Comput. Phys. 227, (2008).
-    """
-    eps = 1e-16
-    # sub-stencil candidates
-    qi1 = 1.0 / 3.0 * qmm - 7.0 / 6.0 * qm + 11.0 / 6.0 * q0
-    qi2 = -1.0 / 6.0 * qm + 5.0 / 6.0 * q0 + 1.0 / 3.0 * qp
-    qi3 = 1.0 / 3.0 * q0 + 5.0 / 6.0 * qp - 1.0 / 6.0 * qpp
-    # smoothness indicators
-    k1, k2 = 13.0 / 12.0, 0.25
-    b1 = k1 * (qmm - 2.0 * qm + q0) ** 2 + k2 * (qmm - 4.0 * qm + 3.0 * q0) ** 2
-    b2 = k1 * (qm - 2.0 * q0 + qp) ** 2 + k2 * (qm - qp) ** 2
-    b3 = k1 * (q0 - 2.0 * qp + qpp) ** 2 + k2 * (3.0 * q0 - 4.0 * qp + qpp) ** 2
-    tau5 = jnp.abs(b1 - b3)
-    # ideal weights
-    g1, g2, g3 = 0.1, 0.6, 0.3
-    w1 = g1 * (1.0 + tau5 / (b1 + eps))
-    w2 = g2 * (1.0 + tau5 / (b2 + eps))
-    w3 = g3 * (1.0 + tau5 / (b3 + eps))
-    return (w1 * qi1 + w2 * qi2 + w3 * qi3) / (w1 + w2 + w3)
+from finitevolx._src.reconstructions.weno import (
+    weno_3pts as _weno3,
+    weno_3pts_improved as _wenoz3,
+    weno_5pts as _weno5,
+    weno_5pts_improved as _wenoz5,
+)
 
 
 class Reconstruction1D(eqx.Module):
