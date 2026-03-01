@@ -53,6 +53,9 @@ from jaxtyping import Array, Bool, Float, Int
 import numpy as np
 from scipy.ndimage import binary_dilation
 
+# jaxtyping dimension variable for irregular-boundary arrays (dynamic size)
+type Nirr = int
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Internal helpers — pure numpy/scipy, used only during construction
 # ──────────────────────────────────────────────────────────────────────────────
@@ -308,8 +311,8 @@ class ArakawaCGridMask(eqx.Module):
     w_valid: Bool[Array, "Ny Nx"]
 
     # ── irregular boundary indices (dynamic shape — do not use inside jit) ───
-    psi_irrbound_xids: Int[Array, "Nirr"]
-    psi_irrbound_yids: Int[Array, "Nirr"]
+    psi_irrbound_xids: Int[Array, Nirr]
+    psi_irrbound_yids: Int[Array, Nirr]
 
     # ── land/coast classification ─────────────────────────────────────────────
     classification: Int[Array, "Ny Nx"]
