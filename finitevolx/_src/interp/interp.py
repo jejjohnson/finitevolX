@@ -1,7 +1,4 @@
 from collections.abc import Callable
-from typing import (
-    Optional,
-)
 
 import jax.numpy as jnp
 from jaxtyping import Array
@@ -12,7 +9,7 @@ def avg_pool(
     u: Array,
     kernel_size: tuple[int, ...],
     stride: tuple[int, ...],
-    padding: Optional[str | tuple[int, ...]] = None,
+    padding: str | tuple[int, ...] | None = None,
     mean_fn: str = "arithmetic",
     **kwargs,
 ) -> Array:
