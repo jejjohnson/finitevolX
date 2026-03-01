@@ -729,9 +729,7 @@ class Reconstruction3D(eqx.Module):
         """
         out = jnp.zeros_like(h)
         # WENO-3 positive: left-biased, valid for all interior faces
-        h_pos = _weno3(
-            h[1:-1, 1:-1, :-2], h[1:-1, 1:-1, 1:-1], h[1:-1, 1:-1, 2:]
-        )
+        h_pos = _weno3(h[1:-1, 1:-1, :-2], h[1:-1, 1:-1, 1:-1], h[1:-1, 1:-1, 2:])
         # WENO-3 negative: right-biased, valid for i+2 < Nx
         h_neg_interior = _weno3(
             h[1:-1, 1:-1, 3:], h[1:-1, 1:-1, 2:-1], h[1:-1, 1:-1, 1:-2]
@@ -756,9 +754,7 @@ class Reconstruction3D(eqx.Module):
         """
         out = jnp.zeros_like(h)
         # WENO-3 positive: left-biased, valid for all interior faces
-        h_pos = _weno3(
-            h[1:-1, :-2, 1:-1], h[1:-1, 1:-1, 1:-1], h[1:-1, 2:, 1:-1]
-        )
+        h_pos = _weno3(h[1:-1, :-2, 1:-1], h[1:-1, 1:-1, 1:-1], h[1:-1, 2:, 1:-1])
         # WENO-3 negative: right-biased, valid for j+2 < Ny
         h_neg_interior = _weno3(
             h[1:-1, 3:, 1:-1], h[1:-1, 2:-1, 1:-1], h[1:-1, 1:-2, 1:-1]
@@ -783,9 +779,7 @@ class Reconstruction3D(eqx.Module):
         """
         out = jnp.zeros_like(h)
         # WENO-Z-3 positive: left-biased, valid for all interior faces
-        h_pos = _wenoz3(
-            h[1:-1, 1:-1, :-2], h[1:-1, 1:-1, 1:-1], h[1:-1, 1:-1, 2:]
-        )
+        h_pos = _wenoz3(h[1:-1, 1:-1, :-2], h[1:-1, 1:-1, 1:-1], h[1:-1, 1:-1, 2:])
         # WENO-Z-3 negative: right-biased, valid for i+2 < Nx
         h_neg_interior = _wenoz3(
             h[1:-1, 1:-1, 3:], h[1:-1, 1:-1, 2:-1], h[1:-1, 1:-1, 1:-2]
@@ -810,9 +804,7 @@ class Reconstruction3D(eqx.Module):
         """
         out = jnp.zeros_like(h)
         # WENO-Z-3 positive: left-biased, valid for all interior faces
-        h_pos = _wenoz3(
-            h[1:-1, :-2, 1:-1], h[1:-1, 1:-1, 1:-1], h[1:-1, 2:, 1:-1]
-        )
+        h_pos = _wenoz3(h[1:-1, :-2, 1:-1], h[1:-1, 1:-1, 1:-1], h[1:-1, 2:, 1:-1])
         # WENO-Z-3 negative: right-biased, valid for j+2 < Ny
         h_neg_interior = _wenoz3(
             h[1:-1, 3:, 1:-1], h[1:-1, 2:-1, 1:-1], h[1:-1, 1:-2, 1:-1]
