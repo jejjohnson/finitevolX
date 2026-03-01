@@ -1,10 +1,10 @@
 import functools as ft
+import typing as tp
 
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array
 
-from finitevolx._src.masks.masks import FaceMask
 from finitevolx._src.reconstructions.upwind import (
     plusminus,
     upwind_1pt,
@@ -19,7 +19,7 @@ def reconstruct(
     q: Array,
     u: Array,
     dim: int,
-    u_mask: FaceMask | None = None,
+    u_mask: tp.Any | None = None,
     method: str = "wenoz",
     num_pts: int = 5,
 ):
@@ -37,12 +37,12 @@ def reconstruct(
 
 
 def reconstruct_1pt(
-    q: Array, u: Array, dim: int, u_mask: FaceMask | None = None
+    q: Array, u: Array, dim: int, u_mask: tp.Any | None = None
 ) -> Array:
     qi_left_1pt, qi_right_1pt = upwind_1pt(q=q, dim=dim)
     u_pos, u_neg = plusminus(u)
     flux = u_pos * qi_left_1pt + u_neg * qi_right_1pt
-    if u_mask:
+    if u_mask is not None:
         flux *= u_mask.distbound1
     return flux
 
@@ -51,10 +51,10 @@ def reconstruct_3pt(
     q: Array,
     u: Array,
     dim: int,
-    u_mask: FaceMask | None = None,
+    u_mask: tp.Any | None = None,
     method: str = "weno",
 ) -> Array:
-    if u_mask:
+    if u_mask is not None:
         return _reconstruct_3pt_mask(q=q, u=u, dim=dim, u_mask=u_mask, method=method)
     else:
         return _reconstruct_3pt_nomask(q=q, u=u, dim=dim, method=method)
@@ -94,7 +94,7 @@ def _reconstruct_3pt_mask(
     q: Array,
     u: Array,
     dim: int,
-    u_mask: FaceMask,
+    u_mask: tp.Any,
     method: str = "linear",
 ):
     num_dims = q.ndim
@@ -138,7 +138,7 @@ def reconstruct_5pt(
     q: Array,
     u: Array,
     dim: int,
-    u_mask: FaceMask | None = None,
+    u_mask: tp.Any | None = None,
     method: str = "wenoz",
 ) -> Array:
     if u_mask is not None:
@@ -188,7 +188,7 @@ def _reconstruct_5pt_nomask(
 def _reconstruct_5pt_mask(
     q: Array,
     u: Array,
-    u_mask: FaceMask,
+    u_mask: tp.Any,
     dim: int,
     method: str = "linear",
 ):

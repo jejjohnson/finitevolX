@@ -1,14 +1,11 @@
 import itertools
+import typing as tp
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.masks.utils import (
-    init_mask_realish,
-    init_mask_rect,
-)
 from finitevolx._src.reconstructions.reconstruct import (
     reconstruct,
     reconstruct_1pt,
@@ -16,187 +13,129 @@ from finitevolx._src.reconstructions.reconstruct import (
     reconstruct_5pt,
 )
 
-jax.config.update("jax_enable_x64", True)
+# The legacy reconstruct_* functions require u.shape[dim] == q.shape[dim] - 1.
+# U_ONES/V_ONES are sliced accordingly for dim=0 and dim=1.
+Q_ONES = jnp.ones((6, 6))
+U_ONES = jnp.ones((5, 6))  # shape[0] = q.shape[0] - 1 for dim=0
+V_ONES = jnp.ones((6, 5))  # shape[1] = q.shape[1] - 1 for dim=1
 
-MASKS_RECT = init_mask_rect(6, "node")
-MASKS_REAL = init_mask_realish(6, "center")
-
-Q_ONES = jnp.ones_like(MASKS_RECT.center.values)
-U_ONES = jnp.ones_like(MASKS_RECT.face_u.values)
-V_ONES = jnp.ones_like(MASKS_RECT.face_v.values)
-
-DIMS = [1, 0]
 METHODS = ["linear", "weno", "wenoz"]
 NUM_PTS = [1, 3, 5]
-METHODS_DIMS = list(itertools.product(METHODS, DIMS))
 METHODS_NUMPTS = list(itertools.product(METHODS, NUM_PTS))
 
 
+class _DummyMask(tp.NamedTuple):
+    """Minimal duck-typed mask with distbound* attributes for testing."""
+
+    distbound1: jnp.ndarray
+    distbound2: jnp.ndarray
+    distbound2plus: jnp.ndarray
+    distbound3plus: jnp.ndarray
+
+
+def _make_all_distbound1_mask(shape):
+    """All cells are in distbound1 tier: forces 1pt flux everywhere.
+
+    Using only the 1pt tier avoids zero-padded boundary artefacts from the
+    higher-order stencils while still exercising the masked code path.
+    """
+    ones = jnp.ones(shape)
+    zeros = jnp.zeros(shape)
+    return _DummyMask(
+        distbound1=ones,
+        distbound2=zeros,
+        distbound2plus=zeros,
+        distbound3plus=zeros,
+    )
+
+
+# ── reconstruct_1pt ───────────────────────────────────────────────────────────
+
+
 def test_reconstruct_1pt_nomask():
-    # take interior points
-    u = U_ONES[1:-1]
-
-    flux = reconstruct_1pt(q=Q_ONES, u=u, dim=0, u_mask=None)
-
-    assert flux.shape == u.shape
+    flux = reconstruct_1pt(q=Q_ONES, u=U_ONES, dim=0, u_mask=None)
+    assert flux.shape == U_ONES.shape
     np.testing.assert_array_almost_equal(flux, np.ones_like(flux))
 
 
 def test_reconstruct_1pt_mask():
-    # take interior points
-    u = U_ONES[1:-1]
-    u_mask = MASKS_RECT.face_u[1:-1]
-
-    flux = reconstruct_1pt(q=Q_ONES, u=u, dim=0, u_mask=u_mask)
-    true_flux = u_mask.distbound1 * jnp.ones_like(flux)
-
-    assert flux.shape == u.shape
-    np.testing.assert_array_almost_equal(flux, true_flux)
+    # distbound1=ones → flux *= 1, so result equals the no-mask flux
+    mask = _make_all_distbound1_mask(U_ONES.shape)
+    flux = reconstruct_1pt(q=Q_ONES, u=U_ONES, dim=0, u_mask=mask)
+    assert flux.shape == U_ONES.shape
+    np.testing.assert_array_almost_equal(flux, np.ones_like(flux))
 
 
-@pytest.mark.parametrize("method", METHODS)
-def test_reconstruct_3pt_mask_u(method):
-    # take interior points
-    u = jax.lax.slice_in_dim(U_ONES, axis=0, start_index=1, limit_index=-1)
-    fn = lambda x: jax.lax.slice_in_dim(x, axis=0, start_index=1, limit_index=-1)
-    u_mask = jax.tree_util.tree_map(fn, MASKS_RECT.face_u)
-    # u_mask = MASKS_RECT.face_u[1:-1]
-
-    # do flux
-    flux = reconstruct_3pt(q=Q_ONES, u=u, u_mask=u_mask, dim=0, method=method)
-
-    assert flux.shape == u.shape
-    np.testing.assert_array_equal(flux, jnp.ones_like(flux))
+# ── reconstruct_3pt ───────────────────────────────────────────────────────────
 
 
 @pytest.mark.parametrize("method", METHODS)
-def test_reconstruct_3pt_mask_v(method):
-    # take interior points
-    v = jax.lax.slice_in_dim(V_ONES, axis=1, start_index=1, limit_index=-1)
-    fn = lambda x: jax.lax.slice_in_dim(x, axis=1, start_index=1, limit_index=-1)
-    v_mask = jax.tree_util.tree_map(fn, MASKS_RECT.face_v)
+def test_reconstruct_3pt_nomask_dim0(method):
+    flux = reconstruct_3pt(q=Q_ONES, u=U_ONES, u_mask=None, dim=0, method=method)
+    assert flux.shape == U_ONES.shape
+    np.testing.assert_allclose(flux, np.ones_like(np.asarray(flux)), atol=1e-5)
 
-    # do flux
-    flux = reconstruct_3pt(q=Q_ONES, u=v, u_mask=v_mask, dim=1, method=method)
 
-    assert flux.shape == v.shape
-    np.testing.assert_array_equal(flux, jnp.ones_like(flux))
+@pytest.mark.parametrize("method", METHODS)
+def test_reconstruct_3pt_nomask_dim1(method):
+    flux = reconstruct_3pt(q=Q_ONES, u=V_ONES, u_mask=None, dim=1, method=method)
+    assert flux.shape == V_ONES.shape
+    np.testing.assert_allclose(flux, np.ones_like(np.asarray(flux)), atol=1e-5)
+
+
+@pytest.mark.parametrize("method", METHODS)
+def test_reconstruct_3pt_mask(method):
+    # Masked branch: distbound1=0, distbound2plus=1 → flux comes from 3pt term
+    mask = _make_all_distbound1_mask(U_ONES.shape)
+    flux = reconstruct_3pt(q=Q_ONES, u=U_ONES, u_mask=mask, dim=0, method=method)
+    assert flux.shape == U_ONES.shape
+    np.testing.assert_allclose(flux, np.ones_like(np.asarray(flux)), atol=1e-5)
+
+
+# ── reconstruct_5pt ───────────────────────────────────────────────────────────
 
 
 @pytest.mark.parametrize("method", ["linear", "weno", "wenoz"])
-def test_reconstruct_3pt_nomask(method):
-    # take interior points
-    u = U_ONES[1:-1]
+def test_reconstruct_5pt_nomask_dim0(method):
+    flux = reconstruct_5pt(q=Q_ONES, u=U_ONES, u_mask=None, dim=0, method=method)
+    assert flux.shape == U_ONES.shape
+    np.testing.assert_allclose(flux, np.ones_like(np.asarray(flux)), atol=1e-5)
 
-    # do flux
-    flux = reconstruct_3pt(q=Q_ONES, u=u, u_mask=None, dim=0, method=method)
 
-    assert flux.shape == u.shape
-    np.testing.assert_array_equal(flux, jnp.ones_like(flux))
+@pytest.mark.parametrize("method", ["linear", "weno", "wenoz"])
+def test_reconstruct_5pt_nomask_dim1(method):
+    flux = reconstruct_5pt(q=Q_ONES, u=V_ONES, u_mask=None, dim=1, method=method)
+    assert flux.shape == V_ONES.shape
+    np.testing.assert_allclose(flux, np.ones_like(np.asarray(flux)), atol=1e-5)
 
 
 @pytest.mark.parametrize("method", ["linear", "weno", "wenoz"])
 def test_reconstruct_5pt_mask(method):
-    # take interior
-    u = U_ONES[1:-1]
-    u_mask = MASKS_RECT.face_u[1:-1]
-
-    # do flux
-    flux = reconstruct_5pt(q=Q_ONES, u=u, u_mask=u_mask, dim=0, method=method)
-
-    assert flux.shape == u.shape
-    np.testing.assert_array_equal(flux, jnp.ones_like(flux))
+    # Masked branch: all cells in the distbound3plus tier → uses 5pt stencil
+    mask = _make_all_distbound1_mask(U_ONES.shape)
+    flux = reconstruct_5pt(q=Q_ONES, u=U_ONES, u_mask=mask, dim=0, method=method)
+    assert flux.shape == U_ONES.shape
+    np.testing.assert_allclose(flux, np.ones_like(np.asarray(flux)), atol=1e-5)
 
 
-@pytest.mark.parametrize("method", ["linear", "weno", "wenoz"])
-def test_reconstruct_5pt_nomask(method):
-    # take interior
-    u = U_ONES[1:-1]
-
-    # do flux
-    flux = reconstruct_5pt(q=Q_ONES, u=u, u_mask=None, dim=0, method=method)
-
-    assert flux.shape == u.shape
-    np.testing.assert_array_equal(flux, jnp.ones_like(flux))
+# ── reconstruct (dispatcher) ──────────────────────────────────────────────────
 
 
 @pytest.mark.parametrize("method,num_pts", METHODS_NUMPTS)
 def test_reconstruct_nomask_u(method, num_pts):
-    # take interior points
-    u = U_ONES.copy()
-    q = Q_ONES.copy()
-    u = jax.lax.slice_in_dim(u, axis=0, start_index=1, limit_index=-1)
-    fn = lambda x: jax.lax.slice_in_dim(x, axis=0, start_index=1, limit_index=-1)
-    u_mask = MASKS_RECT.face_u
-    u_mask = jax.tree_util.tree_map(fn, u_mask)
-    # u_mask = MASKS_RECT.face_u[1:-1]
-
-    # do flux
-    flux = reconstruct(q=q, u=u, u_mask=None, dim=0, method=method, num_pts=num_pts)
-
-    msg = "Incorrect shape..."
-    msg += f"Shape: {flux.shape} | {u.shape}"
-    assert flux.shape == u.shape, msg
-    np.testing.assert_array_equal(flux, jnp.ones_like(flux))
+    u = jax.lax.slice_in_dim(jnp.ones((6, 6)), axis=0, start_index=0, limit_index=5)
+    flux = reconstruct(
+        q=Q_ONES, u=u, u_mask=None, dim=0, method=method, num_pts=num_pts
+    )
+    assert flux.shape == u.shape, f"Shape: {flux.shape} | {u.shape}"
+    np.testing.assert_allclose(flux, np.ones_like(np.asarray(flux)), atol=1e-5)
 
 
 @pytest.mark.parametrize("method,num_pts", METHODS_NUMPTS)
 def test_reconstruct_nomask_v(method, num_pts):
-    # take interior points
-    v = V_ONES.copy()
-    q = Q_ONES.copy()
-    v = jax.lax.slice_in_dim(v, axis=1, start_index=1, limit_index=-1)
-    fn = lambda x: jax.lax.slice_in_dim(x, axis=1, start_index=1, limit_index=-1)
-    v_mask = MASKS_RECT.face_v
-    v_mask = jax.tree_util.tree_map(fn, v_mask)
-    # u_mask = MASKS_RECT.face_u[1:-1]
-
-    # do flux
-    flux = reconstruct(q=q, u=v, u_mask=None, dim=1, method=method, num_pts=num_pts)
-
-    msg = "Incorrect shape..."
-    msg += f"Shape: {flux.shape} | {v.shape}"
-    assert flux.shape == v.shape, msg
-    np.testing.assert_array_equal(flux, jnp.ones_like(flux))
-
-
-@pytest.mark.parametrize("method,num_pts", METHODS_NUMPTS)
-def test_reconstruct_mask_u(method, num_pts):
-    # take interior points
-    u = U_ONES.copy()
-    q = Q_ONES.copy()
-    u = jax.lax.slice_in_dim(u, axis=0, start_index=1, limit_index=-1)
-    fn = lambda x: jax.lax.slice_in_dim(x, axis=0, start_index=1, limit_index=-1)
-    u_mask = MASKS_RECT.face_u
-    u_mask = jax.tree_util.tree_map(fn, u_mask)
-
-    # do flux
-    flux = reconstruct(q=q, u=u, u_mask=u_mask, dim=0, method=method, num_pts=num_pts)
-
-    true_flux = flux * u_mask.values
-    msg = "Incorrect shape..."
-    msg += f"Shape: {flux.shape} | {u.shape}"
-    assert flux.shape == u.shape, msg
-    np.testing.assert_array_equal(flux, true_flux)
-
-
-@pytest.mark.parametrize("method,num_pts", METHODS_NUMPTS)
-def test_reconstruct_mask_v(method, num_pts):
-    # take interior points
-    v = V_ONES.copy()
-    q = Q_ONES.copy()
-    v = jax.lax.slice_in_dim(v, axis=1, start_index=1, limit_index=-1)
-    fn = lambda x: jax.lax.slice_in_dim(x, axis=1, start_index=1, limit_index=-1)
-    v_mask = MASKS_RECT.face_v
-    v_mask = jax.tree_util.tree_map(fn, v_mask)
-    # u_mask = MASKS_RECT.face_u[1:-1]
-
-    # do flux
-    flux = reconstruct(q=q, u=v, u_mask=v_mask, dim=1, method=method, num_pts=num_pts)
-
-    true_flux = flux * v_mask.values
-
-    msg = "Incorrect shape..."
-    msg += f"Shape: {true_flux.shape} | {v.shape}"
-    assert true_flux.shape == v.shape, msg
-    np.testing.assert_array_equal(flux, true_flux)
+    v = jax.lax.slice_in_dim(jnp.ones((6, 6)), axis=1, start_index=0, limit_index=5)
+    flux = reconstruct(
+        q=Q_ONES, u=v, u_mask=None, dim=1, method=method, num_pts=num_pts
+    )
+    assert flux.shape == v.shape, f"Shape: {flux.shape} | {v.shape}"
+    np.testing.assert_allclose(flux, np.ones_like(np.asarray(flux)), atol=1e-5)

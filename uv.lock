@@ -257,7 +257,7 @@ wheels = [
 
 [[package]]
 name = "finitevolx"
-version = "0.0.1"
+version = "0.0.2"
 source = { editable = "." }
 dependencies = [
     { name = "beartype" },
@@ -265,6 +265,7 @@ dependencies = [
     { name = "jax" },
     { name = "jaxlib" },
     { name = "jaxtyping" },
+    { name = "scipy" },
 ]
 
 [package.optional-dependencies]
@@ -318,6 +319,7 @@ requires-dist = [
     { name = "pytest-pretty", marker = "extra == 'test'", specifier = ">=1.2.0" },
     { name = "pytest-xdist", marker = "extra == 'test'", specifier = ">=3.5.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
+    { name = "scipy", specifier = ">=1.13.0" },
     { name = "tqdm", marker = "extra == 'examples'", specifier = ">=4.66.0" },
     { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.19" },
     { name = "xarray", marker = "extra == 'examples'", specifier = ">=2024.6.0" },
