@@ -88,10 +88,10 @@ class ArakawaCGrid2D(eqx.Module):
 
     Colocation convention::
 
-        T[j, i]  cell centre    at  (j dx,     i dy    )
-        U[j, i]  east face      at  (j dx,    (i+1/2)dy)
-        V[j, i]  north face     at ((j+1/2)dx, i dy    )
-        X[j, i]  NE corner      at ((j+1/2)dx,(i+1/2)dy)
+        T[j, i]  cell centre    at  (i*dx,     j*dy    )
+        U[j, i]  east face      at  ((i+1/2)*dx, j*dy  )
+        V[j, i]  north face     at  (i*dx,    (j+1/2)*dy)
+        X[j, i]  NE corner      at  ((i+1/2)*dx,(j+1/2)*dy)
     """
 
     Nx: int

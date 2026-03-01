@@ -432,7 +432,7 @@ class Difference3D(eqx.Module):
         return out
 
     def diff_y_V_to_T(
-        self, u: Float[Array, "Nz Ny Nx"]
+        self, v: Float[Array, "Nz Ny Nx"]
     ) -> Float[Array, "Nz Ny Nx"]:
         """Backward y-difference over all z-levels: V -> T.
 
@@ -440,7 +440,7 @@ class Difference3D(eqx.Module):
 
         Parameters
         ----------
-        u : Float[Array, "Nz Ny Nx"]
+        v : Float[Array, "Nz Ny Nx"]
             y-velocity at V-points.
 
         Returns
@@ -448,10 +448,10 @@ class Difference3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             Backward y-difference at T-points.
         """
-        out = jnp.zeros_like(u)
+        out = jnp.zeros_like(v)
         # dv_dy[k, j, i] = (v[k, j+1/2, i] - v[k, j-1/2, i]) / dy
         out = out.at[1:-1, 1:-1, 1:-1].set(
-            (u[1:-1, 1:-1, 1:-1] - u[1:-1, :-2, 1:-1]) / self.grid.dy
+            (v[1:-1, 1:-1, 1:-1] - v[1:-1, :-2, 1:-1]) / self.grid.dy
         )
         return out
 
