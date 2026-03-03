@@ -40,15 +40,9 @@
 
 ## Boundary Conditions
 
-::: finitevolx.enforce_boundaries_2d
+::: finitevolx.enforce_periodic
 
-::: finitevolx.pad_boundaries_2d
-
-::: finitevolx.enforce_periodic_2d
-
-::: finitevolx.enforce_periodic_x_2d
-
-::: finitevolx.enforce_periodic_y_2d
+::: finitevolx.pad_interior
 
 ## Stencil Capabilities
 
