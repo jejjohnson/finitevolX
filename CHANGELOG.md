@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.8](https://github.com/jejjohnson/finitevolX/compare/v0.0.7...v0.0.8) (2026-03-03)
+
+
+### Features
+
+* adopt pypackage_template standards and best practices ([71afd3e](https://github.com/jejjohnson/finitevolX/commit/71afd3e3f40f2c06b9a23dce4863944f3e446b76))
+
+
+### Bug Fixes
+
+* correct API reference documentation to use actual exported functions ([4dc1804](https://github.com/jejjohnson/finitevolX/commit/4dc1804668ff687e6b9457b0fe7c5d3503c37302))
+
 ## [0.0.7](https://github.com/jejjohnson/finitevolX/compare/v0.0.6...v0.0.7) (2026-03-01)
 
 
