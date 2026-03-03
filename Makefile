@@ -1,4 +1,4 @@
-.PHONY: help install uv-format uv-lint uv-pre-commit test
+.PHONY: help install uv-format uv-lint uv-pre-commit test test-cov typecheck docs docs-serve docs-deploy clean version
 .DEFAULT_GOAL = help
 
 # ANSI Color Codes for pretty terminal output
@@ -53,3 +53,49 @@ test: ## Test code using pytest.
 @printf "$(YELLOW)>>> Launching test suite with verbosity...$(RESET)\n"
 @uv run pytest tests -v
 @printf "$(GREEN)>>> All tests passed.$(RESET)\n"
+
+.PHONY: test-cov
+test-cov: ## Run tests with coverage
+@printf "$(YELLOW)>>> Running tests with coverage...$(RESET)\n"
+@uv run pytest tests -v --cov=$(PKGROOT) --cov-report=xml --cov-report=term
+@printf "$(GREEN)>>> Coverage report generated.$(RESET)\n"
+
+##@ Type Checking
+.PHONY: typecheck
+typecheck: ## Type check code with ty
+@printf "$(YELLOW)>>> Type checking code...$(RESET)\n"
+@uv run ty check $(PKGROOT)
+@printf "$(GREEN)>>> Type checks passed.$(RESET)\n"
+
+##@ Documentation
+.PHONY: docs
+docs: ## Build documentation
+@printf "$(YELLOW)>>> Building documentation...$(RESET)\n"
+@uv run mkdocs build
+@printf "$(GREEN)>>> Documentation built successfully.$(RESET)\n"
+
+.PHONY: docs-serve
+docs-serve: ## Serve documentation locally
+@printf "$(YELLOW)>>> Starting local documentation server...$(RESET)\n"
+@uv run mkdocs serve
+
+.PHONY: docs-deploy
+docs-deploy: ## Deploy documentation to GitHub Pages
+@printf "$(YELLOW)>>> Deploying documentation to GitHub Pages...$(RESET)\n"
+@uv run mkdocs gh-deploy --force
+@printf "$(GREEN)>>> Documentation deployed successfully.$(RESET)\n"
+
+##@ Utilities
+.PHONY: clean
+clean: ## Remove build artifacts and cache
+@printf "$(YELLOW)>>> Cleaning build artifacts...$(RESET)\n"
+@rm -rf build/ dist/ *.egg-info .pytest_cache/ .coverage reports/
+@find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+@printf "$(GREEN)>>> Cleanup complete.$(RESET)\n"
+
+.PHONY: version
+version: ## Display version information
+@printf "$(BLUE)>>> finitevolX version information:$(RESET)\n"
+@uv run python -c "import finitevolx; print(f'Package version: {finitevolx.__version__ if hasattr(finitevolx, \"__version__\") else \"unknown\"}')"
+@printf "$(BLUE)>>> Python version:$(RESET)\n"
+@uv run python --version
