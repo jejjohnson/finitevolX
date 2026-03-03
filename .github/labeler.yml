@@ -1,0 +1,24 @@
+"ci":
+  - changed-files:
+    - any-glob-to-any-file: ".github/workflows/**"
+
+"dependencies":
+  - changed-files:
+    - any-glob-to-any-file:
+      - "pyproject.toml"
+      - ".pre-commit-config.yaml"
+
+"documentation":
+  - changed-files:
+    - any-glob-to-any-file:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "*.md"
+
+"testing":
+  - changed-files:
+    - any-glob-to-any-file: "tests/**"
+
+"source":
+  - changed-files:
+    - any-glob-to-any-file: "src/**"
