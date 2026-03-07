@@ -77,6 +77,22 @@ class TestDifference2D:
         result = diff.diff_y_T_to_V(h)
         np.testing.assert_allclose(result[1:-1, 1:-1], c, rtol=1e-5)
 
+    def test_diff_y_X_to_U_linear(self, grid2d):
+        diff = Difference2D(grid=grid2d)
+        c = 1.75
+        y = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
+        q = jnp.broadcast_to(c * y[:, None], (grid2d.Ny, grid2d.Nx))
+        result = diff.diff_y_X_to_U(q)
+        np.testing.assert_allclose(result[1:-1, 1:-1], c, rtol=1e-5)
+
+    def test_diff_x_X_to_V_linear(self, grid2d):
+        diff = Difference2D(grid=grid2d)
+        c = 1.25
+        x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
+        q = jnp.broadcast_to(c * x, (grid2d.Ny, grid2d.Nx))
+        result = diff.diff_x_X_to_V(q)
+        np.testing.assert_allclose(result[1:-1, 1:-1], c, rtol=1e-5)
+
     def test_divergence_constant_flow(self, grid2d):
         diff = Difference2D(grid=grid2d)
         # uniform flow: divergence = 0
@@ -101,6 +117,18 @@ class TestDifference2D:
         h = x[None, :] ** 2 + y[:, None] ** 2
         result = diff.laplacian(h)
         np.testing.assert_allclose(result[1:-1, 1:-1], 4.0, rtol=1e-5)
+
+    def test_corner_streamfunction_velocity_is_discretely_nondivergent(self, grid2d):
+        diff = Difference2D(grid=grid2d)
+        x = jnp.arange(grid2d.Nx, dtype=float)
+        y = jnp.arange(grid2d.Ny, dtype=float)
+        psi_x = y[:, None] * x[None, :]
+
+        u = -diff.diff_y_X_to_U(psi_x)
+        v = diff.diff_x_X_to_V(psi_x)
+        divergence = diff.divergence(u, v)
+
+        np.testing.assert_allclose(divergence[1:-1, 1:-1], 0.0, atol=1e-12)
 
     def test_output_shape(self, grid2d):
         diff = Difference2D(grid=grid2d)
