@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.0.12](https://github.com/jejjohnson/finitevolX/compare/v0.0.11...v0.0.12) (2026-03-07)
+
+
+### Bug Fixes
+
+* address operator dtype and fixture review feedback ([e2d6afc](https://github.com/jejjohnson/finitevolX/commit/e2d6afc4c243ace9ec08584aca8b93c6344f9a4e))
+* Advection3D ghost flux bug; add U/V/X ghost cell tests; update instructions and figures ([a4ca415](https://github.com/jejjohnson/finitevolX/commit/a4ca4156e9a1ec42f8ed4e22a321b29747b927a7))
+* correct Arakawa C-grid operators, ghost-cell tests for all staggered types, and agent instructions ([d0c3c8c](https://github.com/jejjohnson/finitevolX/commit/d0c3c8c03f3595fe1d9e5e224f43451d25416b2d))
+* correct operators, add non-constant tests, document C-grid discretization ([5a1e831](https://github.com/jejjohnson/finitevolX/commit/5a1e8316ec6d73621e6e68be2f1173d01e7f658f))
+* rewrite kinetic_energy and bernoulli_potential for Arakawa C-grid same-size convention ([06d8c9a](https://github.com/jejjohnson/finitevolX/commit/06d8c9ae06a762d64801067f20abeced4a9faf46))
+
 ## [0.0.11](https://github.com/jejjohnson/finitevolX/compare/v0.0.10...v0.0.11) (2026-03-07)
 
 
