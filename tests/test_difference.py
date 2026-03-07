@@ -279,6 +279,118 @@ class TestDifference2D:
         np.testing.assert_allclose(result[1, 1:-1], expected_j1, rtol=1e-6)
 
 
+# ---------------------------------------------------------------------------
+# Ghost-cell interaction tests for difference operators
+# ---------------------------------------------------------------------------
+
+
+class TestDifferenceGhostCells2D:
+    """Verify that each difference operator reads/writes the correct ghost cells.
+
+    Forward operators (T→U, T→V, V→X, U→X):
+      last interior face reads the EAST/NORTH ghost of the source array.
+
+    Backward operators (U→T, V→T, X→U, X→V):
+      first interior output reads the WEST/SOUTH ghost of the source array.
+    """
+
+    # -- diff_x_T_to_U: last U-col reads east ghost T -----------------------
+
+    def test_diff_x_T_to_U_last_col_reads_east_ghost_T(self, grid2d):
+        """diff_x_T_to_U at last interior U-col uses T[j, Nx-1] (east ghost T)."""
+        diff = Difference2D(grid=grid2d)
+        h = jnp.zeros((grid2d.Ny, grid2d.Nx))
+        h = h.at[1:-1, grid2d.Nx - 2].set(2.0)  # last interior T = 2
+        h = h.at[1:-1, grid2d.Nx - 1].set(6.0)  # east ghost T = 6
+        result = diff.diff_x_T_to_U(h)
+        expected = (6.0 - 2.0) / grid2d.dx
+        np.testing.assert_allclose(result[1:-1, grid2d.Nx - 2], expected, rtol=1e-6)
+
+    # -- diff_x_U_to_T: first T-col reads west ghost U-face -----------------
+
+    def test_diff_x_U_to_T_first_col_reads_west_ghost_U(self, grid2d):
+        """diff_x_U_to_T at first T-col uses U[j, 0] (west boundary U-face)."""
+        diff = Difference2D(grid=grid2d)
+        u = jnp.zeros((grid2d.Ny, grid2d.Nx))
+        u = u.at[1:-1, 0].set(3.0)  # west ghost U-face = 3
+        u = u.at[1:-1, 1].set(9.0)  # first interior U = 9
+        result = diff.diff_x_U_to_T(u)
+        expected = (9.0 - 3.0) / grid2d.dx
+        np.testing.assert_allclose(result[1:-1, 1], expected, rtol=1e-6)
+
+    # -- diff_y_T_to_V: last V-row reads north ghost T ----------------------
+
+    def test_diff_y_T_to_V_last_row_reads_north_ghost_T(self, grid2d):
+        """diff_y_T_to_V at last interior V-row uses T[Ny-1, i] (north ghost T)."""
+        diff = Difference2D(grid=grid2d)
+        h = jnp.zeros((grid2d.Ny, grid2d.Nx))
+        h = h.at[grid2d.Ny - 2, 1:-1].set(1.0)  # last interior T = 1
+        h = h.at[grid2d.Ny - 1, 1:-1].set(5.0)  # north ghost T = 5
+        result = diff.diff_y_T_to_V(h)
+        expected = (5.0 - 1.0) / grid2d.dy
+        np.testing.assert_allclose(result[grid2d.Ny - 2, 1:-1], expected, rtol=1e-6)
+
+    # -- diff_y_V_to_T: first T-row reads south ghost V-face ----------------
+
+    def test_diff_y_V_to_T_first_row_reads_south_ghost_V(self, grid2d):
+        """diff_y_V_to_T at first T-row uses V[0, i] (south boundary V-face)."""
+        diff = Difference2D(grid=grid2d)
+        v = jnp.zeros((grid2d.Ny, grid2d.Nx))
+        v = v.at[0, 1:-1].set(2.0)  # south ghost V-face = 2
+        v = v.at[1, 1:-1].set(8.0)  # first interior V = 8
+        result = diff.diff_y_V_to_T(v)
+        expected = (8.0 - 2.0) / grid2d.dy
+        np.testing.assert_allclose(result[1, 1:-1], expected, rtol=1e-6)
+
+    # -- diff_x_V_to_X: last X-col reads east ghost V-col -------------------
+
+    def test_diff_x_V_to_X_last_col_reads_east_ghost_V(self, grid2d):
+        """diff_x_V_to_X at last X-col uses V[j, Nx-1] (east ghost V-col)."""
+        diff = Difference2D(grid=grid2d)
+        v = jnp.zeros((grid2d.Ny, grid2d.Nx))
+        v = v.at[1:-1, grid2d.Nx - 2].set(4.0)  # last interior V = 4
+        v = v.at[1:-1, grid2d.Nx - 1].set(10.0)  # east ghost V = 10
+        result = diff.diff_x_V_to_X(v)
+        expected = (10.0 - 4.0) / grid2d.dx
+        np.testing.assert_allclose(result[1:-1, grid2d.Nx - 2], expected, rtol=1e-6)
+
+    # -- diff_y_U_to_X: last X-row reads north ghost U-row ------------------
+
+    def test_diff_y_U_to_X_last_row_reads_north_ghost_U(self, grid2d):
+        """diff_y_U_to_X at last X-row uses U[Ny-1, i] (north ghost U-row)."""
+        diff = Difference2D(grid=grid2d)
+        u = jnp.zeros((grid2d.Ny, grid2d.Nx))
+        u = u.at[grid2d.Ny - 2, 1:-1].set(2.0)  # last interior U = 2
+        u = u.at[grid2d.Ny - 1, 1:-1].set(8.0)  # north ghost U = 8
+        result = diff.diff_y_U_to_X(u)
+        expected = (8.0 - 2.0) / grid2d.dy
+        np.testing.assert_allclose(result[grid2d.Ny - 2, 1:-1], expected, rtol=1e-6)
+
+    # -- diff_x_X_to_V: first V-col reads west ghost X-col -----------------
+
+    def test_diff_x_X_to_V_first_col_reads_west_ghost_X(self, grid2d):
+        """diff_x_X_to_V at first V-col uses X[j, 0] (west ghost X-col)."""
+        diff = Difference2D(grid=grid2d)
+        q = jnp.zeros((grid2d.Ny, grid2d.Nx))
+        q = q.at[1:-1, 0].set(2.0)  # west ghost X = 2
+        q = q.at[1:-1, 1].set(8.0)  # first interior X = 8
+        result = diff.diff_x_X_to_V(q)
+        expected = (8.0 - 2.0) / grid2d.dx
+        np.testing.assert_allclose(result[1:-1, 1], expected, rtol=1e-6)
+
+    # -- diff_y_X_to_U: first U-row reads south ghost X-row ----------------
+
+    def test_diff_y_X_to_U_first_row_reads_south_ghost_X(self, grid2d):
+        """diff_y_X_to_U at first U-row uses X[0, i] (south ghost X-row)."""
+        diff = Difference2D(grid=grid2d)
+        q = jnp.zeros((grid2d.Ny, grid2d.Nx))
+        q = q.at[0, 1:-1].set(3.0)  # south ghost X = 3
+        q = q.at[1, 1:-1].set(9.0)  # first interior X = 9
+        result = diff.diff_y_X_to_U(q)
+        expected = (9.0 - 3.0) / grid2d.dy
+        np.testing.assert_allclose(result[1, 1:-1], expected, rtol=1e-6)
+
+
 class TestDifference3D:
     def test_diff_x_T_to_U_shape(self, grid3d):
         diff = Difference3D(grid=grid3d)

@@ -51,6 +51,8 @@ indices `[1:-1, 1:-1]` (shape `(Ny-2) × (Nx-2)`).  The outer ring —
 rows `0` and `Ny-1`, columns `0` and `Nx-1` — consists of **ghost cells**
 reserved for boundary conditions.
 
+### T-point ghost cells
+
 ```
  col:   0    1    2  ...  Nx-2  Nx-1
 row 0: [g]  [g]  [g] ...  [g]  [g]   ← ghost (south)
@@ -62,6 +64,62 @@ row Ny-1:[g] [g] [g] ...  [g]  [g]   ← ghost (north)
      ghost                    ghost
      (west)                   (east)
 ```
+
+### U-point ghost cells
+
+`U[j, i]` sits at east face `(j, i+1/2)`.
+
+| Index | Physical meaning | Who sets it? |
+|-------|-----------------|--------------|
+| `U[j, 0]` | West **boundary face** `(j, ½)` | BC layer (e.g. periodic copy) |
+| `U[j, 1..Nx-2]` | Interior east faces | Forward operators (`diff_x_T_to_U`, `T_to_U`) |
+| `U[j, Nx-1]` | Outside domain | Unused / left zero |
+| `U[0, i]`, `U[Ny-1, i]` | South/north ghost rows | BC layer |
+
+`U[j, Nx-2]` is the **east boundary face** — it sits inside `[1:-1, 1:-1]`
+and is computed by forward operators using the east ghost T-cell `T[j, Nx-1]`.
+
+### V-point ghost cells
+
+`V[j, i]` sits at north face `(j+½, i)`.
+
+| Index | Physical meaning | Who sets it? |
+|-------|-----------------|--------------|
+| `V[0, i]` | South **boundary face** `(½, i)` | BC layer |
+| `V[1..Ny-2, i]` | Interior north faces | Forward operators (`diff_y_T_to_V`, `T_to_V`) |
+| `V[Ny-1, i]` | Outside domain | Unused / left zero |
+| `V[j, 0]`, `V[j, Nx-1]` | West/east ghost cols | BC layer |
+
+`V[Ny-2, i]` is the **north boundary face** — computed using north ghost T.
+
+### X-point ghost cells
+
+`X[j, i]` sits at NE corner `(j+½, i+½)`.
+
+| Index | Physical meaning | Who sets it? |
+|-------|-----------------|--------------|
+| `X[0, i]` | South ghost X-row | BC layer |
+| `X[j, 0]` | West ghost X-col | BC layer |
+| `X[1..Ny-2, 1..Nx-2]` | Interior corners | Forward operators (`T_to_X`, `diff_y_U_to_X`, etc.) |
+| `X[Ny-1, i]`, `X[j, Nx-1]` | Outside domain | Unused / left zero |
+
+### Ghost asymmetry: forward vs backward
+
+The same `[1:-1, 1:-1]` write range has **different ghost-cell implications**
+depending on direction:
+
+| Operator direction | Last interior output uses... | First interior output reads... |
+|--------------------|------------------------------|-------------------------------|
+| T→U (forward x)    | east ghost T `T[j, Nx-1]`   | —                             |
+| T→V (forward y)    | north ghost T `T[Ny-1, i]`  | —                             |
+| V→X (forward x)    | east ghost V `V[j, Nx-1]`   | —                             |
+| U→X (forward y)    | north ghost U `U[Ny-1, i]`  | —                             |
+| U→T (backward x)   | —                            | west ghost U `U[j, 0]`        |
+| V→T (backward y)   | —                            | south ghost V `V[0, i]`       |
+| X→U (backward y)   | —                            | south ghost X `X[0, i]`       |
+| X→V (backward x)   | —                            | west ghost X `X[j, 0]`        |
+| U→V (cross)        | north ghost U `U[Ny-1, i]`  | —                             |
+| V→U (cross)        | east ghost V `V[j, Nx-1]`   | —                             |
 
 **Operators write only to `[1:-1, 1:-1]`.**  Ghost cells remain at their
 initialised value (typically zero).  Callers are responsible for filling

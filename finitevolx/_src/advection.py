@@ -203,10 +203,15 @@ class Advection3D(eqx.Module):
         out = jnp.zeros_like(h)
         # dh[k, j, i] = -( (fe[k,j,i+1/2] - fe[k,j,i-1/2])/dx
         #                 + (fn[k,j+1/2,i] - fn[k,j-1/2,i])/dy )
-        out = out.at[1:-1, 1:-1, 1:-1].set(
+        # Reconstruction writes to [1:-1, 1:-1, 1:-1]; the west flux at i=0
+        # and south flux at j=0 are ghost cells (value 0, not filled).
+        # Consistent with 1D/2D operators, skip the ghost-adjacent interior
+        # ring in the horizontal plane so we never read ghost flux cells.
+        # All z-levels are independent, so z uses the full interior [1:-1].
+        out = out.at[1:-1, 2:-2, 2:-2].set(
             -(
-                (fe[1:-1, 1:-1, 1:-1] - fe[1:-1, 1:-1, :-2]) / self.grid.dx
-                + (fn[1:-1, 1:-1, 1:-1] - fn[1:-1, :-2, 1:-1]) / self.grid.dy
+                (fe[1:-1, 2:-2, 2:-2] - fe[1:-1, 2:-2, 1:-3]) / self.grid.dx
+                + (fn[1:-1, 2:-2, 2:-2] - fn[1:-1, 1:-3, 2:-2]) / self.grid.dy
             )
         )
         return out

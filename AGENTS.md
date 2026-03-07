@@ -135,9 +135,102 @@ Notebooks in `notebooks/` may be stored as `.ipynb` files.
   - `V[j, i]`  → north face   `(j+1/2, i    )`
   - `X[j, i]`  → NE corner    `(j+1/2, i+1/2)`
 
+### Ghost cells per staggered type
+
+All four types share the same `[Ny, Nx]` shape, but the **meaning** of the
+ghost ring differs.  The table below uses "BC-owned" for cells that must be
+filled by the caller before running a chained operator, and "outside domain"
+for cells that have no physical meaning.
+
+| Type | West ghost `[:,0]` | East ghost `[:,Nx-1]` | South ghost `[0,:]` | North ghost `[Ny-1,:]` |
+|------|--------------------|-----------------------|---------------------|------------------------|
+| T    | west BC T-cell     | east BC T-cell        | south BC T-cell     | north BC T-cell        |
+| U    | west boundary face (BC-owned) | outside domain | south ghost U-row (BC-owned) | north ghost U-row (BC-owned) |
+| V    | west ghost V-col (BC-owned)  | east ghost V-col (BC-owned) | south boundary face (BC-owned) | outside domain |
+| X    | west ghost X-col (BC-owned)  | outside domain        | south ghost X-row (BC-owned) | outside domain |
+
+**Key asymmetry** (same-index convention):
+
+* **Forward operators** (T→U, T→V, T→X) write to `[1:-1, 1:-1]`.  The last
+  interior column/row **does** use the `+direction` ghost of the *source*
+  array (east ghost T for T→U, north ghost T for T→V, NE corner ghost for
+  T→X) because that face lies inside the `[1:-1, 1:-1]` output range.
+* **Backward operators** (U→T, V→T, X→T) write to `[1:-1, 1:-1]`.  The
+  first interior column/row reads the `-direction` ghost of the *source*
+  array (west ghost U-face for U→T, south ghost V-face for V→T).  This ghost
+  is **not** set by any forward operator — the caller must supply it via BC.
+* **Cross operators** (U→V, V→U, U→X, V→X, X→U, X→V) follow the same
+  pattern: the last interior output reads the "far side" ghost of the source.
+
+### Stencil slice reference
+
+| Slice pattern          | Meaning (j = row, i = col)          |
+|------------------------|-------------------------------------|
+| `arr[1:-1, 1:-1]`      | interior at `(j, i)`                |
+| `arr[1:-1, 2:]`        | interior rows, one step east `i+1`  |
+| `arr[1:-1, :-2]`       | interior rows, one step west `i-1`  |
+| `arr[2:, 1:-1]`        | interior cols, one step north `j+1` |
+| `arr[:-2, 1:-1]`       | interior cols, one step south `j-1` |
+
+Every shifted slice has the **same shape** as `[1:-1, 1:-1]` because one
+ghost-cell ring provides exactly one step in any direction.
+
+### Forward difference stencils (T → face / corner)
+
+```
+# diff_x_T_to_U:  dh[j, i+1/2] = (h[j, i+1] - h[j, i]) / dx
+out.at[1:-1, 1:-1].set((h[1:-1, 2:] - h[1:-1, 1:-1]) / dx)
+
+# diff_y_T_to_V:  dh[j+1/2, i] = (h[j+1, i] - h[j, i]) / dy
+out.at[1:-1, 1:-1].set((h[2:, 1:-1] - h[1:-1, 1:-1]) / dy)
+
+# diff_y_U_to_X:  du[j+1/2, i+1/2] = (u[j+1, i] - u[j, i]) / dy
+out.at[1:-1, 1:-1].set((u[2:, 1:-1] - u[1:-1, 1:-1]) / dy)
+
+# diff_x_V_to_X:  dv[j+1/2, i+1/2] = (v[j, i+1] - v[j, i]) / dx
+out.at[1:-1, 1:-1].set((v[1:-1, 2:] - v[1:-1, 1:-1]) / dx)
+```
+
+### Backward difference stencils (face / corner → T)
+
+```
+# diff_x_U_to_T:  du[j, i] = (u[j, i] - u[j, i-1]) / dx
+out.at[1:-1, 1:-1].set((u[1:-1, 1:-1] - u[1:-1, :-2]) / dx)
+
+# diff_y_V_to_T:  dv[j, i] = (v[j, i] - v[j-1, i]) / dy
+out.at[1:-1, 1:-1].set((v[1:-1, 1:-1] - v[:-2, 1:-1]) / dy)
+
+# diff_y_X_to_U:  dq[j, i+1/2] = (q[j, i] - q[j-1, i]) / dy
+out.at[1:-1, 1:-1].set((q[1:-1, 1:-1] - q[:-2, 1:-1]) / dy)
+
+# diff_x_X_to_V:  dq[j+1/2, i] = (q[j, i] - q[j, i-1]) / dx
+out.at[1:-1, 1:-1].set((q[1:-1, 1:-1] - q[1:-1, :-2]) / dx)
+```
+
+### Ghost-cell interaction at stencil boundaries
+
+Ghost cells on the **`+` side** (east, north) of staggered arrays are
+computed by forward operators using BC-owned ghost T-cells.  Ghost cells on
+the **`-` side** (west, south) must be set by the caller (via BC layer)
+before chained backward-diff or interpolation calls.
+
+Without BCs, `diff_x_U_to_T` at `i=1` sees a zero west ghost U-face and
+produces `(u[j,1] - 0) / dx` instead of the correct value.  This is the
+**expected** behaviour — not a bug.  Apply BCs to intermediate fields before
+chaining operators.
+
+### Advection divergence
+
+Advection operators (`Advection1D`, `Advection2D`) write tendencies to
+`[2:-2]` / `[2:-2, 2:-2]` (not `[1:-1]`) to avoid reading ghost flux cells.
+`Advection3D` uses `[1:-1, 2:-2, 2:-2]` — all z-levels are independent, so
+the full z-interior is valid, but the horizontal plane follows the same
+`[2:-2]` rule.
+
 ## Operator Idiom (finitevolX-specific)
 
-* Every operator writes **only** into `[1:-1, 1:-1]` of the output array.
+* Every operator writes **only** into `[1:-1, 1:-1]` of the output array
+  (or `[2:-2]`/`[2:-2, 2:-2]` for advection — see above).
 * Initialise output with `jnp.zeros_like(input)` then use `.at[1:-1, 1:-1].set(...)`.
 * The caller is responsible for boundary conditions (pad, enforce_periodic, etc.).
 

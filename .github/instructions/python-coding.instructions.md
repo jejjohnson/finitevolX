@@ -73,10 +73,41 @@ Every stencil operation must include the half-index formula:
 out = out.at[1:-1, 1:-1].set((h[1:-1, 2:] - h[1:-1, 1:-1]) / self.grid.dx)
 ```
 
+### Ghost-Cell Rules for All Staggered Types
+
+All four array types (T, U, V, X) share shape `[Ny, Nx]`.  Operators write
+only to `[1:-1, 1:-1]` but the ghost cells consumed differ per type:
+
+| Operator direction | Source ghost consumed          | Slice that reads it    |
+|--------------------|--------------------------------|------------------------|
+| T→U (forward x)    | east ghost T `T[j, Nx-1]`     | `h[1:-1, 2:]` at last col |
+| T→V (forward y)    | north ghost T `T[Ny-1, i]`    | `h[2:, 1:-1]` at last row |
+| V→X (forward x)    | east ghost V `V[j, Nx-1]`     | `v[1:-1, 2:]` at last col |
+| U→X (forward y)    | north ghost U `U[Ny-1, i]`    | `u[2:, 1:-1]` at last row |
+| U→T (backward x)   | west ghost U `U[j, 0]`        | `u[1:-1, :-2]` at first col |
+| V→T (backward y)   | south ghost V `V[0, i]`       | `v[:-2, 1:-1]` at first row |
+| X→V (backward x)   | west ghost X `X[j, 0]`        | `q[1:-1, :-2]` at first col |
+| X→U (backward y)   | south ghost X `X[0, i]`       | `q[:-2, 1:-1]` at first row |
+| U→V                | north ghost U `U[Ny-1, i]`    | `u[2:, 1:-1]` at last row  |
+| V→U                | east ghost V `V[j, Nx-1]`     | `v[1:-1, 2:]` at last col  |
+
+**Forward operators** compute the last interior face using BC-owned ghost source
+cells — this is **correct and intentional**.  **Backward operators** read
+BC-owned ghost *output-type* cells for the first interior cell — the caller
+**must** set these before chaining operators.
+
+### Advection Write Region
+
+Advection operators use `[2:-2]` / `[2:-2, 2:-2]` (not `[1:-1]`) to avoid
+reading ghost flux cells.  `Advection3D` uses `[1:-1, 2:-2, 2:-2]` since
+the z-axis is independent.  Never change this to `[1:-1, ...]` for the
+horizontal dimensions.
+
 ### Array Shape Tracking
 Always document array shapes in comments:
 ```python
 # h: [Ny, Nx] - scalar field at T-points
 # u: [Ny, Nx] - velocity at U-points (east faces)
 # v: [Ny, Nx] - velocity at V-points (north faces)
+# q: [Ny, Nx] - quantity at X-points (NE corners)
 ```
