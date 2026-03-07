@@ -281,9 +281,10 @@ def solve_helmholtz_dct(
     Uses DCT-II (type 2) for the spectral decomposition associated with
     ∂ψ/∂n = 0 boundary conditions.
 
-    For the Poisson problem (λ = 0) the system is singular (the (0,0) mode
-    has eigenvalue 0). In that case callers should use
-    :func:`solve_poisson_dct`, which enforces a zero-mean gauge.
+    When ``lambda_ == 0`` the system is singular because the (0,0) DCT mode
+    has eigenvalue zero.  In that case this function automatically delegates to
+    :func:`solve_poisson_dct`, which fixes the gauge by enforcing a zero domain
+    mean.
 
     Parameters
     ----------
@@ -294,17 +295,19 @@ def solve_helmholtz_dct(
     dy : float
         Grid spacing in y.
     lambda_ : float
-        Helmholtz parameter λ.  Must satisfy λ ≠ any Neumann eigenvalue.
+        Helmholtz parameter λ.  When λ = 0 the Poisson gauge is used.
 
     Returns
     -------
     Float[Array, "Ny Nx"]
         Solution ψ, same shape as *rhs*.
     """
+    if lambda_ == 0.0:
+        return solve_poisson_dct(rhs, dx, dy)
     Ny, Nx = rhs.shape
     # Forward 2-D DCT-II
     rhs_hat = dctn(rhs, type=2, axes=[0, 1])
-    # 2-D eigenvalue matrix
+    # 2-D eigenvalue matrix: eig2d[0,0] = -lambda_ != 0 when lambda_ != 0
     eigx = dct2_eigenvalues(Nx, dx)
     eigy = dct2_eigenvalues(Ny, dy)
     eig2d = eigy[:, None] + eigx[None, :] - lambda_
@@ -366,9 +369,10 @@ def solve_helmholtz_fft(
 ) -> Float[Array, "Ny Nx"]:
     """Solve (∇² − λ)ψ = f with periodic BCs using the 2-D FFT.
 
-    For the Poisson problem (λ = 0) the system is singular (the (0,0) mode
-    has eigenvalue 0). In that case callers should use
-    :func:`solve_poisson_fft`, which enforces a zero-mean gauge.
+    When ``lambda_ == 0`` the system is singular because the (0,0) Fourier
+    mode has eigenvalue zero.  In that case this function automatically
+    delegates to :func:`solve_poisson_fft`, which fixes the gauge by enforcing
+    a zero domain mean.
 
     Parameters
     ----------
@@ -379,17 +383,20 @@ def solve_helmholtz_fft(
     dy : float
         Grid spacing in y.
     lambda_ : float
-        Helmholtz parameter λ.  Must satisfy λ ≠ any FFT eigenvalue.
+        Helmholtz parameter λ.  When λ = 0 the Poisson gauge is used.
 
     Returns
     -------
     Float[Array, "Ny Nx"]
         Solution ψ (real), same shape as *rhs*.
     """
+    if lambda_ == 0.0:
+        return solve_poisson_fft(rhs, dx, dy)
     Ny, Nx = rhs.shape
     rhs_hat = jnp.fft.fft2(rhs)
     eigx = fft_eigenvalues(Nx, dx)
     eigy = fft_eigenvalues(Ny, dy)
+    # eig2d[0,0] = -lambda_ != 0 when lambda_ != 0
     eig2d = eigy[:, None] + eigx[None, :] - lambda_
     psi_hat = rhs_hat / eig2d
     return jnp.real(jnp.fft.ifft2(psi_hat))

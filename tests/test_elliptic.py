@@ -180,6 +180,18 @@ class TestSolveHelmholtzDCT:
         psi = solve_helmholtz_dct(rhs, dx, dy, lambda_=lam)
         np.testing.assert_allclose(np.array(psi), np.array(psi_exact), atol=1e-9)
 
+    def test_lambda0_delegates_to_poisson(self, neumann_grid):
+        """solve_helmholtz_dct(lambda_=0) matches solve_poisson_dct exactly."""
+        Ny, Nx, dx, dy = neumann_grid
+        rhs = jnp.sin(jnp.arange(Ny, dtype=float)[:, None]) * jnp.cos(
+            jnp.arange(Nx, dtype=float)[None, :]
+        )
+        np.testing.assert_allclose(
+            np.array(solve_helmholtz_dct(rhs, dx, dy, lambda_=0.0)),
+            np.array(solve_poisson_dct(rhs, dx, dy)),
+            atol=1e-14,
+        )
+
 
 # ---------------------------------------------------------------------------
 # FFT periodic solver
@@ -230,6 +242,18 @@ class TestSolveHelmholtzFFT:
         )
         psi = solve_helmholtz_fft(rhs, dx, dy, lambda_=lam)
         np.testing.assert_allclose(np.array(psi), np.array(psi_exact), atol=1e-10)
+
+    def test_lambda0_delegates_to_poisson(self, periodic_grid):
+        """solve_helmholtz_fft(lambda_=0) matches solve_poisson_fft exactly."""
+        Ny, Nx, dx, dy = periodic_grid
+        rhs = jnp.sin(jnp.arange(Ny, dtype=float)[:, None]) * jnp.cos(
+            jnp.arange(Nx, dtype=float)[None, :]
+        )
+        np.testing.assert_allclose(
+            np.array(solve_helmholtz_fft(rhs, dx, dy, lambda_=0.0)),
+            np.array(solve_poisson_fft(rhs, dx, dy)),
+            atol=1e-14,
+        )
 
 
 # ---------------------------------------------------------------------------
