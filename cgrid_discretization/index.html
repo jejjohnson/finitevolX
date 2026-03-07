@@ -1,0 +1,1775 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Finite volume operators for JAX on Arakawa C-grids">
+      
+      
+        <meta name="author" content="Juan Emmanuel Johnson, Takaya Uchida">
+      
+      
+      
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../examples/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
+    
+    
+      
+        <title>C-Grid Discretization - finitevolX</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#arakawa-c-grid-discretization" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="finitevolX" class="md-header__button md-logo" aria-label="finitevolX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            finitevolX
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              C-Grid Discretization
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jejjohnson/finitevolX" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/finitevolX
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  C-Grid Discretization
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../examples/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Examples
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../api/reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API Reference
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../CHANGELOG/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="finitevolX" class="md-nav__button md-logo" aria-label="finitevolX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    finitevolX
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jejjohnson/finitevolX" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/finitevolX
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C-Grid Discretization
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C-Grid Discretization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#variable-co-location" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Variable Co-location
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ghost-cells" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ghost Cells
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Ghost Cells">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#t-point-ghost-cells" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        T-point ghost cells
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#u-point-ghost-cells" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        U-point ghost cells
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v-point-ghost-cells" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        V-point ghost cells
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#x-point-ghost-cells" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        X-point ghost cells
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ghost-asymmetry-forward-vs-backward" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ghost asymmetry: forward vs backward
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#creating-a-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating a Grid
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#difference-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Difference Operators
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Difference Operators">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#forward-differences-t-face-corner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Forward differences (T → face / corner)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backward-differences-face-corner-t" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backward differences (face / corner → T)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#divergence-curl-and-laplacian" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Divergence, Curl, and Laplacian
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#interpolation-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interpolation Operators
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Interpolation Operators">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#averaging-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Averaging table
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kinetic-energy-and-bernoulli-potential" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kinetic Energy and Bernoulli Potential
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Kinetic Energy and Bernoulli Potential">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#kinetic-energy-at-t-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kinetic energy at T-points
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bernoulli-potential-at-t-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bernoulli potential at T-points
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#slicing-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slicing Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ghost-cell-interaction-at-stencil-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ghost-Cell Interaction at Stencil Boundaries
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Ghost-Cell Interaction at Stencil Boundaries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#concrete-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concrete example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-advection-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Advection Step
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CHANGELOG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#variable-co-location" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Variable Co-location
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ghost-cells" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ghost Cells
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Ghost Cells">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#t-point-ghost-cells" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        T-point ghost cells
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#u-point-ghost-cells" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        U-point ghost cells
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v-point-ghost-cells" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        V-point ghost cells
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#x-point-ghost-cells" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        X-point ghost cells
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ghost-asymmetry-forward-vs-backward" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ghost asymmetry: forward vs backward
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#creating-a-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating a Grid
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#difference-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Difference Operators
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Difference Operators">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#forward-differences-t-face-corner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Forward differences (T → face / corner)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backward-differences-face-corner-t" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backward differences (face / corner → T)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#divergence-curl-and-laplacian" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Divergence, Curl, and Laplacian
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#interpolation-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interpolation Operators
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Interpolation Operators">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#averaging-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Averaging table
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kinetic-energy-and-bernoulli-potential" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kinetic Energy and Bernoulli Potential
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Kinetic Energy and Bernoulli Potential">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#kinetic-energy-at-t-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kinetic energy at T-points
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bernoulli-potential-at-t-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bernoulli potential at T-points
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#slicing-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slicing Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ghost-cell-interaction-at-stencil-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ghost-Cell Interaction at Stencil Boundaries
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Ghost-Cell Interaction at Stencil Boundaries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#concrete-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concrete example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-advection-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Advection Step
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="arakawa-c-grid-discretization">Arakawa C-Grid Discretization</h1>
+<p>This document describes the numerical discretization scheme used throughout
+<code>finitevolX</code>, explaining the same-size array convention, ghost-cell layout,
+variable co-location, and the slicing patterns that implement each stencil.</p>
+<hr />
+<h2 id="overview">Overview</h2>
+<p><code>finitevolX</code> uses an <strong>Arakawa C-grid</strong>, a staggered finite-volume mesh where
+different physical variables live at different grid locations.  The key
+departure from many textbook implementations is that <strong>every array has the
+same total shape <code>[Ny, Nx]</code></strong>, including one ring of ghost cells on each
+side.  There are no separate <code>[Ny, Nx+1]</code> or <code>[Nx-1, Ny-1]</code> arrays.</p>
+<p>This same-size convention simplifies JAX JIT compilation (all shapes are
+statically known from the grid parameters alone) and enables clean,
+uniform ghost-cell handling.</p>
+<hr />
+<h2 id="variable-co-location">Variable Co-location</h2>
+<p>Four distinct locations are used, identified by letter:</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Name</th>
+<th>Physical location</th>
+<th>Same-index meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>T</code></td>
+<td>cell centre</td>
+<td><code>(j·dy,      i·dx     )</code></td>
+<td><code>T[j, i]</code>  lives at <code>(j,     i    )</code></td>
+</tr>
+<tr>
+<td><code>U</code></td>
+<td>east face</td>
+<td><code>(j·dy,     (i+½)·dx  )</code></td>
+<td><code>U[j, i]</code>  lives at <code>(j,     i+½  )</code></td>
+</tr>
+<tr>
+<td><code>V</code></td>
+<td>north face</td>
+<td><code>((j+½)·dy,  i·dx     )</code></td>
+<td><code>V[j, i]</code>  lives at <code>(j+½,   i    )</code></td>
+</tr>
+<tr>
+<td><code>X</code></td>
+<td>NE corner</td>
+<td><code>((j+½)·dy, (i+½)·dx  )</code></td>
+<td><code>X[j, i]</code>  lives at <code>(j+½,   i+½  )</code></td>
+</tr>
+</tbody>
+</table>
+<p>The "same-index" rule means that array index <code>[j, i]</code> encodes the
+<strong>south-west</strong> corner of the stencil neighbourhood:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>   X[j,i] ---V[j,i]--- X[j,i+1]
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>     |           |           |
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>   U[j,i]  T[j,i]  U[j,i+1]
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>     |           |           |
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  X[j-1,i]--V[j-1,i]--X[j-1,i+1]
+</code></pre></div>
+<hr />
+<h2 id="ghost-cells">Ghost Cells</h2>
+<p>For a grid with <code>Nx × Ny</code> total cells, the <strong>physical interior</strong> occupies
+indices <code>[1:-1, 1:-1]</code> (shape <code>(Ny-2) × (Nx-2)</code>).  The outer ring —
+rows <code>0</code> and <code>Ny-1</code>, columns <code>0</code> and <code>Nx-1</code> — consists of <strong>ghost cells</strong>
+reserved for boundary conditions.</p>
+<h3 id="t-point-ghost-cells">T-point ghost cells</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a> col:   0    1    2  ...  Nx-2  Nx-1
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>row 0: [g]  [g]  [g] ...  [g]  [g]   ← ghost (south)
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>row 1: [g]  [ ]  [ ] ...  [ ]  [g]   ← first interior row
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  ...        interior               ...
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>row Ny-2:[g][ ]  [ ] ...  [ ]  [g]   ← last interior row
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>row Ny-1:[g] [g] [g] ...  [g]  [g]   ← ghost (north)
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        ^                        ^
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>     ghost                    ghost
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>     (west)                   (east)
+</code></pre></div>
+<h3 id="u-point-ghost-cells">U-point ghost cells</h3>
+<p><code>U[j, i]</code> sits at east face <code>(j, i+1/2)</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Index</th>
+<th>Physical meaning</th>
+<th>Who sets it?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>U[j, 0]</code></td>
+<td>West <strong>boundary face</strong> <code>(j, ½)</code></td>
+<td>BC layer (e.g. periodic copy)</td>
+</tr>
+<tr>
+<td><code>U[j, 1..Nx-2]</code></td>
+<td>Interior east faces</td>
+<td>Forward operators (<code>diff_x_T_to_U</code>, <code>T_to_U</code>)</td>
+</tr>
+<tr>
+<td><code>U[j, Nx-1]</code></td>
+<td>Outside domain</td>
+<td>Unused / left zero</td>
+</tr>
+<tr>
+<td><code>U[0, i]</code>, <code>U[Ny-1, i]</code></td>
+<td>South/north ghost rows</td>
+<td>BC layer</td>
+</tr>
+</tbody>
+</table>
+<p><code>U[j, Nx-2]</code> is the <strong>east boundary face</strong> — it sits inside <code>[1:-1, 1:-1]</code>
+and is computed by forward operators using the east ghost T-cell <code>T[j, Nx-1]</code>.</p>
+<h3 id="v-point-ghost-cells">V-point ghost cells</h3>
+<p><code>V[j, i]</code> sits at north face <code>(j+½, i)</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Index</th>
+<th>Physical meaning</th>
+<th>Who sets it?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>V[0, i]</code></td>
+<td>South <strong>boundary face</strong> <code>(½, i)</code></td>
+<td>BC layer</td>
+</tr>
+<tr>
+<td><code>V[1..Ny-2, i]</code></td>
+<td>Interior north faces</td>
+<td>Forward operators (<code>diff_y_T_to_V</code>, <code>T_to_V</code>)</td>
+</tr>
+<tr>
+<td><code>V[Ny-1, i]</code></td>
+<td>Outside domain</td>
+<td>Unused / left zero</td>
+</tr>
+<tr>
+<td><code>V[j, 0]</code>, <code>V[j, Nx-1]</code></td>
+<td>West/east ghost cols</td>
+<td>BC layer</td>
+</tr>
+</tbody>
+</table>
+<p><code>V[Ny-2, i]</code> is the <strong>north boundary face</strong> — computed using north ghost T.</p>
+<h3 id="x-point-ghost-cells">X-point ghost cells</h3>
+<p><code>X[j, i]</code> sits at NE corner <code>(j+½, i+½)</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Index</th>
+<th>Physical meaning</th>
+<th>Who sets it?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>X[0, i]</code></td>
+<td>South ghost X-row</td>
+<td>BC layer</td>
+</tr>
+<tr>
+<td><code>X[j, 0]</code></td>
+<td>West ghost X-col</td>
+<td>BC layer</td>
+</tr>
+<tr>
+<td><code>X[1..Ny-2, 1..Nx-2]</code></td>
+<td>Interior corners</td>
+<td>Forward operators (<code>T_to_X</code>, <code>diff_y_U_to_X</code>, etc.)</td>
+</tr>
+<tr>
+<td><code>X[Ny-1, i]</code>, <code>X[j, Nx-1]</code></td>
+<td>Outside domain</td>
+<td>Unused / left zero</td>
+</tr>
+</tbody>
+</table>
+<h3 id="ghost-asymmetry-forward-vs-backward">Ghost asymmetry: forward vs backward</h3>
+<p>The same <code>[1:-1, 1:-1]</code> write range has <strong>different ghost-cell implications</strong>
+depending on direction:</p>
+<table>
+<thead>
+<tr>
+<th>Operator direction</th>
+<th>Last interior output uses...</th>
+<th>First interior output reads...</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T→U (forward x)</td>
+<td>east ghost T <code>T[j, Nx-1]</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>T→V (forward y)</td>
+<td>north ghost T <code>T[Ny-1, i]</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>V→X (forward x)</td>
+<td>east ghost V <code>V[j, Nx-1]</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>U→X (forward y)</td>
+<td>north ghost U <code>U[Ny-1, i]</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>U→T (backward x)</td>
+<td>—</td>
+<td>west ghost U <code>U[j, 0]</code></td>
+</tr>
+<tr>
+<td>V→T (backward y)</td>
+<td>—</td>
+<td>south ghost V <code>V[0, i]</code></td>
+</tr>
+<tr>
+<td>X→U (backward y)</td>
+<td>—</td>
+<td>south ghost X <code>X[0, i]</code></td>
+</tr>
+<tr>
+<td>X→V (backward x)</td>
+<td>—</td>
+<td>west ghost X <code>X[j, 0]</code></td>
+</tr>
+<tr>
+<td>U→V (cross)</td>
+<td>north ghost U <code>U[Ny-1, i]</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>V→U (cross)</td>
+<td>east ghost V <code>V[j, Nx-1]</code></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Operators write only to <code>[1:-1, 1:-1]</code>.</strong>  Ghost cells remain at their
+initialised value (typically zero).  Callers are responsible for filling
+ghosts via boundary-condition helpers (<code>pad_interior</code>, <code>enforce_periodic</code>,
+<code>BoundaryConditionSet</code>, etc.) before the next operator call.</p>
+<hr />
+<h2 id="creating-a-grid">Creating a Grid</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">finitevolx</span><span class="w"> </span><span class="kn">import</span> <span class="n">ArakawaCGrid2D</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># 64 physical cells in each direction; 66×66 total array shape</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">grid</span> <span class="o">=</span> <span class="n">ArakawaCGrid2D</span><span class="o">.</span><span class="n">from_interior</span><span class="p">(</span><span class="n">nx_interior</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span> <span class="n">ny_interior</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>                                     <span class="n">Lx</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">Ly</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="c1"># grid.Nx == 66, grid.Ny == 66</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># grid.dx == 1/64, grid.dy == 1/64</span>
+</code></pre></div>
+<p>All field arrays are then allocated as <code>jnp.zeros((grid.Ny, grid.Nx))</code>.</p>
+<hr />
+<h2 id="difference-operators">Difference Operators</h2>
+<p>Every finite-difference stencil is a <strong>one-cell shift divided by the grid
+spacing</strong>.  The direction of the shift (forward or backward) is determined
+by which point type the output lives at.</p>
+<h3 id="forward-differences-t-face-corner">Forward differences (T → face / corner)</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Stencil formula</th>
+<th>Writes to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>diff_x_T_to_U</code></td>
+<td><code>dh/dx[j, i+½] = (h[j, i+1] - h[j, i]) / dx</code></td>
+<td>U-points</td>
+</tr>
+<tr>
+<td><code>diff_y_T_to_V</code></td>
+<td><code>dh/dy[j+½, i] = (h[j+1, i] - h[j, i]) / dy</code></td>
+<td>V-points</td>
+</tr>
+<tr>
+<td><code>diff_y_U_to_X</code></td>
+<td><code>du/dy[j+½, i+½] = (u[j+1, i] - u[j, i]) / dy</code></td>
+<td>X-points</td>
+</tr>
+<tr>
+<td><code>diff_x_V_to_X</code></td>
+<td><code>dv/dx[j+½, i+½] = (v[j, i+1] - v[j, i]) / dx</code></td>
+<td>X-points</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example slice</strong> for <code>diff_x_T_to_U</code> (writes to <code>[1:-1, 1:-1]</code>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># dh_dx[j, i+1/2] = (h[j, i+1] - h[j, i]) / dx</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">out</span> <span class="o">=</span> <span class="n">out</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set</span><span class="p">((</span><span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">:]</span> <span class="o">-</span> <span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="n">dx</span><span class="p">)</span>
+</code></pre></div>
+<p>The slice <code>h[1:-1, 2:]</code> gives <code>h[j, i+1]</code> for <code>i</code> ranging over interior
+columns; <code>h[1:-1, 1:-1]</code> gives <code>h[j, i]</code>.</p>
+<h3 id="backward-differences-face-corner-t">Backward differences (face / corner → T)</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Stencil formula</th>
+<th>Writes to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>diff_x_U_to_T</code></td>
+<td><code>du/dx[j, i] = (u[j, i] - u[j, i-1]) / dx</code></td>
+<td>T-points</td>
+</tr>
+<tr>
+<td><code>diff_y_V_to_T</code></td>
+<td><code>dv/dy[j, i] = (v[j, i] - v[j-1, i]) / dy</code></td>
+<td>T-points</td>
+</tr>
+<tr>
+<td><code>diff_y_X_to_U</code></td>
+<td><code>dq/dy[j, i+½] = (q[j, i] - q[j-1, i]) / dy</code></td>
+<td>U-points</td>
+</tr>
+<tr>
+<td><code>diff_x_X_to_V</code></td>
+<td><code>dq/dx[j+½, i] = (q[j, i] - q[j, i-1]) / dx</code></td>
+<td>V-points</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example slice</strong> for <code>diff_x_U_to_T</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># du_dx[j, i] = (u[j, i+1/2] - u[j, i-1/2]) / dx</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1">#             = (u[j, i]     - u[j, i-1]   ) / dx</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">out</span> <span class="o">=</span> <span class="n">out</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set</span><span class="p">((</span><span class="n">u</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">u</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">2</span><span class="p">])</span> <span class="o">/</span> <span class="n">dx</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="divergence-curl-and-laplacian">Divergence, Curl, and Laplacian</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">diff</span> <span class="o">=</span> <span class="n">Difference2D</span><span class="p">(</span><span class="n">grid</span><span class="o">=</span><span class="n">grid</span><span class="p">)</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">divergence</span> <span class="o">=</span> <span class="n">diff</span><span class="o">.</span><span class="n">divergence</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>   <span class="c1"># du/dx + dv/dy at T-points</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">curl</span>       <span class="o">=</span> <span class="n">diff</span><span class="o">.</span><span class="n">curl</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>         <span class="c1"># dv/dx - du/dy at X-points</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">laplacian</span>  <span class="o">=</span> <span class="n">diff</span><span class="o">.</span><span class="n">laplacian</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>       <span class="c1"># d²h/dx² + d²h/dy² at T-points</span>
+</code></pre></div>
+<p><strong>Discrete-non-divergence property</strong>: A velocity derived from a
+corner-streamfunction <code>ψ</code> via
+<code>u = -diff_y_X_to_U(ψ)</code>, <code>v = diff_x_X_to_V(ψ)</code>
+is <strong>exactly</strong> non-divergent at interior T-points.</p>
+<hr />
+<h2 id="interpolation-operators">Interpolation Operators</h2>
+<p>Each interpolation moves a field between co-location points by <strong>averaging
+the two nearest neighbours</strong> along the relevant axis.</p>
+<h3 id="averaging-table">Averaging table</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Formula</th>
+<th>Source → Target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>T_to_U</code></td>
+<td><code>h[j, i+½] = ½(h[j,i] + h[j,i+1])</code></td>
+<td>T → U</td>
+</tr>
+<tr>
+<td><code>T_to_V</code></td>
+<td><code>h[j+½, i] = ½(h[j,i] + h[j+1,i])</code></td>
+<td>T → V</td>
+</tr>
+<tr>
+<td><code>T_to_X</code></td>
+<td><code>h[j+½, i+½] = ¼(h[j,i]+h[j,i+1]+h[j+1,i]+h[j+1,i+1])</code></td>
+<td>T → X</td>
+</tr>
+<tr>
+<td><code>U_to_T</code></td>
+<td><code>u[j, i] = ½(u[j,i+½] + u[j,i-½]) = ½(u[j,i]+u[j,i-1])</code></td>
+<td>U → T</td>
+</tr>
+<tr>
+<td><code>V_to_T</code></td>
+<td><code>v[j, i] = ½(v[j+½,i] + v[j-½,i]) = ½(v[j,i]+v[j-1,i])</code></td>
+<td>V → T</td>
+</tr>
+<tr>
+<td><code>X_to_T</code></td>
+<td>4-point average over <code>q[j,i], q[j-1,i], q[j,i-1], q[j-1,i-1]</code></td>
+<td>X → T</td>
+</tr>
+<tr>
+<td><code>U_to_X</code></td>
+<td><code>u[j+½,i+½] = ½(u[j,i] + u[j+1,i])</code></td>
+<td>U → X</td>
+</tr>
+<tr>
+<td><code>V_to_X</code></td>
+<td><code>v[j+½,i+½] = ½(v[j,i] + v[j,i+1])</code></td>
+<td>V → X</td>
+</tr>
+<tr>
+<td><code>X_to_U</code></td>
+<td><code>q[j,i+½] = ½(q[j,i] + q[j-1,i])</code></td>
+<td>X → U</td>
+</tr>
+<tr>
+<td><code>X_to_V</code></td>
+<td><code>q[j+½,i] = ½(q[j,i] + q[j,i-1])</code></td>
+<td>X → V</td>
+</tr>
+<tr>
+<td><code>U_to_V</code></td>
+<td>4-point average over <code>u[j,i], u[j+1,i], u[j,i-1], u[j+1,i-1]</code></td>
+<td>U → V</td>
+</tr>
+<tr>
+<td><code>V_to_U</code></td>
+<td>4-point average over <code>v[j,i], v[j-1,i], v[j,i+1], v[j-1,i+1]</code></td>
+<td>V → U</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example slice</strong> for <code>T_to_U</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># h_on_u[j, i+1/2] = 0.5 * (h[j, i] + h[j, i+1])</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">out</span> <span class="o">=</span> <span class="n">out</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">:]))</span>
+</code></pre></div>
+<p>The key: <code>h[1:-1, 1:-1]</code> is <code>h[j, i]</code> and <code>h[1:-1, 2:]</code> is <code>h[j, i+1]</code>
+for interior column indices <code>i = 1 … Nx-2</code>.</p>
+<hr />
+<h2 id="kinetic-energy-and-bernoulli-potential">Kinetic Energy and Bernoulli Potential</h2>
+<p>These operators live in <code>finitevolx._src.operators.operators</code> and
+follow the same conventions.</p>
+<h3 id="kinetic-energy-at-t-points">Kinetic energy at T-points</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>ke[j, i] = ½ (u²_on_T[j, i] + v²_on_T[j, i])
+</code></pre></div>
+<p>where the face-squared fields are averaged to cell centres:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>u²_on_T[j, i] = ½ (u[j, i+½]² + u[j, i-½]²)
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>              = ½ (u[j, i]²   + u[j, i-1]²)
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>v²_on_T[j, i] = ½ (v[j+½, i]² + v[j-½, i]²)
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>              = ½ (v[j, i]²   + v[j-1, i]²)
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># ke[j, i] at T-points</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">u2</span> <span class="o">=</span> <span class="n">u</span><span class="o">**</span><span class="mi">2</span><span class="p">;</span>  <span class="n">v2</span> <span class="o">=</span> <span class="n">v</span><span class="o">**</span><span class="mi">2</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">u2_on_T</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">u2</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">u2</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">2</span><span class="p">])</span>   <span class="c1"># U → T in x</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">v2_on_T</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">v2</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">v2</span><span class="p">[:</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>   <span class="c1"># V → T in y</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">out</span> <span class="o">=</span> <span class="n">out</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">u2_on_T</span> <span class="o">+</span> <span class="n">v2_on_T</span><span class="p">))</span>
+</code></pre></div>
+<h3 id="bernoulli-potential-at-t-points">Bernoulli potential at T-points</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>p[j, i] = ke[j, i] + g · h[j, i]
+</code></pre></div>
+<p>Both <code>ke</code> and <code>h</code> are at T-points, so this is a simple elementwise sum
+restricted to the interior:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">out</span> <span class="o">=</span> <span class="n">out</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">ke</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">gravity</span> <span class="o">*</span> <span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+</code></pre></div>
+<hr />
+<h2 id="slicing-reference">Slicing Reference</h2>
+<p>The table below collects all the slice patterns used in stencil
+implementations.  <code>Ny, Nx</code> denote the total array sizes.</p>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Meaning (rows = j, cols = i)</th>
+<th>Shape</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>arr[1:-1, 1:-1]</code></td>
+<td>interior at <code>(j, i)</code>, both directions</td>
+<td><code>(Ny-2, Nx-2)</code></td>
+</tr>
+<tr>
+<td><code>arr[1:-1, 2:]</code></td>
+<td>interior rows, one step <strong>east</strong></td>
+<td><code>(Ny-2, Nx-2)</code></td>
+</tr>
+<tr>
+<td><code>arr[1:-1, :-2]</code></td>
+<td>interior rows, one step <strong>west</strong></td>
+<td><code>(Ny-2, Nx-2)</code></td>
+</tr>
+<tr>
+<td><code>arr[2:, 1:-1]</code></td>
+<td>interior cols, one step <strong>north</strong></td>
+<td><code>(Ny-2, Nx-2)</code></td>
+</tr>
+<tr>
+<td><code>arr[:-2, 1:-1]</code></td>
+<td>interior cols, one step <strong>south</strong></td>
+<td><code>(Ny-2, Nx-2)</code></td>
+</tr>
+<tr>
+<td><code>arr[2:, 2:]</code></td>
+<td>one step north-east</td>
+<td><code>(Ny-2, Nx-2)</code></td>
+</tr>
+<tr>
+<td><code>arr[:-2, :-2]</code></td>
+<td>one step south-west</td>
+<td><code>(Ny-2, Nx-2)</code></td>
+</tr>
+</tbody>
+</table>
+<p>Notice that every shifted slice has the <strong>same shape</strong> as the unshifted
+interior slice.  This is possible because arrays have one ghost-cell ring
+on each side, so a single-step shift never reads outside the array bounds.</p>
+<hr />
+<h2 id="ghost-cell-interaction-at-stencil-boundaries">Ghost-Cell Interaction at Stencil Boundaries</h2>
+<p>The first and last interior points see one ghost neighbour.  For example,
+<code>diff_x_T_to_U</code> at the first interior U-column (<code>i=1</code>, output <code>out[j, 1]</code>)
+uses <code>h[j, 1]</code> (interior T-point) and <code>h[j, 2]</code> (second interior
+T-point) — no ghosts involved.</p>
+<p>However, <code>diff_x_U_to_T</code> at <code>i=1</code> uses <code>u[j, 1]</code> and <code>u[j, 0]</code>.  If
+<code>u[j, 0]</code> is a ghost (zero by default), the result at <code>i=1</code> reflects that
+zero ghost rather than a physical extrapolation.  This is intentional: the
+<strong>caller</strong> sets ghost values via the boundary-condition layer before calling
+operators.</p>
+<p>A consequence: the composition
+<code>diff_x_U_to_T(diff_x_T_to_U(h))</code> equals <code>d²h/dx²</code> only at columns
+<code>i = 2 … Nx-3</code> (deep interior), because the intermediate <code>dh_u</code> field has
+a zero ghost at <code>i = 0</code> that pollutes column <code>i = 1</code>.</p>
+<h3 id="concrete-example">Concrete example</h3>
+<p>For <code>h[j, i] = c·i·dx</code> and no boundary conditions applied:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>dh_u = diff_x_T_to_U(h)
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a># dh_u[j, 0] = 0      ← ghost U-face, NOT written by the operator
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a># dh_u[j, 1] = c      ← first interior U-face
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a># dh_u[j, 2..Nx-2] = c ← rest of interior
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>result = diff_x_U_to_T(dh_u)
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a># result[j, 1] = (c - 0) / dx = c/dx   ← non-zero, ghost pollutes i=1
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a># result[j, 2..Nx-3] = (c - c) / dx = 0 ← correct 2nd derivative
+</code></pre></div>
+<p>This is <strong>correct</strong> operator behaviour. The ghost U-face at <code>i=0</code> is the
+<em>west boundary face</em> <code>U[j, ½]</code>; its value must be supplied by the BC layer
+(periodic, no-slip, etc.), not by the forward-difference stencil.  Always
+apply boundary conditions to intermediate fields before chaining operators.</p>
+<hr />
+<h2 id="example-advection-step">Example: Advection Step</h2>
+<p>A typical shallow-water advection step uses all four co-location points:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">finitevolx</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    <span class="n">ArakawaCGrid2D</span><span class="p">,</span> <span class="n">Difference2D</span><span class="p">,</span> <span class="n">Interpolation2D</span><span class="p">,</span> <span class="n">Vorticity2D</span><span class="p">,</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="n">enforce_periodic</span><span class="p">,</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="p">)</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="n">grid</span>  <span class="o">=</span> <span class="n">ArakawaCGrid2D</span><span class="o">.</span><span class="n">from_interior</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="n">diff</span>  <span class="o">=</span> <span class="n">Difference2D</span><span class="p">(</span><span class="n">grid</span><span class="o">=</span><span class="n">grid</span><span class="p">)</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="n">interp</span> <span class="o">=</span> <span class="n">Interpolation2D</span><span class="p">(</span><span class="n">grid</span><span class="o">=</span><span class="n">grid</span><span class="p">)</span>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="n">vort</span>  <span class="o">=</span> <span class="n">Vorticity2D</span><span class="p">(</span><span class="n">grid</span><span class="o">=</span><span class="n">grid</span><span class="p">)</span>
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a><span class="c1"># ---- assume u, v, h are shape (66, 66) with updated ghosts ----</span>
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a><span class="c1"># 1. Potential vorticity at X-points</span>
+<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a><span class="n">f</span>     <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">grid</span><span class="o">.</span><span class="n">Ny</span><span class="p">,</span> <span class="n">grid</span><span class="o">.</span><span class="n">Nx</span><span class="p">))</span>           <span class="c1"># Coriolis (T-points)</span>
+<a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a><span class="n">q</span>     <span class="o">=</span> <span class="n">vort</span><span class="o">.</span><span class="n">potential_vorticity</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>   <span class="c1"># X-points</span>
+<a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a>
+<a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a><span class="c1"># 2. PV flux (Arakawa-Lamb)</span>
+<a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a><span class="n">qu</span><span class="p">,</span> <span class="n">qv</span> <span class="o">=</span> <span class="n">vort</span><span class="o">.</span><span class="n">pv_flux_arakawa_lamb</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>   <span class="c1"># U- and V-points</span>
+<a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a>
+<a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a><span class="c1"># 3. Kinetic energy and Bernoulli potential</span>
+<a id="__codelineno-13-22" name="__codelineno-13-22" href="#__codelineno-13-22"></a><span class="kn">from</span><span class="w"> </span><span class="nn">finitevolx._src.operators.operators</span><span class="w"> </span><span class="kn">import</span> <span class="n">bernoulli_potential</span>
+<a id="__codelineno-13-23" name="__codelineno-13-23" href="#__codelineno-13-23"></a><span class="n">p</span> <span class="o">=</span> <span class="n">bernoulli_potential</span><span class="p">(</span><span class="n">h</span><span class="o">=</span><span class="n">h</span><span class="p">,</span> <span class="n">u</span><span class="o">=</span><span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="o">=</span><span class="n">v</span><span class="p">)</span>         <span class="c1"># T-points</span>
+<a id="__codelineno-13-24" name="__codelineno-13-24" href="#__codelineno-13-24"></a>
+<a id="__codelineno-13-25" name="__codelineno-13-25" href="#__codelineno-13-25"></a><span class="c1"># 4. Tendencies</span>
+<a id="__codelineno-13-26" name="__codelineno-13-26" href="#__codelineno-13-26"></a><span class="n">du_dt</span> <span class="o">=</span> <span class="o">-</span><span class="n">diff</span><span class="o">.</span><span class="n">diff_x_T_to_U</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="o">+</span> <span class="n">qv</span>           <span class="c1"># U-points</span>
+<a id="__codelineno-13-27" name="__codelineno-13-27" href="#__codelineno-13-27"></a><span class="n">dv_dt</span> <span class="o">=</span> <span class="o">-</span><span class="n">diff</span><span class="o">.</span><span class="n">diff_y_T_to_V</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="o">-</span> <span class="n">qu</span>           <span class="c1"># V-points</span>
+<a id="__codelineno-13-28" name="__codelineno-13-28" href="#__codelineno-13-28"></a><span class="n">dh_dt</span> <span class="o">=</span> <span class="o">-</span><span class="n">diff</span><span class="o">.</span><span class="n">divergence</span><span class="p">(</span><span class="n">h_u</span><span class="p">,</span> <span class="n">h_v</span><span class="p">)</span>            <span class="c1"># T-points (h*u fluxes)</span>
+</code></pre></div>
+<p>Every intermediate array has the same shape <code>(66, 66)</code>.  The ghost ring
+carries boundary-condition data; the interior <code>[1:-1, 1:-1]</code> carries the
+physical solution.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "content.code.copy", "content.code.annotate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
