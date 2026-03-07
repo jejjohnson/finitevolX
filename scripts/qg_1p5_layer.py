@@ -70,8 +70,8 @@ def geostrophic_velocity_from_streamfunction(
     The streamfunction is first averaged to X-points so that the orthogonal
     derivatives land directly on the U and V faces:
 
-    - u[j, i+1/2] = -(ψ[j+1/2, i+1/2] - ψ[j-1/2, i+1/2]) / dy
-    - v[j+1/2, i] =  (ψ[j+1/2, i+1/2] - ψ[j+1/2, i-1/2]) / dx
+    - u[j, i] = -(ψ[j+1/2, i+1/2] - ψ[j-1/2, i+1/2]) / dy
+    - v[j, i] =  (ψ[j+1/2, i+1/2] - ψ[j+1/2, i-1/2]) / dx
 
     Parameters
     ----------

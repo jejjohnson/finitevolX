@@ -46,7 +46,20 @@ def load_script_module(module_name: str, script_name: str):
 
 
 def checkerboard_metric(field: np.ndarray) -> float:
-    """Return the normalized amplitude of the 2-D Nyquist checkerboard mode."""
+    """Return the normalized amplitude of the 2-D Nyquist checkerboard mode.
+
+    Parameters
+    ----------
+    field : np.ndarray
+        Two-dimensional sampled field to analyse.
+
+    Returns
+    -------
+    float
+        Normalized checkerboard amplitude. Values near 0 indicate little
+        odd-even structure, while values closer to 1 indicate a strong
+        checkerboard mode.
+    """
     y_index, x_index = np.indices(field.shape)
     checker = (-1.0) ** (x_index + y_index)
     rms = np.sqrt(np.mean(field**2))
@@ -148,7 +161,7 @@ def test_qg_script_runs_stably(tmp_path: Path) -> None:
 
 def test_qg_geostrophic_velocity_helper_is_nearly_nondivergent() -> None:
     """The QG streamfunction-to-velocity mapping should preserve incompressibility."""
-    module = load_script_module("qg_velocity_script", "qg_1p5_layer.py")
+    module = load_script_module("qg_module", "qg_1p5_layer.py")
     config = module.QuasiGeostrophicConfig(nx=16, ny=16)
     grid = ArakawaCGrid2D.from_interior(config.nx, config.ny, config.Lx, config.Ly)
     diff = Difference2D(grid=grid)

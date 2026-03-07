@@ -192,7 +192,7 @@ class Difference2D(eqx.Module):
     def diff_y_X_to_U(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """Backward y-difference: X-point -> U-point.
 
-        dq_dy[j, i+1/2] = (q[j+1/2, i+1/2] - q[j-1/2, i+1/2]) / dy
+        dq_dy[j, i] = (q[j+1/2, i+1/2] - q[j-1/2, i+1/2]) / dy
 
         Parameters
         ----------
@@ -212,7 +212,7 @@ class Difference2D(eqx.Module):
     def diff_x_X_to_V(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """Backward x-difference: X-point -> V-point.
 
-        dq_dx[j+1/2, i] = (q[j+1/2, i+1/2] - q[j+1/2, i-1/2]) / dx
+        dq_dx[j, i] = (q[j+1/2, i+1/2] - q[j+1/2, i-1/2]) / dx
 
         Parameters
         ----------
