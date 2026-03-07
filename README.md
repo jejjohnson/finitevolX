@@ -99,6 +99,10 @@ Artifacts written by default:
 
 ![1.5-layer QG double gyre](docs/images/qg_1p5_layer_double_gyre.png)
 
+The QG example now uses basin-scale default parameters that are closer to the
+MQGeometry double-gyre benchmark and saves a **relative-vorticity** figure
+instead of a streamfunction plot, which produces a more recognizable eddy field.
+
 For a different artifact location during development, pass `--output-dir` to any
 of the scripts.
 

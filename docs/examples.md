@@ -35,7 +35,7 @@ Script: `scripts/swm_linear.py`
 - Periodic beta-plane, double-gyre wind forcing
 - Linearised momentum and mass equations
 - `xarray` coordinates for the initial height anomaly, Coriolis field, and wind forcing
-- Zarr output fields: `eta`, `u`, `v`, `speed`, `kinetic_energy`, `mass_anomaly`
+- Zarr output fields: `eta`, `u`, `v`, `speed`, `relative_vorticity`, `kinetic_energy`, `mass_anomaly`
 
 ![Linear shallow-water double gyre](images/linear_shallow_water_double_gyre.png)
 
@@ -46,7 +46,7 @@ Script: `scripts/shallow_water.py`
 - Periodic beta-plane, double-gyre wind forcing
 - Nonlinear continuity equation with total depth `H + eta`
 - Compact Bernoulli and advective closure in the momentum equation
-- Zarr output fields: `eta`, `u`, `v`, `speed`, `kinetic_energy`, `minimum_depth`
+- Zarr output fields: `eta`, `u`, `v`, `speed`, `relative_vorticity`, `kinetic_energy`, `minimum_depth`
 
 ![Nonlinear shallow-water double gyre](images/shallow_water_double_gyre.png)
 
@@ -57,7 +57,9 @@ Script: `scripts/qg_1p5_layer.py`
 - Periodic beta-plane, double-gyre wind-curl forcing
 - Potential-vorticity advection with `Advection2D`
 - Streamfunction inversion through `solve_helmholtz_fft`
-- Zarr output fields: `q`, `psi`, `u`, `v`, `speed`, `pv_enstrophy`
+- Basin-scale defaults tuned toward the MQGeometry double-gyre benchmark (`Lx = Ly = 5120 km`, `f0 = 9.375e-5 s^-1`, `beta = 1.754e-11 m^-1 s^-1`)
+- Saved figure shows **relative vorticity** rather than streamfunction so the eddy field matches the expected diagnostic
+- Zarr output fields: `q`, `psi`, `u`, `v`, `speed`, `relative_vorticity`, `pv_enstrophy`
 
 ![1.5-layer QG double gyre](images/qg_1p5_layer_double_gyre.png)
 

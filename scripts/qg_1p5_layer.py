@@ -46,6 +46,7 @@ from finitevolx import (
     ArakawaCGrid2D,
     Difference2D,
     Interpolation2D,
+    Vorticity2D,
     enforce_periodic,
     solve_helmholtz_fft,
 )
@@ -65,13 +66,19 @@ def save_comparison_plot(
     variable_name: str,
     title: str,
     cmap: str = "RdBu_r",
+    scale_factor: float = 1.0,
+    colorbar_label: str | None = None,
 ) -> None:
     """Save a static before/after plot for a sampled field."""
     figure_path.parent.mkdir(parents=True, exist_ok=True)
 
-    data = dataset[variable_name]
+    data = dataset[variable_name] * scale_factor
     initial = data.isel(time=0)
     final = data.isel(time=-1)
+    vmax = float(np.nanmax(np.abs(np.stack([initial.to_numpy(), final.to_numpy()]))))
+    if vmax == 0.0:
+        vmax = 1.0
+    vmin = -vmax
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 4), constrained_layout=True)
     for axis, field, panel in zip(
@@ -83,11 +90,15 @@ def save_comparison_plot(
             field,
             shading="auto",
             cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
         )
         axis.set_title(panel)
         axis.set_xlabel("x [m]")
         axis.set_ylabel("y [m]")
-        fig.colorbar(image, ax=axis, shrink=0.9)
+        colorbar = fig.colorbar(image, ax=axis, shrink=0.9)
+        if colorbar_label is not None:
+            colorbar.set_label(colorbar_label)
 
     fig.suptitle(title)
     fig.savefig(figure_path, dpi=150)
@@ -104,6 +115,8 @@ class QuasiGeostrophicConfig:
         Number of interior cells in x and y.
     Lx, Ly : float, optional
         Domain lengths [m].
+    f0 : float, optional
+        Reference Coriolis parameter [s⁻¹].
     beta : float, optional
         Meridional Coriolis gradient [m⁻¹ s⁻¹].
     rossby_radius : float, optional
@@ -136,16 +149,17 @@ class QuasiGeostrophicConfig:
 
     nx: int = 64
     ny: int = 64
-    Lx: float = 2.0e6
-    Ly: float = 1.0e6
-    beta: float = 1.5e-11
+    Lx: float = 5.12e6
+    Ly: float = 5.12e6
+    f0: float = 9.375e-5
+    beta: float = 1.754e-11
     rossby_radius: float = 4.0e4
-    drag: float = 5.0e-6
-    viscosity: float = 8.0e5
-    wind_curl_forcing: float = 5.0e-12
-    dt: float = 300.0
-    steps: int = 1800
-    snapshot_interval: int = 225
+    drag: float = 5.0e-8
+    viscosity: float = 5.0e4
+    wind_curl_forcing: float = 2.0e-10
+    dt: float = 4000.0
+    steps: int = 4000
+    snapshot_interval: int = 500
     zarr_path: Path = Path("outputs/qg_1p5_layer_double_gyre.zarr")
     figure_path: Path = Path("outputs/qg_1p5_layer_double_gyre.png")
 
@@ -198,7 +212,9 @@ def make_preprocessing_dataset(
         5.0e-9 * np.sin(2.0 * np.pi * x2d / config.Lx) * np.sin(np.pi * y2d / config.Ly)
     )
     beta_term = config.beta * (y2d - 0.5 * config.Ly)
-    wind_curl = config.wind_curl_forcing * np.sin(2.0 * np.pi * y2d / config.Ly)
+    # Match the sign convention used in MQGeometry's double_gyre.py:
+    # curl_tau(y) = -tau0 * (2π / Ly) * sin(2π y / Ly)
+    wind_curl = -config.wind_curl_forcing * np.sin(2.0 * np.pi * y2d / config.Ly)
 
     return xr.Dataset(
         data_vars={
@@ -243,6 +259,7 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
     diff = Difference2D(grid=grid)
     interp = Interpolation2D(grid=grid)
     adv = Advection2D(grid=grid)
+    vort = Vorticity2D(grid=grid)
     forcing = make_preprocessing_dataset(config, grid)
 
     q = to_periodic_field(forcing["q0"])
@@ -303,6 +320,7 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
     u_snapshots: list[np.ndarray] = []
     v_snapshots: list[np.ndarray] = []
     speed_snapshots: list[np.ndarray] = []
+    relative_vorticity_snapshots: list[np.ndarray] = []
     pv_enstrophy: list[float] = []
 
     def record_snapshot(
@@ -317,8 +335,11 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
         psi_np = np.asarray(jax.device_get(psi_field[1:-1, 1:-1]))
         u_center = interp.U_to_T(u_field)
         v_center = interp.V_to_T(v_field)
+        zeta_corner = vort.relative_vorticity(u_field, v_field)
+        zeta_center = interp.X_to_T(zeta_corner)
         u_np = np.asarray(jax.device_get(u_center[1:-1, 1:-1]))
         v_np = np.asarray(jax.device_get(v_center[1:-1, 1:-1]))
+        zeta_np = np.asarray(jax.device_get(zeta_center[1:-1, 1:-1]))
         speed_np = np.sqrt(u_np**2 + v_np**2)
 
         snapshot_times.append(step_index * dt)
@@ -327,6 +348,7 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
         u_snapshots.append(u_np)
         v_snapshots.append(v_np)
         speed_snapshots.append(speed_np)
+        relative_vorticity_snapshots.append(zeta_np)
         pv_enstrophy.append(float(0.5 * np.mean(q_np**2)))
 
     record_snapshot(step_index=0, q_field=q, psi_field=psi, u_field=u, v_field=v)
@@ -369,6 +391,11 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
                 np.stack(speed_snapshots, axis=0),
                 {"long_name": "speed_at_t_points", "units": "m s-1"},
             ),
+            "relative_vorticity": (
+                ("time", "y", "x"),
+                np.stack(relative_vorticity_snapshots, axis=0),
+                {"long_name": "relative_vorticity_at_t_points", "units": "s-1"},
+            ),
             "wind_curl": (
                 ("y", "x"),
                 forcing["wind_curl"].to_numpy(),
@@ -403,9 +430,10 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
     save_comparison_plot(
         dataset=dataset,
         figure_path=config.figure_path,
-        variable_name="psi",
-        title="1.5-layer QG double gyre: streamfunction",
-        cmap="viridis",
+        variable_name="relative_vorticity",
+        title="1.5-layer QG double gyre: relative vorticity",
+        scale_factor=1.0e5,
+        colorbar_label=r"[$10^{-5}\ \mathrm{s}^{-1}$]",
     )
     return dataset
 

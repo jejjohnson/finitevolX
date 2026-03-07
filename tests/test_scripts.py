@@ -59,11 +59,13 @@ def test_linear_shallow_water_script_runs_stably(tmp_path: Path) -> None:
 
     eta = reopened["eta"].to_numpy()
     speed = reopened["speed"].to_numpy()
+    relative_vorticity = reopened["relative_vorticity"].to_numpy()
     assert config.zarr_path.exists()
     assert config.figure_path.exists()
     assert dataset.sizes["time"] >= 3
     assert np.isfinite(eta).all()
     assert np.isfinite(speed).all()
+    assert np.isfinite(relative_vorticity).all()
     assert np.max(np.abs(eta)) < 0.1
     assert np.max(speed) < 0.01
 
@@ -86,12 +88,14 @@ def test_nonlinear_shallow_water_script_runs_stably(tmp_path: Path) -> None:
     eta = reopened["eta"].to_numpy()
     speed = reopened["speed"].to_numpy()
     minimum_depth = reopened["minimum_depth"].to_numpy()
+    relative_vorticity = reopened["relative_vorticity"].to_numpy()
     assert config.zarr_path.exists()
     assert config.figure_path.exists()
     assert dataset.sizes["time"] >= 3
     assert np.isfinite(eta).all()
     assert np.isfinite(speed).all()
     assert np.isfinite(minimum_depth).all()
+    assert np.isfinite(relative_vorticity).all()
     assert np.min(minimum_depth) > 499.9
     assert np.max(speed) < 0.01
 
@@ -113,10 +117,16 @@ def test_qg_script_runs_stably(tmp_path: Path) -> None:
 
     q = reopened["q"].to_numpy()
     psi = reopened["psi"].to_numpy()
+    relative_vorticity = reopened["relative_vorticity"].to_numpy()
     assert config.zarr_path.exists()
     assert config.figure_path.exists()
     assert dataset.sizes["time"] >= 3
     assert np.isfinite(q).all()
     assert np.isfinite(psi).all()
-    assert np.max(np.abs(q)) < 1.0e-5
-    assert np.max(np.abs(psi)) < 2.0e4
+    assert np.isfinite(relative_vorticity).all()
+    assert np.max(np.abs(q)) < 2.0e-3
+    assert np.max(np.abs(psi)) < 1.0e6
+    # The QG example uses a deterministic sinusoidal initial condition and
+    # steady double-gyre forcing, so the relative-vorticity variability should
+    # increase during the short smoke-test integration.
+    assert np.std(relative_vorticity[-1]) > np.std(relative_vorticity[0])

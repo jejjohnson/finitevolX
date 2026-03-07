@@ -42,7 +42,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 
-from finitevolx import ArakawaCGrid2D, Difference2D, Interpolation2D, enforce_periodic
+from finitevolx import (
+    ArakawaCGrid2D,
+    Difference2D,
+    Interpolation2D,
+    Vorticity2D,
+    enforce_periodic,
+)
 
 jax.config.update("jax_enable_x64", True)
 
@@ -99,12 +105,12 @@ class LinearShallowWaterConfig:
 
     nx: int = 64
     ny: int = 64
-    Lx: float = 2.0e6
-    Ly: float = 1.0e6
+    Lx: float = 5.12e6
+    Ly: float = 5.12e6
     gravity: float = 9.81
     mean_depth: float = 500.0
-    f0: float = 1.0e-4
-    beta: float = 1.5e-11
+    f0: float = 9.375e-5
+    beta: float = 1.754e-11
     drag: float = 1.0e-4
     viscosity: float = 2.0e5
     wind_acceleration: float = 2.0e-7
@@ -212,6 +218,8 @@ def save_comparison_plot(
     variable_name: str,
     title: str,
     cmap: str = "RdBu_r",
+    scale_factor: float = 1.0,
+    colorbar_label: str | None = None,
 ) -> None:
     """Save a static before/after plot for a sampled field.
 
@@ -240,9 +248,13 @@ def save_comparison_plot(
     """
     figure_path.parent.mkdir(parents=True, exist_ok=True)
 
-    data = dataset[variable_name]
+    data = dataset[variable_name] * scale_factor
     initial = data.isel(time=0)
     final = data.isel(time=-1)
+    vmax = float(np.nanmax(np.abs(np.stack([initial.to_numpy(), final.to_numpy()]))))
+    if vmax == 0.0:
+        vmax = 1.0
+    vmin = -vmax
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 4), constrained_layout=True)
     for axis, field, panel in zip(
@@ -254,11 +266,15 @@ def save_comparison_plot(
             field,
             shading="auto",
             cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
         )
         axis.set_title(panel)
         axis.set_xlabel("x [m]")
         axis.set_ylabel("y [m]")
-        fig.colorbar(image, ax=axis, shrink=0.9)
+        colorbar = fig.colorbar(image, ax=axis, shrink=0.9)
+        if colorbar_label is not None:
+            colorbar.set_label(colorbar_label)
 
     fig.suptitle(title)
     fig.savefig(figure_path, dpi=150)
@@ -292,6 +308,7 @@ def run_simulation(config: LinearShallowWaterConfig | None = None) -> xr.Dataset
     grid = ArakawaCGrid2D.from_interior(config.nx, config.ny, config.Lx, config.Ly)
     diff = Difference2D(grid=grid)
     interp = Interpolation2D(grid=grid)
+    vort = Vorticity2D(grid=grid)
     forcing = make_preprocessing_dataset(config, grid)
 
     eta = to_periodic_field(forcing["eta0"])
@@ -353,6 +370,7 @@ def run_simulation(config: LinearShallowWaterConfig | None = None) -> xr.Dataset
     u_snapshots: list[np.ndarray] = []
     v_snapshots: list[np.ndarray] = []
     speed_snapshots: list[np.ndarray] = []
+    relative_vorticity_snapshots: list[np.ndarray] = []
     kinetic_energy: list[float] = []
     mass_anomaly: list[float] = []
 
@@ -366,8 +384,11 @@ def run_simulation(config: LinearShallowWaterConfig | None = None) -> xr.Dataset
         eta_np = np.asarray(jax.device_get(eta_field[1:-1, 1:-1]))
         u_center = interp.U_to_T(u_field)
         v_center = interp.V_to_T(v_field)
+        zeta_corner = vort.relative_vorticity(u_field, v_field)
+        zeta_center = interp.X_to_T(zeta_corner)
         u_np = np.asarray(jax.device_get(u_center[1:-1, 1:-1]))
         v_np = np.asarray(jax.device_get(v_center[1:-1, 1:-1]))
+        zeta_np = np.asarray(jax.device_get(zeta_center[1:-1, 1:-1]))
         speed_np = np.sqrt(u_np**2 + v_np**2)
 
         snapshot_times.append(step_index * dt)
@@ -375,6 +396,7 @@ def run_simulation(config: LinearShallowWaterConfig | None = None) -> xr.Dataset
         u_snapshots.append(u_np)
         v_snapshots.append(v_np)
         speed_snapshots.append(speed_np)
+        relative_vorticity_snapshots.append(zeta_np)
         kinetic_energy.append(float(0.5 * np.mean(speed_np**2)))
         mass_anomaly.append(float(np.mean(eta_np)))
 
@@ -406,6 +428,11 @@ def run_simulation(config: LinearShallowWaterConfig | None = None) -> xr.Dataset
                 ("time", "y", "x"),
                 np.stack(speed_snapshots, axis=0),
                 {"long_name": "speed_at_t_points", "units": "m s-1"},
+            ),
+            "relative_vorticity": (
+                ("time", "y", "x"),
+                np.stack(relative_vorticity_snapshots, axis=0),
+                {"long_name": "relative_vorticity_at_t_points", "units": "s-1"},
             ),
             "wind_u": (
                 ("y", "x"),
