@@ -141,9 +141,7 @@ class TestSolvePoissonDCT:
         j = jnp.arange(Ny)[:, None]
         i = jnp.arange(Nx)[None, :]
         # DCT-II eigenfunction: cos(π(j+0.5)/N)
-        psi_exact = jnp.cos(jnp.pi * (j + 0.5) / Ny) * jnp.cos(
-            jnp.pi * (i + 0.5) / Nx
-        )
+        psi_exact = jnp.cos(jnp.pi * (j + 0.5) / Ny) * jnp.cos(jnp.pi * (i + 0.5) / Nx)
         lx1 = dct2_eigenvalues(Nx, dx)[1]
         ly1 = dct2_eigenvalues(Ny, dy)[1]
         rhs = (lx1 + ly1) * psi_exact
@@ -171,9 +169,7 @@ class TestSolveHelmholtzDCT:
         lam = -2.0
         j = jnp.arange(Ny)[:, None]
         i = jnp.arange(Nx)[None, :]
-        psi_exact = jnp.cos(jnp.pi * (j + 0.5) / Ny) * jnp.cos(
-            jnp.pi * (i + 0.5) / Nx
-        )
+        psi_exact = jnp.cos(jnp.pi * (j + 0.5) / Ny) * jnp.cos(jnp.pi * (i + 0.5) / Nx)
         lx1 = dct2_eigenvalues(Nx, dx)[1]
         ly1 = dct2_eigenvalues(Ny, dy)[1]
         rhs = (lx1 + ly1 - lam) * psi_exact
@@ -207,10 +203,9 @@ class TestSolvePoissonFFT:
         psi_exact = jnp.cos(2 * jnp.pi * i / Nx) + jnp.cos(2 * jnp.pi * j / Ny)
         lx1 = fft_eigenvalues(Nx, dx)[1]
         ly1 = fft_eigenvalues(Ny, dy)[1]
-        rhs = (
-            lx1 * jnp.cos(2 * jnp.pi * i / Nx) * jnp.ones((Ny, 1))
-            + ly1 * jnp.cos(2 * jnp.pi * j / Ny) * jnp.ones((1, Nx))
-        )
+        rhs = lx1 * jnp.cos(2 * jnp.pi * i / Nx) * jnp.ones((Ny, 1)) + ly1 * jnp.cos(
+            2 * jnp.pi * j / Ny
+        ) * jnp.ones((1, Nx))
         psi = solve_poisson_fft(rhs, dx, dy)
         np.testing.assert_allclose(np.array(psi), np.array(psi_exact), atol=1e-10)
 
@@ -236,10 +231,9 @@ class TestSolveHelmholtzFFT:
         psi_exact = jnp.cos(2 * jnp.pi * i / Nx) + jnp.cos(2 * jnp.pi * j / Ny)
         lx1 = fft_eigenvalues(Nx, dx)[1]
         ly1 = fft_eigenvalues(Ny, dy)[1]
-        rhs = (
-            (lx1 - lam) * jnp.cos(2 * jnp.pi * i / Nx) * jnp.ones((Ny, 1))
-            + (ly1 - lam) * jnp.cos(2 * jnp.pi * j / Ny) * jnp.ones((1, Nx))
-        )
+        rhs = (lx1 - lam) * jnp.cos(2 * jnp.pi * i / Nx) * jnp.ones((Ny, 1)) + (
+            ly1 - lam
+        ) * jnp.cos(2 * jnp.pi * j / Ny) * jnp.ones((1, Nx))
         psi = solve_helmholtz_fft(rhs, dx, dy, lambda_=lam)
         np.testing.assert_allclose(np.array(psi), np.array(psi_exact), atol=1e-10)
 
@@ -295,10 +289,9 @@ class TestSolveCG:
         psi_ref = jnp.cos(2 * jnp.pi * i / Nx) + jnp.cos(2 * jnp.pi * j / Ny)
         eigx = fft_eigenvalues(Nx, dx)
         eigy = fft_eigenvalues(Ny, dy)
-        rhs = (
-            (eigx[1] - lam) * jnp.cos(2 * jnp.pi * i / Nx) * jnp.ones((Ny, 1))
-            + (eigy[1] - lam) * jnp.cos(2 * jnp.pi * j / Ny) * jnp.ones((1, Nx))
-        )
+        rhs = (eigx[1] - lam) * jnp.cos(2 * jnp.pi * i / Nx) * jnp.ones((Ny, 1)) + (
+            eigy[1] - lam
+        ) * jnp.cos(2 * jnp.pi * j / Ny) * jnp.ones((1, Nx))
 
         def A(psi):
             eig2d = eigy[:, None] + eigx[None, :] - lam
@@ -340,7 +333,9 @@ class TestSolveCG:
 
         _, info_no_pre = solve_cg(A, rhs, rtol=1e-8, atol=1e-8, max_steps=200)
         M_inv = make_spectral_preconditioner(dx, dy, lambda_=lam, bc="fft")
-        _, info_pre = solve_cg(A, rhs, preconditioner=M_inv, rtol=1e-8, atol=1e-8, max_steps=200)
+        _, info_pre = solve_cg(
+            A, rhs, preconditioner=M_inv, rtol=1e-8, atol=1e-8, max_steps=200
+        )
         # Preconditioner should not make things worse
         assert info_pre.iterations <= info_no_pre.iterations + 5
 
@@ -356,11 +351,11 @@ class TestSolveCG:
             eig2d = eigy[:, None] + eigx[None, :] - lam
             return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
 
-        psi, info = solve_cg(A, rhs, preconditioner=None, rtol=1e-8, atol=1e-8)
+        _psi, info = solve_cg(A, rhs, preconditioner=None, rtol=1e-8, atol=1e-8)
         assert info.converged
 
     def test_make_spectral_preconditioner_invalid_bc(self, periodic_grid):
-        Ny, Nx, dx, dy = periodic_grid
+        _Ny, _Nx, dx, dy = periodic_grid
         with pytest.raises(ValueError, match="bc must be"):
             make_spectral_preconditioner(dx, dy, bc="invalid")
 
@@ -381,12 +376,11 @@ class TestMaskedLaplacian:
         lap_masked = masked_laplacian(psi, mask, dx, dy, lambda_=0.0)
         # Standard periodic Laplacian
         lap_std = (
-            (jnp.roll(psi, 1, axis=1) + jnp.roll(psi, -1, axis=1) - 2 * psi) / dx**2
-            + (jnp.roll(psi, 1, axis=0) + jnp.roll(psi, -1, axis=0) - 2 * psi) / dy**2
-        )
-        np.testing.assert_allclose(
-            np.array(lap_masked), np.array(lap_std), atol=1e-12
-        )
+            jnp.roll(psi, 1, axis=1) + jnp.roll(psi, -1, axis=1) - 2 * psi
+        ) / dx**2 + (
+            jnp.roll(psi, 1, axis=0) + jnp.roll(psi, -1, axis=0) - 2 * psi
+        ) / dy**2
+        np.testing.assert_allclose(np.array(lap_masked), np.array(lap_std), atol=1e-12)
 
     def test_zero_outside_mask(self, periodic_grid):
         """Output is zero where mask is zero."""

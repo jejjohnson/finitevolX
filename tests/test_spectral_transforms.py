@@ -26,7 +26,7 @@ _X6 = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
 
 
 # ---------------------------------------------------------------------------
-# DCT types I–IV: agreement with scipy
+# DCT types I-IV: agreement with scipy
 # ---------------------------------------------------------------------------
 
 
@@ -67,7 +67,7 @@ class TestDCTvsScipyType4:
 
 
 # ---------------------------------------------------------------------------
-# DST types I–IV: agreement with scipy
+# DST types I-IV: agreement with scipy
 # ---------------------------------------------------------------------------
 
 
@@ -85,17 +85,13 @@ def test_dst_vs_scipy(t):
 @pytest.mark.parametrize("t", [1, 2, 3, 4])
 def test_idct_roundtrip(t):
     x = jnp.array(_X4)
-    np.testing.assert_allclose(
-        np.array(idct(dct(x, type=t), type=t)), _X4, atol=1e-10
-    )
+    np.testing.assert_allclose(np.array(idct(dct(x, type=t), type=t)), _X4, atol=1e-10)
 
 
 @pytest.mark.parametrize("t", [1, 2, 3, 4])
 def test_idst_roundtrip(t):
     x = jnp.array(_X4)
-    np.testing.assert_allclose(
-        np.array(idst(dst(x, type=t), type=t)), _X4, atol=1e-10
-    )
+    np.testing.assert_allclose(np.array(idst(dst(x, type=t), type=t)), _X4, atol=1e-10)
 
 
 # ---------------------------------------------------------------------------
