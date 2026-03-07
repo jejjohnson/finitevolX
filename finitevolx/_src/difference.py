@@ -189,6 +189,46 @@ class Difference2D(eqx.Module):
         out = out.at[1:-1, 1:-1].set((v[1:-1, 2:] - v[1:-1, 1:-1]) / self.grid.dx)
         return out
 
+    def diff_y_X_to_U(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+        """Backward y-difference: X-point -> U-point.
+
+        dq_dy[j, i+1/2] = (q[j+1/2, i+1/2] - q[j-1/2, i+1/2]) / dy
+
+        Parameters
+        ----------
+        q : Float[Array, "Ny Nx"]
+            Scalar field at X-points.
+
+        Returns
+        -------
+        Float[Array, "Ny Nx"]
+            Backward y-difference at U-points.
+        """
+        out = jnp.zeros_like(q)
+        # dq_dy[j, i+1/2] = (q[j+1/2, i+1/2] - q[j-1/2, i+1/2]) / dy
+        out = out.at[1:-1, 1:-1].set((q[1:-1, 1:-1] - q[:-2, 1:-1]) / self.grid.dy)
+        return out
+
+    def diff_x_X_to_V(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+        """Backward x-difference: X-point -> V-point.
+
+        dq_dx[j+1/2, i] = (q[j+1/2, i+1/2] - q[j+1/2, i-1/2]) / dx
+
+        Parameters
+        ----------
+        q : Float[Array, "Ny Nx"]
+            Scalar field at X-points.
+
+        Returns
+        -------
+        Float[Array, "Ny Nx"]
+            Backward x-difference at V-points.
+        """
+        out = jnp.zeros_like(q)
+        # dq_dx[j+1/2, i] = (q[j+1/2, i+1/2] - q[j+1/2, i-1/2]) / dx
+        out = out.at[1:-1, 1:-1].set((q[1:-1, 1:-1] - q[1:-1, :-2]) / self.grid.dx)
+        return out
+
     # ------------------------------------------------------------------
     # Backward differences
     # ------------------------------------------------------------------

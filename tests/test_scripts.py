@@ -4,8 +4,11 @@ import importlib.util
 from pathlib import Path
 import sys
 
+import jax.numpy as jnp
 import numpy as np
 import pytest
+
+from finitevolx import ArakawaCGrid2D, Difference2D, Interpolation2D, enforce_periodic
 
 xr = pytest.importorskip("xarray")
 pytest.importorskip("zarr")
@@ -42,6 +45,14 @@ def load_script_module(module_name: str, script_name: str):
     return module
 
 
+def checkerboard_metric(field: np.ndarray) -> float:
+    """Return the normalized amplitude of the 2-D Nyquist checkerboard mode."""
+    y_index, x_index = np.indices(field.shape)
+    checker = (-1.0) ** (x_index + y_index)
+    rms = np.sqrt(np.mean(field**2))
+    return float(np.abs(np.mean(field * checker)) / (rms + 1.0e-30))
+
+
 def test_linear_shallow_water_script_runs_stably(tmp_path: Path) -> None:
     """The linear shallow-water example should save finite, bounded output."""
     module = load_script_module("swm_linear_script", "swm_linear.py")
@@ -68,6 +79,8 @@ def test_linear_shallow_water_script_runs_stably(tmp_path: Path) -> None:
     assert np.isfinite(relative_vorticity).all()
     assert np.max(np.abs(eta)) < 0.1
     assert np.max(speed) < 0.01
+    assert checkerboard_metric(eta[-1]) < 1.0e-2
+    assert checkerboard_metric(relative_vorticity[-1]) < 1.0e-2
 
 
 def test_nonlinear_shallow_water_script_runs_stably(tmp_path: Path) -> None:
@@ -126,7 +139,34 @@ def test_qg_script_runs_stably(tmp_path: Path) -> None:
     assert np.isfinite(relative_vorticity).all()
     assert np.max(np.abs(q)) < 2.0e-3
     assert np.max(np.abs(psi)) < 1.0e6
+    assert checkerboard_metric(relative_vorticity[-1]) < 1.0e-2
     # The QG example uses a deterministic sinusoidal initial condition and
     # steady double-gyre forcing, so the relative-vorticity variability should
     # increase during the short smoke-test integration.
     assert np.std(relative_vorticity[-1]) > np.std(relative_vorticity[0])
+
+
+def test_qg_geostrophic_velocity_helper_is_nearly_nondivergent() -> None:
+    """The QG streamfunction-to-velocity mapping should preserve incompressibility."""
+    module = load_script_module("qg_velocity_script", "qg_1p5_layer.py")
+    config = module.QuasiGeostrophicConfig(nx=16, ny=16)
+    grid = ArakawaCGrid2D.from_interior(config.nx, config.ny, config.Lx, config.Ly)
+    diff = Difference2D(grid=grid)
+    interp = Interpolation2D(grid=grid)
+
+    x = (np.arange(config.nx) + 0.5) * grid.dx
+    y = (np.arange(config.ny) + 0.5) * grid.dy
+    x2d, y2d = np.meshgrid(x, y)
+    psi_interior = np.sin(2.0 * np.pi * x2d / config.Lx) * np.sin(
+        2.0 * np.pi * y2d / config.Ly
+    )
+    psi_field = enforce_periodic(
+        jnp.pad(jnp.asarray(psi_interior), pad_width=1, mode="wrap")
+    )
+
+    u_field, v_field = module.geostrophic_velocity_from_streamfunction(
+        psi_field, diff, interp
+    )
+    divergence = diff.divergence(u_field, v_field)
+
+    np.testing.assert_allclose(divergence[1:-1, 1:-1], 0.0, atol=1e-12)

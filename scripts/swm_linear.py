@@ -332,10 +332,8 @@ def run_simulation(config: LinearShallowWaterConfig | None = None) -> xr.Dataset
         eta_rhs = -mean_depth * diff.divergence(u_field, v_field)
         eta_rhs = eta_rhs + viscosity * diff.laplacian(eta_field)
 
-        u_on_t = interp.U_to_T(u_field)
-        v_on_t = interp.V_to_T(v_field)
-        v_on_u = interp.T_to_U(v_on_t)
-        u_on_v = interp.T_to_V(u_on_t)
+        v_on_u = interp.V_to_U(v_field)
+        u_on_v = interp.U_to_V(u_field)
         coriolis_on_u = interp.T_to_U(coriolis)
         coriolis_on_v = interp.T_to_V(coriolis)
 

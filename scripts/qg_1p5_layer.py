@@ -60,6 +60,39 @@ def to_periodic_field(field: xr.DataArray) -> Array:
     return enforce_periodic(jnp.pad(interior, pad_width=1, mode="wrap"))
 
 
+def geostrophic_velocity_from_streamfunction(
+    psi_field: Array,
+    diff: Difference2D,
+    interp: Interpolation2D,
+) -> tuple[Array, Array]:
+    """Map a T-point streamfunction to face-centred geostrophic velocities.
+
+    The streamfunction is first averaged to X-points so that the orthogonal
+    derivatives land directly on the U and V faces:
+
+    - u[j, i+1/2] = -(ψ[j+1/2, i+1/2] - ψ[j-1/2, i+1/2]) / dy
+    - v[j+1/2, i] =  (ψ[j+1/2, i+1/2] - ψ[j+1/2, i-1/2]) / dx
+
+    Parameters
+    ----------
+    psi_field : Array
+        Streamfunction stored at T-points with one ghost-cell ring.
+    diff : Difference2D
+        Difference operators for the active grid.
+    interp : Interpolation2D
+        Interpolation operators for the active grid.
+
+    Returns
+    -------
+    tuple[Array, Array]
+        The zonal and meridional velocities on U and V points.
+    """
+    psi_on_x = interp.T_to_X(psi_field)
+    u_field = -diff.diff_y_X_to_U(psi_on_x)
+    v_field = diff.diff_x_X_to_V(psi_on_x)
+    return u_field, v_field
+
+
 def save_comparison_plot(
     dataset: xr.Dataset,
     figure_path: Path,
@@ -284,18 +317,12 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
         psi_field = psi_field.at[1:-1, 1:-1].set(psi_interior)
         return enforce_periodic(psi_field)
 
-    def geostrophic_velocity(psi_field: Array) -> tuple[Array, Array]:
-        """Map the streamfunction to face-centred geostrophic velocities."""
-        psi_x_center = interp.U_to_T(diff.diff_x_T_to_U(psi_field))
-        psi_y_center = interp.V_to_T(diff.diff_y_T_to_V(psi_field))
-        u_field = interp.T_to_U(-psi_y_center)
-        v_field = interp.T_to_V(psi_x_center)
-        return u_field, v_field
-
     def tendency(q_field: Array) -> tuple[Array, Array, Array, Array]:
         """Compute the QG PV tendency and the diagnosed balanced state."""
         psi_field = invert_streamfunction(q_field)
-        u_field, v_field = geostrophic_velocity(psi_field)
+        u_field, v_field = geostrophic_velocity_from_streamfunction(
+            psi_field, diff, interp
+        )
         q_rhs = adv(q_field, u_field, v_field, method="upwind1")
         q_rhs = q_rhs + wind_curl - drag * q_field + viscosity * diff.laplacian(q_field)
         return q_rhs, psi_field, u_field, v_field
@@ -308,11 +335,13 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
         k2_q, _, _, _ = tendency(q_stage)
         q_next = enforce_periodic(q_field + 0.5 * dt * (k1_q + k2_q))
         psi_next = invert_streamfunction(q_next)
-        u_next, v_next = geostrophic_velocity(psi_next)
+        u_next, v_next = geostrophic_velocity_from_streamfunction(
+            psi_next, diff, interp
+        )
         return q_next, psi_next, u_next, v_next
 
     psi = invert_streamfunction(q)
-    u, v = geostrophic_velocity(psi)
+    u, v = geostrophic_velocity_from_streamfunction(psi, diff, interp)
 
     snapshot_times: list[float] = []
     q_snapshots: list[np.ndarray] = []
