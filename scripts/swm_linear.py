@@ -455,6 +455,7 @@ def run_simulation(config: LinearShallowWaterConfig | None = None) -> xr.Dataset
 def parse_args() -> LinearShallowWaterConfig:
     """Parse the command line for the linear shallow-water example."""
     parser = argparse.ArgumentParser(description=__doc__)
+    defaults = LinearShallowWaterConfig()
     parser.add_argument(
         "--output-dir",
         type=Path,
@@ -464,20 +465,20 @@ def parse_args() -> LinearShallowWaterConfig:
     parser.add_argument(
         "--steps",
         type=int,
-        default=LinearShallowWaterConfig.steps,
+        default=defaults.steps,
         help="Number of explicit time steps to integrate.",
     )
     parser.add_argument(
         "--snapshot-interval",
         type=int,
-        default=LinearShallowWaterConfig.snapshot_interval,
+        default=defaults.snapshot_interval,
         help="Number of steps between sampled outputs.",
     )
     args = parser.parse_args()
 
     if args.output_dir is None:
-        zarr_path = LinearShallowWaterConfig.zarr_path
-        figure_path = LinearShallowWaterConfig.figure_path
+        zarr_path = defaults.zarr_path
+        figure_path = defaults.figure_path
     else:
         zarr_path = args.output_dir / "linear_shallow_water_double_gyre.zarr"
         figure_path = args.output_dir / "linear_shallow_water_double_gyre.png"

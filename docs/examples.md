@@ -30,7 +30,7 @@ Use `--output-dir` to choose a different location for the artifacts.
 
 ## Linear shallow-water model
 
-Script: [`scripts/swm_linear.py`](https://github.com/jejjohnson/finitevolX/blob/main/scripts/swm_linear.py)
+Script: `scripts/swm_linear.py`
 
 - Periodic beta-plane, double-gyre wind forcing
 - Linearised momentum and mass equations
@@ -41,7 +41,7 @@ Script: [`scripts/swm_linear.py`](https://github.com/jejjohnson/finitevolX/blob/
 
 ## Nonlinear shallow-water model
 
-Script: [`scripts/shallow_water.py`](https://github.com/jejjohnson/finitevolX/blob/main/scripts/shallow_water.py)
+Script: `scripts/shallow_water.py`
 
 - Periodic beta-plane, double-gyre wind forcing
 - Nonlinear continuity equation with total depth `H + eta`
@@ -52,7 +52,7 @@ Script: [`scripts/shallow_water.py`](https://github.com/jejjohnson/finitevolX/bl
 
 ## 1.5-layer QG model
 
-Script: [`scripts/qg_1p5_layer.py`](https://github.com/jejjohnson/finitevolX/blob/main/scripts/qg_1p5_layer.py)
+Script: `scripts/qg_1p5_layer.py`
 
 - Periodic beta-plane, double-gyre wind-curl forcing
 - Potential-vorticity advection with `Advection2D`

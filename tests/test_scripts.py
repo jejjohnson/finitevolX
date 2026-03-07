@@ -16,7 +16,20 @@ SCRIPTS_DIR = REPO_ROOT / "scripts"
 
 
 def load_script_module(module_name: str, script_name: str):
-    """Load a script as a Python module for smoke testing."""
+    """Load a script as an importable module for smoke testing.
+
+    Parameters
+    ----------
+    module_name : str
+        Synthetic module name used for the import.
+    script_name : str
+        File name of the script inside ``scripts/``.
+
+    Returns
+    -------
+    module
+        Imported Python module corresponding to the requested script.
+    """
     script_path = SCRIPTS_DIR / script_name
     spec = importlib.util.spec_from_file_location(module_name, script_path)
     if spec is None or spec.loader is None:

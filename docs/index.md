@@ -66,9 +66,9 @@ See the `scripts/` directory for complete double-gyre examples that all use the
 current class-based API and save sampled fields to Zarr instead of opening live
 plots:
 
-- [`scripts/swm_linear.py`](https://github.com/jejjohnson/finitevolX/blob/main/scripts/swm_linear.py) - Linear shallow-water model
-- [`scripts/shallow_water.py`](https://github.com/jejjohnson/finitevolX/blob/main/scripts/shallow_water.py) - Nonlinear shallow-water model
-- [`scripts/qg_1p5_layer.py`](https://github.com/jejjohnson/finitevolX/blob/main/scripts/qg_1p5_layer.py) - 1.5-layer quasi-geostrophic model
+- `scripts/swm_linear.py` - Linear shallow-water model
+- `scripts/shallow_water.py` - Nonlinear shallow-water model
+- `scripts/qg_1p5_layer.py` - 1.5-layer quasi-geostrophic model
 
 The [Examples page](examples.md) shows the saved before/after figures and the
 artifacts written by each script.

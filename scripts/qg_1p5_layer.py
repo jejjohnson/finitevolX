@@ -413,6 +413,7 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
 def parse_args() -> QuasiGeostrophicConfig:
     """Parse the command line for the QG example."""
     parser = argparse.ArgumentParser(description=__doc__)
+    defaults = QuasiGeostrophicConfig()
     parser.add_argument(
         "--output-dir",
         type=Path,
@@ -422,20 +423,20 @@ def parse_args() -> QuasiGeostrophicConfig:
     parser.add_argument(
         "--steps",
         type=int,
-        default=QuasiGeostrophicConfig.steps,
+        default=defaults.steps,
         help="Number of explicit time steps to integrate.",
     )
     parser.add_argument(
         "--snapshot-interval",
         type=int,
-        default=QuasiGeostrophicConfig.snapshot_interval,
+        default=defaults.snapshot_interval,
         help="Number of steps between sampled outputs.",
     )
     args = parser.parse_args()
 
     if args.output_dir is None:
-        zarr_path = QuasiGeostrophicConfig.zarr_path
-        figure_path = QuasiGeostrophicConfig.figure_path
+        zarr_path = defaults.zarr_path
+        figure_path = defaults.figure_path
     else:
         zarr_path = args.output_dir / "qg_1p5_layer_double_gyre.zarr"
         figure_path = args.output_dir / "qg_1p5_layer_double_gyre.png"
