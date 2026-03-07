@@ -65,7 +65,8 @@ Script: `scripts/qg_1p5_layer.py`
 
 ## Stability checks
 
-The repository test suite includes smoke tests that run all three scripts on small
-grids, reopen the generated Zarr stores, and check that the saved fields remain
-finite and within expected ranges. These tests complement the longer manual runs
-used to generate the figures shown above.
+The repository test suite installs the script dependencies through the `test`
+extra and runs smoke tests that execute all three scripts on small grids,
+reopen the generated Zarr stores, and check that the saved fields remain finite
+and within expected ranges. These automated checks complement the longer manual
+runs used to generate the figures shown above.

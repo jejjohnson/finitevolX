@@ -526,11 +526,14 @@ examples = [
 ]
 test = [
     { name = "coverage" },
+    { name = "matplotlib" },
     { name = "networkx" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-pretty" },
     { name = "pytest-xdist" },
+    { name = "xarray" },
+    { name = "zarr" },
 ]
 
 [package.dev-dependencies]
@@ -551,6 +554,7 @@ requires-dist = [
     { name = "lineax", specifier = ">=0.1.0" },
     { name = "loguru", marker = "extra == 'examples'", specifier = ">=0.7.2" },
     { name = "matplotlib", marker = "extra == 'examples'", specifier = ">=3.9.0" },
+    { name = "matplotlib", marker = "extra == 'test'", specifier = ">=3.9.0" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6.0" },
     { name = "mkdocs-jupyter", marker = "extra == 'docs'", specifier = ">=0.24.0" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },
@@ -568,7 +572,9 @@ requires-dist = [
     { name = "tqdm", marker = "extra == 'examples'", specifier = ">=4.66.0" },
     { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.19" },
     { name = "xarray", marker = "extra == 'examples'", specifier = ">=2024.6.0" },
+    { name = "xarray", marker = "extra == 'test'", specifier = ">=2024.6.0" },
     { name = "zarr", marker = "extra == 'examples'", specifier = ">=3.1.5" },
+    { name = "zarr", marker = "extra == 'test'", specifier = ">=3.1.5" },
 ]
 provides-extras = ["test", "dev", "examples", "docs"]
 
