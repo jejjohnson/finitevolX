@@ -558,11 +558,11 @@ def solve_cg(
     sol = lx.linear_solve(operator, rhs, solver=solver, options=options)
 
     x_out = sol.value
-    res_norm = float(jnp.sqrt(jnp.sum((matvec(x_out) - rhs) ** 2)))
+    res_norm = jnp.linalg.norm(matvec(x_out) - rhs)
     info = CGInfo(
-        iterations=int(sol.stats["num_steps"]),
+        iterations=sol.stats["num_steps"],
         residual_norm=res_norm,
-        converged=bool(sol.result == lx.RESULTS.successful),
+        converged=sol.result == lx.RESULTS.successful,
     )
     return x_out, info
 
