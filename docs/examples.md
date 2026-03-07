@@ -54,9 +54,9 @@ Script: `scripts/shallow_water.py`
 
 Script: `scripts/qg_1p5_layer.py`
 
-- Periodic beta-plane, double-gyre wind-curl forcing
+- Closed-basin Atlantic-style double-gyre (no-normal-flow solid walls, ψ = 0)
 - Potential-vorticity advection with `Advection2D`
-- Streamfunction inversion through `solve_helmholtz_fft`
+- Streamfunction inversion through `solve_helmholtz_dst` (homogeneous Dirichlet BCs)
 - Basin-scale defaults tuned toward the MQGeometry double-gyre benchmark (`Lx = Ly = 5120 km`, `f0 = 9.375e-5 s^-1`, `beta = 1.754e-11 m^-1 s^-1`)
 - Saved figure shows **relative vorticity** rather than streamfunction so the eddy field matches the expected diagnostic
 - Zarr output fields: `q`, `psi`, `u`, `v`, `speed`, `relative_vorticity`, `pv_enstrophy`
