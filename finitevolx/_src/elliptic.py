@@ -79,9 +79,9 @@ from collections.abc import Callable
 from typing import NamedTuple
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
+import lineax as lx
 import numpy as np
 
 from finitevolx._src.spectral_transforms import dctn, dstn, idctn, idstn
@@ -443,9 +443,9 @@ class CGInfo(NamedTuple):
     iterations: int
     """Number of PCG iterations performed."""
     residual_norm: float
-    """L2 norm of the final residual."""
+    """L2 norm of the final residual ``A(x) - rhs``."""
     converged: bool
-    """True if the solver converged within *tol*."""
+    """True if the solver converged within the requested tolerances."""
 
 
 def solve_cg(
@@ -453,8 +453,9 @@ def solve_cg(
     rhs: Float[Array, ...],
     x0: Float[Array, ...] | None = None,
     preconditioner: Callable[[Float[Array, ...]], Float[Array, ...]] | None = None,
-    tol: float = 1e-6,
-    maxiter: int = 500,
+    rtol: float = 1e-6,
+    atol: float = 1e-6,
+    max_steps: int | None = 500,
 ) -> tuple[Float[Array, ...], CGInfo]:
     """Preconditioned Conjugate Gradient solver for symmetric linear operators.
 
@@ -462,46 +463,39 @@ def solve_cg(
     operator ``A``.  The operator need not be explicitly formed; only
     matrix-vector products are required.
 
-    The iteration is implemented via ``jax.lax.while_loop``, making the
-    entire solve JIT-compilable and differentiable through unrolling.
+    The solve is delegated to :class:`lineax.CG`, which provides a
+    numerically stabilised PCG implementation with periodic residual
+    recomputation to guard against floating-point drift.
 
-    Algorithm (standard PCG):
-
-    .. code-block:: text
-
-        r = rhs − A(x₀)
-        z = M⁻¹(r),  p = z,  ρ = ⟨r, z⟩
-        for k = 0, 1, …:
-            Ap = A(p)
-            α  = ρ / ⟨p, Ap⟩
-            x  = x + α p
-            r  = r − α Ap
-            z  = M⁻¹(r)
-            ρ′ = ⟨r, z⟩
-            β  = ρ′ / ρ
-            p  = z + β p
-            ρ  = ρ′
-            if ‖r‖₂ < tol: break
+    The operator ``A`` is assumed to be *negative definite*, which is
+    the case for the Helmholtz operator ``(nabla^2 - lambda)`` when
+    ``lambda > 0``.  Note that ``lambda < 0`` yields an indefinite operator
+    and will cause CG to fail; use ``lambda = 0`` only if the operator is
+    strictly negative semidefinite via the mask (e.g. the masked Laplacian
+    with homogeneous Dirichlet BCs on a non-trivial domain).
+    The preconditioner, if supplied, should approximate ``A^{-1}``
+    (the negative-definite inverse).  The required sign-flip for
+    ``lineax.CG`` is handled internally.
 
     Parameters
     ----------
     matvec : callable
         Function implementing the symmetric linear operator ``A``.
-        Signature: ``matvec(x: Array) -> Array``.  The input and output
-        arrays must have the same shape as *rhs*.
+        Signature: ``matvec(x: Array) -> Array``.
     rhs : Float[Array, "..."]
         Right-hand side of the linear system.
     x0 : Float[Array, "..."] or None
-        Initial guess.  Defaults to zeros with the same shape as *rhs*.
+        Initial guess.  Defaults to zeros.
     preconditioner : callable or None
-        Approximate inverse of ``A`` used to accelerate convergence.
+        Optional approximate inverse of ``A``.
         Signature: ``preconditioner(r: Array) -> Array``.
-        Defaults to the identity (i.e., no preconditioning).
-    tol : float
-        Convergence tolerance.  Iteration stops when ``‖r‖₂ < tol``.
-        Default: 1e-6.
-    maxiter : int
-        Maximum number of iterations.  Default: 500.
+        When ``None``, no preconditioning is applied (identity).
+    rtol : float
+        Relative convergence tolerance.  Default: 1e-6.
+    atol : float
+        Absolute convergence tolerance.  Default: 1e-6.
+    max_steps : int or None
+        Maximum CG iterations.  ``None`` means unlimited.  Default: 500.
 
     Returns
     -------
@@ -513,80 +507,62 @@ def solve_cg(
 
     Examples
     --------
-    Solve the 2-D Poisson equation on a periodic domain as a sanity-check:
+    Solve a 2-D Helmholtz problem on a periodic domain:
 
     >>> import jax.numpy as jnp
-    >>> from finitevolx._src.elliptic import solve_cg, solve_poisson_fft
+    >>> from finitevolx._src.elliptic import (
+    ...     solve_cg,
+    ...     fft_eigenvalues,
+    ...     make_spectral_preconditioner,
+    ... )
     >>> Ny, Nx = 8, 10
-    >>> dx, dy = 2 * jnp.pi / Nx, 2 * jnp.pi / Ny
-    >>> lam = -1.0
+    >>> dx, dy = float(2 * jnp.pi / Nx), float(2 * jnp.pi / Ny)
+    >>> lam = 1.0  # lam > 0 makes (nabla^2 - lam) negative definite
+    >>> eigx = fft_eigenvalues(Nx, dx)
+    ... eigy = fft_eigenvalues(Ny, dy)
+    >>> def A(x):
+    ...     return jnp.real(
+    ...         jnp.fft.ifft2((eigy[:, None] + eigx[None, :] - lam) * jnp.fft.fft2(x))
+    ...     )
     >>> i = jnp.arange(Nx)[None, :]
     ... j = jnp.arange(Ny)[:, None]
     >>> psi_ref = jnp.cos(2 * jnp.pi * i / Nx) + jnp.cos(2 * jnp.pi * j / Ny)
-    >>> from finitevolx._src.elliptic import fft_eigenvalues
-    >>> rhs = (
-    ...     fft_eigenvalues(Nx, float(dx))[1]
-    ...     * jnp.cos(2 * jnp.pi * i / Nx)
-    ...     * jnp.ones((Ny, 1))
-    ...     + fft_eigenvalues(Ny, float(dy))[1]
-    ...     * jnp.cos(2 * jnp.pi * j / Ny)
-    ...     * jnp.ones((1, Nx))
-    ...     - lam * psi_ref
-    ... )
-    >>> def A(x):
-    ...     return jnp.real(
-    ...         jnp.fft.ifft2(
-    ...             (
-    ...                 fft_eigenvalues(Nx, float(dx))[None, :]
-    ...                 + fft_eigenvalues(Ny, float(dy))[:, None]
-    ...                 - lam
-    ...             )
-    ...             * jnp.fft.fft2(x)
-    ...         )
-    ...     )
-    >>> psi, info = solve_cg(A, rhs, tol=1e-8)
+    >>> rhs = A(psi_ref)
+    >>> M_inv = make_spectral_preconditioner(dx, dy, lambda_=lam, bc="fft")
+    >>> psi, info = solve_cg(A, rhs, preconditioner=M_inv)
     >>> info.converged
     True
     """
-    if x0 is None:
-        x0 = jnp.zeros_like(rhs)
-    if preconditioner is None:
-        preconditioner = lambda z: z
+    zero = jnp.zeros_like(rhs)
+    # Tag as NSD; caller is responsible for ensuring A is actually negative (semi)definite.
+    operator = lx.FunctionLinearOperator(
+        matvec, zero, tags=[lx.negative_semidefinite_tag]
+    )
+    solver = lx.CG(rtol=rtol, atol=atol, max_steps=max_steps)
 
-    def _inner(a: Array, b: Array) -> Array:
-        return jnp.sum(a * b)
+    options: dict = {}
+    if x0 is not None:
+        options["y0"] = x0
+    if preconditioner is not None:
+        # lineax CG internally negates the NSD operator to make it positive, so it
+        # expects a preconditioner that approximates (-A)^{-1} = -A^{-1} (positive).
+        # The caller's `preconditioner` approximates A^{-1} (negative), so we negate
+        # it here; this is transparent to the caller.
+        def _lx_precond(r: Array) -> Array:
+            return -preconditioner(r)  # negate: maps caller's A^{-1} -> (-A)^{-1}
 
-    r0 = rhs - matvec(x0)
-    z0 = preconditioner(r0)
-    p0 = z0
-    rz0 = _inner(r0, z0)
+        options["preconditioner"] = lx.FunctionLinearOperator(
+            _lx_precond, zero, tags=[lx.positive_semidefinite_tag]
+        )
 
-    # State: (x, r, p, z, rz, k)
-    init_state = (x0, r0, p0, z0, rz0, jnp.int32(0))
+    sol = lx.linear_solve(operator, rhs, solver=solver, options=options)
 
-    def cond_fn(state: tuple) -> Array:
-        _x, r, _p, _z, _rz, k = state
-        return (k < maxiter) & (jnp.sqrt(_inner(r, r)) > tol)
-
-    def body_fn(state: tuple) -> tuple:
-        x, r, p, _z, rz, k = state
-        Ap = matvec(p)
-        pAp = _inner(p, Ap)
-        alpha = rz / pAp
-        x_new = x + alpha * p
-        r_new = r - alpha * Ap
-        z_new = preconditioner(r_new)
-        rz_new = _inner(r_new, z_new)
-        beta = rz_new / rz
-        p_new = z_new + beta * p
-        return (x_new, r_new, p_new, z_new, rz_new, k + 1)
-
-    x_out, r_out, _p, _z, _rz, k_out = jax.lax.while_loop(cond_fn, body_fn, init_state)
-    res_norm = jnp.sqrt(_inner(r_out, r_out))
+    x_out = sol.value
+    res_norm = float(jnp.sqrt(jnp.sum((matvec(x_out) - rhs) ** 2)))
     info = CGInfo(
-        iterations=int(k_out),
-        residual_norm=float(res_norm),
-        converged=bool(res_norm <= tol),
+        iterations=int(sol.stats["num_steps"]),
+        residual_norm=res_norm,
+        converged=bool(sol.result == lx.RESULTS.successful),
     )
     return x_out, info
 

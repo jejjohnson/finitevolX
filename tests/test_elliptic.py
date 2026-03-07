@@ -263,7 +263,9 @@ class TestSolveCG:
     def test_helmholtz_fft_exact(self, periodic_grid):
         """CG with spectral preconditioner solves Helmholtz on periodic grid."""
         Ny, Nx, dx, dy = periodic_grid
-        lam = -1.0
+        # lam > 0 makes (nabla^2 - lam) negative definite, as required by lineax.CG
+        # for NSD operators.
+        lam = 1.0
         j = jnp.arange(Ny)[:, None]
         i = jnp.arange(Nx)[None, :]
         psi_ref = jnp.cos(2 * jnp.pi * i / Nx) + jnp.cos(2 * jnp.pi * j / Ny)
@@ -279,13 +281,13 @@ class TestSolveCG:
             return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
 
         M_inv = make_spectral_preconditioner(dx, dy, lambda_=lam, bc="fft")
-        psi, info = solve_cg(A, rhs, preconditioner=M_inv, tol=1e-10)
+        psi, info = solve_cg(A, rhs, preconditioner=M_inv, rtol=1e-10, atol=1e-10)
         assert info.converged
         np.testing.assert_allclose(np.array(psi), np.array(psi_ref), atol=1e-8)
 
     def test_returns_cg_info(self, periodic_grid):
         Ny, Nx, dx, dy = periodic_grid
-        lam = -1.0
+        lam = 1.0  # lam > 0 → negative definite Helmholtz operator
         eigx = fft_eigenvalues(Nx, dx)
         eigy = fft_eigenvalues(Ny, dy)
 
@@ -293,7 +295,7 @@ class TestSolveCG:
             eig2d = eigy[:, None] + eigx[None, :] - lam
             return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
 
-        _, info = solve_cg(A, jnp.ones((Ny, Nx)), tol=1e-6)
+        _, info = solve_cg(A, jnp.ones((Ny, Nx)), rtol=1e-6, atol=1e-6)
         assert isinstance(info, CGInfo)
         assert info.iterations >= 0
         assert info.residual_norm >= 0.0
@@ -301,7 +303,7 @@ class TestSolveCG:
     def test_preconditioner_reduces_iterations(self, periodic_grid):
         """Spectral preconditioner should not require more iters than unpreconditioned."""
         Ny, Nx, dx, dy = periodic_grid
-        lam = -1.0
+        lam = 1.0  # lam > 0 → negative definite Helmholtz operator
         eigx = fft_eigenvalues(Nx, dx)
         eigy = fft_eigenvalues(Ny, dy)
         rhs = jnp.sin(jnp.arange(Ny, dtype=float)[:, None] / Ny) * jnp.cos(
@@ -312,16 +314,16 @@ class TestSolveCG:
             eig2d = eigy[:, None] + eigx[None, :] - lam
             return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
 
-        _, info_no_pre = solve_cg(A, rhs, tol=1e-8, maxiter=200)
+        _, info_no_pre = solve_cg(A, rhs, rtol=1e-8, atol=1e-8, max_steps=200)
         M_inv = make_spectral_preconditioner(dx, dy, lambda_=lam, bc="fft")
-        _, info_pre = solve_cg(A, rhs, preconditioner=M_inv, tol=1e-8, maxiter=200)
+        _, info_pre = solve_cg(A, rhs, preconditioner=M_inv, rtol=1e-8, atol=1e-8, max_steps=200)
         # Preconditioner should not make things worse
         assert info_pre.iterations <= info_no_pre.iterations + 5
 
     def test_identity_preconditioner(self, periodic_grid):
         """None preconditioner (identity) still converges."""
         Ny, Nx, dx, dy = periodic_grid
-        lam = -1.0
+        lam = 1.0  # lam > 0 → negative definite Helmholtz operator
         eigx = fft_eigenvalues(Nx, dx)
         eigy = fft_eigenvalues(Ny, dy)
         rhs = jnp.ones((Ny, Nx))
@@ -330,7 +332,7 @@ class TestSolveCG:
             eig2d = eigy[:, None] + eigx[None, :] - lam
             return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
 
-        psi, info = solve_cg(A, rhs, preconditioner=None, tol=1e-8)
+        psi, info = solve_cg(A, rhs, preconditioner=None, rtol=1e-8, atol=1e-8)
         assert info.converged
 
     def test_make_spectral_preconditioner_invalid_bc(self, periodic_grid):

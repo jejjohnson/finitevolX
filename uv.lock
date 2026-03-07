@@ -485,6 +485,7 @@ dependencies = [
     { name = "jax" },
     { name = "jaxlib" },
     { name = "jaxtyping" },
+    { name = "lineax" },
     { name = "scipy" },
 ]
 
@@ -534,6 +535,7 @@ requires-dist = [
     { name = "jax", specifier = ">=0.4.30" },
     { name = "jaxlib", specifier = ">=0.4.30" },
     { name = "jaxtyping", specifier = ">=0.2.28" },
+    { name = "lineax", specifier = ">=0.1.0" },
     { name = "loguru", marker = "extra == 'examples'", specifier = ">=0.7.2" },
     { name = "matplotlib", marker = "extra == 'examples'", specifier = ">=3.9.0" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6.0" },
