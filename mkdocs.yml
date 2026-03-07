@@ -42,6 +42,7 @@ plugins:
 
 nav:
   - Home: index.md
+  - Examples: examples.md
   - API Reference: api/reference.md
   - Changelog: CHANGELOG.md
 

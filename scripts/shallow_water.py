@@ -1,170 +1,473 @@
+from __future__ import annotations
+
+"""Nonlinear shallow-water double-gyre example.
+
+This script modernises the old nonlinear shallow-water example so that it uses the
+current :mod:`finitevolx` API throughout. The model is driven by the same
+double-gyre wind stress pattern as the linear case, but the mass equation uses the
+full layer thickness and the momentum equation includes a compact nonlinear
+Bernoulli/advection closure. ``xarray`` handles the coordinate-aware forcing and
+saved diagnostics, and the sampled fields are written to Zarr instead of being
+shown in a live plot.
+
+The nonlinear model integrates
+
+- ∂η/∂t = -∇·((H + η) u⃗) + nu ∇²eta
+- ∂u/∂t = -∂B/∂x - u⃗·∇u + f v - r u + nu ∇²u + Fₓ
+- ∂v/∂t = -∂B/∂y - u⃗·∇v - f u - r v + nu ∇²v
+
+with the Bernoulli function ``B = g η + 1/2 (u² + v²)``.
+
+Examples
+--------
+Run the default experiment and save the outputs::
+
+    uv run python scripts/shallow_water.py
+
+Run a shorter debug case in a temporary directory::
+
+    uv run python scripts/shallow_water.py --steps 300 --output-dir /tmp/nonlinear-swe
 """
-Shallow Water Equations (SWE) example using finitevolX.
 
-Demonstrates the usage of finitevolX operators for a rotating shallow water
-model on an Arakawa C-grid.
-
-Equations (non-linear SWE)
---------------------------
-  dh/dt = -div(h * u_vec)
-  du/dt = -g * dh_dx + q * h * v   (PV flux form)
-  dv/dt = -g * dh_dy - q * h * u   (PV flux form)
-
-where q = (zeta + f) / h is the potential vorticity.
-
-Usage
------
-  python scripts/shallow_water.py
-"""
+import argparse
+from dataclasses import dataclass
+from pathlib import Path
 
 import jax
+from jax import Array
 import jax.numpy as jnp
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+import xarray as xr
 
 from finitevolx import (
     Advection2D,
     ArakawaCGrid2D,
     Difference2D,
     Interpolation2D,
-    Vorticity2D,
     enforce_periodic,
 )
 
-# ---------------------------------------------------------------------------
-# Grid setup
-# ---------------------------------------------------------------------------
-
-Lx = 1.0e6  # domain length in x [m]
-Ly = 1.0e6  # domain length in y [m]
-nx = 64  # interior cells in x
-ny = 64  # interior cells in y
-
-grid = ArakawaCGrid2D.from_interior(nx, ny, Lx, Ly)
-
-diff = Difference2D(grid=grid)
-interp = Interpolation2D(grid=grid)
-adv = Advection2D(grid=grid)
-vort = Vorticity2D(grid=grid)
-
-# ---------------------------------------------------------------------------
-# Physical parameters
-# ---------------------------------------------------------------------------
-
-g = 9.81  # gravitational acceleration [m/s^2]
-f0 = 1.0e-4  # Coriolis parameter [1/s]
-H0 = 100.0  # reference layer thickness [m]
-dt = 100.0  # time step [s]
-T = 1.0e5  # total simulation time [s]
-
-# ---------------------------------------------------------------------------
-# Initial conditions
-# ---------------------------------------------------------------------------
+jax.config.update("jax_enable_x64", True)
 
 
-def init_fields(grid: ArakawaCGrid2D):
-    """Gaussian bump in height with zero velocity."""
-    Ny, Nx = grid.Ny, grid.Nx
-    # Cell-centre coordinates
-    x = (jnp.arange(Nx) - 0.5) * grid.dx
-    y = (jnp.arange(Ny) - 0.5) * grid.dy
-    X, Y = jnp.meshgrid(x, y)
-
-    xc = 0.5 * grid.Lx
-    yc = 0.5 * grid.Ly
-    sigma = 0.1 * grid.Lx
-
-    # Height perturbation at T-points
-    h = H0 + 0.1 * H0 * jnp.exp(-((X - xc) ** 2 + (Y - yc) ** 2) / (2.0 * sigma**2))
-    u = jnp.zeros((Ny, Nx))  # U-points
-    v = jnp.zeros((Ny, Nx))  # V-points
-    return h, u, v
+def to_periodic_field(field: xr.DataArray) -> Array:
+    """Pad an interior ``xarray`` field with a periodic ghost-cell ring."""
+    interior = jnp.asarray(field.to_numpy())
+    return enforce_periodic(jnp.pad(interior, pad_width=1, mode="wrap"))
 
 
-# ---------------------------------------------------------------------------
-# Tendency functions
-# ---------------------------------------------------------------------------
+def save_comparison_plot(
+    dataset: xr.Dataset,
+    figure_path: Path,
+    variable_name: str,
+    title: str,
+    cmap: str = "RdBu_r",
+) -> None:
+    """Save a static before/after plot for a sampled field."""
+    figure_path.parent.mkdir(parents=True, exist_ok=True)
+
+    data = dataset[variable_name]
+    initial = data.isel(time=0)
+    final = data.isel(time=-1)
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4), constrained_layout=True)
+    for axis, field, panel in zip(
+        axes, [initial, final], ["Initial", "Final"], strict=True
+    ):
+        image = axis.pcolormesh(
+            dataset["x"],
+            dataset["y"],
+            field,
+            shading="auto",
+            cmap=cmap,
+        )
+        axis.set_title(panel)
+        axis.set_xlabel("x [m]")
+        axis.set_ylabel("y [m]")
+        fig.colorbar(image, ax=axis, shrink=0.9)
+
+    fig.suptitle(title)
+    fig.savefig(figure_path, dpi=150)
+    plt.close(fig)
 
 
-def swe_tendency(h, u, v, grid, g=g, f0=f0):
-    """Compute SWE tendencies using finitevolX operators.
+@dataclass(frozen=True)
+class ShallowWaterConfig:
+    """Configuration for the nonlinear shallow-water double-gyre example.
+
+    Parameters
+    ----------
+    nx, ny : int, optional
+        Number of interior grid cells in x and y.
+    Lx, Ly : float, optional
+        Domain lengths [m].
+    gravity : float, optional
+        Gravitational acceleration [m s⁻²].
+    mean_depth : float, optional
+        Reference layer depth ``H`` [m].
+    f0 : float, optional
+        Reference Coriolis parameter [s⁻¹].
+    beta : float, optional
+        Meridional Coriolis gradient [m⁻¹ s⁻¹].
+    drag : float, optional
+        Rayleigh drag coefficient [s⁻¹].
+    viscosity : float, optional
+        Laplacian viscosity/diffusivity [m² s⁻¹].
+    wind_acceleration : float, optional
+        Peak zonal body-force acceleration [m s⁻²].
+    dt : float, optional
+        Time step [s].
+    steps : int, optional
+        Number of explicit steps.
+    snapshot_interval : int, optional
+        Steps between saved snapshots.
+    zarr_path, figure_path : Path, optional
+        Artifact paths written by the script.
+
+    Examples
+    --------
+    Use the default stable configuration::
+
+        config = ShallowWaterConfig()
+
+    Reduce the runtime for a quick smoke test::
+
+        config = ShallowWaterConfig(nx=24, ny=24, steps=160)
+    """
+
+    nx: int = 64
+    ny: int = 64
+    Lx: float = 2.0e6
+    Ly: float = 1.0e6
+    gravity: float = 9.81
+    mean_depth: float = 500.0
+    f0: float = 1.0e-4
+    beta: float = 1.5e-11
+    drag: float = 1.5e-4
+    viscosity: float = 2.0e5
+    wind_acceleration: float = 2.0e-7
+    dt: float = 20.0
+    steps: int = 1200
+    snapshot_interval: int = 150
+    zarr_path: Path = Path("outputs/shallow_water_double_gyre.zarr")
+    figure_path: Path = Path("outputs/shallow_water_double_gyre.png")
+
+
+def make_preprocessing_dataset(
+    config: ShallowWaterConfig, grid: ArakawaCGrid2D
+) -> xr.Dataset:
+    """Build the coordinate-aware fields for the nonlinear example.
+
+    Parameters
+    ----------
+    config : ShallowWaterConfig
+        Example configuration.
+    grid : ArakawaCGrid2D
+        Underlying Arakawa C-grid.
 
     Returns
     -------
-    dh, du, dv : arrays of shape [Ny, Nx]
+    xr.Dataset
+        Interior-grid ``xarray`` dataset with the initial free-surface anomaly,
+        Coriolis parameter, and wind forcing.
+
+    Examples
+    --------
+    Build the interior fields before converting them to JAX arrays::
+
+        forcing = make_preprocessing_dataset(config, grid)
+
+    The returned dataset is also suitable for exploratory plotting::
+
+        forcing["eta0"].plot()
     """
-    # Coriolis parameter at T-points (constant f-plane)
-    f = f0 * jnp.ones_like(h)
+    x = xr.DataArray(
+        (np.arange(config.nx) + 0.5) * grid.dx,
+        dims=("x",),
+        name="x",
+        attrs={"long_name": "cell_center_x", "units": "m"},
+    )
+    y = xr.DataArray(
+        (np.arange(config.ny) + 0.5) * grid.dy,
+        dims=("y",),
+        name="y",
+        attrs={"long_name": "cell_center_y", "units": "m"},
+    )
+    x2d, y2d = xr.broadcast(x, y)
+    x2d = x2d.transpose("y", "x")
+    y2d = y2d.transpose("y", "x")
 
-    # --- height tendency: -div(h * u_vec) ---
-    dh = adv(h, u, v, method="upwind1")
+    eta0 = 0.01 * np.sin(np.pi * x2d / config.Lx) * np.sin(np.pi * y2d / config.Ly)
+    coriolis = config.f0 + config.beta * (y2d - 0.5 * config.Ly)
+    wind_u = -config.wind_acceleration * np.cos(2.0 * np.pi * y2d / config.Ly)
 
-    # --- PV flux form momentum tendencies ---
-    q = vort.potential_vorticity(u, v, h, f)  # q at X-points
-
-    # Arakawa-Lamb PV flux
-    qu, qv = vort.pv_flux_arakawa_lamb(q, u, v)  # qu at U, qv at V
-
-    # Pressure gradient (geopotential phi = g*h)
-    phi = g * h
-    dphi_dx = diff.diff_x_T_to_U(phi)  # dphi/dx at U-points
-    dphi_dy = diff.diff_y_T_to_V(phi)  # dphi/dy at V-points
-
-    # h at faces for PV flux
-    h_on_u = interp.T_to_U(h)
-    h_on_v = interp.T_to_V(h)
-
-    # du/dt = -dphi/dx + q * h * v_on_u
-    du = jnp.zeros_like(u)
-    du = du.at[1:-1, 1:-1].set(
-        -dphi_dx[1:-1, 1:-1] + qu[1:-1, 1:-1] * h_on_u[1:-1, 1:-1]
+    return xr.Dataset(
+        data_vars={
+            "eta0": eta0.rename("eta0"),
+            "coriolis": coriolis.rename("coriolis"),
+            "wind_u": wind_u.rename("wind_u"),
+        },
+        coords={"x": x, "y": y},
+        attrs={
+            "model": "nonlinear shallow water",
+            "configuration": "double gyre",
+            "boundary_conditions": "periodic in x and y",
+        },
     )
 
-    # dv/dt = -dphi/dy - q * h * u_on_v
-    dv = jnp.zeros_like(v)
-    dv = dv.at[1:-1, 1:-1].set(
-        -dphi_dy[1:-1, 1:-1] - qv[1:-1, 1:-1] * h_on_v[1:-1, 1:-1]
+
+def run_simulation(config: ShallowWaterConfig | None = None) -> xr.Dataset:  # noqa: PLR0915
+    """Run the nonlinear shallow-water double-gyre example.
+
+    Parameters
+    ----------
+    config : ShallowWaterConfig | None, optional
+        Simulation configuration. The default provides a stable reference run.
+
+    Returns
+    -------
+    xr.Dataset
+        Sampled output dataset that is also written to ``config.zarr_path``.
+
+    Examples
+    --------
+    Run the default example::
+
+        dataset = run_simulation()
+
+    Use a smaller grid when validating the example in tests::
+
+        dataset = run_simulation(ShallowWaterConfig(nx=24, ny=24, steps=160))
+    """
+    config = config or ShallowWaterConfig()
+    grid = ArakawaCGrid2D.from_interior(config.nx, config.ny, config.Lx, config.Ly)
+    diff = Difference2D(grid=grid)
+    interp = Interpolation2D(grid=grid)
+    adv = Advection2D(grid=grid)
+    forcing = make_preprocessing_dataset(config, grid)
+
+    eta = to_periodic_field(forcing["eta0"])
+    u = enforce_periodic(jnp.zeros_like(eta))
+    v = enforce_periodic(jnp.zeros_like(eta))
+    coriolis = to_periodic_field(forcing["coriolis"])
+    wind_u = to_periodic_field(forcing["wind_u"])
+
+    viscosity = config.viscosity
+    gravity = config.gravity
+    mean_depth = config.mean_depth
+    drag = config.drag
+    dt = config.dt
+
+    def centered_gradients(
+        field: Array,
+    ) -> tuple[Array, Array]:
+        """Return centre-point gradients by differentiating and re-averaging."""
+        dfield_dx = interp.U_to_T(diff.diff_x_T_to_U(field))
+        dfield_dy = interp.V_to_T(diff.diff_y_T_to_V(field))
+        return dfield_dx, dfield_dy
+
+    def tendency(
+        eta_field: Array,
+        u_field: Array,
+        v_field: Array,
+    ) -> tuple[Array, Array, Array]:
+        """Compute the nonlinear shallow-water tendencies on the C-grid."""
+        layer_depth = mean_depth + eta_field
+        eta_rhs = adv(layer_depth, u_field, v_field, method="upwind1")
+        eta_rhs = eta_rhs + viscosity * diff.laplacian(eta_field)
+
+        u_on_t = interp.U_to_T(u_field)
+        v_on_t = interp.V_to_T(v_field)
+        speed_squared = u_on_t**2 + v_on_t**2
+        bernoulli = gravity * eta_field + 0.5 * speed_squared
+
+        du_dx, du_dy = centered_gradients(u_on_t)
+        dv_dx, dv_dy = centered_gradients(v_on_t)
+        u_adv = interp.T_to_U(u_on_t * du_dx + v_on_t * du_dy)
+        v_adv = interp.T_to_V(u_on_t * dv_dx + v_on_t * dv_dy)
+
+        v_on_u = interp.T_to_U(v_on_t)
+        u_on_v = interp.T_to_V(u_on_t)
+        coriolis_on_u = interp.T_to_U(coriolis)
+        coriolis_on_v = interp.T_to_V(coriolis)
+
+        u_rhs = -diff.diff_x_T_to_U(bernoulli)
+        u_rhs = u_rhs - u_adv + coriolis_on_u * v_on_u + wind_u
+        u_rhs = u_rhs - drag * u_field + viscosity * diff.laplacian(u_field)
+
+        v_rhs = -diff.diff_y_T_to_V(bernoulli)
+        v_rhs = v_rhs - v_adv - coriolis_on_v * u_on_v
+        v_rhs = v_rhs - drag * v_field + viscosity * diff.laplacian(v_field)
+        return eta_rhs, u_rhs, v_rhs
+
+    @jax.jit
+    def step(
+        eta_field: Array, u_field: Array, v_field: Array
+    ) -> tuple[Array, Array, Array]:
+        """Advance one Heun step with periodic ghost-cell updates."""
+        k1_eta, k1_u, k1_v = tendency(eta_field, u_field, v_field)
+        eta_stage = enforce_periodic(eta_field + dt * k1_eta)
+        u_stage = enforce_periodic(u_field + dt * k1_u)
+        v_stage = enforce_periodic(v_field + dt * k1_v)
+        k2_eta, k2_u, k2_v = tendency(eta_stage, u_stage, v_stage)
+        eta_next = enforce_periodic(eta_field + 0.5 * dt * (k1_eta + k2_eta))
+        u_next = enforce_periodic(u_field + 0.5 * dt * (k1_u + k2_u))
+        v_next = enforce_periodic(v_field + 0.5 * dt * (k1_v + k2_v))
+        return eta_next, u_next, v_next
+
+    snapshot_times: list[float] = []
+    eta_snapshots: list[np.ndarray] = []
+    u_snapshots: list[np.ndarray] = []
+    v_snapshots: list[np.ndarray] = []
+    speed_snapshots: list[np.ndarray] = []
+    kinetic_energy: list[float] = []
+    min_depth: list[float] = []
+
+    def record_snapshot(
+        step_index: int, eta_field: Array, u_field: Array, v_field: Array
+    ) -> None:
+        """Convert a sampled state into ``xarray``-ready NumPy arrays."""
+        eta_np = np.asarray(jax.device_get(eta_field[1:-1, 1:-1]))
+        u_center = interp.U_to_T(u_field)
+        v_center = interp.V_to_T(v_field)
+        u_np = np.asarray(jax.device_get(u_center[1:-1, 1:-1]))
+        v_np = np.asarray(jax.device_get(v_center[1:-1, 1:-1]))
+        speed_np = np.sqrt(u_np**2 + v_np**2)
+
+        snapshot_times.append(step_index * dt)
+        eta_snapshots.append(eta_np)
+        u_snapshots.append(u_np)
+        v_snapshots.append(v_np)
+        speed_snapshots.append(speed_np)
+        kinetic_energy.append(float(0.5 * np.mean(speed_np**2)))
+        min_depth.append(float(np.min(mean_depth + eta_np)))
+
+    record_snapshot(step_index=0, eta_field=eta, u_field=u, v_field=v)
+
+    for iteration in range(1, config.steps + 1):
+        eta, u, v = step(eta, u, v)
+        if iteration % config.snapshot_interval == 0 or iteration == config.steps:
+            record_snapshot(step_index=iteration, eta_field=eta, u_field=u, v_field=v)
+
+    dataset = xr.Dataset(
+        data_vars={
+            "eta": (
+                ("time", "y", "x"),
+                np.stack(eta_snapshots, axis=0),
+                {"long_name": "free_surface_anomaly", "units": "m"},
+            ),
+            "u": (
+                ("time", "y", "x"),
+                np.stack(u_snapshots, axis=0),
+                {"long_name": "zonal_velocity_at_t_points", "units": "m s-1"},
+            ),
+            "v": (
+                ("time", "y", "x"),
+                np.stack(v_snapshots, axis=0),
+                {"long_name": "meridional_velocity_at_t_points", "units": "m s-1"},
+            ),
+            "speed": (
+                ("time", "y", "x"),
+                np.stack(speed_snapshots, axis=0),
+                {"long_name": "speed_at_t_points", "units": "m s-1"},
+            ),
+            "wind_u": (
+                ("y", "x"),
+                forcing["wind_u"].to_numpy(),
+                {"long_name": "double_gyre_zonal_forcing", "units": "m s-2"},
+            ),
+            "kinetic_energy": (
+                ("time",),
+                np.asarray(kinetic_energy),
+                {"long_name": "domain_mean_kinetic_energy", "units": "m2 s-2"},
+            ),
+            "minimum_depth": (
+                ("time",),
+                np.asarray(min_depth),
+                {"long_name": "minimum_total_depth", "units": "m"},
+            ),
+        },
+        coords={
+            "time": xr.DataArray(
+                np.asarray(snapshot_times),
+                dims=("time",),
+                attrs={"long_name": "time", "units": "s"},
+            ),
+            "x": forcing["x"],
+            "y": forcing["y"],
+        },
+        attrs={
+            "model": "nonlinear shallow water",
+            "configuration": "double gyre",
+            "time_step_seconds": config.dt,
+            "num_steps": config.steps,
+            "notes": "Finitevolx nonlinear example with xarray preprocessing/postprocessing.",
+        },
     )
 
-    return dh, du, dv
+    config.zarr_path.parent.mkdir(parents=True, exist_ok=True)
+    dataset.to_zarr(config.zarr_path, mode="w", consolidated=False)
+    save_comparison_plot(
+        dataset=dataset,
+        figure_path=config.figure_path,
+        variable_name="eta",
+        title="Nonlinear shallow-water double gyre: free-surface anomaly",
+    )
+    return dataset
 
 
-# ---------------------------------------------------------------------------
-# Time integration (simple forward Euler)
-# ---------------------------------------------------------------------------
+def parse_args() -> ShallowWaterConfig:
+    """Parse the command line for the nonlinear shallow-water example."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Directory that will receive the Zarr store and comparison plot.",
+    )
+    parser.add_argument(
+        "--steps",
+        type=int,
+        default=ShallowWaterConfig.steps,
+        help="Number of explicit time steps to integrate.",
+    )
+    parser.add_argument(
+        "--snapshot-interval",
+        type=int,
+        default=ShallowWaterConfig.snapshot_interval,
+        help="Number of steps between sampled outputs.",
+    )
+    args = parser.parse_args()
+
+    if args.output_dir is None:
+        zarr_path = ShallowWaterConfig.zarr_path
+        figure_path = ShallowWaterConfig.figure_path
+    else:
+        zarr_path = args.output_dir / "shallow_water_double_gyre.zarr"
+        figure_path = args.output_dir / "shallow_water_double_gyre.png"
+
+    return ShallowWaterConfig(
+        steps=args.steps,
+        snapshot_interval=args.snapshot_interval,
+        zarr_path=zarr_path,
+        figure_path=figure_path,
+    )
 
 
-def step(h, u, v):
-    """Single forward-Euler time step with periodic BCs."""
-    dh, du, dv = swe_tendency(h, u, v, grid)
-    h = enforce_periodic(h + dt * dh)
-    u = enforce_periodic(u + dt * du)
-    v = enforce_periodic(v + dt * dv)
-    return h, u, v
-
-
-step_jit = jax.jit(step)
-
-
-def run():
-    """Run the shallow water model."""
-    h, u, v = init_fields(grid)
-    h = enforce_periodic(h)
-
-    nsteps = int(T / dt)
-    print(f"Running SWE for {nsteps} steps on {nx}x{ny} grid ...")
-
-    for i in range(nsteps):
-        h, u, v = step_jit(h, u, v)
-        if i % (nsteps // 10) == 0:
-            ke = 0.5 * jnp.mean(
-                h[1:-1, 1:-1] * (u[1:-1, 1:-1] ** 2 + v[1:-1, 1:-1] ** 2)
-            )
-            print(
-                f"  step {i:5d}/{nsteps}  KE={float(ke):.4e}  h_max={float(h.max()):.4f}"
-            )
-
-    print("Done.")
-    return h, u, v
+def main() -> None:
+    """Run the nonlinear shallow-water example from the command line."""
+    config = parse_args()
+    dataset = run_simulation(config)
+    print(f"Saved nonlinear shallow-water fields to {config.zarr_path}")
+    print(f"Saved nonlinear shallow-water comparison plot to {config.figure_path}")
+    print(
+        f"Final minimum depth = {float(dataset['minimum_depth'].isel(time=-1)):.3f} m"
+    )
 
 
 if __name__ == "__main__":
-    h, u, v = run()
+    main()
