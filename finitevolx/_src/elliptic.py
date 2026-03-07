@@ -718,8 +718,8 @@ class CapacitanceSolver(eqx.Module):
     _i_b: Array
     dx: float
     dy: float
-    lambda_: float
-    base_bc: str
+    lambda_: float = eqx.field(static=True)
+    base_bc: str = eqx.field(static=True)
 
     def __call__(
         self,
