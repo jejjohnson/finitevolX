@@ -57,7 +57,7 @@ def _norm_axis(axis: int, ndim: int) -> int:
 
 
 # ---------------------------------------------------------------------------
-# DCT types I–IV  (unnormalized, scipy-compatible)
+# DCT types I-IV  (unnormalized, scipy-compatible)
 # ---------------------------------------------------------------------------
 
 
@@ -83,9 +83,7 @@ def _dct2(x: Array, axis: int) -> Array:
     DCT-II[k] = Re( 2·exp(−iπk/(2N)) · FFT(v)[k] )
     """
     N = x.shape[axis]
-    # even-indexed then reversed odd-indexed
-    even = _sl(x, 0, None, axis)[..., 0::1] if axis == x.ndim - 1 else None
-    # Use raw slicing via index objects for arbitrary axis
+    # Use index objects for arbitrary-axis stride-2 slicing
     idx_even = [slice(None)] * x.ndim
     idx_even[axis] = slice(0, None, 2)
     idx_odd = [slice(None)] * x.ndim
@@ -145,7 +143,7 @@ def _dct4(x: Array, axis: int) -> Array:
 
 
 # ---------------------------------------------------------------------------
-# DST types I–IV  (unnormalized, scipy-compatible)
+# DST types I-IV  (unnormalized, scipy-compatible)
 # ---------------------------------------------------------------------------
 
 
@@ -227,10 +225,10 @@ _DST_IMPLS = {1: _dst1, 2: _dst2, 3: _dst3, 4: _dst4}
 
 
 def dct(
-    x: Float[Array, "..."],
+    x: Float[Array, ...],
     type: Literal[1, 2, 3, 4] = 2,
     axis: int = -1,
-) -> Float[Array, "..."]:
+) -> Float[Array, ...]:
     """Unnormalized Discrete Cosine Transform (scipy norm=None convention).
 
     Parameters
@@ -263,10 +261,10 @@ def dct(
 
 
 def idct(
-    x: Float[Array, "..."],
+    x: Float[Array, ...],
     type: Literal[1, 2, 3, 4] = 2,
     axis: int = -1,
-) -> Float[Array, "..."]:
+) -> Float[Array, ...]:
     """Unnormalized Inverse Discrete Cosine Transform.
 
     Satisfies ``idct(dct(x, t), t) == x`` for all types t ∈ {1, 2, 3, 4}.
@@ -319,10 +317,10 @@ def idct(
 
 
 def dst(
-    x: Float[Array, "..."],
+    x: Float[Array, ...],
     type: Literal[1, 2, 3, 4] = 1,
     axis: int = -1,
-) -> Float[Array, "..."]:
+) -> Float[Array, ...]:
     """Unnormalized Discrete Sine Transform (scipy norm=None convention).
 
     Parameters
@@ -355,10 +353,10 @@ def dst(
 
 
 def idst(
-    x: Float[Array, "..."],
+    x: Float[Array, ...],
     type: Literal[1, 2, 3, 4] = 1,
     axis: int = -1,
-) -> Float[Array, "..."]:
+) -> Float[Array, ...]:
     """Unnormalized Inverse Discrete Sine Transform.
 
     Satisfies ``idst(dst(x, t), t) == x`` for all types t ∈ {1, 2, 3, 4}.
@@ -407,10 +405,10 @@ def idst(
 
 
 def dctn(
-    x: Float[Array, "..."],
+    x: Float[Array, ...],
     type: Literal[1, 2, 3, 4] = 2,
     axes: Sequence[int] | None = None,
-) -> Float[Array, "..."]:
+) -> Float[Array, ...]:
     """N-dimensional DCT: apply ``dct`` sequentially along each axis.
 
     Parameters
@@ -436,10 +434,10 @@ def dctn(
 
 
 def idctn(
-    x: Float[Array, "..."],
+    x: Float[Array, ...],
     type: Literal[1, 2, 3, 4] = 2,
     axes: Sequence[int] | None = None,
-) -> Float[Array, "..."]:
+) -> Float[Array, ...]:
     """N-dimensional inverse DCT: apply ``idct`` sequentially along each axis.
 
     Parameters
@@ -465,10 +463,10 @@ def idctn(
 
 
 def dstn(
-    x: Float[Array, "..."],
+    x: Float[Array, ...],
     type: Literal[1, 2, 3, 4] = 1,
     axes: Sequence[int] | None = None,
-) -> Float[Array, "..."]:
+) -> Float[Array, ...]:
     """N-dimensional DST: apply ``dst`` sequentially along each axis.
 
     Parameters
@@ -494,10 +492,10 @@ def dstn(
 
 
 def idstn(
-    x: Float[Array, "..."],
+    x: Float[Array, ...],
     type: Literal[1, 2, 3, 4] = 1,
     axes: Sequence[int] | None = None,
-) -> Float[Array, "..."]:
+) -> Float[Array, ...]:
     """N-dimensional inverse DST: apply ``idst`` sequentially along each axis.
 
     Parameters

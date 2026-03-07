@@ -1040,9 +1040,7 @@ class Reconstruction3D(eqx.Module):
         h3_neg_first = _weno3(
             h[1:-1, 1:-1, 3:4], h[1:-1, 1:-1, 2:3], h[1:-1, 1:-1, 1:2]
         )
-        h_neg = jnp.concatenate(
-            [h3_neg_first, h5_neg_int, h[1:-1, 1:-1, -1:]], axis=2
-        )
+        h_neg = jnp.concatenate([h3_neg_first, h5_neg_int, h[1:-1, 1:-1, -1:]], axis=2)
         h_face = jnp.where(u[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = out.at[1:-1, 1:-1, 1:-1].set(h_face * u[1:-1, 1:-1, 1:-1])
         return out
@@ -1084,9 +1082,7 @@ class Reconstruction3D(eqx.Module):
         h3_neg_first = _weno3(
             h[1:-1, 3:4, 1:-1], h[1:-1, 2:3, 1:-1], h[1:-1, 1:2, 1:-1]
         )
-        h_neg = jnp.concatenate(
-            [h3_neg_first, h5_neg_int, h[1:-1, -1:, 1:-1]], axis=1
-        )
+        h_neg = jnp.concatenate([h3_neg_first, h5_neg_int, h[1:-1, -1:, 1:-1]], axis=1)
         h_face = jnp.where(v[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = out.at[1:-1, 1:-1, 1:-1].set(h_face * v[1:-1, 1:-1, 1:-1])
         return out
@@ -1128,9 +1124,7 @@ class Reconstruction3D(eqx.Module):
         h3_neg_first = _wenoz3(
             h[1:-1, 1:-1, 3:4], h[1:-1, 1:-1, 2:3], h[1:-1, 1:-1, 1:2]
         )
-        h_neg = jnp.concatenate(
-            [h3_neg_first, h5_neg_int, h[1:-1, 1:-1, -1:]], axis=2
-        )
+        h_neg = jnp.concatenate([h3_neg_first, h5_neg_int, h[1:-1, 1:-1, -1:]], axis=2)
         h_face = jnp.where(u[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = out.at[1:-1, 1:-1, 1:-1].set(h_face * u[1:-1, 1:-1, 1:-1])
         return out
@@ -1172,9 +1166,7 @@ class Reconstruction3D(eqx.Module):
         h3_neg_first = _wenoz3(
             h[1:-1, 3:4, 1:-1], h[1:-1, 2:3, 1:-1], h[1:-1, 1:2, 1:-1]
         )
-        h_neg = jnp.concatenate(
-            [h3_neg_first, h5_neg_int, h[1:-1, -1:, 1:-1]], axis=1
-        )
+        h_neg = jnp.concatenate([h3_neg_first, h5_neg_int, h[1:-1, -1:, 1:-1]], axis=1)
         h_face = jnp.where(v[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = out.at[1:-1, 1:-1, 1:-1].set(h_face * v[1:-1, 1:-1, 1:-1])
         return out
