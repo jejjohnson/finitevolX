@@ -23,7 +23,7 @@ jax.config.update("jax_enable_x64", True)
 
 
 @pytest.fixture()
-def grid():
+def grid2d():
     # 8 interior cells in each direction → total shape [10, 10]
     return ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
 
@@ -34,21 +34,21 @@ def grid():
 
 
 class TestKineticEnergy2D:
-    def test_constant_unity_field(self, grid):
+    def test_constant_unity_field(self, grid2d):
         """Constant u=v=1 everywhere → ke = 1.0 at interior."""
-        u = jnp.ones((grid.Ny, grid.Nx))
-        v = jnp.ones((grid.Ny, grid.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((grid2d.Ny, grid2d.Nx))
         ke = kinetic_energy(u=u, v=v)
 
-        assert ke.shape == (grid.Ny, grid.Nx)
+        assert ke.shape == (grid2d.Ny, grid2d.Nx)
         # u²_on_T = 0.5*(1² + 1²) = 1, v²_on_T = 0.5*(1² + 1²) = 1
         # ke = 0.5*(u²_on_T + v²_on_T) = 0.5*(1 + 1) = 1.0
         np.testing.assert_allclose(ke[1:-1, 1:-1], 1.0, rtol=1e-6)
 
-    def test_ghost_ring_is_zero(self, grid):
+    def test_ghost_ring_is_zero(self, grid2d):
         """Ghost cells must remain zero (interior-point idiom)."""
-        u = jnp.ones((grid.Ny, grid.Nx))
-        v = jnp.ones((grid.Ny, grid.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((grid2d.Ny, grid2d.Nx))
         ke = kinetic_energy(u=u, v=v)
 
         np.testing.assert_array_equal(ke[0, :], 0.0)
@@ -56,23 +56,23 @@ class TestKineticEnergy2D:
         np.testing.assert_array_equal(ke[:, 0], 0.0)
         np.testing.assert_array_equal(ke[:, -1], 0.0)
 
-    def test_output_shape(self, grid):
+    def test_output_shape(self, grid2d):
         """ke must have the same shape as u and v."""
-        u = jnp.zeros((grid.Ny, grid.Nx))
-        v = jnp.zeros((grid.Ny, grid.Nx))
+        u = jnp.zeros((grid2d.Ny, grid2d.Nx))
+        v = jnp.zeros((grid2d.Ny, grid2d.Nx))
         ke = kinetic_energy(u=u, v=v)
-        assert ke.shape == (grid.Ny, grid.Nx)
+        assert ke.shape == (grid2d.Ny, grid2d.Nx)
 
-    def test_nonconst_u_linear_in_x(self, grid):
+    def test_nonconst_u_linear_in_x(self, grid2d):
         """u varies linearly in x; v=0 → checks U→T averaging along x-axis.
 
         u[j, i] = i  (U-point at east face i+1/2)
         u²_on_T[j, i] = 0.5*(u[j,i]² + u[j,i-1]²) = 0.5*(i² + (i-1)²)
         ke[j, i] = 0.5 * u²_on_T[j, i]
         """
-        ix = jnp.arange(grid.Nx, dtype=float)
-        u = jnp.broadcast_to(ix, (grid.Ny, grid.Nx))
-        v = jnp.zeros((grid.Ny, grid.Nx))
+        ix = jnp.arange(grid2d.Nx, dtype=float)
+        u = jnp.broadcast_to(ix, (grid2d.Ny, grid2d.Nx))
+        v = jnp.zeros((grid2d.Ny, grid2d.Nx))
 
         ke = kinetic_energy(u=u, v=v)
 
@@ -84,16 +84,16 @@ class TestKineticEnergy2D:
 
         np.testing.assert_allclose(ke[1, 1:-1], expected, rtol=1e-6)
 
-    def test_nonconst_v_linear_in_y(self, grid):
+    def test_nonconst_v_linear_in_y(self, grid2d):
         """v varies linearly in y; u=0 → checks V→T averaging along y-axis.
 
         v[j, i] = j  (V-point at north face j+1/2)
         v²_on_T[j, i] = 0.5*(v[j,i]² + v[j-1,i]²) = 0.5*(j² + (j-1)²)
         ke[j, i] = 0.5 * v²_on_T[j, i]
         """
-        jy = jnp.arange(grid.Ny, dtype=float)
-        u = jnp.zeros((grid.Ny, grid.Nx))
-        v = jnp.broadcast_to(jy[:, None], (grid.Ny, grid.Nx))
+        jy = jnp.arange(grid2d.Ny, dtype=float)
+        u = jnp.zeros((grid2d.Ny, grid2d.Nx))
+        v = jnp.broadcast_to(jy[:, None], (grid2d.Ny, grid2d.Nx))
 
         ke = kinetic_energy(u=u, v=v)
 
@@ -106,12 +106,12 @@ class TestKineticEnergy2D:
         # v is constant in x → all interior columns are identical; compare one column
         np.testing.assert_allclose(ke[1:-1, 1], expected, rtol=1e-6)
 
-    def test_nonconst_uv_combined(self, grid):
+    def test_nonconst_uv_combined(self, grid2d):
         """u and v both vary; verifies combined averaging is independent per axis."""
-        ix = jnp.arange(grid.Nx, dtype=float)
-        jy = jnp.arange(grid.Ny, dtype=float)
-        u = jnp.broadcast_to(ix, (grid.Ny, grid.Nx))
-        v = jnp.broadcast_to(jy[:, None], (grid.Ny, grid.Nx))
+        ix = jnp.arange(grid2d.Nx, dtype=float)
+        jy = jnp.arange(grid2d.Ny, dtype=float)
+        u = jnp.broadcast_to(ix, (grid2d.Ny, grid2d.Nx))
+        v = jnp.broadcast_to(jy[:, None], (grid2d.Ny, grid2d.Nx))
 
         ke = kinetic_energy(u=u, v=v)
 
@@ -123,6 +123,16 @@ class TestKineticEnergy2D:
 
         np.testing.assert_allclose(ke[1:-1, 1:-1], expected, rtol=1e-6)
 
+    def test_integer_inputs_preserve_fractional_output(self, grid2d):
+        """Integer inputs should still produce floating kinetic energy."""
+        u = jnp.ones((grid2d.Ny, grid2d.Nx), dtype=jnp.int32)
+        v = jnp.zeros((grid2d.Ny, grid2d.Nx), dtype=jnp.int32)
+
+        ke = kinetic_energy(u=u, v=v)
+
+        assert jnp.issubdtype(ke.dtype, jnp.floating)
+        np.testing.assert_allclose(ke[1:-1, 1:-1], 0.5, rtol=1e-6)
+
 
 # ---------------------------------------------------------------------------
 # bernoulli_potential
@@ -130,22 +140,22 @@ class TestKineticEnergy2D:
 
 
 class TestBernoulliPotential2D:
-    def test_constant_unity_fields(self, grid):
+    def test_constant_unity_fields(self, grid2d):
         """u=v=h=1 everywhere → p = ke + g*h = 1.0 + g at interior."""
-        u = jnp.ones((grid.Ny, grid.Nx))
-        v = jnp.ones((grid.Ny, grid.Nx))
-        h = jnp.ones((grid.Ny, grid.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((grid2d.Ny, grid2d.Nx))
+        h = jnp.ones((grid2d.Ny, grid2d.Nx))
 
         p = bernoulli_potential(h=h, u=u, v=v)
 
-        assert p.shape == (grid.Ny, grid.Nx)
+        assert p.shape == (grid2d.Ny, grid2d.Nx)
         np.testing.assert_allclose(p[1:-1, 1:-1], 1.0 + GRAVITY * 1.0, rtol=1e-6)
 
-    def test_ghost_ring_is_zero(self, grid):
+    def test_ghost_ring_is_zero(self, grid2d):
         """Ghost cells must remain zero (interior-point idiom)."""
-        u = jnp.ones((grid.Ny, grid.Nx))
-        v = jnp.ones((grid.Ny, grid.Nx))
-        h = jnp.ones((grid.Ny, grid.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((grid2d.Ny, grid2d.Nx))
+        h = jnp.ones((grid2d.Ny, grid2d.Nx))
         p = bernoulli_potential(h=h, u=u, v=v)
 
         np.testing.assert_array_equal(p[0, :], 0.0)
@@ -153,20 +163,20 @@ class TestBernoulliPotential2D:
         np.testing.assert_array_equal(p[:, 0], 0.0)
         np.testing.assert_array_equal(p[:, -1], 0.0)
 
-    def test_output_shape(self, grid):
+    def test_output_shape(self, grid2d):
         """p must have the same shape as h, u, v."""
-        u = jnp.zeros((grid.Ny, grid.Nx))
-        v = jnp.zeros((grid.Ny, grid.Nx))
-        h = jnp.zeros((grid.Ny, grid.Nx))
+        u = jnp.zeros((grid2d.Ny, grid2d.Nx))
+        v = jnp.zeros((grid2d.Ny, grid2d.Nx))
+        h = jnp.zeros((grid2d.Ny, grid2d.Nx))
         p = bernoulli_potential(h=h, u=u, v=v)
-        assert p.shape == (grid.Ny, grid.Nx)
+        assert p.shape == (grid2d.Ny, grid2d.Nx)
 
-    def test_equals_ke_plus_gh(self, grid):
+    def test_equals_ke_plus_gh(self, grid2d):
         """p == ke(u,v) + g*h elementwise at interior, with spatially varying fields."""
-        ix = jnp.arange(grid.Nx, dtype=float)
-        jy = jnp.arange(grid.Ny, dtype=float)
-        u = jnp.broadcast_to(ix, (grid.Ny, grid.Nx))
-        v = jnp.broadcast_to(jy[:, None], (grid.Ny, grid.Nx))
+        ix = jnp.arange(grid2d.Nx, dtype=float)
+        jy = jnp.arange(grid2d.Ny, dtype=float)
+        u = jnp.broadcast_to(ix, (grid2d.Ny, grid2d.Nx))
+        v = jnp.broadcast_to(jy[:, None], (grid2d.Ny, grid2d.Nx))
         # h: distinct values to avoid accidental cancellation
         h = (ix[None, :] + jy[:, None]) * 0.1
 
@@ -176,13 +186,24 @@ class TestBernoulliPotential2D:
         expected = ke[1:-1, 1:-1] + GRAVITY * h[1:-1, 1:-1]
         np.testing.assert_allclose(p[1:-1, 1:-1], expected, rtol=1e-6)
 
-    def test_zero_velocity_gives_gravity_term_only(self, grid):
+    def test_zero_velocity_gives_gravity_term_only(self, grid2d):
         """u=v=0 → ke=0 → p = g*h at interior."""
-        u = jnp.zeros((grid.Ny, grid.Nx))
-        v = jnp.zeros((grid.Ny, grid.Nx))
-        ix = jnp.arange(grid.Nx, dtype=float)
-        jy = jnp.arange(grid.Ny, dtype=float)
+        u = jnp.zeros((grid2d.Ny, grid2d.Nx))
+        v = jnp.zeros((grid2d.Ny, grid2d.Nx))
+        ix = jnp.arange(grid2d.Nx, dtype=float)
+        jy = jnp.arange(grid2d.Ny, dtype=float)
         h = ix[None, :] + jy[:, None]
 
         p = bernoulli_potential(h=h, u=u, v=v)
         np.testing.assert_allclose(p[1:-1, 1:-1], GRAVITY * h[1:-1, 1:-1], rtol=1e-6)
+
+    def test_integer_inputs_preserve_fractional_output(self, grid2d):
+        """Integer h/u/v should still produce floating Bernoulli potential."""
+        u = jnp.ones((grid2d.Ny, grid2d.Nx), dtype=jnp.int32)
+        v = jnp.zeros((grid2d.Ny, grid2d.Nx), dtype=jnp.int32)
+        h = jnp.ones((grid2d.Ny, grid2d.Nx), dtype=jnp.int32)
+
+        p = bernoulli_potential(h=h, u=u, v=v)
+
+        assert jnp.issubdtype(p.dtype, jnp.floating)
+        np.testing.assert_allclose(p[1:-1, 1:-1], GRAVITY + 0.5, rtol=1e-6)

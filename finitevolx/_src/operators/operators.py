@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import jax
 import jax.numpy as jnp
 from jaxtyping import (
@@ -177,9 +179,12 @@ def kinetic_energy(
         ke (Array): kinetic energy at T-points, shape [Ny, Nx].
             Ghost ring is zero; interior is [1:-1, 1:-1].
     """
-    u2 = u**2
-    v2 = v**2
-    out = jnp.zeros_like(u)
+    dtype = jnp.result_type(u, v, 0.0)
+    u_float = jnp.asarray(u, dtype=dtype)
+    v_float = jnp.asarray(v, dtype=dtype)
+    u2 = u_float**2
+    v2 = v_float**2
+    out = jnp.zeros_like(u_float)
     # u²_on_T[j, i] = 0.5 * (u²[j, i] + u²[j, i-1])  (east + west U-faces)
     # v²_on_T[j, i] = 0.5 * (v²[j, i] + v²[j-1, i])  (north + south V-faces)
     u2_on_T = 0.5 * (u2[1:-1, 1:-1] + u2[1:-1, :-2])
@@ -252,7 +257,9 @@ def bernoulli_potential(
         >>> u, v, h = ...
         >>> p = bernoulli_potential(h=h, u=u, v=v)
     """
+    dtype = jnp.result_type(h, u, v, 0.0)
+    h_float = jnp.asarray(h, dtype=dtype)
     ke = kinetic_energy(u=u, v=v)
-    out = jnp.zeros_like(h)
-    out = out.at[1:-1, 1:-1].set(ke[1:-1, 1:-1] + gravity * h[1:-1, 1:-1])
+    out = jnp.zeros_like(h_float)
+    out = out.at[1:-1, 1:-1].set(ke[1:-1, 1:-1] + gravity * h_float[1:-1, 1:-1])
     return out
