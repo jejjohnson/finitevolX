@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-"""Wind-driven 1.5-layer quasi-geostrophic double-gyre example.
+"""Wind-driven 1.5-layer quasi-geostrophic closed-basin double-gyre example.
 
 This example shows how to combine the current :mod:`finitevolx` advection,
 interpolation, and spectral elliptic solvers to build a compact 1.5-layer QG
-model. The potential-vorticity field is advected on a periodic beta-plane, the
-streamfunction is recovered from a Helmholtz inversion, and the output is saved
-through ``xarray``/Zarr together with a static before/after figure.
+model. The potential-vorticity field is advected in a closed rectangular basin
+with no-normal-flow solid walls, the streamfunction is recovered from a
+Helmholtz inversion with homogeneous Dirichlet (ψ = 0) wall boundary
+conditions using ``solve_helmholtz_dst``, and the output is saved through
+``xarray``/Zarr together with a static before/after figure.
 
 The model evolves the QG potential-vorticity anomaly ``q`` according to
 
@@ -14,7 +16,8 @@ The model evolves the QG potential-vorticity anomaly ``q`` according to
 - (∇² - 1 / Ld²) ψ = q - β (y - Ly / 2)
 - u = -∂ψ/∂y,  v = ∂ψ/∂x
 
-where ``F`` is a prescribed double-gyre wind-curl forcing.
+where ``F`` is a prescribed double-gyre wind-curl forcing and ψ = 0 on all
+four basin walls (solid no-normal-flow boundary conditions).
 
 Examples
 --------
@@ -47,17 +50,29 @@ from finitevolx import (
     Difference2D,
     Interpolation2D,
     Vorticity2D,
-    enforce_periodic,
-    solve_helmholtz_fft,
+    pad_interior,
+    solve_helmholtz_dst,
 )
 
 jax.config.update("jax_enable_x64", True)
 
 
-def to_periodic_field(field: xr.DataArray) -> Array:
-    """Pad an interior ``xarray`` field with a periodic ghost-cell ring."""
+def to_wall_field(field: xr.DataArray) -> Array:
+    """Pad an interior ``xarray`` field with zero (no-normal-flow wall) ghost cells.
+
+    Parameters
+    ----------
+    field : xr.DataArray
+        Interior field with shape ``[Ny, Nx]``.
+
+    Returns
+    -------
+    Array
+        Full field of shape ``[Ny+2, Nx+2]`` with interior values preserved and
+        ghost cells set to zero (homogeneous Dirichlet wall boundary condition).
+    """
     interior = jnp.asarray(field.to_numpy())
-    return enforce_periodic(jnp.pad(interior, pad_width=1, mode="wrap"))
+    return jnp.pad(interior, pad_width=1, mode="constant")
 
 
 def geostrophic_velocity_from_streamfunction(
@@ -259,7 +274,7 @@ def make_preprocessing_dataset(
         attrs={
             "model": "1.5-layer quasi-geostrophic",
             "configuration": "double gyre",
-            "boundary_conditions": "periodic in x and y",
+            "boundary_conditions": "closed basin (no-normal-flow solid walls)",
         },
     )
 
@@ -295,9 +310,9 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
     vort = Vorticity2D(grid=grid)
     forcing = make_preprocessing_dataset(config, grid)
 
-    q = to_periodic_field(forcing["q0"])
+    q = to_wall_field(forcing["q0"])
     beta_term = jnp.asarray(forcing["beta_term"].to_numpy())
-    wind_curl = to_periodic_field(forcing["wind_curl"])
+    wind_curl = to_wall_field(forcing["wind_curl"])
 
     viscosity = config.viscosity
     drag = config.drag
@@ -305,17 +320,31 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
     deformation_wavenumber = 1.0 / config.rossby_radius**2
 
     def invert_streamfunction(q_field: Array) -> Array:
-        """Recover the streamfunction from the PV anomaly using Helmholtz FFT."""
+        """Recover the streamfunction from the PV anomaly using Helmholtz DST.
+
+        Uses homogeneous Dirichlet BCs (ψ = 0 on all four walls), which is
+        the appropriate condition for a closed rectangular basin.
+
+        Parameters
+        ----------
+        q_field : Array
+            PV anomaly on the full ``[Ny+2, Nx+2]`` grid (ghost ring included).
+
+        Returns
+        -------
+        Array
+            Streamfunction on the full grid with zero ghost cells (ψ = 0 walls).
+        """
         rhs = q_field[1:-1, 1:-1] - beta_term
-        psi_interior = solve_helmholtz_fft(
+        psi_interior = solve_helmholtz_dst(
             rhs,
             grid.dx,
             grid.dy,
             lambda_=deformation_wavenumber,
         )
         psi_field = jnp.zeros_like(q_field)
-        psi_field = psi_field.at[1:-1, 1:-1].set(psi_interior)
-        return enforce_periodic(psi_field)
+        # Ghost cells remain zero, encoding ψ = 0 on the solid walls.
+        return psi_field.at[1:-1, 1:-1].set(psi_interior)
 
     def tendency(q_field: Array) -> tuple[Array, Array, Array, Array]:
         """Compute the QG PV tendency and the diagnosed balanced state."""
@@ -331,9 +360,9 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
     def step(q_field: Array) -> tuple[Array, Array, Array, Array]:
         """Advance one Heun step and diagnose the balanced velocity field."""
         k1_q, _, _, _ = tendency(q_field)
-        q_stage = enforce_periodic(q_field + dt * k1_q)
+        q_stage = pad_interior(q_field + dt * k1_q, mode="constant")
         k2_q, _, _, _ = tendency(q_stage)
-        q_next = enforce_periodic(q_field + 0.5 * dt * (k1_q + k2_q))
+        q_next = pad_interior(q_field + 0.5 * dt * (k1_q + k2_q), mode="constant")
         psi_next = invert_streamfunction(q_next)
         u_next, v_next = geostrophic_velocity_from_streamfunction(
             psi_next, diff, interp
@@ -450,7 +479,7 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
             "configuration": "double gyre",
             "time_step_seconds": config.dt,
             "num_steps": config.steps,
-            "notes": "Finitevolx advection plus FFT Helmholtz inversion with xarray output.",
+            "notes": "Finitevolx advection plus DST Helmholtz inversion with closed-basin (Dirichlet) wall BCs and xarray output.",
         },
     )
 
