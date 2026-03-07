@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.10](https://github.com/jejjohnson/finitevolX/compare/v0.0.9...v0.0.10) (2026-03-07)
+
+
+### Features
+
+* add per-side boundary condition API for 2D ghost-ring fields ([928e0b5](https://github.com/jejjohnson/finitevolX/commit/928e0b525dcaeab5e5279677005f1f9922749381))
+
+
+### Bug Fixes
+
+* correct Neumann face signs and exports ([b08cdfa](https://github.com/jejjohnson/finitevolX/commit/b08cdfaaf72d2237e950a2e79f66d1decc5176f7))
+
 ## [0.0.9](https://github.com/jejjohnson/finitevolX/compare/v0.0.8...v0.0.9) (2026-03-07)
 
 
