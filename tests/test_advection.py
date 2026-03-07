@@ -130,5 +130,24 @@ class TestAdvection3D:
         u = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         v = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         result = adv(h, u, v, method="upwind1")
-        # strictly interior (away from ghost edges): flux difference = 0
-        np.testing.assert_allclose(result[2:-2, 2:-2, 2:-2], 0.0, atol=1e-10)
+        # Valid region: all z-interior levels, deep horizontal interior
+        # (avoids ghost-adjacent horizontal cells where flux ghosts are 0).
+        np.testing.assert_allclose(result[1:-1, 2:-2, 2:-2], 0.0, atol=1e-10)
+
+    def test_ghost_ring_zero(self, grid3d):
+        """Ghost and boundary-adjacent rings must stay zero (no flux ghost set)."""
+        adv = Advection3D(grid=grid3d)
+        h = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        u = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        v = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = adv(h, u, v)
+        # Outer ghost rows/cols
+        np.testing.assert_array_equal(result[:, 0, :], 0.0)
+        np.testing.assert_array_equal(result[:, -1, :], 0.0)
+        np.testing.assert_array_equal(result[:, :, 0], 0.0)
+        np.testing.assert_array_equal(result[:, :, -1], 0.0)
+        # Second ring (boundary-adjacent horizontal cells, flux ghost not set)
+        np.testing.assert_array_equal(result[:, 1, :], 0.0)
+        np.testing.assert_array_equal(result[:, -2, :], 0.0)
+        np.testing.assert_array_equal(result[:, :, 1], 0.0)
+        np.testing.assert_array_equal(result[:, :, -2], 0.0)
