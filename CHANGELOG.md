@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.0.9](https://github.com/jejjohnson/finitevolX/compare/v0.0.8...v0.0.9) (2026-03-07)
+
+
+### Features
+
+* add capacitance matrix solver and preconditioned CG ([3b96918](https://github.com/jejjohnson/finitevolX/commit/3b96918d72e597dbf9a180ec169fd3701f13450e))
+* add spectral transforms and core elliptic solvers (DST/DCT/FFT) ([3674204](https://github.com/jejjohnson/finitevolX/commit/3674204cf9e4c8bf80de0f068551e1904974d7e0))
+* integrate JAX spectral transforms, elliptic solvers, capacitance matrix method, and lineax-based PCG into finitevolX ([e8f0191](https://github.com/jejjohnson/finitevolX/commit/e8f0191a00b5725bf2234f518fb5bf2652c691b2))
+
+
+### Bug Fixes
+
+* handle lambda_=0 in solve_helmholtz_dct and solve_helmholtz_fft ([72ec96b](https://github.com/jejjohnson/finitevolX/commit/72ec96be8bd6defba5ff6dcbedb7a20e1f15000d))
+* resolve ruff lint errors in test files (RUF059, RUF003) ([cc9400a](https://github.com/jejjohnson/finitevolX/commit/cc9400a45b0700efd24bae7feb456883984ab5fc))
+
 ## [0.0.8](https://github.com/jejjohnson/finitevolX/compare/v0.0.7...v0.0.8) (2026-03-03)
 
 
