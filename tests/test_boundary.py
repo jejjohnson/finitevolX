@@ -115,6 +115,26 @@ class TestBoundaryConditionAtoms:
         expected = field[:, -2] + 3.0
         np.testing.assert_allclose(result[:, -1], expected)
 
+    def test_neumann_sets_south_ghost_with_negative_outward_direction(self):
+        field = (
+            jnp.zeros((6, 6))
+            .at[1:-1, 1:-1]
+            .set(jnp.arange(16, dtype=float).reshape(4, 4))
+        )
+        result = Neumann1D("south", value=1.5)(field, dx=2.0, dy=3.0)
+        expected = field[1, :] - 4.5
+        np.testing.assert_allclose(result[0, :], expected)
+
+    def test_neumann_sets_west_ghost_with_negative_outward_direction(self):
+        field = (
+            jnp.zeros((6, 6))
+            .at[1:-1, 1:-1]
+            .set(jnp.arange(16, dtype=float).reshape(4, 4))
+        )
+        result = Neumann1D("west", value=1.5)(field, dx=2.0, dy=3.0)
+        expected = field[:, 1] - 3.0
+        np.testing.assert_allclose(result[:, 0], expected)
+
     def test_sponge_relaxes_ghost_face_toward_background(self):
         field = (
             jnp.zeros((6, 6))

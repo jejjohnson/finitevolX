@@ -43,6 +43,14 @@ def _normal_spacing(face: Face, dx: float, dy: float) -> float:
             return dx
 
 
+def _outward_sign(face: Face) -> float:
+    match face:
+        case "south" | "west":
+            return -1.0
+        case "north" | "east":
+            return 1.0
+
+
 def _set_face(
     field: Float[Array, "Ny Nx"], face: Face, values: BoundarySlice
 ) -> Float[Array, "Ny Nx"]:
@@ -110,7 +118,7 @@ class Neumann1D(eqx.Module):
         """Return ``field`` with one Neumann ghost face updated."""
         spacing = _normal_spacing(self.face, dx=dx, dy=dy)
         interior = _adjacent_interior(field, self.face)
-        ghost = interior + (self.value * spacing)
+        ghost = interior + (_outward_sign(self.face) * self.value * spacing)
         return _set_face(field, self.face, ghost)
 
 
