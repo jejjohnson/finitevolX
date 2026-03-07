@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.11](https://github.com/jejjohnson/finitevolX/compare/v0.0.10...v0.0.11) (2026-03-07)
+
+
+### Features
+
+* modernize double gyre example scripts ([1189ede](https://github.com/jejjohnson/finitevolX/commit/1189edefad59acd5319ce0aad7c796a4e9276240))
+
+
+### Bug Fixes
+
+* address example script review feedback ([c09953d](https://github.com/jejjohnson/finitevolX/commit/c09953d518c4a4dc162008d8da2d8c9ba1a00352))
+* tune double gyre example diagnostics ([65c0fe6](https://github.com/jejjohnson/finitevolX/commit/65c0fe6f1097c3ca4e314dd3c908367a5865487d))
+* use corner-based qg geostrophic mapping ([e6f995d](https://github.com/jejjohnson/finitevolX/commit/e6f995df79e3ac448ffe5ee4790129cff942583f))
+
 ## [0.0.10](https://github.com/jejjohnson/finitevolX/compare/v0.0.9...v0.0.10) (2026-03-07)
 
 
