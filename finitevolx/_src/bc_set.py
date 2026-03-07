@@ -54,7 +54,11 @@ class BoundaryConditionSet(eqx.Module):
     def __call__(
         self, field: Float[Array, "Ny Nx"], dx: float, dy: float
     ) -> Float[Array, "Ny Nx"]:
-        """Return ``field`` with all configured ghost faces updated."""
+        """Return ``field`` with all configured ghost faces updated.
+
+        Boundary conditions are applied in south, north, west, east order, so
+        west/east updates overwrite the corner values written by south/north.
+        """
         out = field
         for bc in (self.south, self.north, self.west, self.east):
             if bc is not None:

@@ -2,6 +2,7 @@
 
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 from finitevolx import (
     BoundaryConditionSet,
@@ -124,6 +125,10 @@ class TestBoundaryConditionAtoms:
         expected = 0.75 * field[-2, :] - 0.25
         np.testing.assert_allclose(result[-1, :], expected)
 
+    def test_sponge_rejects_invalid_weight(self):
+        with pytest.raises(ValueError, match=r"\[0, 1\]"):
+            Sponge1D("north", background=0.0, weight=1.5)
+
     def test_reflective_matches_adjacent_interior(self):
         field = (
             jnp.zeros((6, 6))
@@ -174,6 +179,7 @@ class TestBoundaryConditionSet:
             east=Outflow1D("east"),
         )
         result = bcs(field, dx=1.0, dy=1.0)
+        np.testing.assert_array_equal(result[0, 2:-2], 200.0 - field[1, 2:-2])
         np.testing.assert_array_equal(result[0, 0], result[0, 1])
         np.testing.assert_array_equal(result[0, -1], result[0, -2])
 

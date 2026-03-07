@@ -7,11 +7,11 @@ from typing import Literal
 import equinox as eqx
 from jaxtyping import Array, Float
 
-Face = Literal["south", "north", "west", "east"]
-FaceArray = Float[Array, "Nface"]
+type Face = Literal["south", "north", "west", "east"]
+type BoundarySlice = Float[Array, "N"]
 
 
-def _adjacent_interior(field: Float[Array, "Ny Nx"], face: Face) -> FaceArray:
+def _adjacent_interior(field: Float[Array, "Ny Nx"], face: Face) -> BoundarySlice:
     match face:
         case "south":
             return field[1, :]
@@ -23,7 +23,7 @@ def _adjacent_interior(field: Float[Array, "Ny Nx"], face: Face) -> FaceArray:
             return field[:, -2]
 
 
-def _opposite_interior(field: Float[Array, "Ny Nx"], face: Face) -> FaceArray:
+def _opposite_interior(field: Float[Array, "Ny Nx"], face: Face) -> BoundarySlice:
     match face:
         case "south":
             return field[-2, :]
@@ -44,7 +44,7 @@ def _normal_spacing(face: Face, dx: float, dy: float) -> float:
 
 
 def _set_face(
-    field: Float[Array, "Ny Nx"], face: Face, values: FaceArray
+    field: Float[Array, "Ny Nx"], face: Face, values: BoundarySlice
 ) -> Float[Array, "Ny Nx"]:
     match face:
         case "south":
@@ -202,18 +202,20 @@ class Sponge1D(eqx.Module):
     background: float
     weight: float
 
+    def __check_init__(self) -> None:
+        if not 0.0 <= self.weight <= 1.0:
+            raise ValueError("Sponge1D weight must lie in [0, 1].")
+
     def __call__(
         self, field: Float[Array, "Ny Nx"], dx: float, dy: float
     ) -> Float[Array, "Ny Nx"]:
         """Return ``field`` with one sponge ghost face updated."""
         del dx, dy
-        if not 0.0 <= self.weight <= 1.0:
-            raise ValueError("Sponge1D weight must lie in [0, 1].")
         interior = _adjacent_interior(field, self.face)
         ghost = ((1.0 - self.weight) * interior) + (self.weight * self.background)
         return _set_face(field, self.face, ghost)
 
 
-BoundaryCondition1D = (
+type BoundaryCondition1D = (
     Dirichlet1D | Neumann1D | Periodic1D | Outflow1D | Reflective1D | Sponge1D
 )

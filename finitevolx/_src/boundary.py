@@ -43,6 +43,7 @@ def pad_interior(
     (6, 6)
     """
     if mode == "edge":
+        # BoundaryConditionSet.open() is zero-gradient and does not use dx/dy.
         return BoundaryConditionSet.open()(field, dx=1.0, dy=1.0)
     interior = field[1:-1, 1:-1]  # shape [Ny-2, Nx-2]
     return jnp.pad(interior, pad_width=1, mode=mode)  # shape [Ny, Nx]
@@ -70,4 +71,5 @@ def enforce_periodic(
     Float[Array, "Ny Nx"]
         Array with periodic ghost cells.
     """
+    # Periodic1D wraps opposite interior values and does not use dx/dy.
     return BoundaryConditionSet.periodic()(field, dx=1.0, dy=1.0)
