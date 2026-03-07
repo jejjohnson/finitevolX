@@ -29,6 +29,7 @@ dependencies = [
     "beartype>=0.18.0",
     "equinox",
     "scipy>=1.13.0",
+    "lineax>=0.1.0",
 ]
 
 [project.urls]

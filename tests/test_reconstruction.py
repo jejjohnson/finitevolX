@@ -617,9 +617,9 @@ class TestReconstruction2DMasked:
             # mask forces 1st-order upwind. For a non-constant h this differs from
             # the WENO-5 result produced by the unmasked method.
             row_slice = slice(2, 8)
-            diffs_found = jnp.any(
-                masked[row_slice, 3] != ref[row_slice, 3]
-            ) | jnp.any(masked[row_slice, 6] != ref[row_slice, 6])
+            diffs_found = jnp.any(masked[row_slice, 3] != ref[row_slice, 3]) | jnp.any(
+                masked[row_slice, 6] != ref[row_slice, 6]
+            )
             assert diffs_found.item()
 
     # --- weno5_y_masked ---
