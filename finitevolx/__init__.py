@@ -1,4 +1,14 @@
 from finitevolx._src.advection import Advection1D, Advection2D, Advection3D
+from finitevolx._src.bc_1d import (
+    Dirichlet1D,
+    Neumann1D,
+    Outflow1D,
+    Periodic1D,
+    Reflective1D,
+    Sponge1D,
+)
+from finitevolx._src.bc_field import FieldBCSet
+from finitevolx._src.bc_set import BoundaryConditionSet
 from finitevolx._src.boundary import enforce_periodic, pad_interior
 from finitevolx._src.difference import Difference1D, Difference2D, Difference3D
 from finitevolx._src.elliptic import (
@@ -52,6 +62,15 @@ __all__ = [
     "ArakawaCGrid2D",
     "ArakawaCGrid3D",
     "ArakawaCGridMask",
+    # Boundary condition sets and 1D BCs
+    "BoundaryConditionSet",
+    "Dirichlet1D",
+    "FieldBCSet",
+    "Neumann1D",
+    "Outflow1D",
+    "Periodic1D",
+    "Reflective1D",
+    "Sponge1D",
     # Finite difference
     "Difference1D",
     "Difference2D",
