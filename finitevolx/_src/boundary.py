@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Boundary condition helpers for finitevolX.
 
@@ -8,6 +10,8 @@ The physical interior lives at [1:-1, 1:-1].
 
 import jax.numpy as jnp
 from jaxtyping import Array, Float
+
+from finitevolx._src.bc_set import BoundaryConditionSet
 
 
 def pad_interior(
@@ -38,6 +42,8 @@ def pad_interior(
     >>> pad_interior(f).shape
     (6, 6)
     """
+    if mode == "edge":
+        return BoundaryConditionSet.open()(field, dx=1.0, dy=1.0)
     interior = field[1:-1, 1:-1]  # shape [Ny-2, Nx-2]
     return jnp.pad(interior, pad_width=1, mode=mode)  # shape [Ny, Nx]
 
@@ -64,9 +70,4 @@ def enforce_periodic(
     Float[Array, "Ny Nx"]
         Array with periodic ghost cells.
     """
-    out = field
-    out = out.at[0, :].set(out[-2, :])  # ghost south  <- interior south
-    out = out.at[-1, :].set(out[1, :])  # ghost north  <- interior north
-    out = out.at[:, 0].set(out[:, -2])  # ghost west   <- interior east
-    out = out.at[:, -1].set(out[:, 1])  # ghost east   <- interior west
-    return out
+    return BoundaryConditionSet.periodic()(field, dx=1.0, dy=1.0)
