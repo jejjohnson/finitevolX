@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx import ArakawaCGrid2D, Difference2D, Interpolation2D, enforce_periodic
+from finitevolx import ArakawaCGrid2D, Difference2D, Interpolation2D
 
 xr = pytest.importorskip("xarray")
 pytest.importorskip("zarr")
@@ -157,6 +157,14 @@ def test_qg_script_runs_stably(tmp_path: Path) -> None:
     # steady double-gyre forcing, so the relative-vorticity variability should
     # increase during the short smoke-test integration.
     assert np.std(relative_vorticity[-1]) > np.std(relative_vorticity[0])
+    # The example must report closed-basin (not periodic) boundary conditions.
+    notes = dataset.attrs.get("notes", "")
+    assert "closed" in notes.lower(), (
+        f"Expected 'closed' in dataset notes, got: {notes!r}"
+    )
+    assert "periodic" not in notes.lower(), (
+        f"Found 'periodic' in dataset notes: {notes!r}"
+    )
 
 
 def test_qg_geostrophic_velocity_helper_is_nearly_nondivergent() -> None:
@@ -173,9 +181,8 @@ def test_qg_geostrophic_velocity_helper_is_nearly_nondivergent() -> None:
     psi_interior = np.sin(2.0 * np.pi * x2d / config.Lx) * np.sin(
         2.0 * np.pi * y2d / config.Ly
     )
-    psi_field = enforce_periodic(
-        jnp.pad(jnp.asarray(psi_interior), pad_width=1, mode="wrap")
-    )
+    # Use zero (Dirichlet wall) ghost cells, matching the closed-basin setup.
+    psi_field = jnp.pad(jnp.asarray(psi_interior), pad_width=1, mode="constant")
 
     u_field, v_field = module.geostrophic_velocity_from_streamfunction(
         psi_field, diff, interp
@@ -183,3 +190,27 @@ def test_qg_geostrophic_velocity_helper_is_nearly_nondivergent() -> None:
     divergence = diff.divergence(u_field, v_field)
 
     np.testing.assert_allclose(divergence[1:-1, 1:-1], 0.0, atol=1e-12)
+
+
+def test_qg_wall_field_produces_zero_ghost_cells() -> None:
+    """Verify that to_wall_field produces zero ghost cells (closed-basin Dirichlet BCs)."""
+    module = load_script_module("qg_wall_module", "qg_1p5_layer.py")
+    interior = np.ones((16, 16))
+    da = xr.DataArray(interior, dims=("y", "x"))
+    padded = np.asarray(module.to_wall_field(da))
+
+    # All four ghost rows/columns must be exactly zero.
+    np.testing.assert_array_equal(
+        padded[0, :], 0.0, err_msg="south ghost row is not zero"
+    )
+    np.testing.assert_array_equal(
+        padded[-1, :], 0.0, err_msg="north ghost row is not zero"
+    )
+    np.testing.assert_array_equal(
+        padded[:, 0], 0.0, err_msg="west ghost col is not zero"
+    )
+    np.testing.assert_array_equal(
+        padded[:, -1], 0.0, err_msg="east ghost col is not zero"
+    )
+    # Interior values must be preserved unchanged.
+    np.testing.assert_array_equal(padded[1:-1, 1:-1], interior)
