@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.13](https://github.com/jejjohnson/finitevolX/compare/v0.0.12...v0.0.13) (2026-03-08)
+
+
+### Bug Fixes
+
+* convert QG example from periodic beta-plane to closed-basin double-gyre ([b132e8e](https://github.com/jejjohnson/finitevolX/commit/b132e8e0001ab6a111e8d86d6b735f26eb8e3a20))
+* convert QG example from periodic beta-plane to closed-basin double-gyre ([10a253d](https://github.com/jejjohnson/finitevolX/commit/10a253df437afbad5f9178e8bbbce82366301549))
+
 ## [0.0.12](https://github.com/jejjohnson/finitevolX/compare/v0.0.11...v0.0.12) (2026-03-07)
 
 
