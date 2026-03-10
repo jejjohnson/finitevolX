@@ -38,10 +38,10 @@ class Advection1D(eqx.Module):
 
     def __call__(
         self,
-        h: Float[Array, Nx],
-        u: Float[Array, Nx],
+        h: Float[Array, "Nx"],
+        u: Float[Array, "Nx"],
         method: str = "upwind1",
-    ) -> Float[Array, Nx]:
+    ) -> Float[Array, "Nx"]:
         """Advective tendency -d(h*u)/dx at T-points.
 
         dh[i] = -(fe[i+1/2] - fe[i-1/2]) / dx
