@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import jax.numpy as jnp
 from jaxtyping import Array
+import numpy as np
 
 _WENO7_COEFFS = (
     (-1.0 / 4.0, 13.0 / 12.0, -23.0 / 12.0, 25.0 / 12.0),
@@ -9,7 +12,7 @@ _WENO7_COEFFS = (
 )
 _WENO7_WEIGHTS = (1.0 / 35.0, 12.0 / 35.0, 18.0 / 35.0, 4.0 / 35.0)
 _WENO7_BETA_MATRICES = (
-    jnp.array(
+    np.array(
         [
             [547.0 / 240.0, -647.0 / 80.0, 2321.0 / 240.0, -309.0 / 80.0],
             [-647.0 / 80.0, 7043.0 / 240.0, -8623.0 / 240.0, 3521.0 / 240.0],
@@ -17,7 +20,7 @@ _WENO7_BETA_MATRICES = (
             [-309.0 / 80.0, 3521.0 / 240.0, -1567.0 / 80.0, 2107.0 / 240.0],
         ]
     ),
-    jnp.array(
+    np.array(
         [
             [89.0 / 80.0, -821.0 / 240.0, 267.0 / 80.0, -247.0 / 240.0],
             [-821.0 / 240.0, 2843.0 / 240.0, -2983.0 / 240.0, 961.0 / 240.0],
@@ -25,7 +28,7 @@ _WENO7_BETA_MATRICES = (
             [-247.0 / 240.0, 961.0 / 240.0, -1261.0 / 240.0, 547.0 / 240.0],
         ]
     ),
-    jnp.array(
+    np.array(
         [
             [547.0 / 240.0, -1261.0 / 240.0, 961.0 / 240.0, -247.0 / 240.0],
             [-1261.0 / 240.0, 3443.0 / 240.0, -2983.0 / 240.0, 267.0 / 80.0],
@@ -33,7 +36,7 @@ _WENO7_BETA_MATRICES = (
             [-247.0 / 240.0, 267.0 / 80.0, -821.0 / 240.0, 89.0 / 80.0],
         ]
     ),
-    jnp.array(
+    np.array(
         [
             [2107.0 / 240.0, -1567.0 / 80.0, 3521.0 / 240.0, -309.0 / 80.0],
             [-1567.0 / 80.0, 11003.0 / 240.0, -8623.0 / 240.0, 2321.0 / 240.0],
@@ -52,7 +55,7 @@ _WENO9_COEFFS = (
 )
 _WENO9_WEIGHTS = (1.0 / 126.0, 10.0 / 63.0, 10.0 / 21.0, 20.0 / 63.0, 5.0 / 126.0)
 _WENO9_BETA_MATRICES = (
-    jnp.array(
+    np.array(
         [
             [
                 11329.0 / 2520.0,
@@ -91,7 +94,7 @@ _WENO9_BETA_MATRICES = (
             ],
         ]
     ),
-    jnp.array(
+    np.array(
         [
             [
                 1727.0 / 1260.0,
@@ -130,7 +133,7 @@ _WENO9_BETA_MATRICES = (
             ],
         ]
     ),
-    jnp.array(
+    np.array(
         [
             [
                 1727.0 / 1260.0,
@@ -169,7 +172,7 @@ _WENO9_BETA_MATRICES = (
             ],
         ]
     ),
-    jnp.array(
+    np.array(
         [
             [
                 11329.0 / 2520.0,
@@ -208,7 +211,7 @@ _WENO9_BETA_MATRICES = (
             ],
         ]
     ),
-    jnp.array(
+    np.array(
         [
             [
                 53959.0 / 2520.0,
@@ -254,15 +257,16 @@ def _linear_combo(coeffs: tuple[float, ...], stencil: tuple[Array, ...]) -> Arra
     return sum(coeff * value for coeff, value in zip(coeffs, stencil, strict=True))
 
 
-def _smoothness_indicator(beta_matrix: Array, stencil: tuple[Array, ...]) -> Array:
+def _smoothness_indicator(beta_matrix: np.ndarray, stencil: tuple[Array, ...]) -> Array:
     values = jnp.stack(stencil, axis=0)
-    return jnp.einsum("i...,ij,j...->...", values, beta_matrix, values)
+    beta_matrix_jax = jnp.asarray(beta_matrix, dtype=values.dtype)
+    return jnp.einsum("i...,ij,j...->...", values, beta_matrix_jax, values)
 
 
 def _weno_reconstruct(
     stencils: tuple[tuple[Array, ...], ...],
     coeffs: tuple[tuple[float, ...], ...],
-    beta_matrices: tuple[Array, ...],
+    beta_matrices: tuple[np.ndarray, ...],
     linear_weights: tuple[float, ...],
     eps: float = 1e-8,
 ) -> Array:

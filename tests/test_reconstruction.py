@@ -512,6 +512,34 @@ class TestReconstruction2D:
         negative = getattr(recon, method_name)(h, -velocity)
         np.testing.assert_allclose(negative[1:-1, 1:-1], -4.0, rtol=1e-5)
 
+    @pytest.mark.parametrize(
+        ("method_name", "depth"),
+        [("weno7_x", 3), ("weno9_x", 4)],
+    )
+    def test_higher_order_weno_x_linear_ramp_is_centered(self, method_name, depth):
+        grid = ArakawaCGrid2D.from_interior(12, 12, 1.0, 1.0)
+        recon = Reconstruction2D(grid=grid)
+        x_idx = jnp.arange(grid.Nx, dtype=float)
+        h = jnp.broadcast_to(x_idx, (grid.Ny, grid.Nx))
+        u = jnp.ones((grid.Ny, grid.Nx))
+        result = getattr(recon, method_name)(h, u)
+        expected = 0.5 * (h[1:-1, depth:-depth] + h[1:-1, depth + 1 : -(depth - 1)])
+        np.testing.assert_allclose(result[1:-1, depth:-depth], expected, rtol=1e-5)
+
+    @pytest.mark.parametrize(
+        ("method_name", "depth"),
+        [("weno7_y", 3), ("weno9_y", 4)],
+    )
+    def test_higher_order_weno_y_linear_ramp_is_centered(self, method_name, depth):
+        grid = ArakawaCGrid2D.from_interior(12, 12, 1.0, 1.0)
+        recon = Reconstruction2D(grid=grid)
+        y_idx = jnp.arange(grid.Ny, dtype=float)
+        h = jnp.broadcast_to(y_idx[:, None], (grid.Ny, grid.Nx))
+        v = jnp.ones((grid.Ny, grid.Nx))
+        result = getattr(recon, method_name)(h, v)
+        expected = 0.5 * (h[depth:-depth, 1:-1] + h[depth + 1 : -(depth - 1), 1:-1])
+        np.testing.assert_allclose(result[depth:-depth, 1:-1], expected, rtol=1e-5)
+
     # --- TVD flux-limiter tests ---
 
     def test_tvd_x_output_shape(self, grid2d):
@@ -663,6 +691,42 @@ class TestReconstruction3D:
         np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], 4.0, rtol=1e-5)
         negative = getattr(recon, method_name)(h, -velocity)
         np.testing.assert_allclose(negative[1:-1, 1:-1, 1:-1], -4.0, rtol=1e-5)
+
+    @pytest.mark.parametrize(
+        ("method_name", "depth"),
+        [("weno7_x", 3), ("weno9_x", 4)],
+    )
+    def test_higher_order_weno_x_linear_ramp_is_centered(self, method_name, depth):
+        grid = ArakawaCGrid3D.from_interior(12, 12, 4, 1.0, 1.0, 1.0)
+        recon = Reconstruction3D(grid=grid)
+        x_idx = jnp.arange(grid.Nx, dtype=float)
+        h = jnp.broadcast_to(x_idx[None, None, :], (grid.Nz, grid.Ny, grid.Nx))
+        u = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        result = getattr(recon, method_name)(h, u)
+        expected = 0.5 * (
+            h[1:-1, 1:-1, depth:-depth] + h[1:-1, 1:-1, depth + 1 : -(depth - 1)]
+        )
+        np.testing.assert_allclose(
+            result[1:-1, 1:-1, depth:-depth], expected, rtol=1e-5
+        )
+
+    @pytest.mark.parametrize(
+        ("method_name", "depth"),
+        [("weno7_y", 3), ("weno9_y", 4)],
+    )
+    def test_higher_order_weno_y_linear_ramp_is_centered(self, method_name, depth):
+        grid = ArakawaCGrid3D.from_interior(12, 12, 4, 1.0, 1.0, 1.0)
+        recon = Reconstruction3D(grid=grid)
+        y_idx = jnp.arange(grid.Ny, dtype=float)
+        h = jnp.broadcast_to(y_idx[None, :, None], (grid.Nz, grid.Ny, grid.Nx))
+        v = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        result = getattr(recon, method_name)(h, v)
+        expected = 0.5 * (
+            h[1:-1, depth:-depth, 1:-1] + h[1:-1, depth + 1 : -(depth - 1), 1:-1]
+        )
+        np.testing.assert_allclose(
+            result[1:-1, depth:-depth, 1:-1], expected, rtol=1e-5
+        )
 
     # --- TVD flux-limiter tests ---
 
