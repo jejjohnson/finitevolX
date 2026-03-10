@@ -259,6 +259,8 @@ def _linear_combo(coeffs: tuple[float, ...], stencil: tuple[Array, ...]) -> Arra
 
 def _smoothness_indicator(beta_matrix: np.ndarray, stencil: tuple[Array, ...]) -> Array:
     values = jnp.stack(stencil, axis=0)
+    # Cast the precomputed NumPy matrix to the traced input dtype so WENO
+    # smoothness indicators follow float32/float64 runtime settings.
     beta_matrix_jax = jnp.asarray(beta_matrix, dtype=values.dtype)
     return jnp.einsum("i...,ij,j...->...", values, beta_matrix_jax, values)
 
