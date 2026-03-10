@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.0.16](https://github.com/jejjohnson/finitevolX/compare/v0.0.15...v0.0.16) (2026-03-10)
+
+
+### Features
+
+* replace static PNG comparison plots with animated GIFs ([ebf4b18](https://github.com/jejjohnson/finitevolX/commit/ebf4b188f6c0fb4fede0e6a92042ab704cd43f99))
+* replace static PNG comparison plots with animated GIFs ([9d813d1](https://github.com/jejjohnson/finitevolX/commit/9d813d1ccf640269762bf4cf5cd78927be917945))
+
+
+### Bug Fixes
+
+* address reviewer feedback on GIF animation changes ([94ebc36](https://github.com/jejjohnson/finitevolX/commit/94ebc3657ddd1580f3f804ca9e671499de99e162))
+
 ## [0.0.15](https://github.com/jejjohnson/finitevolX/compare/v0.0.14...v0.0.15) (2026-03-10)
 
 
