@@ -85,14 +85,18 @@ class LinearShallowWaterConfig:
         Peak zonal body-force acceleration [m s⁻²].
     dt : float, optional
         Explicit time step [s].
+    spinup_steps : int, optional
+        Number of silent spin-up steps run before snapshot recording begins.
+        The spin-up advances the model state but records no output; the first
+        saved snapshot starts at ``spinup_steps * dt`` seconds.
     steps : int, optional
-        Number of time steps to integrate.
+        Number of time steps to record after the spin-up phase.
     snapshot_interval : int, optional
         Number of steps between saved snapshots.
     zarr_path : Path, optional
         Output path for the sampled Zarr dataset.
     figure_path : Path, optional
-        Output path for the comparison figure.
+        Output path for the animated GIF figure.
 
     Examples
     --------
@@ -257,6 +261,10 @@ def save_animation_gif(
         save_animation_gif(dataset, Path("eta.gif"), "eta", "Linear SWE")
     """
     from matplotlib.animation import FuncAnimation, PillowWriter
+
+    if fps < 1:
+        msg = f"fps must be >= 1, got {fps}"
+        raise ValueError(msg)
 
     gif_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -485,7 +493,9 @@ def run_simulation(config: LinearShallowWaterConfig | None = None) -> xr.Dataset
             "model": "linear shallow water",
             "configuration": "double gyre",
             "time_step_seconds": config.dt,
+            "spinup_steps": config.spinup_steps,
             "num_steps": config.steps,
+            "total_integrated_steps": config.spinup_steps + config.steps,
             "notes": "Finitevolx C-grid example with xarray preprocessing/postprocessing.",
         },
     )

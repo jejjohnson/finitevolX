@@ -192,6 +192,10 @@ def save_animation_gif(
     """
     from matplotlib.animation import FuncAnimation, PillowWriter
 
+    if fps < 1:
+        msg = f"fps must be >= 1, got {fps}"
+        raise ValueError(msg)
+
     gif_path.parent.mkdir(parents=True, exist_ok=True)
 
     data = dataset[variable_name] * scale_factor
@@ -257,12 +261,17 @@ class QuasiGeostrophicConfig:
         faster demo spin-up while keeping velocities in a plausible range.
     dt : float, optional
         Explicit time step [s].
+    spinup_steps : int, optional
+        Number of silent spin-up steps run before snapshot recording begins.
+        The spin-up advances the model state but records no output; the first
+        saved snapshot starts at ``spinup_steps * dt`` seconds.
     steps : int, optional
-        Number of time steps.
+        Number of time steps to record after the spin-up phase.
     snapshot_interval : int, optional
         Steps between sampled outputs.
     zarr_path, figure_path : Path, optional
-        Artifact paths written by the script.
+        Artifact paths written by the script. ``figure_path`` receives an
+        animated GIF of the relative vorticity field.
 
     Examples
     --------
@@ -590,7 +599,9 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
             "model": "1.5-layer quasi-geostrophic",
             "configuration": "double gyre",
             "time_step_seconds": config.dt,
+            "spinup_steps": config.spinup_steps,
             "num_steps": config.steps,
+            "total_integrated_steps": config.spinup_steps + config.steps,
             "notes": (
                 "Finitevolx 1.5-layer QG double-gyre with Formulation B: "
                 "q_a = zeta - psi/Ld^2 (no beta background in prognostic PV). "

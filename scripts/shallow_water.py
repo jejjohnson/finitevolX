@@ -109,6 +109,10 @@ def save_animation_gif(
     """
     from matplotlib.animation import FuncAnimation, PillowWriter
 
+    if fps < 1:
+        msg = f"fps must be >= 1, got {fps}"
+        raise ValueError(msg)
+
     gif_path.parent.mkdir(parents=True, exist_ok=True)
 
     data = dataset[variable_name] * scale_factor
@@ -173,12 +177,17 @@ class ShallowWaterConfig:
         Peak zonal body-force acceleration [m s⁻²].
     dt : float, optional
         Time step [s].
+    spinup_steps : int, optional
+        Number of silent spin-up steps run before snapshot recording begins.
+        The spin-up advances the model state but records no output; the first
+        saved snapshot starts at ``spinup_steps * dt`` seconds.
     steps : int, optional
-        Number of explicit steps.
+        Number of explicit steps to record after the spin-up phase.
     snapshot_interval : int, optional
         Steps between saved snapshots.
     zarr_path, figure_path : Path, optional
-        Artifact paths written by the script.
+        Artifact paths written by the script. ``figure_path`` receives an
+        animated GIF of the free-surface anomaly.
 
     Examples
     --------
@@ -494,7 +503,9 @@ def run_simulation(config: ShallowWaterConfig | None = None) -> xr.Dataset:  # n
             "model": "nonlinear shallow water",
             "configuration": "double gyre",
             "time_step_seconds": config.dt,
+            "spinup_steps": config.spinup_steps,
             "num_steps": config.steps,
+            "total_integrated_steps": config.spinup_steps + config.steps,
             "notes": "Finitevolx nonlinear example with xarray preprocessing/postprocessing.",
         },
     )
