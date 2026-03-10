@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.17](https://github.com/jejjohnson/finitevolX/compare/v0.0.16...v0.0.17) (2026-03-10)
+
+
+### Features
+
+* add WENO7 and WENO9 advection schemes ([6fd9ebc](https://github.com/jejjohnson/finitevolX/commit/6fd9ebc81ad46c720ffde40f85756f087d583d0b))
+
 ## [0.0.16](https://github.com/jejjohnson/finitevolX/compare/v0.0.15...v0.0.16) (2026-03-10)
 
 
