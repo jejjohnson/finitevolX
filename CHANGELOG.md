@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.15](https://github.com/jejjohnson/finitevolX/compare/v0.0.14...v0.0.15) (2026-03-10)
+
+
+### Features
+
+* add TVD flux limiters, masked TVD schemes, and advection method support ([863b3ac](https://github.com/jejjohnson/finitevolX/commit/863b3ace4622a010a6e6fc3f84716c1cae745470))
+* flux limiters and masked advection schemes ([7fc7654](https://github.com/jejjohnson/finitevolX/commit/7fc7654a56437464c2efa4e865372e05d2de79ec))
+
+
+### Bug Fixes
+
+* correct inaccurate comment on TVD stencil size in tvd_x_masked ([39db0c2](https://github.com/jejjohnson/finitevolX/commit/39db0c22dcab86696878f4006deee344c8975d99))
+* keep jaxtyping shape strings compatible with ruff and ty ([263f491](https://github.com/jejjohnson/finitevolX/commit/263f49127b9ec57ed182519ac081f18c29a704f3))
+
 ## [0.0.14](https://github.com/jejjohnson/finitevolX/compare/v0.0.13...v0.0.14) (2026-03-10)
 
 
