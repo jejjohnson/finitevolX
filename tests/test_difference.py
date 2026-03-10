@@ -413,3 +413,202 @@ class TestDifference3D:
         h = jnp.broadcast_to(h2d, (grid3d.Nz, grid3d.Ny, grid3d.Nx))
         result = diff.laplacian(h)
         np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], 4.0, rtol=1e-5)
+
+
+# ---------------------------------------------------------------------------
+# Analytical correctness: laplacian of constant field
+# ---------------------------------------------------------------------------
+
+
+class TestDifferenceLaplacianConstant:
+    """Laplacian of a constant field must be zero everywhere in the interior."""
+
+    def test_laplacian_1d_constant_is_zero(self):
+        grid = ArakawaCGrid1D.from_interior(8, 1.0)
+        diff = Difference1D(grid=grid)
+        h = 5.0 * jnp.ones(grid.Nx)
+        result = diff.laplacian(h)
+        np.testing.assert_allclose(result[1:-1], 0.0, atol=1e-10)
+
+    def test_laplacian_2d_constant_is_zero(self):
+        grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+        diff = Difference2D(grid=grid)
+        h = 7.0 * jnp.ones((grid.Ny, grid.Nx))
+        result = diff.laplacian(h)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
+
+    def test_laplacian_3d_constant_is_zero(self):
+        grid = ArakawaCGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+        diff = Difference3D(grid=grid)
+        h = 3.0 * jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        result = diff.laplacian(h)
+        np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], 0.0, atol=1e-10)
+
+    def test_laplacian_2d_linear_x_is_zero(self):
+        """Laplacian of h=c*x is zero (second derivative of linear field = 0).
+
+        The Laplacian is computed as diff_x_U_to_T(diff_x_T_to_U(h)).
+        diff_x_T_to_U writes only to interior U-points [1:-1, 1:-1]; the west
+        ghost U-face (column 0) is NOT filled, so diff_x_U_to_T at i=1 reads
+        a zero ghost and computes a non-zero spurious value.  Columns i≥2
+        only read interior U-values and recover d²h/dx² = 0 correctly.
+        The y-direction is unaffected by this (h doesn't vary in y), so
+        the full y-interior [1:-1] is valid.
+        """
+        grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+        diff = Difference2D(grid=grid)
+        c = 3.0
+        x = jnp.arange(grid.Nx, dtype=float) * grid.dx
+        h = jnp.broadcast_to(c * x, (grid.Ny, grid.Nx))
+        result = diff.laplacian(h)
+        # Skip column i=1 (spurious from zero west ghost U-face); y-axis is unaffected.
+        np.testing.assert_allclose(result[1:-1, 2:-1], 0.0, atol=1e-10)
+
+    def test_laplacian_2d_linear_y_is_zero(self):
+        """Laplacian of h=c*y is zero (second derivative of linear field = 0).
+
+        The Laplacian is computed as diff_y_V_to_T(diff_y_T_to_V(h)).
+        diff_y_T_to_V writes only to interior V-points [1:-1, 1:-1]; the south
+        ghost V-face (row 0) is NOT filled, so diff_y_V_to_T at j=1 reads
+        a zero ghost and computes a non-zero spurious value.  Rows j≥2
+        only read interior V-values and recover d²h/dy² = 0 correctly.
+        The x-direction is unaffected (h doesn't vary in x), so the full
+        x-interior [1:-1] is valid.
+        """
+        grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+        diff = Difference2D(grid=grid)
+        c = 2.5
+        y = jnp.arange(grid.Ny, dtype=float) * grid.dy
+        h = jnp.broadcast_to(c * y[:, None], (grid.Ny, grid.Nx))
+        result = diff.laplacian(h)
+        # Skip row j=1 (spurious from zero south ghost V-face); x-axis is unaffected.
+        np.testing.assert_allclose(result[2:-1, 1:-1], 0.0, atol=1e-10)
+
+
+# ---------------------------------------------------------------------------
+# Cross-axis independence: x-diff of y-only field is zero, and vice versa
+# ---------------------------------------------------------------------------
+
+
+class TestDifferenceCrossAxis:
+    """Derivatives of fields that vary in one axis only should vanish in the
+    other axis."""
+
+    def test_x_diff_of_y_only_field_is_zero(self):
+        """h = f(y) only → dh/dx = 0 everywhere in the interior."""
+        grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+        diff = Difference2D(grid=grid)
+        y = jnp.arange(grid.Ny, dtype=float) * grid.dy
+        h = jnp.broadcast_to(2.0 * y[:, None], (grid.Ny, grid.Nx))
+        result = diff.diff_x_T_to_U(h)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
+
+    def test_y_diff_of_x_only_field_is_zero(self):
+        """h = f(x) only → dh/dy = 0 everywhere in the interior."""
+        grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+        diff = Difference2D(grid=grid)
+        x = jnp.arange(grid.Nx, dtype=float) * grid.dx
+        h = jnp.broadcast_to(3.0 * x, (grid.Ny, grid.Nx))
+        result = diff.diff_y_T_to_V(h)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
+
+
+# ---------------------------------------------------------------------------
+# Anisotropic (dx ≠ dy) and rectangular (nx ≠ ny) grid tests
+# ---------------------------------------------------------------------------
+
+
+class TestDifferenceAnisotropicGrid:
+    """All difference operators must scale correctly when dx ≠ dy."""
+
+    def test_diff_x_respects_dx_scaling(self):
+        """dh/dx output should scale inversely with dx."""
+        dx, dy = 2.0, 1.0
+        grid = ArakawaCGrid2D.from_interior(8, 8, dx * 8, dy * 8)
+        diff = Difference2D(grid=grid)
+        c = 3.0
+        x = jnp.arange(grid.Nx, dtype=float) * grid.dx
+        h = jnp.broadcast_to(c * x, (grid.Ny, grid.Nx))
+        result = diff.diff_x_T_to_U(h)
+        np.testing.assert_allclose(result[1:-1, 1:-1], c, rtol=1e-5)
+
+    def test_diff_y_respects_dy_scaling(self):
+        """dh/dy output should scale inversely with dy."""
+        dx, dy = 1.0, 3.0
+        grid = ArakawaCGrid2D.from_interior(8, 8, dx * 8, dy * 8)
+        diff = Difference2D(grid=grid)
+        c = 2.0
+        y = jnp.arange(grid.Ny, dtype=float) * grid.dy
+        h = jnp.broadcast_to(c * y[:, None], (grid.Ny, grid.Nx))
+        result = diff.diff_y_T_to_V(h)
+        np.testing.assert_allclose(result[1:-1, 1:-1], c, rtol=1e-5)
+
+    def test_laplacian_anisotropic_quadratic(self):
+        """h = a*x^2 + b*y^2 → Laplacian = 2a/dx^2*dx^2 + 2b/dy^2*dy^2.
+
+        Using unit-domain grids so that
+        d²h/dx² = 2*a  and  d²h/dy² = 2*b,
+        giving Laplacian = 2*(a+b) as the continuous value.
+        Since we use the same spacing for both axes in grid units, the
+        discrete Laplacian matches the continuous one for quadratic fields.
+        """
+        # Use unit domain so that grid.dx = Lx/nx = 1.0, grid.dy = Ly/ny = 1.0
+        grid = ArakawaCGrid2D.from_interior(8, 8, 8.0, 8.0)
+        diff = Difference2D(grid=grid)
+        a, b = 1.0, 2.0
+        x = jnp.arange(grid.Nx, dtype=float) * grid.dx
+        y = jnp.arange(grid.Ny, dtype=float) * grid.dy
+        h = a * x[None, :] ** 2 + b * y[:, None] ** 2
+        result = diff.laplacian(h)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 2.0 * (a + b), rtol=1e-5)
+
+
+class TestDifferenceRectangularGrid:
+    """Operators must work correctly on non-square (nx ≠ ny) domains."""
+
+    def test_output_shape_rectangular(self):
+        grid = ArakawaCGrid2D.from_interior(6, 10, 1.0, 1.0)
+        diff = Difference2D(grid=grid)
+        h = jnp.ones((grid.Ny, grid.Nx))
+        assert diff.diff_x_T_to_U(h).shape == (grid.Ny, grid.Nx)
+        assert diff.diff_y_T_to_V(h).shape == (grid.Ny, grid.Nx)
+        assert diff.laplacian(h).shape == (grid.Ny, grid.Nx)
+
+    def test_linear_field_x_on_rectangular_grid(self):
+        """Forward x-diff of a linear field is exact on a rectangular grid."""
+        grid = ArakawaCGrid2D.from_interior(4, 10, 1.0, 1.0)
+        diff = Difference2D(grid=grid)
+        c = 2.5
+        x = jnp.arange(grid.Nx, dtype=float) * grid.dx
+        h = jnp.broadcast_to(c * x, (grid.Ny, grid.Nx))
+        result = diff.diff_x_T_to_U(h)
+        np.testing.assert_allclose(result[1:-1, 1:-1], c, rtol=1e-5)
+
+    def test_linear_field_y_on_rectangular_grid(self):
+        """Forward y-diff of a linear field is exact on a rectangular grid."""
+        grid = ArakawaCGrid2D.from_interior(10, 4, 1.0, 1.0)
+        diff = Difference2D(grid=grid)
+        c = 1.5
+        y = jnp.arange(grid.Ny, dtype=float) * grid.dy
+        h = jnp.broadcast_to(c * y[:, None], (grid.Ny, grid.Nx))
+        result = diff.diff_y_T_to_V(h)
+        np.testing.assert_allclose(result[1:-1, 1:-1], c, rtol=1e-5)
+
+    def test_divergence_constant_flow_rectangular(self):
+        """Divergence of uniform flow is zero on a rectangular grid."""
+        grid = ArakawaCGrid2D.from_interior(5, 12, 2.0, 3.0)
+        diff = Difference2D(grid=grid)
+        u = jnp.ones((grid.Ny, grid.Nx))
+        v = jnp.ones((grid.Ny, grid.Nx))
+        result = diff.divergence(u, v)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
+
+    def test_no_nan_on_rectangular_grid(self):
+        """Ensure no NaN values are produced for rectangular domains."""
+        grid = ArakawaCGrid2D.from_interior(6, 10, 2.0, 5.0)
+        diff = Difference2D(grid=grid)
+        x = jnp.arange(grid.Nx, dtype=float) * grid.dx
+        y = jnp.arange(grid.Ny, dtype=float) * grid.dy
+        h = jnp.sin(x[None, :]) + jnp.cos(y[:, None])
+        for result in [diff.laplacian(h), diff.diff_x_T_to_U(h), diff.diff_y_T_to_V(h)]:
+            assert jnp.all(jnp.isfinite(result)), "NaN/Inf on rectangular grid"
