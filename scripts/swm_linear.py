@@ -117,10 +117,11 @@ class LinearShallowWaterConfig:
     viscosity: float = 2.0e5
     wind_acceleration: float = 2.0e-7
     dt: float = 30.0
+    spinup_steps: int = 0
     steps: int = 1200
     snapshot_interval: int = 150
     zarr_path: Path = Path("outputs/linear_shallow_water_double_gyre.zarr")
-    figure_path: Path = Path("outputs/linear_shallow_water_double_gyre.png")
+    figure_path: Path = Path("outputs/linear_shallow_water_double_gyre.gif")
 
 
 def make_preprocessing_dataset(
@@ -218,72 +219,80 @@ def to_periodic_field(field: xr.DataArray) -> Float[Array, "Ny Nx"]:
     return enforce_periodic(jnp.pad(interior, pad_width=1, mode="wrap"))
 
 
-def save_comparison_plot(
+def save_animation_gif(
     dataset: xr.Dataset,
-    figure_path: Path,
+    gif_path: Path,
     variable_name: str,
     title: str,
     cmap: str = "RdBu_r",
     scale_factor: float = 1.0,
     colorbar_label: str | None = None,
+    fps: int = 3,
 ) -> None:
-    """Save a static before/after plot for a sampled field.
+    """Save an animated GIF showing the time evolution of a sampled field.
 
     Parameters
     ----------
     dataset : xr.Dataset
-        Sampled simulation output.
-    figure_path : Path
-        Output path for the saved figure.
+        Sampled simulation output with ``time``, ``y``, and ``x`` dimensions.
+    gif_path : Path
+        Output path for the animated GIF.
     variable_name : str
-        Name of the field to visualise.
+        Name of the field to animate.
     title : str
-        Figure title.
+        Figure title prefix; the simulation time in days is appended per frame.
     cmap : str, optional
         Matplotlib colour map.
+    scale_factor : float, optional
+        Multiplicative scale applied to the field values before display.
+    colorbar_label : str | None, optional
+        Colour-bar label.
+    fps : int, optional
+        Frames per second for the output GIF.
 
     Examples
     --------
-    Save a comparison of the initial and final free-surface anomaly::
+    Save an animated GIF of the free-surface anomaly::
 
-        save_comparison_plot(dataset, Path("linear.png"), "eta", "Linear SWE")
-
-    Save a streamfunction comparison using a sequential colour map::
-
-        save_comparison_plot(dataset, Path("psi.png"), "psi", "QG", cmap="viridis")
+        save_animation_gif(dataset, Path("eta.gif"), "eta", "Linear SWE")
     """
-    figure_path.parent.mkdir(parents=True, exist_ok=True)
+    from matplotlib.animation import FuncAnimation, PillowWriter
+
+    gif_path.parent.mkdir(parents=True, exist_ok=True)
 
     data = dataset[variable_name] * scale_factor
-    initial = data.isel(time=0)
-    final = data.isel(time=-1)
-    vmax = float(np.nanmax(np.abs(np.stack([initial.to_numpy(), final.to_numpy()]))))
+    vmax = float(np.nanmax(np.abs(data.to_numpy())))
     if vmax == 0.0:
         vmax = 1.0
-    vmin = -vmax
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4), constrained_layout=True)
-    for axis, field, panel in zip(
-        axes, [initial, final], ["Initial", "Final"], strict=True
-    ):
-        image = axis.pcolormesh(
-            dataset["x"],
-            dataset["y"],
-            field,
-            shading="auto",
-            cmap=cmap,
-            vmin=vmin,
-            vmax=vmax,
-        )
-        axis.set_title(panel)
-        axis.set_xlabel("x [m]")
-        axis.set_ylabel("y [m]")
-        colorbar = fig.colorbar(image, ax=axis, shrink=0.9)
-        if colorbar_label is not None:
-            colorbar.set_label(colorbar_label)
+    fig, ax = plt.subplots(figsize=(6, 5), constrained_layout=True)
+    frame0 = data.isel(time=0).to_numpy()
+    image = ax.pcolormesh(
+        dataset["x"].to_numpy(),
+        dataset["y"].to_numpy(),
+        frame0,
+        shading="auto",
+        cmap=cmap,
+        vmin=-vmax,
+        vmax=vmax,
+    )
+    ax.set_xlabel("x [m]")
+    ax.set_ylabel("y [m]")
+    colorbar = fig.colorbar(image, ax=ax, shrink=0.9)
+    if colorbar_label is not None:
+        colorbar.set_label(colorbar_label)
+    t_days = float(data["time"].isel(time=0)) / 86400.0
+    title_text = ax.set_title(f"{title} | t = {t_days:.1f} d")
 
-    fig.suptitle(title)
-    fig.savefig(figure_path, dpi=150)
+    def update(frame: int) -> None:
+        field = data.isel(time=frame).to_numpy()
+        image.set_array(field.ravel())
+        t = float(data["time"].isel(time=frame)) / 86400.0
+        title_text.set_text(f"{title} | t = {t:.1f} d")
+
+    n_frames = data.sizes["time"]
+    anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 // fps)
+    anim.save(gif_path, writer=PillowWriter(fps=fps))
     plt.close(fig)
 
 
@@ -404,12 +413,21 @@ def run_simulation(config: LinearShallowWaterConfig | None = None) -> xr.Dataset
         kinetic_energy.append(float(0.5 * np.mean(speed_np**2)))
         mass_anomaly.append(float(np.mean(eta_np)))
 
-    record_snapshot(step_index=0, eta_field=eta, u_field=u, v_field=v)
+    # Silent spin-up phase: run without recording snapshots.
+    for _spinup in range(config.spinup_steps):
+        eta, u, v = step(eta, u, v)
+
+    record_snapshot(step_index=config.spinup_steps, eta_field=eta, u_field=u, v_field=v)
 
     for iteration in range(1, config.steps + 1):
         eta, u, v = step(eta, u, v)
         if iteration % config.snapshot_interval == 0 or iteration == config.steps:
-            record_snapshot(step_index=iteration, eta_field=eta, u_field=u, v_field=v)
+            record_snapshot(
+                step_index=config.spinup_steps + iteration,
+                eta_field=eta,
+                u_field=u,
+                v_field=v,
+            )
 
     dataset = xr.Dataset(
         data_vars={
@@ -474,9 +492,9 @@ def run_simulation(config: LinearShallowWaterConfig | None = None) -> xr.Dataset
 
     config.zarr_path.parent.mkdir(parents=True, exist_ok=True)
     dataset.to_zarr(config.zarr_path, mode="w", consolidated=False)
-    save_comparison_plot(
+    save_animation_gif(
         dataset=dataset,
-        figure_path=config.figure_path,
+        gif_path=config.figure_path,
         variable_name="eta",
         title="Linear shallow-water double gyre: free-surface anomaly",
     )
@@ -491,7 +509,7 @@ def parse_args() -> LinearShallowWaterConfig:
         "--output-dir",
         type=Path,
         default=None,
-        help="Directory that will receive the Zarr store and comparison plot.",
+        help="Directory that will receive the Zarr store and animation GIF.",
     )
     parser.add_argument(
         "--steps",
@@ -505,6 +523,12 @@ def parse_args() -> LinearShallowWaterConfig:
         default=defaults.snapshot_interval,
         help="Number of steps between sampled outputs.",
     )
+    parser.add_argument(
+        "--spinup-steps",
+        type=int,
+        default=defaults.spinup_steps,
+        help="Silent spin-up steps before snapshot recording begins.",
+    )
     args = parser.parse_args()
 
     if args.output_dir is None:
@@ -512,11 +536,12 @@ def parse_args() -> LinearShallowWaterConfig:
         figure_path = defaults.figure_path
     else:
         zarr_path = args.output_dir / "linear_shallow_water_double_gyre.zarr"
-        figure_path = args.output_dir / "linear_shallow_water_double_gyre.png"
+        figure_path = args.output_dir / "linear_shallow_water_double_gyre.gif"
 
     return LinearShallowWaterConfig(
         steps=args.steps,
         snapshot_interval=args.snapshot_interval,
+        spinup_steps=args.spinup_steps,
         zarr_path=zarr_path,
         figure_path=figure_path,
     )
@@ -527,7 +552,7 @@ def main() -> None:
     config = parse_args()
     dataset = run_simulation(config)
     print(f"Saved linear shallow-water fields to {config.zarr_path}")
-    print(f"Saved linear shallow-water comparison plot to {config.figure_path}")
+    print(f"Saved linear shallow-water animation to {config.figure_path}")
     print(
         f"Final max |eta| = {float(np.abs(dataset['eta'].isel(time=-1)).max()):.3e} m"
     )

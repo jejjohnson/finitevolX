@@ -75,7 +75,7 @@ def test_linear_shallow_water_script_runs_stably(tmp_path: Path) -> None:
         steps=240,
         snapshot_interval=40,
         zarr_path=tmp_path / "linear.zarr",
-        figure_path=tmp_path / "linear.png",
+        figure_path=tmp_path / "linear.gif",
     )
 
     dataset = module.run_simulation(config)
@@ -105,7 +105,7 @@ def test_nonlinear_shallow_water_script_runs_stably(tmp_path: Path) -> None:
         steps=240,
         snapshot_interval=40,
         zarr_path=tmp_path / "nonlinear.zarr",
-        figure_path=tmp_path / "nonlinear.png",
+        figure_path=tmp_path / "nonlinear.gif",
     )
 
     dataset = module.run_simulation(config)
@@ -135,7 +135,7 @@ def test_qg_script_runs_stably(tmp_path: Path) -> None:
         steps=400,
         snapshot_interval=50,
         zarr_path=tmp_path / "qg.zarr",
-        figure_path=tmp_path / "qg.png",
+        figure_path=tmp_path / "qg.gif",
     )
 
     dataset = module.run_simulation(config)

@@ -489,7 +489,7 @@ wheels = [
 
 [[package]]
 name = "finitevolx"
-version = "0.0.14"
+version = "0.0.15"
 source = { editable = "." }
 dependencies = [
     { name = "beartype" },
@@ -520,6 +520,7 @@ examples = [
     { name = "loguru" },
     { name = "matplotlib" },
     { name = "numpy" },
+    { name = "pillow" },
     { name = "tqdm" },
     { name = "xarray" },
     { name = "zarr" },
@@ -528,6 +529,7 @@ test = [
     { name = "coverage" },
     { name = "matplotlib" },
     { name = "networkx" },
+    { name = "pillow" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-pretty" },
@@ -562,6 +564,8 @@ requires-dist = [
     { name = "nbstripout", marker = "extra == 'dev'", specifier = ">=0.7.1" },
     { name = "networkx", marker = "extra == 'test'", specifier = ">=3.2" },
     { name = "numpy", marker = "extra == 'examples'", specifier = ">=1.26.0" },
+    { name = "pillow", marker = "extra == 'examples'", specifier = ">=10.0.0" },
+    { name = "pillow", marker = "extra == 'test'", specifier = ">=10.0.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0.0" },
     { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=5.0.0" },
