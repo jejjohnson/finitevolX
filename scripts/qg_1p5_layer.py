@@ -407,21 +407,14 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
         )
         # -div(u*q_a): advective tendency (writes to [2:-2, 2:-2])
         q_rhs = adv(q_field, u_field, v_field, method="upwind1")
-        # -v*beta: planetary-vorticity advection at T-points
+        # -v*beta: planetary-vorticity advection at T-points.
+        # Add directly to q_rhs at the interior to avoid an extra allocation.
         v_center = interp.V_to_T(v_field)
-        beta_rhs = (
-            jnp.zeros_like(q_field).at[1:-1, 1:-1].set(-beta * v_center[1:-1, 1:-1])
-        )
+        q_rhs = q_rhs.at[1:-1, 1:-1].add(-beta * v_center[1:-1, 1:-1])
         # Linear drag on relative vorticity zeta = nabla^2 psi (not on q_a).
         # Dragging on q_a would add a spurious anti-damping +drag*psi/Ld^2 term.
         zeta = diff.laplacian(psi_field)
-        q_rhs = (
-            q_rhs
-            + beta_rhs
-            + wind_curl
-            - drag * zeta
-            + viscosity * diff.laplacian(q_field)
-        )
+        q_rhs = q_rhs + wind_curl - drag * zeta + viscosity * diff.laplacian(q_field)
         return q_rhs, psi_field, u_field, v_field
 
     @jax.jit
