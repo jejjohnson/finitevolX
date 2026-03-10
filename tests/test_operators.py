@@ -207,3 +207,89 @@ class TestBernoulliPotential2D:
 
         assert jnp.issubdtype(p.dtype, jnp.floating)
         np.testing.assert_allclose(p[1:-1, 1:-1], GRAVITY + 0.5, rtol=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# Operator identity / compatibility tests
+# ---------------------------------------------------------------------------
+
+
+class TestOperatorIdentities:
+    """Discrete identities that must hold for any physically consistent
+    implementation of divergence, curl, and gradient operators."""
+
+    def test_divergence_of_curl_is_zero(self, grid2d):
+        """div(curl(ψ)) = 0 for any streamfunction ψ.
+
+        u = -∂ψ/∂y  (from X-point via diff_y_X_to_U)
+        v =  ∂ψ/∂x  (from X-point via diff_x_X_to_V)
+        div(u, v) = ∂u/∂x + ∂v/∂y = -∂²ψ/∂x∂y + ∂²ψ/∂x∂y = 0
+        """
+        from finitevolx._src.difference import Difference2D
+
+        diff = Difference2D(grid=grid2d)
+        x = jnp.arange(grid2d.Nx, dtype=float)
+        y = jnp.arange(grid2d.Ny, dtype=float)
+        psi = y[:, None] * x[None, :]  # ψ = x*y
+
+        u = -diff.diff_y_X_to_U(psi)
+        v = diff.diff_x_X_to_V(psi)
+        divergence = diff.divergence(u, v)
+
+        np.testing.assert_allclose(divergence[1:-1, 1:-1], 0.0, atol=1e-12)
+
+    def test_curl_of_gradient_is_zero(self, grid2d):
+        """curl(grad(ϕ)) = 0 for any potential ϕ.
+
+        u = ∂ϕ/∂x (T→U forward)
+        v = ∂ϕ/∂y (T→V forward)
+        curl(u, v) = ∂v/∂x - ∂u/∂y = ∂²ϕ/∂x∂y - ∂²ϕ/∂y∂x = 0
+
+        Note: The identity holds strictly in the deep interior [2:-2, 2:-2].
+        The first and last interior row/column are contaminated by zero ghost
+        boundaries of the intermediate u and v fields (they are only set in
+        [1:-1, 1:-1], so reading their ghost ring gives 0 instead of the
+        physical value).
+        """
+        from finitevolx._src.difference import Difference2D
+
+        diff = Difference2D(grid=grid2d)
+        x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
+        y = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
+        phi = x[None, :] ** 2 + y[:, None] ** 2  # ϕ = x² + y²
+
+        u = diff.diff_x_T_to_U(phi)  # ∂ϕ/∂x at U-points
+        v = diff.diff_y_T_to_V(phi)  # ∂ϕ/∂y at V-points
+        curl = diff.curl(u, v)
+
+        # Deep interior only: [2:-2, 2:-2] avoids ghost boundary contamination
+        # on all four sides of the intermediate u and v fields.
+        np.testing.assert_allclose(curl[2:-2, 2:-2], 0.0, atol=1e-10)
+
+    def test_laplacian_equals_div_grad(self, grid2d):
+        """∇²ϕ = div(grad(ϕ)) at deep interior points.
+
+        laplacian = diff_x_U_to_T(diff_x_T_to_U(h)) + diff_y_V_to_T(diff_y_T_to_V(h))
+        This must match calling diff.laplacian(h) directly at the deep interior.
+        """
+        from finitevolx._src.difference import Difference2D
+
+        diff = Difference2D(grid=grid2d)
+        x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
+        y = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
+        h = x[None, :] ** 2 + y[:, None] ** 2
+
+        lap = diff.laplacian(h)
+
+        dh_dx = diff.diff_x_T_to_U(h)
+        dh_dy = diff.diff_y_T_to_V(h)
+        d2h_dx2 = diff.diff_x_U_to_T(dh_dx)
+        d2h_dy2 = diff.diff_y_V_to_T(dh_dy)
+        div_grad = jnp.zeros_like(h)
+        div_grad = div_grad.at[1:-1, 1:-1].set(
+            d2h_dx2[1:-1, 1:-1] + d2h_dy2[1:-1, 1:-1]
+        )
+
+        # Deep interior only: [2:-2, 2:-2] avoids ghost boundary artefacts
+        # on all four sides from the intermediate u and v ghost rings.
+        np.testing.assert_allclose(lap[2:-2, 2:-2], div_grad[2:-2, 2:-2], atol=1e-10)
