@@ -500,7 +500,9 @@ class TestReconstruction2D:
         result = recon.wenoz5_y(h, v)
         np.testing.assert_allclose(result[1:-1, 1:-1], -9.0, rtol=1e-5)
 
-    @pytest.mark.parametrize("method_name", ["weno7_x", "weno7_y", "weno9_x", "weno9_y"])
+    @pytest.mark.parametrize(
+        "method_name", ["weno7_x", "weno7_y", "weno9_x", "weno9_y"]
+    )
     def test_higher_order_weno_constant(self, grid2d, method_name):
         recon = Reconstruction2D(grid=grid2d)
         h = 4.0 * jnp.ones((grid2d.Ny, grid2d.Nx))

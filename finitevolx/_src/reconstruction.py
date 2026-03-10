@@ -77,7 +77,9 @@ def _weno7_positive_last_axis(h: Array) -> Array:
         h[..., -1:],
     )
     h3_last = _weno3(h[..., -3:-2], h[..., -2:-1], h[..., -1:])
-    return jnp.concatenate([h3_first, h5_second, h7_interior, h5_penultimate, h3_last], axis=-1)
+    return jnp.concatenate(
+        [h3_first, h5_second, h7_interior, h5_penultimate, h3_last], axis=-1
+    )
 
 
 def _weno7_negative_last_axis(h: Array) -> Array:
@@ -146,7 +148,15 @@ def _weno9_positive_last_axis(h: Array) -> Array:
     )
     h3_last = _weno3(h[..., -3:-2], h[..., -2:-1], h[..., -1:])
     return jnp.concatenate(
-        [h3_first, h5_second, h7_third, h9_interior, h7_third_last, h5_second_last, h3_last],
+        [
+            h3_first,
+            h5_second,
+            h7_third,
+            h9_interior,
+            h7_third_last,
+            h5_second_last,
+            h3_last,
+        ],
         axis=-1,
     )
 
@@ -191,7 +201,15 @@ def _weno9_negative_last_axis(h: Array) -> Array:
         h[..., -5:-4],
     )
     return jnp.concatenate(
-        [h3_first, h5_second, h7_third, h9_interior, h7_third_last, h5_second_last, h[..., -1:]],
+        [
+            h3_first,
+            h5_second,
+            h7_third,
+            h9_interior,
+            h7_third_last,
+            h5_second_last,
+            h[..., -1:],
+        ],
         axis=-1,
     )
 
@@ -216,7 +234,9 @@ def _weno_flux_axis_1d(h: Array, velocity: Array, order: int) -> Array:
 
 def _weno_flux_axis_2d_x(h: Array, velocity: Array, order: int) -> Array:
     out = jnp.zeros_like(h)
-    out = out.at[1:-1, 1:-1].set(_weno_last_axis_flux(h[1:-1, :], velocity[1:-1, 1:-1], order))
+    out = out.at[1:-1, 1:-1].set(
+        _weno_last_axis_flux(h[1:-1, :], velocity[1:-1, 1:-1], order)
+    )
     return out
 
 

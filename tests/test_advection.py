@@ -42,7 +42,16 @@ class TestAdvection1D:
         adv = Advection1D(grid=grid1d)
         h = jnp.ones(grid1d.Nx)
         u = jnp.ones(grid1d.Nx)
-        for method in ["naive", "upwind1", "upwind2", "upwind3", "weno3", "weno5", "weno7", "weno9"]:
+        for method in [
+            "naive",
+            "upwind1",
+            "upwind2",
+            "upwind3",
+            "weno3",
+            "weno5",
+            "weno7",
+            "weno9",
+        ]:
             result = adv(h, u, method=method)
             assert result.shape == (grid1d.Nx,)
 
@@ -111,7 +120,16 @@ class TestAdvection2D:
         h = jnp.ones((grid2d.Ny, grid2d.Nx))
         u = jnp.ones((grid2d.Ny, grid2d.Nx))
         v = jnp.ones((grid2d.Ny, grid2d.Nx))
-        for method in ["naive", "upwind1", "upwind2", "upwind3", "weno3", "weno5", "weno7", "weno9"]:
+        for method in [
+            "naive",
+            "upwind1",
+            "upwind2",
+            "upwind3",
+            "weno3",
+            "weno5",
+            "weno7",
+            "weno9",
+        ]:
             result = adv(h, u, v, method=method)
             assert result.shape == (grid2d.Ny, grid2d.Nx)
 

@@ -1,7 +1,6 @@
 import jax.numpy as jnp
 from jaxtyping import Array
 
-
 _WENO7_COEFFS = (
     (-1.0 / 4.0, 13.0 / 12.0, -23.0 / 12.0, 25.0 / 12.0),
     (1.0 / 12.0, -5.0 / 12.0, 13.0 / 12.0, 1.0 / 4.0),
@@ -281,7 +280,10 @@ def _weno_reconstruct(
     ]
     alpha_sum = sum(alphas)
     return (
-        sum(alpha * candidate for alpha, candidate in zip(alphas, candidates, strict=True))
+        sum(
+            alpha * candidate
+            for alpha, candidate in zip(alphas, candidates, strict=True)
+        )
         / alpha_sum
     )
 
@@ -425,7 +427,9 @@ def weno_7pts(
         (qm, q0, qp, qpp),
         (q0, qp, qpp, qppp),
     )
-    return _weno_reconstruct(stencils, _WENO7_COEFFS, _WENO7_BETA_MATRICES, _WENO7_WEIGHTS)
+    return _weno_reconstruct(
+        stencils, _WENO7_COEFFS, _WENO7_BETA_MATRICES, _WENO7_WEIGHTS
+    )
 
 
 def weno_9pts(
@@ -454,4 +458,6 @@ def weno_9pts(
         (qm, q0, qp, qpp, qppp),
         (q0, qp, qpp, qppp, qpppp),
     )
-    return _weno_reconstruct(stencils, _WENO9_COEFFS, _WENO9_BETA_MATRICES, _WENO9_WEIGHTS)
+    return _weno_reconstruct(
+        stencils, _WENO9_COEFFS, _WENO9_BETA_MATRICES, _WENO9_WEIGHTS
+    )
