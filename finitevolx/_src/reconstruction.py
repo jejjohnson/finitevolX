@@ -50,8 +50,7 @@ def _get_limiter(name: str):
     """
     if name not in _LIMITERS:
         raise ValueError(
-            f"Unknown flux limiter {name!r}. "
-            f"Choose one of {list(_LIMITERS)!r}."
+            f"Unknown flux limiter {name!r}. Choose one of {list(_LIMITERS)!r}."
         )
     return _LIMITERS[name]
 
@@ -299,14 +298,14 @@ class Reconstruction1D(eqx.Module):
         out = jnp.zeros_like(h)
         # Positive flow: h_face = h[i] + 0.5*phi(r)*(h[i+1]-h[i])
         # r = (h[i]-h[i-1]) / (h[i+1]-h[i])  for i=1..Nx-2
-        diff_fwd = h[2:] - h[1:-1]           # h[i+1] - h[i]
-        diff_bwd = h[1:-1] - h[:-2]           # h[i] - h[i-1]
+        diff_fwd = h[2:] - h[1:-1]  # h[i+1] - h[i]
+        diff_bwd = h[1:-1] - h[:-2]  # h[i] - h[i-1]
         r_pos = diff_bwd / (diff_fwd + _TVD_EPS)
         h_pos = h[1:-1] + 0.5 * phi(r_pos) * diff_fwd
         # Negative flow: h_face = h[i+1] + 0.5*phi(r)*(h[i]-h[i+1])
         # r = (h[i+1]-h[i+2]) / (h[i]-h[i+1])  for i=1..Nx-3
-        diff_neg = h[1:-2] - h[2:-1]          # h[i] - h[i+1]
-        diff_neg2 = h[2:-1] - h[3:]           # h[i+1] - h[i+2]
+        diff_neg = h[1:-2] - h[2:-1]  # h[i] - h[i+1]
+        diff_neg2 = h[2:-1] - h[3:]  # h[i+1] - h[i+2]
         r_neg_int = diff_neg2 / (diff_neg + _TVD_EPS)
         h_neg_interior = h[2:-1] + 0.5 * phi(r_neg_int) * diff_neg
         # 1st-order upwind fallback at east boundary (i=Nx-2)
@@ -771,14 +770,14 @@ class Reconstruction2D(eqx.Module):
         out = jnp.zeros_like(h)
         # Positive flow: h_face = h[j,i] + 0.5*phi(r)*(h[j,i+1]-h[j,i])
         # r = (h[j,i]-h[j,i-1]) / (h[j,i+1]-h[j,i])
-        diff_fwd = h[1:-1, 2:] - h[1:-1, 1:-1]        # h[j,i+1] - h[j,i]
-        diff_bwd = h[1:-1, 1:-1] - h[1:-1, :-2]        # h[j,i] - h[j,i-1]
+        diff_fwd = h[1:-1, 2:] - h[1:-1, 1:-1]  # h[j,i+1] - h[j,i]
+        diff_bwd = h[1:-1, 1:-1] - h[1:-1, :-2]  # h[j,i] - h[j,i-1]
         r_pos = diff_bwd / (diff_fwd + _TVD_EPS)
         h_pos = h[1:-1, 1:-1] + 0.5 * phi(r_pos) * diff_fwd
         # Negative flow: h_face = h[j,i+1] + 0.5*phi(r)*(h[j,i]-h[j,i+1])
         # r = (h[j,i+1]-h[j,i+2]) / (h[j,i]-h[j,i+1])  for i=1..Nx-3
-        diff_neg = h[1:-1, 1:-2] - h[1:-1, 2:-1]       # h[j,i] - h[j,i+1]
-        diff_neg2 = h[1:-1, 2:-1] - h[1:-1, 3:]        # h[j,i+1] - h[j,i+2]
+        diff_neg = h[1:-1, 1:-2] - h[1:-1, 2:-1]  # h[j,i] - h[j,i+1]
+        diff_neg2 = h[1:-1, 2:-1] - h[1:-1, 3:]  # h[j,i+1] - h[j,i+2]
         r_neg_int = diff_neg2 / (diff_neg + _TVD_EPS)
         h_neg_interior = h[1:-1, 2:-1] + 0.5 * phi(r_neg_int) * diff_neg
         # 1st-order upwind fallback at east boundary column (i=Nx-2)
@@ -824,14 +823,14 @@ class Reconstruction2D(eqx.Module):
         out = jnp.zeros_like(h)
         # Positive flow: h_face = h[j,i] + 0.5*phi(r)*(h[j+1,i]-h[j,i])
         # r = (h[j,i]-h[j-1,i]) / (h[j+1,i]-h[j,i])
-        diff_fwd = h[2:, 1:-1] - h[1:-1, 1:-1]         # h[j+1,i] - h[j,i]
-        diff_bwd = h[1:-1, 1:-1] - h[:-2, 1:-1]         # h[j,i] - h[j-1,i]
+        diff_fwd = h[2:, 1:-1] - h[1:-1, 1:-1]  # h[j+1,i] - h[j,i]
+        diff_bwd = h[1:-1, 1:-1] - h[:-2, 1:-1]  # h[j,i] - h[j-1,i]
         r_pos = diff_bwd / (diff_fwd + _TVD_EPS)
         h_pos = h[1:-1, 1:-1] + 0.5 * phi(r_pos) * diff_fwd
         # Negative flow: h_face = h[j+1,i] + 0.5*phi(r)*(h[j,i]-h[j+1,i])
         # r = (h[j+1,i]-h[j+2,i]) / (h[j,i]-h[j+1,i])  for j=1..Ny-3
-        diff_neg = h[1:-2, 1:-1] - h[2:-1, 1:-1]        # h[j,i] - h[j+1,i]
-        diff_neg2 = h[2:-1, 1:-1] - h[3:, 1:-1]         # h[j+1,i] - h[j+2,i]
+        diff_neg = h[1:-2, 1:-1] - h[2:-1, 1:-1]  # h[j,i] - h[j+1,i]
+        diff_neg2 = h[2:-1, 1:-1] - h[3:, 1:-1]  # h[j+1,i] - h[j+2,i]
         r_neg_int = diff_neg2 / (diff_neg + _TVD_EPS)
         h_neg_interior = h[2:-1, 1:-1] + 0.5 * phi(r_neg_int) * diff_neg
         # 1st-order upwind fallback at north boundary row (j=Ny-2)
@@ -874,7 +873,7 @@ class Reconstruction2D(eqx.Module):
         # TVD uses a 3-cell stencil (upwind cell + one neighbour each side).
         # Stencil size 4 → half-width 2, which covers this requirement.
         amasks = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4))
-        m_tvd = amasks[4]   # TVD stencil available
+        m_tvd = amasks[4]  # TVD stencil available
         fe_tvd = self.tvd_x(h, u, limiter=limiter)
         fe_u1 = self.upwind1_x(h, u)
         # Select based on upwind-cell capability
@@ -1593,9 +1592,7 @@ class Reconstruction3D(eqx.Module):
         fe_u1 = self.upwind1_x(h, u)
         pos_flow = u[1:-1, 1:-1, 1:-1] >= 0.0
         use_tvd = jnp.where(pos_flow, m_tvd[None, 1:-1, 1:-1], m_tvd[None, 1:-1, 2:])
-        selected = jnp.where(
-            use_tvd, fe_tvd[1:-1, 1:-1, 1:-1], fe_u1[1:-1, 1:-1, 1:-1]
-        )
+        selected = jnp.where(use_tvd, fe_tvd[1:-1, 1:-1, 1:-1], fe_u1[1:-1, 1:-1, 1:-1])
         out = jnp.zeros_like(h)
         out = out.at[1:-1, 1:-1, 1:-1].set(selected)
         return out
@@ -1635,9 +1632,7 @@ class Reconstruction3D(eqx.Module):
         fn_u1 = self.upwind1_y(h, v)
         pos_flow = v[1:-1, 1:-1, 1:-1] >= 0.0
         use_tvd = jnp.where(pos_flow, m_tvd[None, 1:-1, 1:-1], m_tvd[None, 2:, 1:-1])
-        selected = jnp.where(
-            use_tvd, fn_tvd[1:-1, 1:-1, 1:-1], fn_u1[1:-1, 1:-1, 1:-1]
-        )
+        selected = jnp.where(use_tvd, fn_tvd[1:-1, 1:-1, 1:-1], fn_u1[1:-1, 1:-1, 1:-1])
         out = jnp.zeros_like(h)
         out = out.at[1:-1, 1:-1, 1:-1].set(selected)
         return out

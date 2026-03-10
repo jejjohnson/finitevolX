@@ -112,10 +112,12 @@ class TestLimitersPublicAPI:
     """Verify the limiters are exported from the top-level package."""
 
     def test_import_from_package(self):
-        from finitevolx import mc as _mc
-        from finitevolx import minmod as _minmod
-        from finitevolx import superbee as _superbee
-        from finitevolx import van_leer as _van_leer
+        from finitevolx import (
+            mc as _mc,
+            minmod as _minmod,
+            superbee as _superbee,
+            van_leer as _van_leer,
+        )
 
         r = jnp.array(1.0)
         # All should return 1.0 for r=1
