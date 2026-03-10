@@ -871,8 +871,8 @@ class Reconstruction2D(eqx.Module):
         Float[Array, "Ny Nx"]
             East-face flux with zero ghost ring.
         """
-        # stencil size 4 corresponds to half-width 2, meaning WENO3 can run.
-        # TVD also needs 2 cells on each side → same capability requirement.
+        # TVD uses a 3-cell stencil (upwind cell + one neighbour each side).
+        # Stencil size 4 → half-width 2, which covers this requirement.
         amasks = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4))
         m_tvd = amasks[4]   # TVD stencil available
         fe_tvd = self.tvd_x(h, u, limiter=limiter)
