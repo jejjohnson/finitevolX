@@ -21,6 +21,8 @@ from finitevolx._src.reconstructions.weno import (
     weno_3pts_improved as _wenoz3,
     weno_5pts as _weno5,
     weno_5pts_improved as _wenoz5,
+    weno_7pts as _weno7,
+    weno_9pts as _weno9,
 )
 
 # Small epsilon to avoid division by zero in TVD slope ratios.
@@ -53,6 +55,214 @@ def _get_limiter(name: str):
             f"Unknown flux limiter {name!r}. Choose one of {list(_LIMITERS)!r}."
         )
     return _LIMITERS[name]
+
+
+def _weno7_positive_last_axis(h: Array) -> Array:
+    h3_first = _weno3(h[..., 0:1], h[..., 1:2], h[..., 2:3])
+    h5_second = _weno5(h[..., 0:1], h[..., 1:2], h[..., 2:3], h[..., 3:4], h[..., 4:5])
+    h7_interior = _weno7(
+        h[..., :-6],
+        h[..., 1:-5],
+        h[..., 2:-4],
+        h[..., 3:-3],
+        h[..., 4:-2],
+        h[..., 5:-1],
+        h[..., 6:],
+    )
+    h5_penultimate = _weno5(
+        h[..., -5:-4],
+        h[..., -4:-3],
+        h[..., -3:-2],
+        h[..., -2:-1],
+        h[..., -1:],
+    )
+    h3_last = _weno3(h[..., -3:-2], h[..., -2:-1], h[..., -1:])
+    return jnp.concatenate(
+        [h3_first, h5_second, h7_interior, h5_penultimate, h3_last], axis=-1
+    )
+
+
+def _weno7_negative_last_axis(h: Array) -> Array:
+    h3_first = _weno3(h[..., 3:4], h[..., 2:3], h[..., 1:2])
+    h5_second = _weno5(h[..., 4:5], h[..., 3:4], h[..., 2:3], h[..., 1:2], h[..., 0:1])
+    h7_interior = _weno7(
+        h[..., 6:],
+        h[..., 5:-1],
+        h[..., 4:-2],
+        h[..., 3:-3],
+        h[..., 2:-4],
+        h[..., 1:-5],
+        h[..., :-6],
+    )
+    h5_penultimate = _weno5(
+        h[..., -1:],
+        h[..., -2:-1],
+        h[..., -3:-2],
+        h[..., -4:-3],
+        h[..., -5:-4],
+    )
+    return jnp.concatenate(
+        [h3_first, h5_second, h7_interior, h5_penultimate, h[..., -1:]],
+        axis=-1,
+    )
+
+
+def _weno9_positive_last_axis(h: Array) -> Array:
+    h3_first = _weno3(h[..., 0:1], h[..., 1:2], h[..., 2:3])
+    h5_second = _weno5(h[..., 0:1], h[..., 1:2], h[..., 2:3], h[..., 3:4], h[..., 4:5])
+    h7_third = _weno7(
+        h[..., 0:1],
+        h[..., 1:2],
+        h[..., 2:3],
+        h[..., 3:4],
+        h[..., 4:5],
+        h[..., 5:6],
+        h[..., 6:7],
+    )
+    h9_interior = _weno9(
+        h[..., :-8],
+        h[..., 1:-7],
+        h[..., 2:-6],
+        h[..., 3:-5],
+        h[..., 4:-4],
+        h[..., 5:-3],
+        h[..., 6:-2],
+        h[..., 7:-1],
+        h[..., 8:],
+    )
+    h7_third_last = _weno7(
+        h[..., -7:-6],
+        h[..., -6:-5],
+        h[..., -5:-4],
+        h[..., -4:-3],
+        h[..., -3:-2],
+        h[..., -2:-1],
+        h[..., -1:],
+    )
+    h5_second_last = _weno5(
+        h[..., -5:-4],
+        h[..., -4:-3],
+        h[..., -3:-2],
+        h[..., -2:-1],
+        h[..., -1:],
+    )
+    h3_last = _weno3(h[..., -3:-2], h[..., -2:-1], h[..., -1:])
+    return jnp.concatenate(
+        [
+            h3_first,
+            h5_second,
+            h7_third,
+            h9_interior,
+            h7_third_last,
+            h5_second_last,
+            h3_last,
+        ],
+        axis=-1,
+    )
+
+
+def _weno9_negative_last_axis(h: Array) -> Array:
+    h3_first = _weno3(h[..., 3:4], h[..., 2:3], h[..., 1:2])
+    h5_second = _weno5(h[..., 4:5], h[..., 3:4], h[..., 2:3], h[..., 1:2], h[..., 0:1])
+    h7_third = _weno7(
+        h[..., 6:7],
+        h[..., 5:6],
+        h[..., 4:5],
+        h[..., 3:4],
+        h[..., 2:3],
+        h[..., 1:2],
+        h[..., 0:1],
+    )
+    h9_interior = _weno9(
+        h[..., 8:],
+        h[..., 7:-1],
+        h[..., 6:-2],
+        h[..., 5:-3],
+        h[..., 4:-4],
+        h[..., 3:-5],
+        h[..., 2:-6],
+        h[..., 1:-7],
+        h[..., :-8],
+    )
+    h7_third_last = _weno7(
+        h[..., -1:],
+        h[..., -2:-1],
+        h[..., -3:-2],
+        h[..., -4:-3],
+        h[..., -5:-4],
+        h[..., -6:-5],
+        h[..., -7:-6],
+    )
+    h5_second_last = _weno5(
+        h[..., -1:],
+        h[..., -2:-1],
+        h[..., -3:-2],
+        h[..., -4:-3],
+        h[..., -5:-4],
+    )
+    return jnp.concatenate(
+        [
+            h3_first,
+            h5_second,
+            h7_third,
+            h9_interior,
+            h7_third_last,
+            h5_second_last,
+            h[..., -1:],
+        ],
+        axis=-1,
+    )
+
+
+def _weno_last_axis_flux(h: Array, velocity: Array, order: int) -> Array:
+    if order == 7:
+        h_pos = _weno7_positive_last_axis(h)
+        h_neg = _weno7_negative_last_axis(h)
+    elif order == 9:
+        h_pos = _weno9_positive_last_axis(h)
+        h_neg = _weno9_negative_last_axis(h)
+    else:
+        raise ValueError(f"Unsupported WENO order: {order}")
+    return jnp.where(velocity >= 0.0, h_pos, h_neg) * velocity
+
+
+def _weno_flux_axis_1d(h: Array, velocity: Array, order: int) -> Array:
+    out = jnp.zeros_like(h)
+    out = out.at[1:-1].set(_weno_last_axis_flux(h, velocity[1:-1], order))
+    return out
+
+
+def _weno_flux_axis_2d_x(h: Array, velocity: Array, order: int) -> Array:
+    out = jnp.zeros_like(h)
+    out = out.at[1:-1, 1:-1].set(
+        _weno_last_axis_flux(h[1:-1, :], velocity[1:-1, 1:-1], order)
+    )
+    return out
+
+
+def _weno_flux_axis_2d_y(h: Array, velocity: Array, order: int) -> Array:
+    out = jnp.zeros_like(h)
+    h_last = jnp.swapaxes(h[:, 1:-1], 0, 1)
+    v_last = jnp.swapaxes(velocity[1:-1, 1:-1], 0, 1)
+    flux = _weno_last_axis_flux(h_last, v_last, order)
+    out = out.at[1:-1, 1:-1].set(jnp.swapaxes(flux, 0, 1))
+    return out
+
+
+def _weno_flux_axis_3d_x(h: Array, velocity: Array, order: int) -> Array:
+    out = jnp.zeros_like(h)
+    flux = _weno_last_axis_flux(h[1:-1, 1:-1, :], velocity[1:-1, 1:-1, 1:-1], order)
+    out = out.at[1:-1, 1:-1, 1:-1].set(flux)
+    return out
+
+
+def _weno_flux_axis_3d_y(h: Array, velocity: Array, order: int) -> Array:
+    out = jnp.zeros_like(h)
+    h_last = jnp.moveaxis(h[1:-1, :, 1:-1], 1, -1)
+    v_last = jnp.moveaxis(velocity[1:-1, 1:-1, 1:-1], 1, -1)
+    flux = _weno_last_axis_flux(h_last, v_last, order)
+    out = out.at[1:-1, 1:-1, 1:-1].set(jnp.moveaxis(flux, -1, 1))
+    return out
 
 
 class Reconstruction1D(eqx.Module):
@@ -258,6 +468,40 @@ class Reconstruction1D(eqx.Module):
         h_face = jnp.where(u[1:-1] >= 0.0, h_pos, h_neg)
         out = out.at[1:-1].set(h_face * u[1:-1])
         return out
+
+    def weno7_x(
+        self,
+        h: Float[Array, "Nx"],
+        u: Float[Array, "Nx"],
+    ) -> Float[Array, "Nx"]:
+        """7-point WENO east-face flux with hierarchical boundary fallbacks.
+
+        Positive flow:  h_face[i+1/2] = WENO7(h[i-3..i+3])
+            for i = 3..Nx-4; WENO5 fallback at i = 2 and i = Nx-3;
+            WENO3 fallback at i = 1 and i = Nx-2.
+        Negative flow:  h_face[i+1/2] = WENO7(h[i+3..i-3])
+            for i = 3..Nx-4; WENO3 fallback at i = 1; WENO5 fallback
+            at i = 2 and i = Nx-3; 1st-order upwind at i = Nx-2.
+        """
+        return _weno_flux_axis_1d(h, u, order=7)
+
+    def weno9_x(
+        self,
+        h: Float[Array, "Nx"],
+        u: Float[Array, "Nx"],
+    ) -> Float[Array, "Nx"]:
+        """9-point WENO east-face flux with hierarchical boundary fallbacks.
+
+        Positive flow:  h_face[i+1/2] = WENO9(h[i-4..i+4])
+            for i = 4..Nx-5; WENO7 fallback at i = 3 and i = Nx-4;
+            WENO5 fallback at i = 2 and i = Nx-3; WENO3 fallback at
+            i = 1 and i = Nx-2.
+        Negative flow:  h_face[i+1/2] = WENO9(h[i+4..i-4])
+            for i = 4..Nx-5; WENO7 fallback at i = 3 and i = Nx-4;
+            WENO5 fallback at i = 2 and i = Nx-3; WENO3 fallback at
+            i = 1; 1st-order upwind at i = Nx-2.
+        """
+        return _weno_flux_axis_1d(h, u, order=9)
 
     def tvd_x(
         self,
@@ -733,6 +977,38 @@ class Reconstruction2D(eqx.Module):
         h_face = jnp.where(v[1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = out.at[1:-1, 1:-1].set(h_face * v[1:-1, 1:-1])
         return out
+
+    def weno7_x(
+        self,
+        h: Float[Array, "Ny Nx"],
+        u: Float[Array, "Ny Nx"],
+    ) -> Float[Array, "Ny Nx"]:
+        """7-point WENO east-face flux with hierarchical boundary fallbacks."""
+        return _weno_flux_axis_2d_x(h, u, order=7)
+
+    def weno7_y(
+        self,
+        h: Float[Array, "Ny Nx"],
+        v: Float[Array, "Ny Nx"],
+    ) -> Float[Array, "Ny Nx"]:
+        """7-point WENO north-face flux with hierarchical boundary fallbacks."""
+        return _weno_flux_axis_2d_y(h, v, order=7)
+
+    def weno9_x(
+        self,
+        h: Float[Array, "Ny Nx"],
+        u: Float[Array, "Ny Nx"],
+    ) -> Float[Array, "Ny Nx"]:
+        """9-point WENO east-face flux with hierarchical boundary fallbacks."""
+        return _weno_flux_axis_2d_x(h, u, order=9)
+
+    def weno9_y(
+        self,
+        h: Float[Array, "Ny Nx"],
+        v: Float[Array, "Ny Nx"],
+    ) -> Float[Array, "Ny Nx"]:
+        """9-point WENO north-face flux with hierarchical boundary fallbacks."""
+        return _weno_flux_axis_2d_y(h, v, order=9)
 
     def tvd_x(
         self,
@@ -1454,6 +1730,38 @@ class Reconstruction3D(eqx.Module):
         h_face = jnp.where(v[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = out.at[1:-1, 1:-1, 1:-1].set(h_face * v[1:-1, 1:-1, 1:-1])
         return out
+
+    def weno7_x(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        u: Float[Array, "Nz Ny Nx"],
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """7-point WENO east-face flux over all z-levels with hierarchical fallbacks."""
+        return _weno_flux_axis_3d_x(h, u, order=7)
+
+    def weno7_y(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        v: Float[Array, "Nz Ny Nx"],
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """7-point WENO north-face flux over all z-levels with hierarchical fallbacks."""
+        return _weno_flux_axis_3d_y(h, v, order=7)
+
+    def weno9_x(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        u: Float[Array, "Nz Ny Nx"],
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """9-point WENO east-face flux over all z-levels with hierarchical fallbacks."""
+        return _weno_flux_axis_3d_x(h, u, order=9)
+
+    def weno9_y(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        v: Float[Array, "Nz Ny Nx"],
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """9-point WENO north-face flux over all z-levels with hierarchical fallbacks."""
+        return _weno_flux_axis_3d_y(h, v, order=9)
 
     def tvd_x(
         self,

@@ -235,6 +235,33 @@ class TestReconstruction1D:
         result = recon.wenoz5_x(h, u)
         np.testing.assert_allclose(result[1:-1], -7.0, rtol=1e-5)
 
+    @pytest.mark.parametrize("method_name", ["weno7_x", "weno9_x"])
+    def test_higher_order_weno_constant_field(self, grid1d, method_name):
+        recon = Reconstruction1D(grid=grid1d)
+        h = 6.0 * jnp.ones(grid1d.Nx)
+        for sign in (1.0, -1.0):
+            u = sign * jnp.ones(grid1d.Nx)
+            result = getattr(recon, method_name)(h, u)
+            np.testing.assert_allclose(result[1:-1], 6.0 * sign, rtol=1e-5)
+
+    def test_weno7_linear_field_large_grid(self):
+        grid = ArakawaCGrid1D.from_interior(12, 1.0)
+        recon = Reconstruction1D(grid=grid)
+        h = jnp.arange(grid.Nx, dtype=float)
+        u = jnp.ones(grid.Nx)
+        result = recon.weno7_x(h, u)
+        expected = 0.5 * (h[1:-1] + h[2:])
+        np.testing.assert_allclose(result[3:-3], expected[2:-2], rtol=1e-5)
+
+    def test_weno9_linear_field_large_grid(self):
+        grid = ArakawaCGrid1D.from_interior(14, 1.0)
+        recon = Reconstruction1D(grid=grid)
+        h = jnp.arange(grid.Nx, dtype=float)
+        u = jnp.ones(grid.Nx)
+        result = recon.weno9_x(h, u)
+        expected = 0.5 * (h[1:-1] + h[2:])
+        np.testing.assert_allclose(result[4:-4], expected[3:-3], rtol=1e-5)
+
     # --- TVD flux-limiter tests ---
 
     def test_tvd_output_shape(self, grid1d):
@@ -473,6 +500,46 @@ class TestReconstruction2D:
         result = recon.wenoz5_y(h, v)
         np.testing.assert_allclose(result[1:-1, 1:-1], -9.0, rtol=1e-5)
 
+    @pytest.mark.parametrize(
+        "method_name", ["weno7_x", "weno7_y", "weno9_x", "weno9_y"]
+    )
+    def test_higher_order_weno_constant(self, grid2d, method_name):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 4.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        velocity = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = getattr(recon, method_name)(h, velocity)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 4.0, rtol=1e-5)
+        negative = getattr(recon, method_name)(h, -velocity)
+        np.testing.assert_allclose(negative[1:-1, 1:-1], -4.0, rtol=1e-5)
+
+    @pytest.mark.parametrize(
+        ("method_name", "depth"),
+        [("weno7_x", 3), ("weno9_x", 4)],
+    )
+    def test_higher_order_weno_x_linear_ramp_is_centered(self, method_name, depth):
+        grid = ArakawaCGrid2D.from_interior(12, 12, 1.0, 1.0)
+        recon = Reconstruction2D(grid=grid)
+        x_idx = jnp.arange(grid.Nx, dtype=float)
+        h = jnp.broadcast_to(x_idx, (grid.Ny, grid.Nx))
+        u = jnp.ones((grid.Ny, grid.Nx))
+        result = getattr(recon, method_name)(h, u)
+        expected = 0.5 * (h[1:-1, depth:-depth] + h[1:-1, depth + 1 : -(depth - 1)])
+        np.testing.assert_allclose(result[1:-1, depth:-depth], expected, rtol=1e-5)
+
+    @pytest.mark.parametrize(
+        ("method_name", "depth"),
+        [("weno7_y", 3), ("weno9_y", 4)],
+    )
+    def test_higher_order_weno_y_linear_ramp_is_centered(self, method_name, depth):
+        grid = ArakawaCGrid2D.from_interior(12, 12, 1.0, 1.0)
+        recon = Reconstruction2D(grid=grid)
+        y_idx = jnp.arange(grid.Ny, dtype=float)
+        h = jnp.broadcast_to(y_idx[:, None], (grid.Ny, grid.Nx))
+        v = jnp.ones((grid.Ny, grid.Nx))
+        result = getattr(recon, method_name)(h, v)
+        expected = 0.5 * (h[depth:-depth, 1:-1] + h[depth + 1 : -(depth - 1), 1:-1])
+        np.testing.assert_allclose(result[depth:-depth, 1:-1], expected, rtol=1e-5)
+
     # --- TVD flux-limiter tests ---
 
     def test_tvd_x_output_shape(self, grid2d):
@@ -611,6 +678,55 @@ class TestReconstruction3D:
         v = -jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         result = recon.wenoz3_y(h, v)
         np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], -7.0, rtol=1e-5)
+
+    @pytest.mark.parametrize(
+        "method_name",
+        ["weno7_x", "weno7_y", "weno9_x", "weno9_y"],
+    )
+    def test_higher_order_weno_constant(self, grid3d, method_name):
+        recon = Reconstruction3D(grid=grid3d)
+        h = 4.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        velocity = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = getattr(recon, method_name)(h, velocity)
+        np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], 4.0, rtol=1e-5)
+        negative = getattr(recon, method_name)(h, -velocity)
+        np.testing.assert_allclose(negative[1:-1, 1:-1, 1:-1], -4.0, rtol=1e-5)
+
+    @pytest.mark.parametrize(
+        ("method_name", "depth"),
+        [("weno7_x", 3), ("weno9_x", 4)],
+    )
+    def test_higher_order_weno_x_linear_ramp_is_centered(self, method_name, depth):
+        grid = ArakawaCGrid3D.from_interior(12, 12, 4, 1.0, 1.0, 1.0)
+        recon = Reconstruction3D(grid=grid)
+        x_idx = jnp.arange(grid.Nx, dtype=float)
+        h = jnp.broadcast_to(x_idx[None, None, :], (grid.Nz, grid.Ny, grid.Nx))
+        u = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        result = getattr(recon, method_name)(h, u)
+        expected = 0.5 * (
+            h[1:-1, 1:-1, depth:-depth] + h[1:-1, 1:-1, depth + 1 : -(depth - 1)]
+        )
+        np.testing.assert_allclose(
+            result[1:-1, 1:-1, depth:-depth], expected, rtol=1e-5
+        )
+
+    @pytest.mark.parametrize(
+        ("method_name", "depth"),
+        [("weno7_y", 3), ("weno9_y", 4)],
+    )
+    def test_higher_order_weno_y_linear_ramp_is_centered(self, method_name, depth):
+        grid = ArakawaCGrid3D.from_interior(12, 12, 4, 1.0, 1.0, 1.0)
+        recon = Reconstruction3D(grid=grid)
+        y_idx = jnp.arange(grid.Ny, dtype=float)
+        h = jnp.broadcast_to(y_idx[None, :, None], (grid.Nz, grid.Ny, grid.Nx))
+        v = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        result = getattr(recon, method_name)(h, v)
+        expected = 0.5 * (
+            h[1:-1, depth:-depth, 1:-1] + h[1:-1, depth + 1 : -(depth - 1), 1:-1]
+        )
+        np.testing.assert_allclose(
+            result[1:-1, depth:-depth, 1:-1], expected, rtol=1e-5
+        )
 
     # --- TVD flux-limiter tests ---
 

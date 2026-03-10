@@ -54,8 +54,9 @@ class Advection1D(eqx.Module):
             Velocity at U-points.
         method : str
             Reconstruction method: ``'naive'``, ``'upwind1'``, ``'upwind2'``,
-            ``'upwind3'``, or a flux-limiter TVD scheme:
-            ``'minmod'``, ``'van_leer'``, ``'superbee'``, ``'mc'``.
+            ``'upwind3'``, ``'weno3'``, ``'weno5'``, ``'weno7'``, ``'weno9'``,
+            or a flux-limiter TVD scheme: ``'minmod'``, ``'van_leer'``,
+            ``'superbee'``, ``'mc'``.
 
         Returns
         -------
@@ -70,6 +71,14 @@ class Advection1D(eqx.Module):
             fe = self.recon.upwind2_x(h, u)
         elif method == "upwind3":
             fe = self.recon.upwind3_x(h, u)
+        elif method == "weno3":
+            fe = self.recon.weno3_x(h, u)
+        elif method == "weno5":
+            fe = self.recon.weno5_x(h, u)
+        elif method == "weno7":
+            fe = self.recon.weno7_x(h, u)
+        elif method == "weno9":
+            fe = self.recon.weno9_x(h, u)
         elif method in _TVD_LIMITERS:
             fe = self.recon.tvd_x(h, u, limiter=method)
         else:
@@ -122,8 +131,9 @@ class Advection2D(eqx.Module):
             y-velocity at V-points.
         method : str
             Reconstruction method: ``'naive'``, ``'upwind1'``, ``'upwind2'``,
-            ``'upwind3'``, or a flux-limiter TVD scheme:
-            ``'minmod'``, ``'van_leer'``, ``'superbee'``, ``'mc'``.
+            ``'upwind3'``, ``'weno3'``, ``'weno5'``, ``'weno7'``, ``'weno9'``,
+            or a flux-limiter TVD scheme: ``'minmod'``, ``'van_leer'``,
+            ``'superbee'``, ``'mc'``.
 
         Returns
         -------
@@ -142,6 +152,18 @@ class Advection2D(eqx.Module):
         elif method == "upwind3":
             fe = self.recon.upwind3_x(h, u)
             fn = self.recon.upwind3_y(h, v)
+        elif method == "weno3":
+            fe = self.recon.weno3_x(h, u)
+            fn = self.recon.weno3_y(h, v)
+        elif method == "weno5":
+            fe = self.recon.weno5_x(h, u)
+            fn = self.recon.weno5_y(h, v)
+        elif method == "weno7":
+            fe = self.recon.weno7_x(h, u)
+            fn = self.recon.weno7_y(h, v)
+        elif method == "weno9":
+            fe = self.recon.weno9_x(h, u)
+            fn = self.recon.weno9_y(h, v)
         elif method in _TVD_LIMITERS:
             fe = self.recon.tvd_x(h, u, limiter=method)
             fn = self.recon.tvd_y(h, v, limiter=method)
@@ -198,9 +220,9 @@ class Advection3D(eqx.Module):
         v : Float[Array, "Nz Ny Nx"]
             y-velocity at V-points.
         method : str
-            Reconstruction method: ``'naive'``, ``'upwind1'``, or a
-            flux-limiter TVD scheme:
-            ``'minmod'``, ``'van_leer'``, ``'superbee'``, ``'mc'``.
+            Reconstruction method: ``'naive'``, ``'upwind1'``, ``'weno3'``,
+            ``'weno5'``, ``'weno7'``, ``'weno9'``, or a flux-limiter TVD
+            scheme: ``'minmod'``, ``'van_leer'``, ``'superbee'``, ``'mc'``.
 
         Returns
         -------
@@ -213,6 +235,18 @@ class Advection3D(eqx.Module):
         elif method == "upwind1":
             fe = self.recon.upwind1_x(h, u)
             fn = self.recon.upwind1_y(h, v)
+        elif method == "weno3":
+            fe = self.recon.weno3_x(h, u)
+            fn = self.recon.weno3_y(h, v)
+        elif method == "weno5":
+            fe = self.recon.weno5_x(h, u)
+            fn = self.recon.weno5_y(h, v)
+        elif method == "weno7":
+            fe = self.recon.weno7_x(h, u)
+            fn = self.recon.weno7_y(h, v)
+        elif method == "weno9":
+            fe = self.recon.weno9_x(h, u)
+            fn = self.recon.weno9_y(h, v)
         elif method in _TVD_LIMITERS:
             fe = self.recon.tvd_x(h, u, limiter=method)
             fn = self.recon.tvd_y(h, v, limiter=method)

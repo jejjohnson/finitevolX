@@ -42,9 +42,27 @@ class TestAdvection1D:
         adv = Advection1D(grid=grid1d)
         h = jnp.ones(grid1d.Nx)
         u = jnp.ones(grid1d.Nx)
-        for method in ["naive", "upwind1", "upwind2", "upwind3"]:
+        for method in [
+            "naive",
+            "upwind1",
+            "upwind2",
+            "upwind3",
+            "weno3",
+            "weno5",
+            "weno7",
+            "weno9",
+        ]:
             result = adv(h, u, method=method)
             assert result.shape == (grid1d.Nx,)
+
+    def test_weno_constant_zero_tendency(self):
+        grid = ArakawaCGrid1D.from_interior(16, 1.0)
+        adv = Advection1D(grid=grid)
+        h = jnp.ones(grid.Nx)
+        u = jnp.ones(grid.Nx)
+        for method, depth in [("weno3", 2), ("weno5", 3), ("weno7", 4), ("weno9", 5)]:
+            result = adv(h, u, method=method)
+            np.testing.assert_allclose(result[depth:-depth], 0.0, atol=1e-6)
 
     def test_tvd_methods_run(self, grid1d):
         adv = Advection1D(grid=grid1d)
@@ -103,9 +121,30 @@ class TestAdvection2D:
         h = jnp.ones((grid2d.Ny, grid2d.Nx))
         u = jnp.ones((grid2d.Ny, grid2d.Nx))
         v = jnp.ones((grid2d.Ny, grid2d.Nx))
-        for method in ["naive", "upwind1", "upwind2", "upwind3"]:
+        for method in [
+            "naive",
+            "upwind1",
+            "upwind2",
+            "upwind3",
+            "weno3",
+            "weno5",
+            "weno7",
+            "weno9",
+        ]:
             result = adv(h, u, v, method=method)
             assert result.shape == (grid2d.Ny, grid2d.Nx)
+
+    def test_weno_constant_zero_tendency(self):
+        grid = ArakawaCGrid2D.from_interior(16, 16, 1.0, 1.0)
+        adv = Advection2D(grid=grid)
+        h = jnp.ones((grid.Ny, grid.Nx))
+        u = jnp.ones((grid.Ny, grid.Nx))
+        v = jnp.ones((grid.Ny, grid.Nx))
+        for method, depth in [("weno3", 2), ("weno5", 3), ("weno7", 4), ("weno9", 5)]:
+            result = adv(h, u, v, method=method)
+            np.testing.assert_allclose(
+                result[depth:-depth, depth:-depth], 0.0, atol=1e-6
+            )
 
     def test_tvd_methods_run(self, grid2d):
         adv = Advection2D(grid=grid2d)
@@ -194,6 +233,27 @@ class TestAdvection3D:
         for method in ["minmod", "van_leer", "superbee", "mc"]:
             result = adv(h, u, v, method=method)
             assert result.shape == (grid3d.Nz, grid3d.Ny, grid3d.Nx)
+
+    def test_weno_methods_run(self, grid3d):
+        adv = Advection3D(grid=grid3d)
+        h = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        u = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        v = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        for method in ["weno3", "weno5", "weno7", "weno9"]:
+            result = adv(h, u, v, method=method)
+            assert result.shape == (grid3d.Nz, grid3d.Ny, grid3d.Nx)
+
+    def test_weno_constant_zero_tendency(self):
+        grid = ArakawaCGrid3D.from_interior(16, 16, 4, 1.0, 1.0, 1.0)
+        adv = Advection3D(grid=grid)
+        h = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        u = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        v = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        for method, depth in [("weno3", 2), ("weno5", 3), ("weno7", 4), ("weno9", 5)]:
+            result = adv(h, u, v, method=method)
+            np.testing.assert_allclose(
+                result[1:-1, depth:-depth, depth:-depth], 0.0, atol=1e-6
+            )
 
     def test_tvd_constant_zero_tendency(self, grid3d):
         adv = Advection3D(grid=grid3d)
