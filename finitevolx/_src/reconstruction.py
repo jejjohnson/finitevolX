@@ -15,12 +15,44 @@ from jaxtyping import Array, Float
 
 from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
 from finitevolx._src.masks.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.reconstructions.limiters import mc, minmod, superbee, van_leer
 from finitevolx._src.reconstructions.weno import (
     weno_3pts as _weno3,
     weno_3pts_improved as _wenoz3,
     weno_5pts as _weno5,
     weno_5pts_improved as _wenoz5,
 )
+
+# Small epsilon to avoid division by zero in TVD slope ratios.
+_TVD_EPS: float = 1e-8
+
+# Mapping from limiter name to callable for TVD reconstruction.
+_LIMITERS = {
+    "minmod": minmod,
+    "van_leer": van_leer,
+    "superbee": superbee,
+    "mc": mc,
+}
+
+
+def _get_limiter(name: str):
+    """Return the flux limiter callable for *name*.
+
+    Parameters
+    ----------
+    name : str
+        One of ``'minmod'``, ``'van_leer'``, ``'superbee'``, ``'mc'``.
+
+    Raises
+    ------
+    ValueError
+        If *name* is not a known limiter.
+    """
+    if name not in _LIMITERS:
+        raise ValueError(
+            f"Unknown flux limiter {name!r}. Choose one of {list(_LIMITERS)!r}."
+        )
+    return _LIMITERS[name]
 
 
 class Reconstruction1D(eqx.Module):
@@ -223,6 +255,62 @@ class Reconstruction1D(eqx.Module):
         # 1st-order upwind fallback at east boundary (i=Nx-2)
         h1_neg_last = h[-1:]
         h_neg = jnp.concatenate([h3_neg_first, h5_neg_interior, h1_neg_last])
+        h_face = jnp.where(u[1:-1] >= 0.0, h_pos, h_neg)
+        out = out.at[1:-1].set(h_face * u[1:-1])
+        return out
+
+    def tvd_x(
+        self,
+        h: Float[Array, "Nx"],
+        u: Float[Array, "Nx"],
+        limiter: str = "minmod",
+    ) -> Float[Array, "Nx"]:
+        """TVD east-face flux using a flux limiter.
+
+        Blends 1st-order upwind with an anti-diffusive correction limited by
+        φ(r) to preserve monotonicity:
+
+        Positive flow:
+            r     = (h[i] − h[i−1]) / (h[i+1] − h[i])
+            h_L   = h[i]   + ½ φ(r) (h[i+1] − h[i])
+
+        Negative flow:
+            r     = (h[i+1] − h[i+2]) / (h[i] − h[i+1])
+            h_R   = h[i+1] + ½ φ(r) (h[i]   − h[i+1])
+        Falls back to 1st-order upwind on east boundary where i+2 unavailable.
+
+        Parameters
+        ----------
+        h : Float[Array, "Nx"]
+            Scalar at T-points.
+        u : Float[Array, "Nx"]
+            Velocity at U-points.
+        limiter : str
+            Flux limiter name: ``'minmod'``, ``'van_leer'``, ``'superbee'``,
+            or ``'mc'``.
+
+        Returns
+        -------
+        Float[Array, "Nx"]
+            East-face flux with zero ghost entries.
+        """
+        phi = _get_limiter(limiter)
+        out = jnp.zeros_like(h)
+        # Positive flow: h_face = h[i] + 0.5*phi(r)*(h[i+1]-h[i])
+        # r = (h[i]-h[i-1]) / (h[i+1]-h[i])  for i=1..Nx-2
+        diff_fwd = h[2:] - h[1:-1]  # h[i+1] - h[i]
+        diff_bwd = h[1:-1] - h[:-2]  # h[i] - h[i-1]
+        r_pos = diff_bwd / (diff_fwd + _TVD_EPS)
+        h_pos = h[1:-1] + 0.5 * phi(r_pos) * diff_fwd
+        # Negative flow: h_face = h[i+1] + 0.5*phi(r)*(h[i]-h[i+1])
+        # r = (h[i+1]-h[i+2]) / (h[i]-h[i+1])  for i=1..Nx-3
+        diff_neg = h[1:-2] - h[2:-1]  # h[i] - h[i+1]
+        diff_neg2 = h[2:-1] - h[3:]  # h[i+1] - h[i+2]
+        r_neg_int = diff_neg2 / (diff_neg + _TVD_EPS)
+        h_neg_interior = h[2:-1] + 0.5 * phi(r_neg_int) * diff_neg
+        # 1st-order upwind fallback at east boundary (i=Nx-2)
+        h_neg_boundary = h[-1:]
+        h_neg = jnp.concatenate([h_neg_interior, h_neg_boundary])
         h_face = jnp.where(u[1:-1] >= 0.0, h_pos, h_neg)
         out = out.at[1:-1].set(h_face * u[1:-1])
         return out
@@ -644,6 +732,202 @@ class Reconstruction2D(eqx.Module):
         h_neg = jnp.concatenate([h3_neg_first, h5_neg_int, h1_neg_last], axis=0)
         h_face = jnp.where(v[1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = out.at[1:-1, 1:-1].set(h_face * v[1:-1, 1:-1])
+        return out
+
+    def tvd_x(
+        self,
+        h: Float[Array, "Ny Nx"],
+        u: Float[Array, "Ny Nx"],
+        limiter: str = "minmod",
+    ) -> Float[Array, "Ny Nx"]:
+        """TVD east-face flux using a flux limiter.
+
+        Positive flow:
+            r         = (h[j,i] − h[j,i−1]) / (h[j,i+1] − h[j,i])
+            h_L[j,i+½] = h[j,i]   + ½ φ(r) (h[j,i+1] − h[j,i])
+
+        Negative flow:
+            r         = (h[j,i+1] − h[j,i+2]) / (h[j,i] − h[j,i+1])
+            h_R[j,i+½] = h[j,i+1] + ½ φ(r) (h[j,i]   − h[j,i+1])
+        Falls back to 1st-order upwind on east boundary where i+2 unavailable.
+
+        Parameters
+        ----------
+        h : Float[Array, "Ny Nx"]
+            Scalar at T-points.
+        u : Float[Array, "Ny Nx"]
+            x-velocity at U-points.
+        limiter : str
+            Flux limiter name: ``'minmod'``, ``'van_leer'``, ``'superbee'``,
+            or ``'mc'``.
+
+        Returns
+        -------
+        Float[Array, "Ny Nx"]
+            East-face flux with zero ghost ring.
+        """
+        phi = _get_limiter(limiter)
+        out = jnp.zeros_like(h)
+        # Positive flow: h_face = h[j,i] + 0.5*phi(r)*(h[j,i+1]-h[j,i])
+        # r = (h[j,i]-h[j,i-1]) / (h[j,i+1]-h[j,i])
+        diff_fwd = h[1:-1, 2:] - h[1:-1, 1:-1]  # h[j,i+1] - h[j,i]
+        diff_bwd = h[1:-1, 1:-1] - h[1:-1, :-2]  # h[j,i] - h[j,i-1]
+        r_pos = diff_bwd / (diff_fwd + _TVD_EPS)
+        h_pos = h[1:-1, 1:-1] + 0.5 * phi(r_pos) * diff_fwd
+        # Negative flow: h_face = h[j,i+1] + 0.5*phi(r)*(h[j,i]-h[j,i+1])
+        # r = (h[j,i+1]-h[j,i+2]) / (h[j,i]-h[j,i+1])  for i=1..Nx-3
+        diff_neg = h[1:-1, 1:-2] - h[1:-1, 2:-1]  # h[j,i] - h[j,i+1]
+        diff_neg2 = h[1:-1, 2:-1] - h[1:-1, 3:]  # h[j,i+1] - h[j,i+2]
+        r_neg_int = diff_neg2 / (diff_neg + _TVD_EPS)
+        h_neg_interior = h[1:-1, 2:-1] + 0.5 * phi(r_neg_int) * diff_neg
+        # 1st-order upwind fallback at east boundary column (i=Nx-2)
+        h_neg_boundary = h[1:-1, -1:]
+        h_neg = jnp.concatenate([h_neg_interior, h_neg_boundary], axis=1)
+        h_face = jnp.where(u[1:-1, 1:-1] >= 0.0, h_pos, h_neg)
+        out = out.at[1:-1, 1:-1].set(h_face * u[1:-1, 1:-1])
+        return out
+
+    def tvd_y(
+        self,
+        h: Float[Array, "Ny Nx"],
+        v: Float[Array, "Ny Nx"],
+        limiter: str = "minmod",
+    ) -> Float[Array, "Ny Nx"]:
+        """TVD north-face flux using a flux limiter.
+
+        Positive flow:
+            r         = (h[j,i] − h[j−1,i]) / (h[j+1,i] − h[j,i])
+            h_L[j+½,i] = h[j,i]   + ½ φ(r) (h[j+1,i] − h[j,i])
+
+        Negative flow:
+            r         = (h[j+1,i] − h[j+2,i]) / (h[j,i] − h[j+1,i])
+            h_R[j+½,i] = h[j+1,i] + ½ φ(r) (h[j,i]   − h[j+1,i])
+        Falls back to 1st-order upwind on north boundary where j+2 unavailable.
+
+        Parameters
+        ----------
+        h : Float[Array, "Ny Nx"]
+            Scalar at T-points.
+        v : Float[Array, "Ny Nx"]
+            y-velocity at V-points.
+        limiter : str
+            Flux limiter name: ``'minmod'``, ``'van_leer'``, ``'superbee'``,
+            or ``'mc'``.
+
+        Returns
+        -------
+        Float[Array, "Ny Nx"]
+            North-face flux with zero ghost ring.
+        """
+        phi = _get_limiter(limiter)
+        out = jnp.zeros_like(h)
+        # Positive flow: h_face = h[j,i] + 0.5*phi(r)*(h[j+1,i]-h[j,i])
+        # r = (h[j,i]-h[j-1,i]) / (h[j+1,i]-h[j,i])
+        diff_fwd = h[2:, 1:-1] - h[1:-1, 1:-1]  # h[j+1,i] - h[j,i]
+        diff_bwd = h[1:-1, 1:-1] - h[:-2, 1:-1]  # h[j,i] - h[j-1,i]
+        r_pos = diff_bwd / (diff_fwd + _TVD_EPS)
+        h_pos = h[1:-1, 1:-1] + 0.5 * phi(r_pos) * diff_fwd
+        # Negative flow: h_face = h[j+1,i] + 0.5*phi(r)*(h[j,i]-h[j+1,i])
+        # r = (h[j+1,i]-h[j+2,i]) / (h[j,i]-h[j+1,i])  for j=1..Ny-3
+        diff_neg = h[1:-2, 1:-1] - h[2:-1, 1:-1]  # h[j,i] - h[j+1,i]
+        diff_neg2 = h[2:-1, 1:-1] - h[3:, 1:-1]  # h[j+1,i] - h[j+2,i]
+        r_neg_int = diff_neg2 / (diff_neg + _TVD_EPS)
+        h_neg_interior = h[2:-1, 1:-1] + 0.5 * phi(r_neg_int) * diff_neg
+        # 1st-order upwind fallback at north boundary row (j=Ny-2)
+        h_neg_boundary = h[-1:, 1:-1]
+        h_neg = jnp.concatenate([h_neg_interior, h_neg_boundary], axis=0)
+        h_face = jnp.where(v[1:-1, 1:-1] >= 0.0, h_pos, h_neg)
+        out = out.at[1:-1, 1:-1].set(h_face * v[1:-1, 1:-1])
+        return out
+
+    def tvd_x_masked(
+        self,
+        h: Float[Array, "Ny Nx"],
+        u: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask,
+        limiter: str = "minmod",
+    ) -> Float[Array, "Ny Nx"]:
+        """TVD east-face flux with mask-aware stencil selection.
+
+        Uses :meth:`ArakawaCGridMask.get_adaptive_masks` to choose between the
+        TVD scheme (requires 3-cell stencil) and 1st-order upwind near
+        coastlines or irregular boundaries.
+
+        Parameters
+        ----------
+        h : Float[Array, "Ny Nx"]
+            Cell-centre tracer field.
+        u : Float[Array, "Ny Nx"]
+            East-face velocity.
+        mask : ArakawaCGridMask
+            Arakawa C-grid mask providing stencil-capability information.
+        limiter : str
+            Flux limiter name: ``'minmod'``, ``'van_leer'``, ``'superbee'``,
+            or ``'mc'``.
+
+        Returns
+        -------
+        Float[Array, "Ny Nx"]
+            East-face flux with zero ghost ring.
+        """
+        # TVD uses a 3-cell stencil (upwind cell + one neighbour each side).
+        # Stencil size 4 → half-width 2, which covers this requirement.
+        amasks = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4))
+        m_tvd = amasks[4]  # TVD stencil available
+        fe_tvd = self.tvd_x(h, u, limiter=limiter)
+        fe_u1 = self.upwind1_x(h, u)
+        # Select based on upwind-cell capability
+        # Positive flow: upwind cell is (j, i)   → mask at [1:-1, 1:-1]
+        # Negative flow: upwind cell is (j, i+1) → mask at [1:-1, 2:]
+        pos_flow = u[1:-1, 1:-1] >= 0.0
+        use_tvd = jnp.where(pos_flow, m_tvd[1:-1, 1:-1], m_tvd[1:-1, 2:])
+        selected = jnp.where(use_tvd, fe_tvd[1:-1, 1:-1], fe_u1[1:-1, 1:-1])
+        out = jnp.zeros_like(h)
+        out = out.at[1:-1, 1:-1].set(selected)
+        return out
+
+    def tvd_y_masked(
+        self,
+        h: Float[Array, "Ny Nx"],
+        v: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask,
+        limiter: str = "minmod",
+    ) -> Float[Array, "Ny Nx"]:
+        """TVD north-face flux with mask-aware stencil selection.
+
+        Uses :meth:`ArakawaCGridMask.get_adaptive_masks` to choose between the
+        TVD scheme (requires 3-cell stencil) and 1st-order upwind near
+        coastlines or irregular boundaries.
+
+        Parameters
+        ----------
+        h : Float[Array, "Ny Nx"]
+            Cell-centre tracer field.
+        v : Float[Array, "Ny Nx"]
+            North-face velocity.
+        mask : ArakawaCGridMask
+            Arakawa C-grid mask providing stencil-capability information.
+        limiter : str
+            Flux limiter name: ``'minmod'``, ``'van_leer'``, ``'superbee'``,
+            or ``'mc'``.
+
+        Returns
+        -------
+        Float[Array, "Ny Nx"]
+            North-face flux with zero ghost ring.
+        """
+        amasks = mask.get_adaptive_masks(direction="y", stencil_sizes=(2, 4))
+        m_tvd = amasks[4]
+        fn_tvd = self.tvd_y(h, v, limiter=limiter)
+        fn_u1 = self.upwind1_y(h, v)
+        # Select based on upwind-cell capability
+        # Positive flow: upwind cell is (j, i)   → mask at [1:-1, 1:-1]
+        # Negative flow: upwind cell is (j+1, i) → mask at [2:, 1:-1]
+        pos_flow = v[1:-1, 1:-1] >= 0.0
+        use_tvd = jnp.where(pos_flow, m_tvd[1:-1, 1:-1], m_tvd[2:, 1:-1])
+        selected = jnp.where(use_tvd, fn_tvd[1:-1, 1:-1], fn_u1[1:-1, 1:-1])
+        out = jnp.zeros_like(h)
+        out = out.at[1:-1, 1:-1].set(selected)
         return out
 
     def weno5_x_masked(
@@ -1169,6 +1453,188 @@ class Reconstruction3D(eqx.Module):
         h_neg = jnp.concatenate([h3_neg_first, h5_neg_int, h[1:-1, -1:, 1:-1]], axis=1)
         h_face = jnp.where(v[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = out.at[1:-1, 1:-1, 1:-1].set(h_face * v[1:-1, 1:-1, 1:-1])
+        return out
+
+    def tvd_x(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        u: Float[Array, "Nz Ny Nx"],
+        limiter: str = "minmod",
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """TVD east-face flux over all z-levels using a flux limiter.
+
+        Positive flow:
+            r           = (h[k,j,i] − h[k,j,i−1]) / (h[k,j,i+1] − h[k,j,i])
+            h_L[k,j,i+½] = h[k,j,i]   + ½ φ(r) (h[k,j,i+1] − h[k,j,i])
+
+        Negative flow:
+            r           = (h[k,j,i+1] − h[k,j,i+2]) / (h[k,j,i] − h[k,j,i+1])
+            h_R[k,j,i+½] = h[k,j,i+1] + ½ φ(r) (h[k,j,i]   − h[k,j,i+1])
+        Falls back to 1st-order upwind on east boundary where i+2 unavailable.
+
+        Parameters
+        ----------
+        h : Float[Array, "Nz Ny Nx"]
+            Scalar at T-points.
+        u : Float[Array, "Nz Ny Nx"]
+            x-velocity at U-points.
+        limiter : str
+            Flux limiter name: ``'minmod'``, ``'van_leer'``, ``'superbee'``,
+            or ``'mc'``.
+
+        Returns
+        -------
+        Float[Array, "Nz Ny Nx"]
+            East-face flux with zero ghost ring.
+        """
+        phi = _get_limiter(limiter)
+        out = jnp.zeros_like(h)
+        # Positive flow: h_face = h[k,j,i] + 0.5*phi(r)*(h[k,j,i+1]-h[k,j,i])
+        diff_fwd = h[1:-1, 1:-1, 2:] - h[1:-1, 1:-1, 1:-1]
+        diff_bwd = h[1:-1, 1:-1, 1:-1] - h[1:-1, 1:-1, :-2]
+        r_pos = diff_bwd / (diff_fwd + _TVD_EPS)
+        h_pos = h[1:-1, 1:-1, 1:-1] + 0.5 * phi(r_pos) * diff_fwd
+        # Negative flow: h_face = h[k,j,i+1] + 0.5*phi(r)*(h[k,j,i]-h[k,j,i+1])
+        diff_neg = h[1:-1, 1:-1, 1:-2] - h[1:-1, 1:-1, 2:-1]
+        diff_neg2 = h[1:-1, 1:-1, 2:-1] - h[1:-1, 1:-1, 3:]
+        r_neg_int = diff_neg2 / (diff_neg + _TVD_EPS)
+        h_neg_interior = h[1:-1, 1:-1, 2:-1] + 0.5 * phi(r_neg_int) * diff_neg
+        # 1st-order upwind fallback at east boundary column (i=Nx-2)
+        h_neg_boundary = h[1:-1, 1:-1, -1:]
+        h_neg = jnp.concatenate([h_neg_interior, h_neg_boundary], axis=2)
+        h_face = jnp.where(u[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
+        out = out.at[1:-1, 1:-1, 1:-1].set(h_face * u[1:-1, 1:-1, 1:-1])
+        return out
+
+    def tvd_y(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        v: Float[Array, "Nz Ny Nx"],
+        limiter: str = "minmod",
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """TVD north-face flux over all z-levels using a flux limiter.
+
+        Positive flow:
+            r           = (h[k,j,i] − h[k,j−1,i]) / (h[k,j+1,i] − h[k,j,i])
+            h_L[k,j+½,i] = h[k,j,i]   + ½ φ(r) (h[k,j+1,i] − h[k,j,i])
+
+        Negative flow:
+            r           = (h[k,j+1,i] − h[k,j+2,i]) / (h[k,j,i] − h[k,j+1,i])
+            h_R[k,j+½,i] = h[k,j+1,i] + ½ φ(r) (h[k,j,i]   − h[k,j+1,i])
+        Falls back to 1st-order upwind on north boundary where j+2 unavailable.
+
+        Parameters
+        ----------
+        h : Float[Array, "Nz Ny Nx"]
+            Scalar at T-points.
+        v : Float[Array, "Nz Ny Nx"]
+            y-velocity at V-points.
+        limiter : str
+            Flux limiter name: ``'minmod'``, ``'van_leer'``, ``'superbee'``,
+            or ``'mc'``.
+
+        Returns
+        -------
+        Float[Array, "Nz Ny Nx"]
+            North-face flux with zero ghost ring.
+        """
+        phi = _get_limiter(limiter)
+        out = jnp.zeros_like(h)
+        # Positive flow: h_face = h[k,j,i] + 0.5*phi(r)*(h[k,j+1,i]-h[k,j,i])
+        diff_fwd = h[1:-1, 2:, 1:-1] - h[1:-1, 1:-1, 1:-1]
+        diff_bwd = h[1:-1, 1:-1, 1:-1] - h[1:-1, :-2, 1:-1]
+        r_pos = diff_bwd / (diff_fwd + _TVD_EPS)
+        h_pos = h[1:-1, 1:-1, 1:-1] + 0.5 * phi(r_pos) * diff_fwd
+        # Negative flow: h_face = h[k,j+1,i] + 0.5*phi(r)*(h[k,j,i]-h[k,j+1,i])
+        diff_neg = h[1:-1, 1:-2, 1:-1] - h[1:-1, 2:-1, 1:-1]
+        diff_neg2 = h[1:-1, 2:-1, 1:-1] - h[1:-1, 3:, 1:-1]
+        r_neg_int = diff_neg2 / (diff_neg + _TVD_EPS)
+        h_neg_interior = h[1:-1, 2:-1, 1:-1] + 0.5 * phi(r_neg_int) * diff_neg
+        # 1st-order upwind fallback at north boundary row (j=Ny-2)
+        h_neg_boundary = h[1:-1, -1:, 1:-1]
+        h_neg = jnp.concatenate([h_neg_interior, h_neg_boundary], axis=1)
+        h_face = jnp.where(v[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
+        out = out.at[1:-1, 1:-1, 1:-1].set(h_face * v[1:-1, 1:-1, 1:-1])
+        return out
+
+    def tvd_x_masked(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        u: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask,
+        limiter: str = "minmod",
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """TVD east-face flux over all z-levels with mask-aware stencil selection.
+
+        The 2-D ``mask`` is broadcast over the z-dimension.  Falls back to
+        1st-order upwind near coastlines where the TVD stencil crosses land.
+
+        Parameters
+        ----------
+        h : Float[Array, "Nz Ny Nx"]
+            Cell-centre tracer field.
+        u : Float[Array, "Nz Ny Nx"]
+            East-face velocity.
+        mask : ArakawaCGridMask
+            2-D Arakawa C-grid mask (broadcast over z).
+        limiter : str
+            Flux limiter name: ``'minmod'``, ``'van_leer'``, ``'superbee'``,
+            or ``'mc'``.
+
+        Returns
+        -------
+        Float[Array, "Nz Ny Nx"]
+            East-face flux with zero ghost ring.
+        """
+        amasks = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4))
+        m_tvd = amasks[4]
+        fe_tvd = self.tvd_x(h, u, limiter=limiter)
+        fe_u1 = self.upwind1_x(h, u)
+        pos_flow = u[1:-1, 1:-1, 1:-1] >= 0.0
+        use_tvd = jnp.where(pos_flow, m_tvd[None, 1:-1, 1:-1], m_tvd[None, 1:-1, 2:])
+        selected = jnp.where(use_tvd, fe_tvd[1:-1, 1:-1, 1:-1], fe_u1[1:-1, 1:-1, 1:-1])
+        out = jnp.zeros_like(h)
+        out = out.at[1:-1, 1:-1, 1:-1].set(selected)
+        return out
+
+    def tvd_y_masked(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        v: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask,
+        limiter: str = "minmod",
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """TVD north-face flux over all z-levels with mask-aware stencil selection.
+
+        The 2-D ``mask`` is broadcast over the z-dimension.  Falls back to
+        1st-order upwind near coastlines where the TVD stencil crosses land.
+
+        Parameters
+        ----------
+        h : Float[Array, "Nz Ny Nx"]
+            Cell-centre tracer field.
+        v : Float[Array, "Nz Ny Nx"]
+            North-face velocity.
+        mask : ArakawaCGridMask
+            2-D Arakawa C-grid mask (broadcast over z).
+        limiter : str
+            Flux limiter name: ``'minmod'``, ``'van_leer'``, ``'superbee'``,
+            or ``'mc'``.
+
+        Returns
+        -------
+        Float[Array, "Nz Ny Nx"]
+            North-face flux with zero ghost ring.
+        """
+        amasks = mask.get_adaptive_masks(direction="y", stencil_sizes=(2, 4))
+        m_tvd = amasks[4]
+        fn_tvd = self.tvd_y(h, v, limiter=limiter)
+        fn_u1 = self.upwind1_y(h, v)
+        pos_flow = v[1:-1, 1:-1, 1:-1] >= 0.0
+        use_tvd = jnp.where(pos_flow, m_tvd[None, 1:-1, 1:-1], m_tvd[None, 2:, 1:-1])
+        selected = jnp.where(use_tvd, fn_tvd[1:-1, 1:-1, 1:-1], fn_u1[1:-1, 1:-1, 1:-1])
+        out = jnp.zeros_like(h)
+        out = out.at[1:-1, 1:-1, 1:-1].set(selected)
         return out
 
     def weno5_x_masked(

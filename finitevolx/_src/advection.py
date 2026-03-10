@@ -4,6 +4,8 @@ Advection operators for Arakawa C-grids.
 Computes -div(h * u_vec) at T-points using face-value reconstruction.
 """
 
+from __future__ import annotations
+
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
@@ -14,6 +16,9 @@ from finitevolx._src.reconstruction import (
     Reconstruction2D,
     Reconstruction3D,
 )
+
+# TVD limiter names supported by the advection operators.
+_TVD_LIMITERS = frozenset({"minmod", "van_leer", "superbee", "mc"})
 
 
 class Advection1D(eqx.Module):
@@ -48,7 +53,9 @@ class Advection1D(eqx.Module):
         u : Float[Array, "Nx"]
             Velocity at U-points.
         method : str
-            Reconstruction method: 'naive', 'upwind1', 'upwind2', 'upwind3'.
+            Reconstruction method: ``'naive'``, ``'upwind1'``, ``'upwind2'``,
+            ``'upwind3'``, or a flux-limiter TVD scheme:
+            ``'minmod'``, ``'van_leer'``, ``'superbee'``, ``'mc'``.
 
         Returns
         -------
@@ -63,6 +70,8 @@ class Advection1D(eqx.Module):
             fe = self.recon.upwind2_x(h, u)
         elif method == "upwind3":
             fe = self.recon.upwind3_x(h, u)
+        elif method in _TVD_LIMITERS:
+            fe = self.recon.tvd_x(h, u, limiter=method)
         else:
             raise ValueError(f"Unknown method: {method!r}")
 
@@ -112,7 +121,9 @@ class Advection2D(eqx.Module):
         v : Float[Array, "Ny Nx"]
             y-velocity at V-points.
         method : str
-            Reconstruction method: 'naive', 'upwind1', 'upwind2', 'upwind3'.
+            Reconstruction method: ``'naive'``, ``'upwind1'``, ``'upwind2'``,
+            ``'upwind3'``, or a flux-limiter TVD scheme:
+            ``'minmod'``, ``'van_leer'``, ``'superbee'``, ``'mc'``.
 
         Returns
         -------
@@ -131,6 +142,9 @@ class Advection2D(eqx.Module):
         elif method == "upwind3":
             fe = self.recon.upwind3_x(h, u)
             fn = self.recon.upwind3_y(h, v)
+        elif method in _TVD_LIMITERS:
+            fe = self.recon.tvd_x(h, u, limiter=method)
+            fn = self.recon.tvd_y(h, v, limiter=method)
         else:
             raise ValueError(f"Unknown method: {method!r}")
 
@@ -184,7 +198,9 @@ class Advection3D(eqx.Module):
         v : Float[Array, "Nz Ny Nx"]
             y-velocity at V-points.
         method : str
-            Reconstruction method: 'naive' or 'upwind1'.
+            Reconstruction method: ``'naive'``, ``'upwind1'``, or a
+            flux-limiter TVD scheme:
+            ``'minmod'``, ``'van_leer'``, ``'superbee'``, ``'mc'``.
 
         Returns
         -------
@@ -197,6 +213,9 @@ class Advection3D(eqx.Module):
         elif method == "upwind1":
             fe = self.recon.upwind1_x(h, u)
             fn = self.recon.upwind1_y(h, v)
+        elif method in _TVD_LIMITERS:
+            fe = self.recon.tvd_x(h, u, limiter=method)
+            fn = self.recon.tvd_y(h, v, limiter=method)
         else:
             raise ValueError(f"Unknown method: {method!r}")
 

@@ -85,7 +85,7 @@ testpaths = ["finitevolx", "tests"]
 xfail_strict = true
 
 [tool.ruff]
-fix = true
+fix = false
 line-length = 88
 target-version = "py312"
 exclude = ["docs/", "notebooks/"]
@@ -121,6 +121,7 @@ ignore = [
     "PLR2004",  # magic value comparison
     "PLR0913",  # too many arguments
     "ISC001",   # conflicts with formatter
+    "UP037",    # jaxtyping shape strings must remain quoted
     "RUF002",   # ambiguous unicode characters in docstrings
     "RUF022",   # __all__ is not sorted (we use logical grouping)
     "RUF046",   # int(round(...)) is intentional

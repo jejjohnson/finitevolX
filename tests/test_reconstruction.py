@@ -235,6 +235,51 @@ class TestReconstruction1D:
         result = recon.wenoz5_x(h, u)
         np.testing.assert_allclose(result[1:-1], -7.0, rtol=1e-5)
 
+    # --- TVD flux-limiter tests ---
+
+    def test_tvd_output_shape(self, grid1d):
+        recon = Reconstruction1D(grid=grid1d)
+        h = jnp.ones(grid1d.Nx)
+        u = jnp.ones(grid1d.Nx)
+        assert recon.tvd_x(h, u).shape == (grid1d.Nx,)
+
+    def test_tvd_constant_field_all_limiters(self, grid1d):
+        """Constant field: all limiters must give h*u exactly."""
+        recon = Reconstruction1D(grid=grid1d)
+        h = 3.0 * jnp.ones(grid1d.Nx)
+        for sign in (1.0, -1.0):
+            u = sign * jnp.ones(grid1d.Nx)
+            for lim in ("minmod", "van_leer", "superbee", "mc"):
+                result = recon.tvd_x(h, u, limiter=lim)
+                np.testing.assert_allclose(result[1:-1], 3.0 * sign, rtol=1e-5)
+
+    def test_tvd_ghost_zero(self, grid1d):
+        recon = Reconstruction1D(grid=grid1d)
+        h = jnp.ones(grid1d.Nx)
+        u = jnp.ones(grid1d.Nx)
+        result = recon.tvd_x(h, u)
+        np.testing.assert_allclose(result[0], 0.0)
+        np.testing.assert_allclose(result[-1], 0.0)
+
+    def test_tvd_positive_flow_linear_field(self, grid1d):
+        """Linear h: TVD limiter φ(1)=1 gives 2nd-order result (h[i]+h[i+1])/2."""
+        recon = Reconstruction1D(grid=grid1d)
+        h = jnp.arange(grid1d.Nx, dtype=float)
+        u = jnp.ones(grid1d.Nx)
+        for lim in ("minmod", "van_leer", "superbee", "mc"):
+            result = recon.tvd_x(h, u, limiter=lim)
+            # Interior (not boundary): r=1 so phi=1, h_face = h[i] + 0.5*(h[i+1]-h[i])
+            # = (h[i]+h[i+1])/2 which is centred
+            expected = 0.5 * (h[1:-1] + h[2:]) * u[1:-1]
+            np.testing.assert_allclose(result[1:-1], expected, rtol=1e-5)
+
+    def test_tvd_unknown_limiter_raises(self, grid1d):
+        recon = Reconstruction1D(grid=grid1d)
+        h = jnp.ones(grid1d.Nx)
+        u = jnp.ones(grid1d.Nx)
+        with pytest.raises(ValueError, match="Unknown flux limiter"):
+            recon.tvd_x(h, u, limiter="bogus")
+
 
 class TestReconstruction2D:
     def test_naive_x_constant(self, grid2d):
@@ -428,6 +473,57 @@ class TestReconstruction2D:
         result = recon.wenoz5_y(h, v)
         np.testing.assert_allclose(result[1:-1, 1:-1], -9.0, rtol=1e-5)
 
+    # --- TVD flux-limiter tests ---
+
+    def test_tvd_x_output_shape(self, grid2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        assert recon.tvd_x(h, u).shape == (grid2d.Ny, grid2d.Nx)
+
+    def test_tvd_x_constant_field_all_limiters(self, grid2d):
+        """Constant field: all limiters must give h*u exactly."""
+        recon = Reconstruction2D(grid=grid2d)
+        h = 4.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        for sign in (1.0, -1.0):
+            u = sign * jnp.ones((grid2d.Ny, grid2d.Nx))
+            for lim in ("minmod", "van_leer", "superbee", "mc"):
+                result = recon.tvd_x(h, u, limiter=lim)
+                np.testing.assert_allclose(result[1:-1, 1:-1], 4.0 * sign, rtol=1e-5)
+
+    def test_tvd_y_constant_field_all_limiters(self, grid2d):
+        """Constant field: all limiters must give h*v exactly."""
+        recon = Reconstruction2D(grid=grid2d)
+        h = 5.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        for sign in (1.0, -1.0):
+            v = sign * jnp.ones((grid2d.Ny, grid2d.Nx))
+            for lim in ("minmod", "van_leer", "superbee", "mc"):
+                result = recon.tvd_y(h, v, limiter=lim)
+                np.testing.assert_allclose(result[1:-1, 1:-1], 5.0 * sign, rtol=1e-5)
+
+    def test_tvd_x_ghost_ring_zero(self, grid2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.tvd_x(h, u)
+        np.testing.assert_array_equal(result[0, :], 0.0)
+        np.testing.assert_array_equal(result[-1, :], 0.0)
+        np.testing.assert_array_equal(result[:, 0], 0.0)
+        np.testing.assert_array_equal(result[:, -1], 0.0)
+
+    def test_tvd_x_linear_field_is_centered(self, grid2d):
+        """Linear h along x: TVD with φ(1)=1 must recover the centred average."""
+        recon = Reconstruction2D(grid=grid2d)
+        x_idx = jnp.arange(grid2d.Nx, dtype=float)
+        h = jnp.broadcast_to(x_idx, (grid2d.Ny, grid2d.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        for lim in ("minmod", "van_leer", "superbee", "mc"):
+            result = recon.tvd_x(h, u, limiter=lim)
+            # For a linear ramp, r=1, phi(1)=1 for all TVD limiters,
+            # so h_face = (h[i]+h[i+1])/2.
+            expected = 0.5 * (h[1:-1, 1:-1] + h[1:-1, 2:]) * u[1:-1, 1:-1]
+            np.testing.assert_allclose(result[1:-1, 1:-1], expected, rtol=1e-5)
+
 
 class TestReconstruction3D:
     def test_naive_x_shape(self, grid3d):
@@ -515,6 +611,38 @@ class TestReconstruction3D:
         v = -jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         result = recon.wenoz3_y(h, v)
         np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], -7.0, rtol=1e-5)
+
+    # --- TVD flux-limiter tests ---
+
+    def test_tvd_x_output_shape(self, grid3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        u = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        assert recon.tvd_x(h, u).shape == (grid3d.Nz, grid3d.Ny, grid3d.Nx)
+
+    def test_tvd_x_constant_field_all_limiters(self, grid3d):
+        """Constant field: all limiters must give h*u exactly."""
+        recon = Reconstruction3D(grid=grid3d)
+        h = 4.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        for sign in (1.0, -1.0):
+            u = sign * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+            for lim in ("minmod", "van_leer", "superbee", "mc"):
+                result = recon.tvd_x(h, u, limiter=lim)
+                np.testing.assert_allclose(
+                    result[1:-1, 1:-1, 1:-1], 4.0 * sign, rtol=1e-5
+                )
+
+    def test_tvd_y_constant_field_all_limiters(self, grid3d):
+        """Constant field: all limiters must give h*v exactly."""
+        recon = Reconstruction3D(grid=grid3d)
+        h = 5.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        for sign in (1.0, -1.0):
+            v = sign * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+            for lim in ("minmod", "van_leer", "superbee", "mc"):
+                result = recon.tvd_y(h, v, limiter=lim)
+                np.testing.assert_allclose(
+                    result[1:-1, 1:-1, 1:-1], 5.0 * sign, rtol=1e-5
+                )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -694,6 +822,63 @@ class TestReconstruction2DMasked:
         result = recon.wenoz5_y_masked(h, v, coastal_mask_2d)
         assert jnp.all(jnp.isfinite(result)).item()
 
+    # --- tvd_x_masked and tvd_y_masked ---
+
+    def test_tvd_x_masked_output_shape(self, grid2d, all_ocean_mask_2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.tvd_x_masked(h, u, all_ocean_mask_2d)
+        assert result.shape == (grid2d.Ny, grid2d.Nx)
+
+    def test_tvd_x_masked_constant_field(self, grid2d, all_ocean_mask_2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 3.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.tvd_x_masked(h, u, all_ocean_mask_2d)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 3.0, rtol=1e-5)
+
+    def test_tvd_x_masked_negative_flow_constant(self, grid2d, all_ocean_mask_2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 3.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = -jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.tvd_x_masked(h, u, all_ocean_mask_2d)
+        np.testing.assert_allclose(result[1:-1, 1:-1], -3.0, rtol=1e-5)
+
+    def test_tvd_x_masked_all_ocean_matches_tvd(self, grid2d, all_ocean_mask_2d):
+        """All-ocean mask: masked TVD must equal unmasked tvd_x."""
+        recon = Reconstruction2D(grid=grid2d)
+        h = 3.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        masked = recon.tvd_x_masked(h, u, all_ocean_mask_2d)
+        unmasked = recon.tvd_x(h, u)
+        np.testing.assert_allclose(masked[1:-1, 1:-1], unmasked[1:-1, 1:-1], rtol=1e-5)
+
+    def test_tvd_y_masked_constant_field(self, grid2d, all_ocean_mask_2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 4.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.tvd_y_masked(h, v, all_ocean_mask_2d)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 4.0, rtol=1e-5)
+
+    def test_tvd_y_masked_negative_flow_constant(self, grid2d, all_ocean_mask_2d):
+        recon = Reconstruction2D(grid=grid2d)
+        h = 4.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = -jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = recon.tvd_y_masked(h, v, all_ocean_mask_2d)
+        np.testing.assert_allclose(result[1:-1, 1:-1], -4.0, rtol=1e-5)
+
+    def test_tvd_x_masked_coastal_fallback(self, coastal_mask_2d):
+        """Near-land cells fall back to upwind1 for TVD masked."""
+        grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+        recon = Reconstruction2D(grid=grid)
+        x_indices = jnp.arange(grid.Nx, dtype=float)
+        h = jnp.broadcast_to(x_indices, (grid.Ny, grid.Nx))
+        for sign in (1.0, -1.0):
+            u = sign * jnp.ones((grid.Ny, grid.Nx))
+            masked = recon.tvd_x_masked(h, u, coastal_mask_2d)
+            assert jnp.all(jnp.isfinite(masked)).item()
+
 
 class TestReconstruction3DMasked:
     # --- weno5_x_masked ---
@@ -766,3 +951,40 @@ class TestReconstruction3DMasked:
         v = -jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         result = recon.wenoz5_y_masked(h, v, all_ocean_mask_3d)
         np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], -7.0, rtol=1e-5)
+
+    # --- tvd_x_masked and tvd_y_masked ---
+
+    def test_tvd_x_masked_output_shape(self, grid3d, all_ocean_mask_3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        u = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = recon.tvd_x_masked(h, u, all_ocean_mask_3d)
+        assert result.shape == (grid3d.Nz, grid3d.Ny, grid3d.Nx)
+
+    def test_tvd_x_masked_constant_field(self, grid3d, all_ocean_mask_3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = 4.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        u = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = recon.tvd_x_masked(h, u, all_ocean_mask_3d)
+        np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], 4.0, rtol=1e-5)
+
+    def test_tvd_x_masked_negative_flow_constant(self, grid3d, all_ocean_mask_3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = 4.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        u = -jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = recon.tvd_x_masked(h, u, all_ocean_mask_3d)
+        np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], -4.0, rtol=1e-5)
+
+    def test_tvd_y_masked_constant_field(self, grid3d, all_ocean_mask_3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = 5.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        v = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = recon.tvd_y_masked(h, v, all_ocean_mask_3d)
+        np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], 5.0, rtol=1e-5)
+
+    def test_tvd_y_masked_negative_flow_constant(self, grid3d, all_ocean_mask_3d):
+        recon = Reconstruction3D(grid=grid3d)
+        h = 5.0 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        v = -jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = recon.tvd_y_masked(h, v, all_ocean_mask_3d)
+        np.testing.assert_allclose(result[1:-1, 1:-1, 1:-1], -5.0, rtol=1e-5)
