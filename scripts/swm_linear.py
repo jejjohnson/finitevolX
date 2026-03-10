@@ -3,19 +3,21 @@ from __future__ import annotations
 """Linear shallow-water double-gyre example.
 
 This example uses the current :mod:`finitevolx` Arakawa C-grid API to integrate a
-wind-driven linear shallow-water model on a periodic beta-plane. The script uses
-``xarray`` for coordinate-aware preprocessing and postprocessing, writes sampled
-fields to a Zarr store, and saves a static before/after comparison figure.
+wind-driven linear shallow-water model on a beta-plane with periodic BCs. The
+script uses ``xarray`` for coordinate-aware preprocessing and postprocessing,
+writes sampled fields to a Zarr store, and saves a static before/after figure.
 
 The prognostic variables are the free-surface anomaly ``eta`` at T-points and the
 velocity components ``u`` and ``v`` on the C-grid faces. The linearised equations
 are
 
-- ∂η/∂t = -H ∇·u⃗ + nu ∇²eta
-- ∂u/∂t = -g ∂η/∂x + f v - r u + nu ∇²u + Fₓ
-- ∂v/∂t = -g ∂η/∂y - f u - r v + nu ∇²v
+- d(eta)/dt = -H * nabla . u_vec + nu * nabla^2(eta)
+- d(u)/dt   = -g * d(eta)/dx + f*v - r*u + nu * nabla^2(u) + F_x
+- d(v)/dt   = -g * d(eta)/dy - f*u - r*v + nu * nabla^2(v)
 
-where the zonal forcing ``Fₓ`` follows the classic double-gyre wind pattern.
+where the zonal body force ``F_x = A * cos(2*pi*y/Ly)`` follows the standard
+double-gyre wind pattern (anticyclonic/subtropical in the south, cyclonic/subpolar
+in the north).
 
 Examples
 --------
@@ -168,7 +170,11 @@ def make_preprocessing_dataset(
 
     eta0 = 0.01 * np.sin(np.pi * x2d / config.Lx) * np.sin(np.pi * y2d / config.Ly)
     coriolis = config.f0 + config.beta * (y2d - 0.5 * config.Ly)
-    wind_u = -config.wind_acceleration * np.cos(2.0 * np.pi * y2d / config.Ly)
+    # Double-gyre zonal wind body force F_x = A * cos(2*pi*y/Ly).
+    # Wind curl = d(F_x)/dy = -(2*pi*A/Ly) * sin(2*pi*y/Ly):
+    #   y in (0,  Ly/2): curl < 0 -> anticyclonic (subtropical gyre, south) ✓
+    #   y in (Ly/2, Ly): curl > 0 -> cyclonic    (subpolar    gyre, north) ✓
+    wind_u = config.wind_acceleration * np.cos(2.0 * np.pi * y2d / config.Ly)
 
     return xr.Dataset(
         data_vars={

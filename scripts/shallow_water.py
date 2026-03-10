@@ -5,18 +5,21 @@ from __future__ import annotations
 This script modernises the old nonlinear shallow-water example so that it uses the
 current :mod:`finitevolx` API throughout. The model is driven by the same
 double-gyre wind stress pattern as the linear case, but the mass equation uses the
-full layer thickness and the momentum equation includes a compact nonlinear
-Bernoulli/advection closure. ``xarray`` handles the coordinate-aware forcing and
-saved diagnostics, and the sampled fields are written to Zarr instead of being
-shown in a live plot.
+full layer thickness and the momentum equation includes the nonlinear advection
+term. ``xarray`` handles the coordinate-aware forcing and saved diagnostics, and
+the sampled fields are written to Zarr instead of being shown in a live plot.
 
 The nonlinear model integrates
 
-- ∂η/∂t = -∇·((H + η) u⃗) + nu ∇²eta
-- ∂u/∂t = -∂B/∂x - u⃗·∇u + f v - r u + nu ∇²u + Fₓ
-- ∂v/∂t = -∂B/∂y - u⃗·∇v - f u - r v + nu ∇²v
+- d(eta)/dt = -nabla . ((H + eta) * u_vec) + nu * nabla^2(eta)
+- d(u)/dt   = -g * d(eta)/dx - (u_vec . nabla) u + f*v - r*u + nu * nabla^2(u) + F_x
+- d(v)/dt   = -g * d(eta)/dy - (u_vec . nabla) v - f*u - r*v + nu * nabla^2(v)
 
-with the Bernoulli function ``B = g η + 1/2 (u² + v²)``.
+The pressure gradient uses only the linear term ``-g * d(eta)/dx`` (not the full
+Bernoulli function ``B = g*eta + 0.5*(u^2 + v^2)``).  Using the full Bernoulli
+together with the separate ``-(u_vec . nabla) u`` advection term would double-count
+the kinetic energy gradient ``-d(u^2/2)/dx`` that is already included in
+``-(u_vec . nabla) u``.
 
 Examples
 --------
@@ -214,7 +217,11 @@ def make_preprocessing_dataset(
 
     eta0 = 0.01 * np.sin(np.pi * x2d / config.Lx) * np.sin(np.pi * y2d / config.Ly)
     coriolis = config.f0 + config.beta * (y2d - 0.5 * config.Ly)
-    wind_u = -config.wind_acceleration * np.cos(2.0 * np.pi * y2d / config.Ly)
+    # Double-gyre zonal wind body force F_x = A * cos(2*pi*y/Ly).
+    # Wind curl = d(F_x)/dy = -(2*pi*A/Ly) * sin(2*pi*y/Ly):
+    #   y in (0,  Ly/2): curl < 0 -> anticyclonic (subtropical gyre, south) ✓
+    #   y in (Ly/2, Ly): curl > 0 -> cyclonic    (subpolar    gyre, north) ✓
+    wind_u = config.wind_acceleration * np.cos(2.0 * np.pi * y2d / config.Ly)
 
     return xr.Dataset(
         data_vars={
@@ -287,31 +294,44 @@ def run_simulation(config: ShallowWaterConfig | None = None) -> xr.Dataset:  # n
         u_field: Array,
         v_field: Array,
     ) -> tuple[Array, Array, Array]:
-        """Compute the nonlinear shallow-water tendencies on the C-grid."""
+        """Compute the nonlinear shallow-water tendencies on the C-grid.
+
+        Uses the advective form:
+          d(u)/dt = -g*d(eta)/dx - (u_vec.nabla)u + f*v - r*u + nu*nabla^2(u) + F_x
+          d(v)/dt = -g*d(eta)/dy - (u_vec.nabla)v - f*u - r*v + nu*nabla^2(v)
+
+        The pressure gradient uses only the linear term ``-g * d(eta)/dx``.  The
+        kinetic energy is carried entirely by the explicit advection ``-(u.nabla)u``
+        to avoid double-counting the KE gradient that would result from using the
+        full Bernoulli B = g*eta + 0.5*speed^2 together with the advection term.
+        """
         layer_depth = mean_depth + eta_field
         eta_rhs = adv(layer_depth, u_field, v_field, method="upwind1")
         eta_rhs = eta_rhs + viscosity * diff.laplacian(eta_field)
 
         u_on_t = interp.U_to_T(u_field)
         v_on_t = interp.V_to_T(v_field)
-        speed_squared = u_on_t**2 + v_on_t**2
-        bernoulli = gravity * eta_field + 0.5 * speed_squared
 
         du_dx, du_dy = centered_gradients(u_on_t)
         dv_dx, dv_dy = centered_gradients(v_on_t)
         u_adv = interp.T_to_U(u_on_t * du_dx + v_on_t * du_dy)
         v_adv = interp.T_to_V(u_on_t * dv_dx + v_on_t * dv_dy)
 
-        v_on_u = interp.T_to_U(v_on_t)
-        u_on_v = interp.T_to_V(u_on_t)
+        # Coriolis: use the 4-point bilinear cross-face averages V_to_U / U_to_V
+        # directly, rather than routing through T-points (V->T->U double-average).
+        # Direct cross-face interpolation is more accurate (one averaging step)
+        # and consistent with the linear script.
+        v_on_u = interp.V_to_U(v_field)
+        u_on_v = interp.U_to_V(u_field)
         coriolis_on_u = interp.T_to_U(coriolis)
         coriolis_on_v = interp.T_to_V(coriolis)
 
-        u_rhs = -diff.diff_x_T_to_U(bernoulli)
+        # Pressure gradient only (no KE term) — advection handles the rest.
+        u_rhs = -gravity * diff.diff_x_T_to_U(eta_field)
         u_rhs = u_rhs - u_adv + coriolis_on_u * v_on_u + wind_u
         u_rhs = u_rhs - drag * u_field + viscosity * diff.laplacian(u_field)
 
-        v_rhs = -diff.diff_y_T_to_V(bernoulli)
+        v_rhs = -gravity * diff.diff_y_T_to_V(eta_field)
         v_rhs = v_rhs - v_adv - coriolis_on_v * u_on_v
         v_rhs = v_rhs - drag * v_field + viscosity * diff.laplacian(v_field)
         return eta_rhs, u_rhs, v_rhs
