@@ -447,13 +447,10 @@ class TestDifferenceLaplacianConstant:
     def test_laplacian_2d_linear_x_is_zero(self):
         """Laplacian of h=c*x is zero (second derivative of linear field = 0).
 
-        The Laplacian is computed as diff_x_U_to_T(diff_x_T_to_U(h)).
-        diff_x_T_to_U writes only to interior U-points [1:-1, 1:-1]; the west
-        ghost U-face (column 0) is NOT filled, so diff_x_U_to_T at i=1 reads
-        a zero ghost and computes a non-zero spurious value.  Columns i≥2
-        only read interior U-values and recover d²h/dx² = 0 correctly.
-        The y-direction is unaffected by this (h doesn't vary in y), so
-        the full y-interior [1:-1] is valid.
+        Difference2D.laplacian uses a direct 3-point stencil on h:
+            d²h/dx²[j,i] = (h[j, i+1] - 2*h[j, i] + h[j, i-1]) / dx²
+        For h=c*x=c*i*dx, the cancellation is exact at every interior point
+        (including i=1, where h[0]=0 is the natural linear continuation).
         """
         grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
         diff = Difference2D(grid=grid)
@@ -461,19 +458,15 @@ class TestDifferenceLaplacianConstant:
         x = jnp.arange(grid.Nx, dtype=float) * grid.dx
         h = jnp.broadcast_to(c * x, (grid.Ny, grid.Nx))
         result = diff.laplacian(h)
-        # Skip column i=1 (spurious from zero west ghost U-face); y-axis is unaffected.
-        np.testing.assert_allclose(result[1:-1, 2:-1], 0.0, atol=1e-10)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
 
     def test_laplacian_2d_linear_y_is_zero(self):
         """Laplacian of h=c*y is zero (second derivative of linear field = 0).
 
-        The Laplacian is computed as diff_y_V_to_T(diff_y_T_to_V(h)).
-        diff_y_T_to_V writes only to interior V-points [1:-1, 1:-1]; the south
-        ghost V-face (row 0) is NOT filled, so diff_y_V_to_T at j=1 reads
-        a zero ghost and computes a non-zero spurious value.  Rows j≥2
-        only read interior V-values and recover d²h/dy² = 0 correctly.
-        The x-direction is unaffected (h doesn't vary in x), so the full
-        x-interior [1:-1] is valid.
+        Difference2D.laplacian uses a direct 3-point stencil on h:
+            d²h/dy²[j,i] = (h[j+1, i] - 2*h[j, i] + h[j-1, i]) / dy²
+        For h=c*y=c*j*dy, the cancellation is exact at every interior point
+        (including j=1, where h[0]=0 is the natural linear continuation).
         """
         grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
         diff = Difference2D(grid=grid)
@@ -481,8 +474,7 @@ class TestDifferenceLaplacianConstant:
         y = jnp.arange(grid.Ny, dtype=float) * grid.dy
         h = jnp.broadcast_to(c * y[:, None], (grid.Ny, grid.Nx))
         result = diff.laplacian(h)
-        # Skip row j=1 (spurious from zero south ghost V-face); x-axis is unaffected.
-        np.testing.assert_allclose(result[2:-1, 1:-1], 0.0, atol=1e-10)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
 
 
 # ---------------------------------------------------------------------------

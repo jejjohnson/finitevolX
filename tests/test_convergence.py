@@ -181,10 +181,14 @@ class TestConvergence2D:
             result = diff.curl(u, v)
             np.testing.assert_allclose(result[1:-1, 1:-1], 2.0 * c, rtol=1e-5)
 
-    def test_diff_x_second_order_convergence_sin(self):
-        """∂h/∂x for h=sin(kx) converges at O(dx²).
+    def test_diff_x_first_order_convergence_sin(self):
+        """∂h/∂x for h=sin(kx) converges at O(dx) (first-order accurate).
 
-        For T→U forward difference, the error should halve ≥ ~3.5× when N doubles.
+        diff_x_T_to_U is a forward difference (first-order stencil):
+            dh/dx[j, i+1/2] = (h[j, i+1] - h[j, i]) / dx
+
+        When N doubles (dx halves), the error should roughly halve (ratio ≈ 2).
+        We require ratio ≥ 1.8 as a conservative lower bound.
         """
         L = 2.0 * np.pi
         k = 1.0
@@ -201,5 +205,5 @@ class TestConvergence2D:
 
         ratio = errors[0] / errors[1]
         assert ratio >= 1.8, (
-            f"diff_x convergence ratio {ratio:.2f} < 1.8 (should be ≥ 2 for O(dx))"
+            f"diff_x convergence ratio {ratio:.2f} < 1.8 (expected ~2 for O(dx) first-order)"
         )

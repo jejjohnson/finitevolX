@@ -203,17 +203,20 @@ class TestWeno5PolynomialExactness:
         )
 
     def test_weno5_linear_weights_approach_optimal(self):
-        """For smooth data, WENO-5 weights w_k / (w_1+w_2+w_3) → g_k = (0.1, 0.6, 0.3).
+        """For smooth data, WENO-5 weights w_k → g_k = (0.1, 0.6, 0.3).
 
-        We test this by verifying that the WENO result is close to the
-        optimal linear combination on smooth quadratic data far from shocks.
+        For constant input data all β_k = 0 exactly, so the weights collapse
+        to the optimal linear weights (g1, g2, g3) = (0.1, 0.6, 0.3) by
+        construction.  We verify this with constant stencil values.
         """
-        # Quadratic field: q = i^2  (smooth, no shock)
-        n = 20
-        q = jnp.arange(n, dtype=float) ** 2
+        c = 3.0
+        qmm = _scalar(c)
+        qm = _scalar(c)
+        q0 = _scalar(c)
+        qp = _scalar(c)
+        qpp = _scalar(c)
 
         eps = 1e-8
-        qmm, qm, q0, qp, qpp = q[:-4], q[1:-3], q[2:-2], q[3:-1], q[4:]
         k1, k2 = 13.0 / 12.0, 0.25
         beta1 = k1 * (qmm - 2 * qm + q0) ** 2 + k2 * (qmm - 4 * qm + 3 * q0) ** 2
         beta2 = k1 * (qm - 2 * q0 + qp) ** 2 + k2 * (qm - qp) ** 2
@@ -224,13 +227,14 @@ class TestWeno5PolynomialExactness:
         w2_raw = g2 / (beta2 + eps) ** 2
         w3_raw = g3 / (beta3 + eps) ** 2
         w_total = w1_raw + w2_raw + w3_raw
-        w1 = w1_raw / w_total
-        w2 = w2_raw / w_total
-        w3 = w3_raw / w_total
+        w1 = float(w1_raw / w_total)
+        w2 = float(w2_raw / w_total)
+        w3 = float(w3_raw / w_total)
 
-        # On smooth quadratic data, the weights should be close to optimal (g1, g2, g3)
-        # They won't be exact because quadratic data causes nonzero β, but the
-        # ratio should be relatively close
+        # For constant data β1=β2=β3=0 → w_k = g_k * (1/eps²) / sum → w_k = g_k
+        np.testing.assert_allclose(w1, g1, rtol=1e-10)
+        np.testing.assert_allclose(w2, g2, rtol=1e-10)
+        np.testing.assert_allclose(w3, g3, rtol=1e-10)
         np.testing.assert_allclose(w1 + w2 + w3, 1.0, rtol=1e-10)
 
 
