@@ -17,8 +17,9 @@ The prognostic variable is the PV anomaly
     q_a = zeta - psi / Ld^2
 
 where zeta = nabla^2 psi is the relative vorticity and Ld is the Rossby
-deformation radius.  The resting state satisfies q_a = 0 (psi = 0, zeta = 0),
-which is used as the initial condition.  The governing equations are
+deformation radius.  The resting state satisfies q_a = 0 (psi = 0, zeta = 0).
+In this example we start from a small sinusoidal PV anomaly perturbation about
+this resting state.  The governing equations are
 
 - dq_a/dt = -u_vec . nabla q_a - v*beta + F - r*zeta + nu*nabla^2 q_a
 - (nabla^2 - 1/Ld^2) psi = q_a
