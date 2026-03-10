@@ -6,12 +6,34 @@ The existing `Vorticity2D` class computes the *inverse* direction (`curl(u,v) �
 
 The perpendicular gradient appears in **all three** reference repositories:
 
-- The `u` component is `-∂ψ/∂y` (forward difference in y: T→V, then negated)
-- The `v` component is `+∂ψ/∂x` (forward difference in x: T→U)
+- The `u` component (zonal velocity) is `-∂ψ/∂y`, at **U-points** `(j, i+1/2)`
+- The `v` component (meridional velocity) is `+∂ψ/∂x`, at **V-points** `(j+1/2, i)`
 
-On the Arakawa C-grid with same-index convention:
-- `u[j, i+1/2] = -(ψ[j+1, i] - ψ[j, i]) / dy`  → result lives at **U-points**
-- `v[j+1/2, i] = +(ψ[j, i+1] - ψ[j, i]) / dx`  → result lives at **V-points**
+The proper Arakawa C-grid approach (matching the existing `qg_1p5_layer.py` script) uses
+a two-step T→X→U/V route through the corner grid:
+
+```
+# Step 1: T → X (corner) interpolation
+psi_x[j+1/2, i+1/2] = (ψ[j,i] + ψ[j+1,i] + ψ[j,i+1] + ψ[j+1,i+1]) / 4
+
+# Step 2a: diff_y_X_to_U  (u at east faces)
+u[j, i+1/2] = -(psi_x[j+1/2, i+1/2] - psi_x[j-1/2, i+1/2]) / dy
+
+# Step 2b: diff_x_X_to_V  (v at north faces)
+v[j+1/2, i] = +(psi_x[j+1/2, i+1/2] - psi_x[j+1/2, i-1/2]) / dx
+```
+
+A simpler (but less accurate) forward-difference approximation used in the reference
+repos produces the result on the opposite faces — `u` at V-points and `v` at U-points:
+
+```
+u[j+1/2, i] = -(ψ[j+1, i] - ψ[j, i]) / dy   → V-points  (simple approach)
+v[j, i+1/2] = +(ψ[j, i+1] - ψ[j, i]) / dx   → U-points  (simple approach)
+```
+
+The preferred finitevolX implementation should use the T→X→U/V route to place `u` on
+U-points and `v` on V-points, consistent with the existing `Interpolation2D` and
+`Difference2D` operators.
 
 ## References
 
@@ -25,15 +47,19 @@ On the Arakawa C-grid with same-index convention:
 
 ```python
 def grad_perp_x(psi: Float[Array, "Ny Nx"], dy: float) -> Float[Array, "Ny Nx"]:
-    """Perpendicular gradient x-component: u = -∂ψ/∂y (T → U points).
+    """Perpendicular gradient x-component: u = -∂ψ/∂y (T → X → U points).
     
-    u[j, i+1/2] = -(ψ[j+1, i] - ψ[j, i]) / dy
+    u[j, i] = -(psi_x[j, i] - psi_x[j-1, i]) / dy
+    where psi_x is ψ interpolated to X-corners via interp_T_to_X.
+    u[j, i] represents the east-face value at physical location (j, i+1/2).
     """
 
 def grad_perp_y(psi: Float[Array, "Ny Nx"], dx: float) -> Float[Array, "Ny Nx"]:
-    """Perpendicular gradient y-component: v = +∂ψ/∂x (T → V points).
+    """Perpendicular gradient y-component: v = +∂ψ/∂x (T → X → V points).
     
-    v[j+1/2, i] = +(ψ[j, i+1] - ψ[j, i]) / dx
+    v[j, i] = +(psi_x[j, i] - psi_x[j, i-1]) / dx
+    where psi_x is ψ interpolated to X-corners via interp_T_to_X.
+    v[j, i] represents the north-face value at physical location (j+1/2, i).
     """
 ```
 
@@ -43,9 +69,11 @@ def grad_perp_y(psi: Float[Array, "Ny Nx"], dx: float) -> Float[Array, "Ny Nx"]:
 class GradPerp2D(eqx.Module):
     """Perpendicular gradient on the Arakawa C-grid: ψ → (u, v).
     
-    Maps a T-point streamfunction to geostrophic velocities:
-      u[j, i+1/2] = -∂ψ/∂y  (U-points)
-      v[j+1/2, i] = +∂ψ/∂x  (V-points)
+    Maps a T-point streamfunction to geostrophic velocities via the
+    T → X (corner) → U/V route:
+      u[j, i] = -∂psi_x/∂y  at U-points (east faces, physical location j, i+1/2)
+      v[j, i] = +∂psi_x/∂x  at V-points (north faces, physical location j+1/2, i)
+    where psi_x is ψ interpolated from T-points to X-corners.
     """
     grid: ArakawaCGrid2D
 
@@ -55,10 +83,13 @@ class GradPerp2D(eqx.Module):
 
 ## Implementation Notes
 
-- The stencils are analogous to `diff_y_T_to_V` and `diff_x_T_to_U` in `Difference2D`, but with a sign flip on the y-component
-- Must write only to `[1:-1, 1:-1]` of the output array (ghost ring initialized to zero)
-- North ghost of `ψ` (T-point) is consumed by u-component at the last interior row
-- East ghost of `ψ` (T-point) is consumed by v-component at the last interior column
+- Follows the same T→X→U/V route already used in `qg_1p5_layer.py`:
+  1. `psi_x = Interpolation2D(grid).interp_T_to_X(psi)` — corners at `(j+1/2, i+1/2)`
+  2. `u = -Difference2D(grid).diff_y_X_to_U(psi_x)` — east faces at `(j, i+1/2)`
+  3. `v = +Difference2D(grid).diff_x_X_to_V(psi_x)` — north faces at `(j+1/2, i)`
+- `GradPerp2D` wraps these two operators and avoids re-computing `psi_x` twice
+- Must write only to `[1:-1, 1:-1]` of output arrays (ghost ring initialized to zero)
+- North ghost of `ψ` (T-point) is consumed by the X-interpolation
 - Add an optional mask-aware variant for use with `ArakawaCGridMask`
 
 ## Acceptance Criteria

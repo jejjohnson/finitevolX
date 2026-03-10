@@ -25,8 +25,14 @@ class Divergence2D(eqx.Module):
     
     div[j, i] = (u[j, i] - u[j, i-1]) / dx + (v[j, i] - v[j-1, i]) / dy
     
-    Reads U-points (east faces) and V-points (north faces);
-    writes result to T-points (cell centres).
+    Using same-index convention:
+      u[j, i]   → east face at (j, i+1/2)   (east boundary of cell i)
+      u[j, i-1] → east face at (j, i-1/2)   (west boundary of cell i) = west ghost U
+      v[j, i]   → north face at (j+1/2, i)  (north boundary of cell i)
+      v[j-1, i] → north face at (j-1/2, i)  (south boundary of cell i) = south ghost V
+    
+    The west ghost u[:,0] and south ghost v[0,:] must be set by the caller
+    (via BCs) before calling. Reads U-points and V-points; writes to T-points.
     """
     grid: ArakawaCGrid2D
 
