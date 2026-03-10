@@ -51,8 +51,10 @@ uv sync --all-extras
 
 The repository now ships three double-gyre examples that all use the current
 `finitevolx` API, use `xarray` for preprocessing and postprocessing, write
-sampled model fields to Zarr, and save a static before/after comparison figure.
-None of the scripts opens a free-running live plot.
+sampled model fields to Zarr, and save an **animated GIF** showing the field
+evolution over time.  Each script accepts an optional `--spinup-steps` argument
+to run a silent spin-up phase before recording frames, which helps produce a
+recognisable double-gyre structure in the animation.
 
 ### Linear shallow-water model
 
@@ -65,9 +67,9 @@ uv run python scripts/swm_linear.py
 Artifacts written by default:
 
 - `outputs/linear_shallow_water_double_gyre.zarr`
-- `outputs/linear_shallow_water_double_gyre.png`
+- `outputs/linear_shallow_water_double_gyre.gif`
 
-![Linear shallow-water double gyre](docs/images/linear_shallow_water_double_gyre.png)
+![Linear shallow-water double gyre](docs/images/linear_shallow_water_double_gyre.gif)
 
 ### Nonlinear shallow-water model
 
@@ -80,9 +82,9 @@ uv run python scripts/shallow_water.py
 Artifacts written by default:
 
 - `outputs/shallow_water_double_gyre.zarr`
-- `outputs/shallow_water_double_gyre.png`
+- `outputs/shallow_water_double_gyre.gif`
 
-![Nonlinear shallow-water double gyre](docs/images/shallow_water_double_gyre.png)
+![Nonlinear shallow-water double gyre](docs/images/shallow_water_double_gyre.gif)
 
 ### 1.5-layer quasi-geostrophic model
 
@@ -95,13 +97,15 @@ uv run python scripts/qg_1p5_layer.py
 Artifacts written by default:
 
 - `outputs/qg_1p5_layer_double_gyre.zarr`
-- `outputs/qg_1p5_layer_double_gyre.png`
+- `outputs/qg_1p5_layer_double_gyre.gif`
 
-![1.5-layer QG double gyre](docs/images/qg_1p5_layer_double_gyre.png)
+![1.5-layer QG double gyre](docs/images/qg_1p5_layer_double_gyre.gif)
 
-The QG example now uses basin-scale default parameters that are closer to the
-MQGeometry double-gyre benchmark and saves a **relative-vorticity** figure
+The QG example uses basin-scale default parameters that are closer to the
+MQGeometry double-gyre benchmark and saves a **relative-vorticity** animation
 instead of a streamfunction plot, which produces a more recognizable eddy field.
+Run with `--spinup-steps 8000` to start recording after the double-gyre
+circulation is well established (~370 days into the simulation).
 
 For a different artifact location during development, pass `--output-dir` to any
 of the scripts.

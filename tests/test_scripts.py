@@ -72,10 +72,11 @@ def test_linear_shallow_water_script_runs_stably(tmp_path: Path) -> None:
     config = module.LinearShallowWaterConfig(
         nx=24,
         ny=24,
+        spinup_steps=20,
         steps=240,
         snapshot_interval=40,
         zarr_path=tmp_path / "linear.zarr",
-        figure_path=tmp_path / "linear.png",
+        figure_path=tmp_path / "linear.gif",
     )
 
     dataset = module.run_simulation(config)
@@ -94,6 +95,9 @@ def test_linear_shallow_water_script_runs_stably(tmp_path: Path) -> None:
     assert np.max(speed) < 0.01
     assert checkerboard_metric(eta[-1]) < 1.0e-2
     assert checkerboard_metric(relative_vorticity[-1]) < 1.0e-2
+    # Verify the first recorded time reflects the spin-up offset.
+    expected_t0 = config.spinup_steps * config.dt
+    assert float(reopened["time"].isel(time=0)) == pytest.approx(expected_t0)
 
 
 def test_nonlinear_shallow_water_script_runs_stably(tmp_path: Path) -> None:
@@ -105,7 +109,7 @@ def test_nonlinear_shallow_water_script_runs_stably(tmp_path: Path) -> None:
         steps=240,
         snapshot_interval=40,
         zarr_path=tmp_path / "nonlinear.zarr",
-        figure_path=tmp_path / "nonlinear.png",
+        figure_path=tmp_path / "nonlinear.gif",
     )
 
     dataset = module.run_simulation(config)
@@ -135,7 +139,7 @@ def test_qg_script_runs_stably(tmp_path: Path) -> None:
         steps=400,
         snapshot_interval=50,
         zarr_path=tmp_path / "qg.zarr",
-        figure_path=tmp_path / "qg.png",
+        figure_path=tmp_path / "qg.gif",
     )
 
     dataset = module.run_simulation(config)
