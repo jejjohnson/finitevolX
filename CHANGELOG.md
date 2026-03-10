@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.14](https://github.com/jejjohnson/finitevolX/compare/v0.0.13...v0.0.14) (2026-03-10)
+
+
+### Bug Fixes
+
+* correct physical formulation in all three double-gyre example scripts ([3bafe48](https://github.com/jejjohnson/finitevolX/commit/3bafe48e8f3ca2b92c425c012a3cc631498ef2b4))
+* correct QG 1.5-layer PV formulation, drag, beta term, and forcing amplitude ([758c377](https://github.com/jejjohnson/finitevolX/commit/758c37773d3964311edfae8ed83d3116c03b8bb5))
+* correct wind sign, nonlinear SWM Bernoulli double-counting, and Coriolis staggering ([4adb0eb](https://github.com/jejjohnson/finitevolX/commit/4adb0eb5babf7cdb8fd0ab1749a95e3a97ef130d))
+
 ## [0.0.13](https://github.com/jejjohnson/finitevolX/compare/v0.0.12...v0.0.13) (2026-03-08)
 
 
