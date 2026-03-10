@@ -4,20 +4,53 @@ from __future__ import annotations
 
 This example shows how to combine the current :mod:`finitevolx` advection,
 interpolation, and spectral elliptic solvers to build a compact 1.5-layer QG
-model. The potential-vorticity field is advected in a closed rectangular basin
-with no-normal-flow solid walls, the streamfunction is recovered from a
-Helmholtz inversion with homogeneous Dirichlet (ψ = 0) wall boundary
-conditions using ``solve_helmholtz_dst``, and the output is saved through
-``xarray``/Zarr together with a static before/after figure.
+model.  The potential-vorticity (PV) *anomaly* is advected in a closed
+rectangular basin with no-normal-flow solid walls, the streamfunction is
+recovered from a Helmholtz inversion with homogeneous Dirichlet (psi = 0) wall
+boundary conditions using ``solve_helmholtz_dst``, and the output is saved
+through ``xarray``/Zarr together with a static before/after figure.
 
-The model evolves the QG potential-vorticity anomaly ``q`` according to
+**Formulation B -- PV anomaly without the beta background**
 
-- ∂q/∂t = -u⃗·∇q + F - r q + nu ∇²q
-- (∇² - 1 / Ld²) ψ = q - β (y - Ly / 2)
-- u = -∂ψ/∂y,  v = ∂ψ/∂x
+The prognostic variable is the PV anomaly
 
-where ``F`` is a prescribed double-gyre wind-curl forcing and ψ = 0 on all
-four basin walls (solid no-normal-flow boundary conditions).
+    q_a = zeta - psi / Ld^2
+
+where zeta = nabla^2 psi is the relative vorticity and Ld is the Rossby
+deformation radius.  The resting state satisfies q_a = 0 (psi = 0, zeta = 0),
+which is used as the initial condition.  The governing equations are
+
+- dq_a/dt = -u_vec . nabla q_a - v*beta + F - r*zeta + nu*nabla^2 q_a
+- (nabla^2 - 1/Ld^2) psi = q_a
+- u = -dpsi/dy,  v = dpsi/dx
+
+where
+
+- ``F``    = prescribed double-gyre wind-curl PV forcing
+- ``r``    = linear drag coefficient acting on relative vorticity zeta
+- ``nu``   = horizontal Laplacian viscosity
+- ``beta`` = meridional Coriolis gradient (planetary vorticity advection)
+
+The ``-v*beta`` term carries the planetary-vorticity advection explicitly
+(rather than absorbing beta*y into q_a, which would require a non-trivial
+background state in the initial condition and ghost cells).
+
+Wind forcing
+------------
+The double-gyre pattern is
+
+    F(y) = -(tau0 / rho0 / H) * (2*pi/Ly) * sin(2*pi*y/Ly)
+
+Peak amplitude ``wind_curl_forcing = tau0 * (2*pi/Ly) / (rho0 * H)``.  For
+tau0 = 0.08 N/m^2, rho0 = 1025 kg/m^3, H = 500 m the physical value is
+~1.9e-13 s^-2; the default of 2e-12 s^-2 is enhanced ~10x for a faster
+demonstration spin-up while keeping velocities in an oceanographically
+plausible range (~10 cm/s).
+
+Boundary conditions
+-------------------
+psi = 0 on all four basin walls (no-normal-flow).  The PV ghost cells are
+held at zero (no-slip, consistent with psi = 0 => zeta = 0 on the walls).
 
 Examples
 --------
@@ -164,17 +197,20 @@ class QuasiGeostrophicConfig:
     Lx, Ly : float, optional
         Domain lengths [m].
     f0 : float, optional
-        Reference Coriolis parameter [s⁻¹].
+        Reference Coriolis parameter [s^-1].
     beta : float, optional
-        Meridional Coriolis gradient [m⁻¹ s⁻¹].
+        Meridional Coriolis gradient [m^-1 s^-1].
     rossby_radius : float, optional
         First baroclinic Rossby radius of deformation [m].
     drag : float, optional
-        Linear PV damping coefficient [s⁻¹].
+        Linear drag coefficient applied to relative vorticity zeta = nabla^2 psi [s^-1].
     viscosity : float, optional
-        Laplacian viscosity [m² s⁻¹].
+        Laplacian viscosity [m^2 s^-1].
     wind_curl_forcing : float, optional
-        Peak PV forcing amplitude [s⁻²].
+        Peak PV forcing amplitude [s^-2].  Physically this equals
+        ``tau0 * (2*pi/Ly) / (rho0 * H)``; the default 2e-12 s^-2 is ~10x the
+        value for tau0 = 0.08 N/m^2, rho0 = 1025 kg/m^3, H = 500 m to allow a
+        faster demo spin-up while keeping velocities in a plausible range.
     dt : float, optional
         Explicit time step [s].
     steps : int, optional
@@ -192,7 +228,7 @@ class QuasiGeostrophicConfig:
 
     Use a smaller test case for CI smoke checks::
 
-        config = QuasiGeostrophicConfig(nx=24, ny=24, steps=300)
+        config = QuasiGeostrophicConfig(nx=24, ny=24, steps=400)
     """
 
     nx: int = 64
@@ -204,10 +240,10 @@ class QuasiGeostrophicConfig:
     rossby_radius: float = 4.0e4
     drag: float = 5.0e-8
     viscosity: float = 5.0e4
-    wind_curl_forcing: float = 2.0e-10
+    wind_curl_forcing: float = 2.0e-12
     dt: float = 4000.0
-    steps: int = 4000
-    snapshot_interval: int = 500
+    steps: int = 10000
+    snapshot_interval: int = 1000
     zarr_path: Path = Path("outputs/qg_1p5_layer_double_gyre.zarr")
     figure_path: Path = Path("outputs/qg_1p5_layer_double_gyre.png")
 
@@ -260,8 +296,10 @@ def make_preprocessing_dataset(
         5.0e-9 * np.sin(2.0 * np.pi * x2d / config.Lx) * np.sin(np.pi * y2d / config.Ly)
     )
     beta_term = config.beta * (y2d - 0.5 * config.Ly)
-    # Match the sign convention used in MQGeometry's double_gyre.py:
-    # curl_tau(y) = -tau0 * (2π / Ly) * sin(2π y / Ly)
+    # Double-gyre wind-curl forcing pattern (antisymmetric about basin midline):
+    #   F(y) = -(tau0/(rho0*H)) * (2*pi/Ly) * sin(2*pi*y/Ly)
+    # Negative in the southern half (anticyclonic, subtropical gyre) and
+    # positive in the northern half (cyclonic, subpolar gyre).
     wind_curl = -config.wind_curl_forcing * np.sin(2.0 * np.pi * y2d / config.Ly)
 
     return xr.Dataset(
@@ -311,9 +349,9 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
     forcing = make_preprocessing_dataset(config, grid)
 
     q = to_wall_field(forcing["q0"])
-    beta_term = jnp.asarray(forcing["beta_term"].to_numpy())
     wind_curl = to_wall_field(forcing["wind_curl"])
 
+    beta = config.beta
     viscosity = config.viscosity
     drag = config.drag
     dt = config.dt
@@ -322,8 +360,12 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
     def invert_streamfunction(q_field: Array) -> Array:
         """Recover the streamfunction from the PV anomaly using Helmholtz DST.
 
-        Uses homogeneous Dirichlet BCs (ψ = 0 on all four walls), which is
-        the appropriate condition for a closed rectangular basin.
+        Formulation B: q_a = zeta - psi/Ld^2, so the Helmholtz equation is
+
+            (nabla^2 - 1/Ld^2) psi = q_a
+
+        with homogeneous Dirichlet BCs (psi = 0 on all four walls), appropriate
+        for a closed rectangular basin where q_a = 0 at rest.
 
         Parameters
         ----------
@@ -333,9 +375,12 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
         Returns
         -------
         Array
-            Streamfunction on the full grid with zero ghost cells (ψ = 0 walls).
+            Streamfunction on the full grid with zero ghost cells (psi = 0 walls).
         """
-        rhs = q_field[1:-1, 1:-1] - beta_term
+        # Formulation B: RHS is just q_a -- no beta*(y-y0) subtraction needed.
+        # Subtracting the beta background is wrong here because q_a already
+        # excludes it; adding it back would drive a large spurious initial psi.
+        rhs = q_field[1:-1, 1:-1]
         psi_interior = solve_helmholtz_dst(
             rhs,
             grid.dx,
@@ -343,17 +388,40 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
             lambda_=deformation_wavenumber,
         )
         psi_field = jnp.zeros_like(q_field)
-        # Ghost cells remain zero, encoding ψ = 0 on the solid walls.
+        # Ghost cells remain zero, encoding psi = 0 on the solid walls.
         return psi_field.at[1:-1, 1:-1].set(psi_interior)
 
     def tendency(q_field: Array) -> tuple[Array, Array, Array, Array]:
-        """Compute the QG PV tendency and the diagnosed balanced state."""
+        """Compute the QG PV tendency and the diagnosed balanced state.
+
+        Implements:  dq_a/dt = -div(u*q_a) - v*beta + F - r*zeta + nu*nabla^2 q_a
+
+        The three fixes vs. a naive implementation:
+        1. No beta*(y-y0) subtraction in the Helmholtz RHS  (Formulation B).
+        2. Explicit ``-v*beta`` planetary-vorticity term in the tendency.
+        3. Linear drag acts on relative vorticity zeta = nabla^2 psi, not on q_a.
+        """
         psi_field = invert_streamfunction(q_field)
         u_field, v_field = geostrophic_velocity_from_streamfunction(
             psi_field, diff, interp
         )
+        # -div(u*q_a): advective tendency (writes to [2:-2, 2:-2])
         q_rhs = adv(q_field, u_field, v_field, method="upwind1")
-        q_rhs = q_rhs + wind_curl - drag * q_field + viscosity * diff.laplacian(q_field)
+        # -v*beta: planetary-vorticity advection at T-points
+        v_center = interp.V_to_T(v_field)
+        beta_rhs = (
+            jnp.zeros_like(q_field).at[1:-1, 1:-1].set(-beta * v_center[1:-1, 1:-1])
+        )
+        # Linear drag on relative vorticity zeta = nabla^2 psi (not on q_a).
+        # Dragging on q_a would add a spurious anti-damping +drag*psi/Ld^2 term.
+        zeta = diff.laplacian(psi_field)
+        q_rhs = (
+            q_rhs
+            + beta_rhs
+            + wind_curl
+            - drag * zeta
+            + viscosity * diff.laplacian(q_field)
+        )
         return q_rhs, psi_field, u_field, v_field
 
     @jax.jit
@@ -479,7 +547,13 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset: 
             "configuration": "double gyre",
             "time_step_seconds": config.dt,
             "num_steps": config.steps,
-            "notes": "Finitevolx advection plus DST Helmholtz inversion with closed-basin (Dirichlet) wall BCs and xarray output.",
+            "notes": (
+                "Finitevolx 1.5-layer QG double-gyre with Formulation B: "
+                "q_a = zeta - psi/Ld^2 (no beta background in prognostic PV). "
+                "Planetary vorticity advected via explicit -v*beta term. "
+                "Drag on relative vorticity zeta=Laplacian(psi). "
+                "DST Helmholtz inversion with closed-basin (Dirichlet) wall BCs."
+            ),
         },
     )
 

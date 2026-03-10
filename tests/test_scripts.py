@@ -150,8 +150,10 @@ def test_qg_script_runs_stably(tmp_path: Path) -> None:
     assert np.isfinite(q).all()
     assert np.isfinite(psi).all()
     assert np.isfinite(relative_vorticity).all()
-    assert np.max(np.abs(q)) < 2.0e-3
-    assert np.max(np.abs(psi)) < 1.0e6
+    # With Formulation B and corrected forcing (2e-12 s⁻²), after 400 steps
+    # the PV anomaly remains small (linear spin-up phase).
+    assert np.max(np.abs(q)) < 1.0e-4
+    assert np.max(np.abs(psi)) < 1.0e5
     assert checkerboard_metric(relative_vorticity[-1]) < 1.0e-2
     # The QG example uses a deterministic sinusoidal initial condition and
     # steady double-gyre forcing, so the relative-vorticity variability should
