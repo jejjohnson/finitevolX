@@ -1,4 +1,12 @@
 """
+Harmonic and biharmonic diffusion operators (flux form) on Arakawa C-grids.
+
+Harmonic diffusion computes ∂h/∂t = ∇·(κ ∇h) at T-points from staggered
+face fluxes via forward-then-backward finite differences.
+
+Biharmonic diffusion applies the harmonic operator twice to give
+∂h/∂t = -κ ∇⁴h = -κ ∇²(∇²h), providing scale-selective dissipation that
+damps short-wave modes much more strongly than long-wave modes.
 Horizontal diffusion operator (flux form) on Arakawa C-grids.
 
 Computes the tracer diffusion tendency ∂h/∂t = ∇·(κ ∇h) at T-points from
@@ -435,3 +443,164 @@ class Diffusion3D(eqx.Module):
             flux_y = flux_y * mask_v
 
         return flux_x, flux_y
+
+
+class BiharmonicDiffusion2D(eqx.Module):
+    """Biharmonic (∇⁴) diffusion operator on a 2-D Arakawa C-grid.
+
+    Computes the local biharmonic diffusion tendency:
+
+        ∂h/∂t|_diff = −κ · ∇⁴h
+
+    where ∇⁴h = ∇²(∇²h) is implemented as two successive flux-form
+    Laplacians via :class:`Diffusion2D`.  The negative sign ensures that a
+    positive κ provides dissipation (the operator damps high-wavenumber
+    modes).
+
+    Scale-selective property: for a Fourier mode with wavenumber **k**, the
+    harmonic tendency scales as ``−κ_h · k²`` while the biharmonic tendency
+    scales as ``−κ_bi · k⁴``.  Biharmonic diffusion therefore damps small
+    scales much more strongly than large scales.
+
+    Only interior cells ``[1:-1, 1:-1]`` are written; the ghost ring is
+    zero.  The caller is responsible for boundary conditions.
+
+    Notes
+    -----
+    The ghost ring of the intermediate Laplacian ∇²h is zero (Dirichlet-0),
+    not a zero-normal-gradient (Neumann) BC.  This means the second Laplacian
+    pass reads a zero halo for the intermediate field, which contaminates the
+    outermost interior row/column of the final tendency even if the input ``h``
+    had correctly set ghost cells.  Only results in the deep interior
+    ``[2:-2, 2:-2]`` are fully BC-consistent.  For periodic domains, call
+    ``enforce_periodic`` on ``h`` before invoking this operator; this sets the
+    input ghost ring correctly and reduces (but does not eliminate) the
+    Dirichlet-0 contamination of the intermediate field.
+
+    Parameters
+    ----------
+    grid : ArakawaCGrid2D
+        The underlying 2-D grid.
+
+    References
+    ----------
+    .. [1] MITgcm Biharmonic Mixing:
+           https://mitgcm.readthedocs.io/en/latest/optionals/packages/mixing.html#biharmonic-mixing
+    .. [2] Leith, C. E. (1968). Diffusion approximation for two-dimensional
+           turbulence. *Physics of Fluids*, 11(3), 671-673.
+
+    Examples
+    --------
+    >>> import jax.numpy as jnp
+    >>> from finitevolx import ArakawaCGrid2D, BiharmonicDiffusion2D
+    >>> grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+    >>> op = BiharmonicDiffusion2D(grid=grid)
+    >>> h = jnp.ones((grid.Ny, grid.Nx))
+    >>> tend = op(h, kappa=1e-6)  # zero for constant field
+    >>> tend.shape
+    (10, 10)
+    """
+
+    grid: ArakawaCGrid2D
+    _harm: Diffusion2D
+
+    def __init__(self, grid: ArakawaCGrid2D) -> None:
+        self.grid = grid
+        self._harm = Diffusion2D(grid=grid)
+
+    def __call__(
+        self,
+        h: Float[Array, "Ny Nx"],
+        kappa: float,
+    ) -> Float[Array, "Ny Nx"]:
+        """Apply biharmonic diffusion and return the tendency -kappa * nabla^4 h.
+
+        Parameters
+        ----------
+        h : Float[Array, "Ny Nx"]
+            Scalar tracer field at T-points, shape ``[Ny, Nx]``.
+        kappa : float
+            Biharmonic diffusion coefficient (kappa >= 0 gives dissipation).
+
+        Returns
+        -------
+        Float[Array, "Ny Nx"]
+            Tendency -kappa * nabla^4 h at T-points, same shape as ``h``.
+            Ghost cells are zero.
+        """
+        # First Laplacian pass: kappa=1.0 gives pure nabla^2 h
+        # Ghost ring of lap1 is zero (Dirichlet-0 BC on intermediate field).
+        lap1 = self._harm(h, kappa=1.0)
+        # Second Laplacian pass: nabla^2(nabla^2 h) = nabla^4 h
+        lap2 = self._harm(lap1, kappa=1.0)
+        return -kappa * lap2
+
+
+class BiharmonicDiffusion3D(eqx.Module):
+    """Biharmonic (nabla^4) diffusion operator on a 3-D Arakawa C-grid.
+
+    Applies the horizontal biharmonic Laplacian independently at each
+    z-level:
+
+        dh/dt|_diff = -kappa * nabla^4_h h
+
+    where nabla^4_h = nabla^2_h(nabla^2_h) denotes the horizontal biharmonic
+    operator, implemented as two successive :class:`Diffusion3D` passes.
+
+    Only interior cells ``[1:-1, 1:-1, 1:-1]`` are written; the ghost ring
+    is zero.  The caller is responsible for boundary conditions.
+
+    Notes
+    -----
+    The ghost ring of the intermediate Laplacian is zero (Dirichlet-0).
+    See :class:`BiharmonicDiffusion2D` notes for details.
+
+    Parameters
+    ----------
+    grid : ArakawaCGrid3D
+        The underlying 3-D grid.
+
+    Examples
+    --------
+    >>> import jax.numpy as jnp
+    >>> from finitevolx import ArakawaCGrid3D, BiharmonicDiffusion3D
+    >>> grid = ArakawaCGrid3D.from_interior(4, 8, 8, 1.0, 1.0, 1.0)
+    >>> op = BiharmonicDiffusion3D(grid=grid)
+    >>> h = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+    >>> tend = op(h, kappa=1e-6)
+    >>> tend.shape
+    (6, 10, 10)
+    """
+
+    grid: ArakawaCGrid3D
+    _harm: Diffusion3D
+
+    def __init__(self, grid: ArakawaCGrid3D) -> None:
+        self.grid = grid
+        self._harm = Diffusion3D(grid=grid)
+
+    def __call__(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        kappa: float,
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """Apply horizontal biharmonic diffusion and return the tendency -kappa * nabla^4_h h.
+
+        Parameters
+        ----------
+        h : Float[Array, "Nz Ny Nx"]
+            Scalar tracer field at T-points, shape ``[Nz, Ny, Nx]``.
+        kappa : float
+            Biharmonic diffusion coefficient (kappa >= 0 gives dissipation).
+
+        Returns
+        -------
+        Float[Array, "Nz Ny Nx"]
+            Tendency -kappa * nabla^4_h h at T-points, same shape as ``h``.
+            Ghost cells are zero.
+        """
+        # First Laplacian pass: kappa=1.0 gives pure nabla^2_h h
+        lap1 = self._harm(h, kappa=1.0)
+        # Second Laplacian pass: nabla^2_h(nabla^2_h h) = nabla^4_h h
+        lap2 = self._harm(lap1, kappa=1.0)
+        return -kappa * lap2

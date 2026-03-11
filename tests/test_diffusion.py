@@ -303,3 +303,235 @@ class TestDiffusion3DClass:
         h = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         result = diff_op3d(h, kappa=1.0)
         assert jnp.all(jnp.isfinite(result))
+
+
+# ---------------------------------------------------------------------------
+# BiharmonicDiffusion2D
+# ---------------------------------------------------------------------------
+
+
+class TestBiharmonicDiffusion2D:
+    def test_constant_field_zero_tendency(self, grid):
+        """Constant h -> nabla^4 h = 0 -> zero tendency everywhere."""
+        from finitevolx._src.diffusion import BiharmonicDiffusion2D
+
+        op = BiharmonicDiffusion2D(grid=grid)
+        h = jnp.ones((grid.Ny, grid.Nx))
+        tend = op(h, kappa=1.0)
+        np.testing.assert_allclose(tend[1:-1, 1:-1], 0.0, atol=1e-12)
+
+    def test_ghost_ring_is_zero(self, grid):
+        """Ghost cells must remain zero (interior-point idiom)."""
+        from finitevolx._src.diffusion import BiharmonicDiffusion2D
+
+        op = BiharmonicDiffusion2D(grid=grid)
+        h = jnp.ones((grid.Ny, grid.Nx))
+        tend = op(h, kappa=1.0)
+        np.testing.assert_array_equal(tend[0, :], 0.0)
+        np.testing.assert_array_equal(tend[-1, :], 0.0)
+        np.testing.assert_array_equal(tend[:, 0], 0.0)
+        np.testing.assert_array_equal(tend[:, -1], 0.0)
+
+    def test_output_shape(self, grid):
+        """Output shape must equal input shape."""
+        from finitevolx._src.diffusion import BiharmonicDiffusion2D
+
+        op = BiharmonicDiffusion2D(grid=grid)
+        h = jnp.zeros((grid.Ny, grid.Nx))
+        assert op(h, kappa=1.0).shape == (grid.Ny, grid.Nx)
+
+    def test_kappa_scales_linearly(self, grid):
+        """Doubling kappa doubles the magnitude of the tendency."""
+        from finitevolx._src.diffusion import BiharmonicDiffusion2D
+
+        op = BiharmonicDiffusion2D(grid=grid)
+        ix = jnp.arange(grid.Nx, dtype=float) * grid.dx
+        jy = jnp.arange(grid.Ny, dtype=float) * grid.dy
+        h = ix[None, :] ** 2 + jy[:, None] ** 2
+        tend1 = op(h, kappa=1.0)
+        tend2 = op(h, kappa=2.0)
+        np.testing.assert_allclose(
+            tend2[2:-2, 2:-2], 2.0 * tend1[2:-2, 2:-2], rtol=1e-6
+        )
+
+    def test_negative_sign_convention(self, grid):
+        """Biharmonic tendency is -kappa * nabla^4 h; the sign must be negative.
+
+        Uses h = sin(x) * sin(y) which has a nonzero biharmonic.  The
+        field is periodic so ghost cells are filled before calling the
+        operator; results are compared in the deep interior [2:-2, 2:-2].
+        """
+        from finitevolx._src.boundary import enforce_periodic
+        from finitevolx._src.diffusion import BiharmonicDiffusion2D, Diffusion2D
+
+        op = BiharmonicDiffusion2D(grid=grid)
+        harm = Diffusion2D(grid=grid)
+
+        ix = jnp.arange(grid.Nx, dtype=float) * grid.dx
+        jy = jnp.arange(grid.Ny, dtype=float) * grid.dy
+        # sin(x)*sin(y): nabla^2 h = -2*sin(x)*sin(y) != const, so nabla^4 h != 0
+        h = jnp.sin(ix[None, :]) * jnp.sin(jy[:, None])
+        h = enforce_periodic(h)
+
+        # nabla^4 h = nabla^2(nabla^2 h); compute independently
+        lap1 = harm(h, kappa=1.0)
+        lap2 = harm(lap1, kappa=1.0)
+
+        kappa = 3.0
+        tend = op(h, kappa=kappa)
+
+        # Verify deep interior: tend = -kappa * nabla^4 h = -kappa * lap2
+        # Also verify that lap2 is not identically zero (sign test is meaningful)
+        assert float(jnp.max(jnp.abs(lap2[2:-2, 2:-2]))) > 0, (
+            "lap2 is zero — test is vacuous"
+        )
+        np.testing.assert_allclose(
+            tend[2:-2, 2:-2], -kappa * lap2[2:-2, 2:-2], rtol=1e-6
+        )
+
+    def test_scale_selective_damping(self):
+        """Biharmonic tendency for sin(k*x) matches the discrete k^4 eigenvalue.
+
+        For h = sin(k*x) with periodic BCs the discrete Laplacian gives:
+            Lap(sin(k*x)) = mu_k * sin(k*x),   mu_k = -4 sin^2(k*dx/2) / dx^2
+
+        The biharmonic tendency is then:
+            -kappa * mu_k^2 * sin(k*x)
+
+        The eigenvalue ratio mu_k4^2 / mu_k1^2 approx (k4/k1)^4 for well-resolved
+        modes (k*dx << 1), demonstrating scale-selective dissipation.
+        """
+        from finitevolx._src.boundary import enforce_periodic
+        from finitevolx._src.diffusion import BiharmonicDiffusion2D
+
+        N_int = 64
+        Lx = 2.0 * float(jnp.pi)
+        Ly = 2.0 * float(jnp.pi)
+        grid = ArakawaCGrid2D.from_interior(N_int, N_int, Lx, Ly)
+        op = BiharmonicDiffusion2D(grid=grid)
+
+        k1, k4 = 1, 4
+        x = jnp.arange(grid.Nx, dtype=float) * grid.dx
+        kappa = 1.0
+
+        def disc_lap_eigenvalue(k: int) -> float:
+            # Eigenvalue of the discrete Laplacian for wavenumber k
+            return float(-4.0 * jnp.sin(k * grid.dx / 2) ** 2 / grid.dx**2)
+
+        for k in [k1, k4]:
+            h = jnp.tile(jnp.sin(k * x), (grid.Ny, 1))
+            h = enforce_periodic(h)
+
+            tend = op(h, kappa=kappa)
+
+            mu_k = disc_lap_eigenvalue(k)
+            # Expected: -kappa * mu_k^2 * sin(k*x) = -kappa * mu_k^2 * h
+            expected = -kappa * mu_k**2 * h
+
+            # Deep interior to avoid ghost-cell contamination on all four sides
+            # Use atol for near-zero crossings of sin where rtol is ill-conditioned
+            max_val = float(jnp.max(jnp.abs(expected[4:-4, 4:-4])))
+            np.testing.assert_allclose(
+                tend[4:-4, 4:-4], expected[4:-4, 4:-4], rtol=0.01, atol=max_val * 1e-8
+            )
+
+        # Eigenvalue ratio approx (k4/k1)^4 for well-resolved modes
+        mu_k1 = disc_lap_eigenvalue(k1)
+        mu_k4 = disc_lap_eigenvalue(k4)
+        eigenvalue_ratio = mu_k4**2 / mu_k1**2
+        np.testing.assert_allclose(eigenvalue_ratio, float(k4**4 / k1**4), rtol=0.05)
+
+    def test_biharmonic_stronger_than_harmonic_for_high_k(self):
+        """For short-wave modes, biharmonic damps more than harmonic.
+
+        The discrete Laplacian eigenvalue for wavenumber k is:
+            mu_k = -4 sin^2(k*dx/2) / dx^2
+
+        Harmonic damps as kappa_h |mu_k|, biharmonic as kappa_bi mu_k^2.
+        For k*dx << 1: |mu_k| approx k^2 and mu_k^2 approx k^4, so with
+        kappa_h = kappa_bi and k > 1/dx, biharmonic damps more (k^4 > k^2).
+        """
+        from finitevolx._src.boundary import enforce_periodic
+        from finitevolx._src.diffusion import BiharmonicDiffusion2D, Diffusion2D
+
+        N_int = 64
+        Lx = 2.0 * float(jnp.pi)
+        Ly = 2.0 * float(jnp.pi)
+        grid = ArakawaCGrid2D.from_interior(N_int, N_int, Lx, Ly)
+
+        harm_op = Diffusion2D(grid=grid)
+        biharm_op = BiharmonicDiffusion2D(grid=grid)
+
+        # k = 8: well-resolved, k*dx = 8 * (2*pi/64) = pi/4, |mu_k|^2 > |mu_k|
+        k = 8
+        x = jnp.arange(grid.Nx, dtype=float) * grid.dx
+        h = jnp.tile(jnp.sin(k * x), (grid.Ny, 1))
+        h = enforce_periodic(h)
+
+        tend_harm = harm_op(h, kappa=1.0)
+        tend_biharm = biharm_op(h, kappa=1.0)
+
+        # Mask out near-zero crossings of sin(k*x) to avoid division artefacts.
+        # Use float multiplication instead of boolean indexing (JAX doesn't
+        # support non-concrete boolean advanced indexing).
+        mask = (jnp.abs(jnp.sin(k * x[4:-4])) > 0.5).astype(float)
+        abs_harm = jnp.abs(tend_harm[4:-4, 4:-4])
+        abs_biharm = jnp.abs(tend_biharm[4:-4, 4:-4])
+
+        # biharmonic amplitude > harmonic amplitude at all masked (non-zero) cells
+        assert jnp.all((abs_biharm > abs_harm) | (mask[None, :] == 0))
+
+
+# ---------------------------------------------------------------------------
+# BiharmonicDiffusion3D
+# ---------------------------------------------------------------------------
+
+
+class TestBiharmonicDiffusion3D:
+    def test_constant_field_zero_tendency(self, grid3d):
+        """Constant h -> nabla^4 h = 0 -> zero tendency."""
+        from finitevolx._src.diffusion import BiharmonicDiffusion3D
+
+        op = BiharmonicDiffusion3D(grid=grid3d)
+        h = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        tend = op(h, kappa=1.0)
+        np.testing.assert_allclose(tend[1:-1, 1:-1, 1:-1], 0.0, atol=1e-12)
+
+    def test_ghost_ring_is_zero(self, grid3d):
+        """Ghost cells must remain zero."""
+        from finitevolx._src.diffusion import BiharmonicDiffusion3D
+
+        op = BiharmonicDiffusion3D(grid=grid3d)
+        h = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        tend = op(h, kappa=1.0)
+        np.testing.assert_array_equal(tend[0, :, :], 0.0)
+        np.testing.assert_array_equal(tend[-1, :, :], 0.0)
+        np.testing.assert_array_equal(tend[:, 0, :], 0.0)
+        np.testing.assert_array_equal(tend[:, -1, :], 0.0)
+        np.testing.assert_array_equal(tend[:, :, 0], 0.0)
+        np.testing.assert_array_equal(tend[:, :, -1], 0.0)
+
+    def test_output_shape(self, grid3d):
+        """Output shape must equal input shape."""
+        from finitevolx._src.diffusion import BiharmonicDiffusion3D
+
+        op = BiharmonicDiffusion3D(grid=grid3d)
+        h = jnp.zeros((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        assert op(h, kappa=1.0).shape == (grid3d.Nz, grid3d.Ny, grid3d.Nx)
+
+    def test_kappa_scales_linearly(self, grid3d):
+        """Doubling kappa doubles the magnitude of the tendency."""
+        from finitevolx._src.diffusion import BiharmonicDiffusion3D
+
+        op = BiharmonicDiffusion3D(grid=grid3d)
+        ix = jnp.arange(grid3d.Nx, dtype=float) * grid3d.dx
+        jy = jnp.arange(grid3d.Ny, dtype=float) * grid3d.dy
+        h = jnp.broadcast_to(
+            ix[None, None, :] + jy[None, :, None] ** 2,
+            (grid3d.Nz, grid3d.Ny, grid3d.Nx),
+        )
+        tend1 = op(h, kappa=1.0)
+        tend2 = op(h, kappa=2.0)
+        np.testing.assert_allclose(
+            tend2[2:-2, 2:-2, 2:-2], 2.0 * tend1[2:-2, 2:-2, 2:-2], rtol=1e-6
+        )
