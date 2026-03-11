@@ -1,6 +1,11 @@
 # Finite Volume Tools in JAX (In Progress)
+[![CI Tests](https://github.com/jejjohnson/finitevolX/actions/workflows/ci.yml/badge.svg)](https://github.com/jejjohnson/finitevolX/actions/workflows/ci.yml)
+[![Lint & Format](https://github.com/jejjohnson/finitevolX/actions/workflows/lint.yml/badge.svg)](https://github.com/jejjohnson/finitevolX/actions/workflows/lint.yml)
+[![Type Check](https://github.com/jejjohnson/finitevolX/actions/workflows/typecheck.yml/badge.svg)](https://github.com/jejjohnson/finitevolX/actions/workflows/typecheck.yml)
 [![CodeFactor](https://www.codefactor.io/repository/github/jejjohnson/finitevolx/badge)](https://www.codefactor.io/repository/github/jejjohnson/finitevolx)
 [![codecov](https://codecov.io/gh/jejjohnson/finitevolX/branch/main/graph/badge.svg?token=YGPQQEAK91)](https://codecov.io/gh/jejjohnson/finitevolX)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > This package provides finite-volume building blocks for staggered Arakawa grids in JAX.
 > The current API is class-based and focuses on differences, interpolations, reconstructions,
