@@ -24,13 +24,14 @@ def arakawa_jacobian(
     g: Float[Array, "... Ny Nx"],
     dx: float,
     dy: float,
-) -> Float[Array, "... Ny-2 Nx-2"]:
+) -> Float[Array, "... Ny_i Nx_i"]:
     """Arakawa (1966) discretization of J(f, g).
 
     Computes the Jacobian J(f, g) = ∂f/∂x·∂g/∂y − ∂f/∂y·∂g/∂x using the
     energy- and enstrophy-conserving three-term Arakawa scheme on a collocated
     grid.  The inputs must include a one-point boundary halo on each side so
-    that the returned interior array has shape ``(..., Ny-2, Nx-2)``.
+    that the returned interior array has shape ``(..., Ny-2, Nx-2)``
+    (i.e. ``Ny_i = Ny - 2``, ``Nx_i = Nx - 2``).
 
     Parameters
     ----------
@@ -45,9 +46,11 @@ def arakawa_jacobian(
 
     Returns
     -------
-    Float[Array, "... Ny-2 Nx-2"]
-        Jacobian evaluated on the interior grid points.  Boundary points are
-        consumed by the stencil and are not included in the output.
+    Float[Array, "... Ny_i Nx_i"]
+        Jacobian evaluated on the interior grid points, where
+        ``Ny_i = Ny - 2`` and ``Nx_i = Nx - 2``.
+        Boundary points are consumed by the stencil and are not included
+        in the output.
 
     Notes
     -----

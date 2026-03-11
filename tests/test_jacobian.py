@@ -6,8 +6,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.jacobian import arakawa_jacobian
-
+from finitevolx import arakawa_jacobian
 
 # ---------------------------------------------------------------------------
 # Helper
@@ -129,8 +128,12 @@ class TestArakawaJacobianConservation:
     def test_integral_vanishes(self):
         """∫∫ J(f, g) dA = 0 with periodic BCs."""
         Ny, Nx = 12, 10
-        f = _periodic_field(Ny, Nx, lambda j, i: jnp.sin(2 * jnp.pi * j) * jnp.cos(2 * jnp.pi * i))
-        g = _periodic_field(Ny, Nx, lambda j, i: jnp.cos(2 * jnp.pi * j) + jnp.sin(2 * jnp.pi * i))
+        f = _periodic_field(
+            Ny, Nx, lambda j, i: jnp.sin(2 * jnp.pi * j) * jnp.cos(2 * jnp.pi * i)
+        )
+        g = _periodic_field(
+            Ny, Nx, lambda j, i: jnp.cos(2 * jnp.pi * j) + jnp.sin(2 * jnp.pi * i)
+        )
         J = arakawa_jacobian(f, g, 1.0, 1.0)
         # Algebraically zero for periodic BCs; float32 precision ~1e-6
         np.testing.assert_allclose(float(jnp.sum(J)), 0.0, atol=1e-6)
@@ -138,8 +141,12 @@ class TestArakawaJacobianConservation:
     def test_energy_conservation(self):
         """∫∫ f · J(f, g) dA = 0 with periodic BCs."""
         Ny, Nx = 12, 10
-        f = _periodic_field(Ny, Nx, lambda j, i: jnp.sin(2 * jnp.pi * j) * jnp.cos(2 * jnp.pi * i))
-        g = _periodic_field(Ny, Nx, lambda j, i: jnp.cos(2 * jnp.pi * j) + jnp.sin(2 * jnp.pi * i))
+        f = _periodic_field(
+            Ny, Nx, lambda j, i: jnp.sin(2 * jnp.pi * j) * jnp.cos(2 * jnp.pi * i)
+        )
+        g = _periodic_field(
+            Ny, Nx, lambda j, i: jnp.cos(2 * jnp.pi * j) + jnp.sin(2 * jnp.pi * i)
+        )
         J = arakawa_jacobian(f, g, 1.0, 1.0)
         f_int = f[1:-1, 1:-1]
         np.testing.assert_allclose(float(jnp.sum(f_int * J)), 0.0, atol=1e-6)
@@ -147,8 +154,12 @@ class TestArakawaJacobianConservation:
     def test_enstrophy_conservation(self):
         """∫∫ g · J(f, g) dA = 0 with periodic BCs."""
         Ny, Nx = 12, 10
-        f = _periodic_field(Ny, Nx, lambda j, i: jnp.sin(2 * jnp.pi * j) * jnp.cos(2 * jnp.pi * i))
-        g = _periodic_field(Ny, Nx, lambda j, i: jnp.cos(2 * jnp.pi * j) + jnp.sin(2 * jnp.pi * i))
+        f = _periodic_field(
+            Ny, Nx, lambda j, i: jnp.sin(2 * jnp.pi * j) * jnp.cos(2 * jnp.pi * i)
+        )
+        g = _periodic_field(
+            Ny, Nx, lambda j, i: jnp.cos(2 * jnp.pi * j) + jnp.sin(2 * jnp.pi * i)
+        )
         J = arakawa_jacobian(f, g, 1.0, 1.0)
         g_int = g[1:-1, 1:-1]
         np.testing.assert_allclose(float(jnp.sum(g_int * J)), 0.0, atol=1e-6)
@@ -156,8 +167,12 @@ class TestArakawaJacobianConservation:
     def test_integral_vanishes_nonsquare(self):
         """∫∫ J(f, g) dA = 0 holds for dx ≠ dy with periodic BCs."""
         Ny, Nx = 14, 12
-        f = _periodic_field(Ny, Nx, lambda j, i: jnp.sin(2 * jnp.pi * j) * jnp.cos(2 * jnp.pi * i))
-        g = _periodic_field(Ny, Nx, lambda j, i: jnp.cos(2 * jnp.pi * j) + jnp.sin(2 * jnp.pi * i))
+        f = _periodic_field(
+            Ny, Nx, lambda j, i: jnp.sin(2 * jnp.pi * j) * jnp.cos(2 * jnp.pi * i)
+        )
+        g = _periodic_field(
+            Ny, Nx, lambda j, i: jnp.cos(2 * jnp.pi * j) + jnp.sin(2 * jnp.pi * i)
+        )
         J = arakawa_jacobian(f, g, 0.5, 1.0)
         # Slightly wider tolerance for non-square grids due to dx scaling in float32
         np.testing.assert_allclose(float(jnp.sum(J)), 0.0, atol=1e-5)
@@ -244,7 +259,5 @@ class TestArakawaJacobianJAX:
         g = jnp.broadcast_to(jnp.sin(X) * jnp.cos(Y), (Nz, Ny, Nx))
 
         J_batched = arakawa_jacobian(f, g, 1.0, 1.0)
-        J_loop = jnp.stack(
-            [arakawa_jacobian(f[k], g[k], 1.0, 1.0) for k in range(Nz)]
-        )
+        J_loop = jnp.stack([arakawa_jacobian(f[k], g[k], 1.0, 1.0) for k in range(Nz)])
         np.testing.assert_allclose(J_batched, J_loop, atol=1e-6)
