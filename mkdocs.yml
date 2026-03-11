@@ -44,7 +44,19 @@ nav:
   - Home: index.md
   - C-Grid Discretization: cgrid_discretization.md
   - Examples: examples.md
-  - API Reference: api/reference.md
+  - API Reference:
+      - Overview & Grids: api/index.md
+      - Difference: api/difference.md
+      - Interpolation: api/interpolation.md
+      - Advection: api/advection.md
+      - Reconstruction: api/reconstruction.md
+      - Vorticity: api/vorticity.md
+      - Diffusion: api/diffusion.md
+      - Divergence: api/divergence.md
+      - Coriolis: api/coriolis.md
+      - Momentum Advection: api/momentum.md
+      - Boundary Conditions: api/boundary_conditions.md
+      - Elliptic Solvers: api/elliptic.md
   - Changelog: CHANGELOG.md
 
 markdown_extensions:
@@ -55,5 +67,7 @@ markdown_extensions:
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.details
+  - pymdownx.snippets:
+      base_path: ['.']
   - attr_list
   - md_in_html
