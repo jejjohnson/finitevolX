@@ -51,14 +51,14 @@ uv-pre-commit: ## Run all pre-commit hooks
 ##@ Testing
 .PHONY: test
 test: ## Test code using pytest.
-	@printf "$(YELLOW)>>> Launching test suite with verbosity...$(RESET)\n"
-	@uv run pytest tests -v
+	@printf "$(YELLOW)>>> Launching test suite...$(RESET)\n"
+	@uv run pytest tests
 	@printf "$(GREEN)>>> All tests passed.$(RESET)\n"
 
 .PHONY: test-cov
 test-cov: ## Run tests with coverage
 	@printf "$(YELLOW)>>> Running tests with coverage...$(RESET)\n"
-	@uv run pytest tests -v --cov=$(PKGROOT) --cov-report=xml --cov-report=term
+	@uv run pytest tests --cov=$(PKGROOT) --cov-report=xml --cov-report=term
 	@printf "$(GREEN)>>> Coverage report generated.$(RESET)\n"
 
 ##@ Type Checking
@@ -79,7 +79,7 @@ ci: ## Run all CI checks locally (lint + format + typecheck + tests)
 	@printf "$(BLUE)>>> [3/4] Type check...$(RESET)\n"
 	@uv run ty check $(PKGROOT)
 	@printf "$(BLUE)>>> [4/4] Tests...$(RESET)\n"
-	@uv run pytest tests -v
+	@uv run pytest tests
 	@printf "$(GREEN)>>> All CI checks passed.$(RESET)\n"
 
 ##@ Documentation
