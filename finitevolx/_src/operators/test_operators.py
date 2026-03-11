@@ -7,7 +7,7 @@ from finitevolx import (
     x_avg_2D,
     y_avg_2D,
 )
-from finitevolx._src.constants import GRAVITY
+from finitevolx._src.grid.constants import GRAVITY
 from finitevolx._src.operators.operators import (
     absolute_vorticity,
     bernoulli_potential,

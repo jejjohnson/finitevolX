@@ -7,7 +7,7 @@ from jaxtyping import (
     Float,
 )
 
-from finitevolx._src.constants import GRAVITY
+from finitevolx._src.grid.constants import GRAVITY
 
 
 def difference(

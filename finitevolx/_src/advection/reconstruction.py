@@ -13,11 +13,9 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from finitevolx._src.flux import upwind_flux
-from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
-from finitevolx._src.masks.cgrid_mask import ArakawaCGridMask
-from finitevolx._src.reconstructions.limiters import mc, minmod, superbee, van_leer
-from finitevolx._src.reconstructions.weno import (
+from finitevolx._src.advection.flux import upwind_flux
+from finitevolx._src.advection.limiters import mc, minmod, superbee, van_leer
+from finitevolx._src.advection.weno import (
     weno_3pts as _weno3,
     weno_3pts_improved as _wenoz3,
     weno_5pts as _weno5,
@@ -25,6 +23,8 @@ from finitevolx._src.reconstructions.weno import (
     weno_7pts as _weno7,
     weno_9pts as _weno9,
 )
+from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
 
 # Small epsilon to avoid division by zero in TVD slope ratios.
 _TVD_EPS: float = 1e-8
@@ -1126,7 +1126,7 @@ class Reconstruction2D(eqx.Module):
     ) -> Float[Array, "Ny Nx"]:
         """TVD east-face flux with mask-aware stencil selection.
 
-        Delegates to :func:`~finitevolx._src.flux.upwind_flux` with a
+        Delegates to :func:`~finitevolx._src.advection.flux.upwind_flux` with a
         two-tier hierarchy (upwind1 / TVD).
 
         Parameters
@@ -1162,7 +1162,7 @@ class Reconstruction2D(eqx.Module):
     ) -> Float[Array, "Ny Nx"]:
         """TVD north-face flux with mask-aware stencil selection.
 
-        Delegates to :func:`~finitevolx._src.flux.upwind_flux` with a
+        Delegates to :func:`~finitevolx._src.advection.flux.upwind_flux` with a
         two-tier hierarchy (upwind1 / TVD).
 
         Parameters
@@ -1197,7 +1197,7 @@ class Reconstruction2D(eqx.Module):
     ) -> Float[Array, "Ny Nx"]:
         """5-point WENO east-face flux with mask-aware adaptive stencil selection.
 
-        Delegates to :func:`~finitevolx._src.flux.upwind_flux` with a
+        Delegates to :func:`~finitevolx._src.advection.flux.upwind_flux` with a
         three-tier hierarchy (upwind1 / WENO3 / WENO5).
 
         Parameters
@@ -1226,7 +1226,7 @@ class Reconstruction2D(eqx.Module):
     ) -> Float[Array, "Ny Nx"]:
         """5-point WENO north-face flux with mask-aware adaptive stencil selection.
 
-        Delegates to :func:`~finitevolx._src.flux.upwind_flux` with a
+        Delegates to :func:`~finitevolx._src.advection.flux.upwind_flux` with a
         three-tier hierarchy (upwind1 / WENO3 / WENO5).
 
         Parameters
@@ -1255,7 +1255,7 @@ class Reconstruction2D(eqx.Module):
     ) -> Float[Array, "Ny Nx"]:
         """5-point WENO-Z east-face flux with mask-aware adaptive stencil selection.
 
-        Delegates to :func:`~finitevolx._src.flux.upwind_flux` with a
+        Delegates to :func:`~finitevolx._src.advection.flux.upwind_flux` with a
         three-tier hierarchy (upwind1 / WENO-Z-3 / WENO-Z-5).
 
         Parameters
@@ -1284,7 +1284,7 @@ class Reconstruction2D(eqx.Module):
     ) -> Float[Array, "Ny Nx"]:
         """5-point WENO-Z north-face flux with mask-aware adaptive stencil selection.
 
-        Delegates to :func:`~finitevolx._src.flux.upwind_flux` with a
+        Delegates to :func:`~finitevolx._src.advection.flux.upwind_flux` with a
         three-tier hierarchy (upwind1 / WENO-Z-3 / WENO-Z-5).
 
         Parameters

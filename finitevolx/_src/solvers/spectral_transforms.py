@@ -248,7 +248,7 @@ def dct(
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from finitevolx._src.spectral_transforms import dct, idct
+    >>> from finitevolx._src.solvers.spectral_transforms import dct, idct
     >>> x = jnp.array([1.0, 2.0, 3.0, 4.0])
     >>> y = dct(x, type=2)
     >>> jnp.allclose(idct(y, type=2), x, atol=1e-5)
@@ -340,7 +340,7 @@ def dst(
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from finitevolx._src.spectral_transforms import dst, idst
+    >>> from finitevolx._src.solvers.spectral_transforms import dst, idst
     >>> x = jnp.array([1.0, 2.0, 3.0, 4.0])
     >>> y = dst(x, type=1)
     >>> jnp.allclose(idst(y, type=1), x, atol=1e-5)

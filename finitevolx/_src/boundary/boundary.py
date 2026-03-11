@@ -11,7 +11,7 @@ The physical interior lives at [1:-1, 1:-1].
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from finitevolx._src.bc_set import BoundaryConditionSet
+from finitevolx._src.boundary.bc_set import BoundaryConditionSet
 
 
 def pad_interior(
