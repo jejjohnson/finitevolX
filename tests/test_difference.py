@@ -333,7 +333,7 @@ class TestGradPerp2D:
         np.testing.assert_allclose(divergence[2:-2, 2:-2], 0.0, atol=1e-12)
 
     def test_linear_psi_x(self, grid2d):
-        """ψ = c * x → u = 0, v = c at full interior.
+        """ψ = c * x → u = 0, v = c at interior [1:-1, 1:-1].
 
         ∂ψ/∂y = 0 → u = 0
         ∂ψ/∂x = c → v = c
@@ -347,7 +347,7 @@ class TestGradPerp2D:
         np.testing.assert_allclose(v[1:-1, 1:-1], c, rtol=1e-5)
 
     def test_linear_psi_y(self, grid2d):
-        """ψ = c * y → u = -c, v = 0 at full interior.
+        """ψ = c * y → u = -c, v = 0 at interior [1:-1, 1:-1].
 
         ∂ψ/∂y = c → u = -c
         ∂ψ/∂x = 0 → v = 0
@@ -390,7 +390,7 @@ class TestGradPerp2D:
         y = jnp.arange(grid.Ny, dtype=float) * grid.dy
         psi = jnp.broadcast_to(c * y[:, None], (grid.Ny, grid.Nx))
         u, _v = diff.grad_perp(psi)
-        # ∂ψ/∂y = c, so u = -c at full interior
+        # ∂ψ/∂y = c, so u = -c at interior [1:-1, 1:-1]
         np.testing.assert_allclose(u[1:-1, 1:-1], -c, rtol=1e-5)
 
     def test_mask_u_zeros_velocity(self, grid2d):
