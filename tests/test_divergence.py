@@ -147,7 +147,7 @@ class TestDivergence2DClass:
         psi = jnp.sin(x[None, :]) * jnp.cos(y[:, None])
 
         u = -diff.diff_y_X_to_U(psi)  # u = -dpsi/dy  at U-points
-        v = diff.diff_x_X_to_V(psi)   # v =  dpsi/dx  at V-points
+        v = diff.diff_x_X_to_V(psi)  # v =  dpsi/dx  at V-points
         div = div_op(u, v)
 
         np.testing.assert_allclose(div[2:-2, 2:-2], 0.0, atol=1e-10)
@@ -174,9 +174,7 @@ class TestDivergence2DNoFlux:
         """When all four wall faces are already zero, noflux and __call__ agree."""
         u = jnp.ones((grid.Ny, grid.Nx)).at[:, 0].set(0.0).at[:, -2].set(0.0)
         v = jnp.ones((grid.Ny, grid.Nx)).at[0, :].set(0.0).at[-2, :].set(0.0)
-        np.testing.assert_allclose(
-            div_op.noflux(u, v), div_op(u, v), atol=1e-12
-        )
+        np.testing.assert_allclose(div_op.noflux(u, v), div_op(u, v), atol=1e-12)
 
     def test_noflux_zeros_west_ghost(self, div_op, grid):
         """noflux makes result independent of the west ghost of u."""
