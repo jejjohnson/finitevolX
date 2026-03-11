@@ -109,22 +109,6 @@ to adjacent velocity faces:
 - **w_horizontal_bound** — on a horizontal (x-direction) boundary
 - **w_cornerout_bound** — at convex corners (both boundary types)
 
-### Rectangular basin
-
-![Vorticity: basin](images/demo_masks_vorticity_basin.png)
-
-### Basin with island
-
-![Vorticity: island](images/demo_masks_vorticity_island.png)
-
-### Zonal channel
-
-![Vorticity: channel](images/demo_masks_vorticity_channel.png)
-
-### Irregular coastline
-
-![Vorticity: irregular](images/demo_masks_vorticity_irregular.png)
-
 ## Stencil capability and adaptive WENO
 
 Each cell stores how many contiguous wet neighbours it has in each
