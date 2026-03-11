@@ -224,6 +224,134 @@ class Sponge1D(eqx.Module):
         return _set_face(field, self.face, ghost)
 
 
+class Robin1D(eqx.Module):
+    """Robin (mixed) boundary condition: α·u + β·∂u/∂n = γ.
+
+    The Robin condition is a linear combination of Dirichlet and Neumann:
+
+    - β = 0 recovers Dirichlet (α·u = γ → u = γ/α)
+    - α = 0 recovers Neumann  (β·∂u/∂n = γ → ∂u/∂n = γ/β)
+
+    The ghost cell is derived from the wall-value and wall-gradient
+    discretisations used by ``Dirichlet1D`` and ``Neumann1D``::
+
+        u_wall  = 0.5 * (u_ghost + u_interior)
+        ∂u/∂n   = sign * (u_ghost - u_interior) / spacing
+
+    Substituting into α·u_wall + β·∂u/∂n = γ and solving for u_ghost:
+
+        s = β · sign / spacing
+        u_ghost = (γ - u_int · (α/2 - s)) / (α/2 + s)
+
+    The denominator ``α/2 + s`` is zero when ``α·spacing = -2·β·sign``.
+    This is a singular configuration that produces inf/NaN ghost values;
+    callers must choose (α, β) such that the denominator is non-zero for
+    the given face and grid spacing.
+
+    Parameters
+    ----------
+    face : Literal["south", "north", "west", "east"]
+        Domain face to update.
+    alpha : float
+        Coefficient on the field value.
+    beta : float
+        Coefficient on the outward-normal gradient.
+    gamma : float
+        Right-hand-side value.
+    """
+
+    face: Face = eqx.field(static=True)
+    alpha: float
+    beta: float
+    gamma: float
+
+    def __check_init__(self) -> None:
+        if self.alpha == 0.0 and self.beta == 0.0:
+            raise ValueError(
+                "Robin1D requires at least one of alpha or beta to be non-zero."
+            )
+
+    def __call__(
+        self, field: Float[Array, "Ny Nx"], dx: float, dy: float
+    ) -> Float[Array, "Ny Nx"]:
+        """Return ``field`` with one Robin ghost face updated."""
+        spacing = _normal_spacing(self.face, dx=dx, dy=dy)
+        sign = _outward_sign(self.face)
+        interior = _adjacent_interior(field, self.face)
+        s = self.beta * sign / spacing
+        ghost = (self.gamma - interior * (self.alpha / 2.0 - s)) / (
+            self.alpha / 2.0 + s
+        )
+        return _set_face(field, self.face, ghost)
+
+
+class Extrapolation1D(eqx.Module):
+    """High-order polynomial extrapolation for ghost cells.
+
+    Uses Lagrange polynomial extrapolation from ``order + 1`` interior points
+    to fill the ghost cell.  This generalises ``Outflow1D`` (which is
+    equivalent to order 0, i.e. constant extrapolation).
+
+    Coefficients (nearest interior → farthest)::
+
+        order 1: [ 2,  -1]
+        order 2: [ 3,  -3,   1]
+        order 3: [ 4,  -6,   4,  -1]
+        order 4: [ 5, -10,  10,  -5,   1]
+        order 5: [ 6, -15,  20, -15,   6, -1]
+
+    The field must have at least ``order + 2`` points along the normal
+    axis (``order + 1`` interior points plus the ghost cell).  On smaller
+    grids the stencil will read into the opposite ghost ring and produce
+    incorrect results.
+
+    Parameters
+    ----------
+    face : Literal["south", "north", "west", "east"]
+        Domain face to update.
+    order : int
+        Extrapolation order (1–5).
+    """
+
+    face: Face = eqx.field(static=True)
+    order: int = eqx.field(static=True)
+    _coeffs: tuple[float, ...] = eqx.field(static=True)
+
+    def __init__(self, face: Face, order: int = 1) -> None:
+        if not 1 <= order <= 5:
+            raise ValueError("Extrapolation1D order must be in [1, 5].")
+        self.face = face
+        self.order = order
+        # Lagrange extrapolation coefficients: (-1)^k * C(n, k+1)
+        n = order + 1
+        coeffs: list[float] = []
+        c = 1.0
+        for k in range(n):
+            c = c * (n - k) / (k + 1)
+            coeffs.append((-1.0) ** k * c)
+        # coeffs[k] multiplies the (k+1)-th interior point from the boundary
+        self._coeffs = tuple(coeffs)
+
+    def __call__(
+        self, field: Float[Array, "Ny Nx"], dx: float, dy: float
+    ) -> Float[Array, "Ny Nx"]:
+        """Return ``field`` with one extrapolated ghost face updated."""
+        del dx, dy
+        ghost: BoundarySlice = _adjacent_interior(field, self.face) * 0.0
+        for k, c in enumerate(self._coeffs):
+            # k=0 → adjacent interior, k=1 → one step further in, etc.
+            match self.face:
+                case "south":
+                    ghost = ghost + c * field[1 + k, :]
+                case "north":
+                    ghost = ghost + c * field[-(2 + k), :]
+                case "west":
+                    ghost = ghost + c * field[:, 1 + k]
+                case "east":
+                    ghost = ghost + c * field[:, -(2 + k)]
+        return _set_face(field, self.face, ghost)
+
+
 class Slip1D(eqx.Module):
     """Slip boundary condition for tangential velocity at a solid wall.
 
@@ -302,5 +430,13 @@ class Slip1D(eqx.Module):
 
 
 type BoundaryCondition1D = (
-    Dirichlet1D | Neumann1D | Periodic1D | Outflow1D | Reflective1D | Sponge1D | Slip1D
+    Dirichlet1D
+    | Neumann1D
+    | Robin1D
+    | Periodic1D
+    | Outflow1D
+    | Extrapolation1D
+    | Reflective1D
+    | Sponge1D
+    | Slip1D
 )

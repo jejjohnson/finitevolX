@@ -1,5 +1,6 @@
 """Tests for boundary condition helpers."""
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -7,8 +8,10 @@ import pytest
 from finitevolx import (
     BoundaryConditionSet,
     Dirichlet1D,
+    Extrapolation1D,
     FieldBCSet,
     Neumann1D,
+    Robin1D,
     Slip1D,
     Sponge1D,
 )
@@ -302,3 +305,176 @@ class TestFieldBCSet:
 
         np.testing.assert_array_equal(result["h"], enforce_periodic(h))
         np.testing.assert_array_equal(result["u"], pad_interior(u, mode="edge"))
+
+
+class TestRobin1D:
+    """Unit tests for the Robin boundary condition."""
+
+    @staticmethod
+    def _field():
+        return (
+            jnp.zeros((6, 6))
+            .at[1:-1, 1:-1]
+            .set(jnp.arange(16, dtype=float).reshape(4, 4))
+        )
+
+    def test_ghost_value_south(self):
+        field = self._field()
+        alpha, beta, gamma = 2.0, 1.0, 5.0
+        result = Robin1D("south", alpha=alpha, beta=beta, gamma=gamma)(
+            field, dx=2.0, dy=3.0
+        )
+        # s = beta * sign / spacing = 1.0 * (-1.0) / 3.0
+        s = beta * (-1.0) / 3.0
+        interior = field[1, :]
+        expected = (gamma - interior * (alpha / 2.0 - s)) / (alpha / 2.0 + s)
+        np.testing.assert_allclose(result[0, :], expected)
+
+    def test_ghost_value_east(self):
+        field = self._field()
+        alpha, beta, gamma = 1.0, 2.0, 3.0
+        result = Robin1D("east", alpha=alpha, beta=beta, gamma=gamma)(
+            field, dx=2.0, dy=3.0
+        )
+        s = beta * 1.0 / 2.0  # east: sign=+1, spacing=dx=2
+        interior = field[:, -2]
+        expected = (gamma - interior * (alpha / 2.0 - s)) / (alpha / 2.0 + s)
+        np.testing.assert_allclose(result[:, -1], expected)
+
+    def test_reduces_to_dirichlet_when_beta_zero(self):
+        """With β=0 the Robin condition α·u = γ gives u_wall = γ/α."""
+        field = self._field()
+        value = 10.0
+        robin_result = Robin1D("south", alpha=1.0, beta=0.0, gamma=value)(
+            field, dx=2.0, dy=3.0
+        )
+        dirichlet_result = Dirichlet1D("south", value=value)(field, dx=2.0, dy=3.0)
+        np.testing.assert_allclose(robin_result[0, :], dirichlet_result[0, :])
+
+    def test_reduces_to_neumann_when_alpha_zero(self):
+        """With α=0 the Robin condition β·∂u/∂n = γ gives ∂u/∂n = γ/β."""
+        field = self._field()
+        grad_value = 1.5
+        beta = 2.0
+        robin_result = Robin1D("east", alpha=0.0, beta=beta, gamma=grad_value * beta)(
+            field, dx=2.0, dy=3.0
+        )
+        neumann_result = Neumann1D("east", value=grad_value)(field, dx=2.0, dy=3.0)
+        np.testing.assert_allclose(robin_result[:, -1], neumann_result[:, -1])
+
+    def test_both_zero_raises(self):
+        with pytest.raises(ValueError, match="non-zero"):
+            Robin1D("south", alpha=0.0, beta=0.0, gamma=1.0)
+
+    def test_all_faces(self):
+        field = self._field()
+        for face in ("south", "north", "west", "east"):
+            result = Robin1D(face, alpha=1.0, beta=1.0, gamma=0.0)(
+                field, dx=1.0, dy=1.0
+            )
+            assert result.shape == field.shape
+
+    def test_jit_compatible(self):
+        field = self._field()
+        bc = Robin1D("north", alpha=1.0, beta=1.0, gamma=0.0)
+        result_eager = bc(field, dx=1.0, dy=1.0)
+        result_jit = jax.jit(bc)(field, dx=1.0, dy=1.0)
+        np.testing.assert_allclose(result_jit, result_eager)
+
+    def test_works_with_boundary_condition_set(self):
+        field = self._field()
+        bcs = BoundaryConditionSet(
+            south=Robin1D("south", alpha=1.0, beta=0.0, gamma=5.0),
+        )
+        result = bcs(field, dx=1.0, dy=1.0)
+        assert result.shape == field.shape
+
+
+class TestExtrapolation1D:
+    """Unit tests for the high-order extrapolation boundary condition."""
+
+    def test_order1_linear_field_exact(self):
+        """Linear field f(j) = 2*j should be extrapolated exactly by order 1."""
+        # 8x8 field, linear in y: f[j, :] = 2*j
+        field = jnp.zeros((8, 8))
+        for j in range(8):
+            field = field.at[j, :].set(2.0 * j)
+        # South ghost (row 0): extrapolate from rows 1, 2
+        # Linear: f(0) = 2*1 - (2*2 - 2*1) = 2 - 2 = 0 ✓ (already 0)
+        result = Extrapolation1D("south", order=1)(field, dx=1.0, dy=1.0)
+        np.testing.assert_allclose(result[0, :], 0.0, atol=1e-12)
+        # North ghost (row -1 = row 7): extrapolate from rows 6, 5
+        # Linear: f(7) = 2*6 + (2*6 - 2*5) = 12 + 2 = 14
+        result = Extrapolation1D("north", order=1)(field, dx=1.0, dy=1.0)
+        np.testing.assert_allclose(result[-1, :], 14.0, atol=1e-12)
+
+    def test_order2_quadratic_field_exact(self):
+        """Quadratic field f(j) = j^2 should be extrapolated exactly by order 2."""
+        field = jnp.zeros((8, 8))
+        for j in range(8):
+            field = field.at[j, :].set(float(j**2))
+        # South ghost (row 0): extrapolate from rows 1, 2, 3
+        # f(0) should be 0 (already correct for j^2)
+        result = Extrapolation1D("south", order=2)(field, dx=1.0, dy=1.0)
+        np.testing.assert_allclose(result[0, :], 0.0, atol=1e-12)
+
+    def test_order3_cubic_field_exact(self):
+        """Cubic field f(j) = j^3 should be extrapolated exactly by order 3."""
+        field = jnp.zeros((10, 10))
+        for j in range(10):
+            field = field.at[j, :].set(float(j**3))
+        # North ghost: extrapolate from rows 8, 7, 6, 5
+        # f(9) = 729
+        result = Extrapolation1D("north", order=3)(field, dx=1.0, dy=1.0)
+        np.testing.assert_allclose(result[-1, :], 729.0, atol=1e-10)
+
+    def test_all_faces_order1(self):
+        """Order 1 extrapolation works on all four faces."""
+        # Linear in x: f[:, i] = 3*i
+        field = jnp.zeros((8, 8))
+        for i in range(8):
+            field = field.at[:, i].set(3.0 * i)
+
+        # West ghost (col 0): extrapolate from cols 1, 2
+        result = Extrapolation1D("west", order=1)(field, dx=1.0, dy=1.0)
+        np.testing.assert_allclose(result[:, 0], 0.0, atol=1e-12)
+
+        # East ghost (col -1 = col 7): extrapolate from cols 6, 5
+        result = Extrapolation1D("east", order=1)(field, dx=1.0, dy=1.0)
+        np.testing.assert_allclose(result[:, -1], 21.0, atol=1e-12)
+
+    def test_invalid_order_zero_raises(self):
+        with pytest.raises(ValueError, match=r"\[1, 5\]"):
+            Extrapolation1D("south", order=0)
+
+    def test_invalid_order_six_raises(self):
+        with pytest.raises(ValueError, match=r"\[1, 5\]"):
+            Extrapolation1D("south", order=6)
+
+    def test_jit_compatible(self):
+        field = jnp.zeros((8, 8))
+        for j in range(8):
+            field = field.at[j, :].set(2.0 * j)
+        bc = Extrapolation1D("south", order=1)
+        result_eager = bc(field, dx=1.0, dy=1.0)
+        result_jit = jax.jit(bc)(field, dx=1.0, dy=1.0)
+        np.testing.assert_allclose(result_jit, result_eager)
+
+    def test_works_with_boundary_condition_set(self):
+        field = jnp.ones((8, 8))
+        bcs = BoundaryConditionSet(
+            south=Extrapolation1D("south", order=2),
+            north=Extrapolation1D("north", order=1),
+        )
+        result = bcs(field, dx=1.0, dy=1.0)
+        assert result.shape == field.shape
+
+    def test_order1_coefficients(self):
+        """Verify the precomputed coefficients for order 1."""
+        bc = Extrapolation1D("south", order=1)
+        assert bc._coeffs == (2.0, -1.0)
+
+    def test_order5_coefficients(self):
+        """Verify the precomputed coefficients for order 5."""
+        bc = Extrapolation1D("south", order=5)
+        assert bc._coeffs == (6.0, -15.0, 20.0, -15.0, 6.0, -1.0)
