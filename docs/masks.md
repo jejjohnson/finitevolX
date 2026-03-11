@@ -83,7 +83,21 @@ domain topologies:
 The mask includes a 4-level classification (0 = land, 1 = coast,
 2 = near-coast, 3 = open ocean):
 
-![Land / coast classification](images/demo_masks_classification.png)
+### Rectangular basin
+
+![Classification: basin](images/demo_masks_classification_basin.png)
+
+### Basin with island
+
+![Classification: island](images/demo_masks_classification_island.png)
+
+### Zonal channel
+
+![Classification: channel](images/demo_masks_classification_channel.png)
+
+### Irregular coastline
+
+![Classification: irregular](images/demo_masks_classification_irregular.png)
 
 ## Vorticity boundary classification
 
@@ -95,7 +109,21 @@ to adjacent velocity faces:
 - **w_horizontal_bound** — on a horizontal (x-direction) boundary
 - **w_cornerout_bound** — at convex corners (both boundary types)
 
-![Vorticity boundary classification](images/demo_masks_vorticity.png)
+### Rectangular basin
+
+![Vorticity: basin](images/demo_masks_vorticity_basin.png)
+
+### Basin with island
+
+![Vorticity: island](images/demo_masks_vorticity_island.png)
+
+### Zonal channel
+
+![Vorticity: channel](images/demo_masks_vorticity_channel.png)
+
+### Irregular coastline
+
+![Vorticity: irregular](images/demo_masks_vorticity_irregular.png)
 
 ## Stencil capability and adaptive WENO
 
