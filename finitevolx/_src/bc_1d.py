@@ -224,6 +224,83 @@ class Sponge1D(eqx.Module):
         return _set_face(field, self.face, ghost)
 
 
+class Slip1D(eqx.Module):
+    """Slip boundary condition for tangential velocity at a solid wall.
+
+    Controls the tangential velocity at the wall via a slip coefficient
+    ``a in [0, 1]``:
+
+    - ``a = 1.0`` — **free-slip**: ghost = +interior (zero gradient, frictionless wall).
+    - ``a = 0.0`` — **no-slip**: ghost = -interior (zero tangential velocity at wall).
+    - ``0 < a < 1`` — **partial-slip**: linear interpolation between the two.
+
+    The ghost cell is set using:
+
+    ``phi_ghost = (2*a - 1) * phi_interior``
+
+    so that the extrapolated wall value
+    ``phi_wall = 0.5 * (phi_ghost + phi_interior) = a * phi_interior``
+    smoothly varies from zero (no-slip) to the interior value (free-slip).
+
+    Parameters
+    ----------
+    face : Literal["south", "north", "west", "east"]
+        Domain face to update.
+    coefficient : float
+        Slip parameter ``a`` in ``[0, 1]``. Default is ``1.0`` (free-slip).
+
+    Examples
+    --------
+    Free-slip on the west wall (tangential velocity preserved):
+
+    >>> bc = Slip1D("west", coefficient=1.0)
+    >>> field_out = bc(field, dx=1.0, dy=1.0)
+
+    No-slip on the north wall (tangential velocity -> 0):
+
+    >>> bc = Slip1D("north", coefficient=0.0)
+    >>> field_out = bc(field, dx=1.0, dy=1.0)
+
+    Partial-slip on the south wall:
+
+    >>> bc = Slip1D("south", coefficient=0.5)
+    >>> field_out = bc(field, dx=1.0, dy=1.0)
+    """
+
+    face: Face = eqx.field(static=True)
+    coefficient: float = 1.0
+
+    def __check_init__(self) -> None:
+        if not 0.0 <= self.coefficient <= 1.0:
+            raise ValueError("Slip1D coefficient must lie in [0, 1].")
+
+    def __call__(
+        self, field: Float[Array, "Ny Nx"], dx: float, dy: float
+    ) -> Float[Array, "Ny Nx"]:
+        """Return ``field`` with one slip ghost face updated.
+
+        Parameters
+        ----------
+        field : Float[Array, "Ny Nx"]
+            Input array with ghost-cell ring.
+        dx : float
+            Grid spacing in x (unused, kept for interface consistency).
+        dy : float
+            Grid spacing in y (unused, kept for interface consistency).
+
+        Returns
+        -------
+        Float[Array, "Ny Nx"]
+            Field with the ghost face set according to the slip coefficient.
+        """
+        del dx, dy
+        interior = _adjacent_interior(field, self.face)
+        # ghost = (2*a - 1) * interior
+        # wall value = 0.5 * (ghost + interior) = a * interior
+        ghost = (2.0 * self.coefficient - 1.0) * interior
+        return _set_face(field, self.face, ghost)
+
+
 type BoundaryCondition1D = (
-    Dirichlet1D | Neumann1D | Periodic1D | Outflow1D | Reflective1D | Sponge1D
+    Dirichlet1D | Neumann1D | Periodic1D | Outflow1D | Reflective1D | Sponge1D | Slip1D
 )
