@@ -117,7 +117,6 @@ class TestMomentumAdvection2D:
         from finitevolx._src.difference import Difference2D
         from finitevolx._src.interpolation import Interpolation2D
 
-        madv = MomentumAdvection2D(grid=grid2d)
         diff = Difference2D(grid=grid2d)
         interp = Interpolation2D(grid=grid2d)
 
@@ -158,7 +157,7 @@ class TestMomentumAdvection2D:
         # Solid-body rotation has non-zero ζ and non-zero ∇K.
         u = jnp.broadcast_to(-y[:, None], (grid2d.Ny, grid2d.Nx))
         v = jnp.broadcast_to(x, (grid2d.Ny, grid2d.Nx))
-        du, dv = madv(u, v)
+        du, _ = madv(u, v)
         # At least some interior cells must be non-zero.
         assert jnp.any(jnp.abs(du[2:-2, 2:-2]) > 0), "du_adv is unexpectedly zero"
 
