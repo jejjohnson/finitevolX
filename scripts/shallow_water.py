@@ -286,7 +286,7 @@ def make_preprocessing_dataset(
     )
 
 
-def run_simulation(config: ShallowWaterConfig | None = None) -> xr.Dataset:  # noqa: PLR0915
+def run_simulation(config: ShallowWaterConfig | None = None) -> xr.Dataset:
     """Run the nonlinear shallow-water double-gyre example.
 
     Parameters

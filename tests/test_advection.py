@@ -6,6 +6,7 @@ import pytest
 
 from finitevolx._src.advection import Advection1D, Advection2D, Advection3D
 from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.masks.cgrid_mask import ArakawaCGridMask
 
 
 @pytest.fixture
@@ -263,3 +264,156 @@ class TestAdvection3D:
         for method in ["minmod", "van_leer", "superbee", "mc"]:
             result = adv(h, u, v, method=method)
             np.testing.assert_allclose(result[1:-1, 2:-2, 2:-2], 0.0, atol=1e-10)
+
+
+# ── Mask-aware Advection2D ────────────────────────────────────────────────────
+
+
+class TestAdvection2DMask:
+    """Verify Advection2D mask=... integrates with upwind_flux."""
+
+    @pytest.fixture
+    def grid(self):
+        return ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+
+    @pytest.fixture
+    def all_ocean(self):
+        return ArakawaCGridMask.from_dimensions(10, 10)
+
+    @pytest.fixture
+    def coastal(self):
+        import numpy as _np
+
+        h = _np.ones((10, 10), dtype=bool)
+        h[:, 4:6] = False
+        return ArakawaCGridMask.from_mask(h)
+
+    def test_output_shape(self, grid, all_ocean):
+        adv = Advection2D(grid=grid)
+        h = jnp.ones((grid.Ny, grid.Nx))
+        u = jnp.ones((grid.Ny, grid.Nx))
+        v = jnp.ones((grid.Ny, grid.Nx))
+        result = adv(h, u, v, method="weno5", mask=all_ocean)
+        assert result.shape == (grid.Ny, grid.Nx)
+
+    def test_constant_zero_tendency_all_methods(self, grid, all_ocean):
+        """Constant field with mask: tendency must be zero in the deep interior."""
+        adv = Advection2D(grid=grid)
+        h = jnp.ones((grid.Ny, grid.Nx))
+        u = jnp.ones((grid.Ny, grid.Nx))
+        v = jnp.ones((grid.Ny, grid.Nx))
+        for method in [
+            "upwind1",
+            "upwind2",
+            "upwind3",
+            "weno3",
+            "weno5",
+            "weno7",
+            "weno9",
+            "minmod",
+            "van_leer",
+        ]:
+            result = adv(h, u, v, method=method, mask=all_ocean)
+            np.testing.assert_allclose(
+                result[3:-3, 3:-3],
+                0.0,
+                atol=1e-6,
+                err_msg=f"Non-zero tendency for method={method!r} with mask",
+            )
+
+    def test_naive_with_mask_falls_through(self, grid, all_ocean):
+        """naive + mask must behave identically to naive without mask."""
+        adv = Advection2D(grid=grid)
+        h = jnp.ones((grid.Ny, grid.Nx))
+        u = jnp.ones((grid.Ny, grid.Nx))
+        v = jnp.ones((grid.Ny, grid.Nx))
+        with_mask = adv(h, u, v, method="naive", mask=all_ocean)
+        without_mask = adv(h, u, v, method="naive")
+        np.testing.assert_array_equal(with_mask, without_mask)
+
+    def test_masked_matches_unmasked_all_ocean_weno5_interior(self, grid, all_ocean):
+        """On all-ocean mask, masked weno5 must equal unmasked weno5 in the
+        deep interior where the full 6-point stencil is available."""
+        adv = Advection2D(grid=grid)
+        q = jnp.broadcast_to(
+            jnp.arange(grid.Ny, dtype=float)[:, None], (grid.Ny, grid.Nx)
+        )
+        u = jnp.ones((grid.Ny, grid.Nx))
+        v = jnp.zeros((grid.Ny, grid.Nx))
+        masked = adv(q, u, v, method="weno5", mask=all_ocean)
+        unmasked = adv(q, u, v, method="weno5")
+        # Deep interior (depth ≥ 3 from ghost) must match
+        np.testing.assert_allclose(masked[3:-3, 3:-3], unmasked[3:-3, 3:-3], atol=1e-6)
+
+    def test_coastal_mask_finite_everywhere(self, grid, coastal):
+        """Coastal mask: result must be finite everywhere."""
+        adv = Advection2D(grid=grid)
+        h = jnp.ones((grid.Ny, grid.Nx))
+        u = jnp.ones((grid.Ny, grid.Nx))
+        v = jnp.ones((grid.Ny, grid.Nx))
+        result = adv(h, u, v, method="weno5", mask=coastal)
+        assert jnp.all(jnp.isfinite(result)).item()
+
+
+# ── Mask-aware Advection3D ────────────────────────────────────────────────────
+
+
+class TestAdvection3DMask:
+    """Verify Advection3D mask=... routes through masked Reconstruction3D methods."""
+
+    @pytest.fixture
+    def grid(self):
+        return ArakawaCGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+
+    @pytest.fixture
+    def all_ocean(self):
+        return ArakawaCGridMask.from_dimensions(8, 8)
+
+    def test_output_shape(self, grid, all_ocean):
+        adv = Advection3D(grid=grid)
+        h = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        u = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        v = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        result = adv(h, u, v, method="weno5", mask=all_ocean)
+        assert result.shape == (grid.Nz, grid.Ny, grid.Nx)
+
+    def test_constant_zero_tendency_supported_methods(self, grid, all_ocean):
+        """Constant field with mask: tendency must be zero in the deep interior."""
+        adv = Advection3D(grid=grid)
+        h = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        u = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        v = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        for method in ["upwind1", "weno3", "weno5", "minmod", "van_leer"]:
+            result = adv(h, u, v, method=method, mask=all_ocean)
+            np.testing.assert_allclose(
+                result[1:-1, 3:-3, 3:-3],
+                0.0,
+                atol=1e-6,
+                err_msg=f"Non-zero tendency for method={method!r} with mask (3D)",
+            )
+
+    def test_weno7_weno9_with_mask_falls_through(self, grid, all_ocean):
+        """weno7/weno9 with mask: no masked 3D variant, falls through to unmasked."""
+        adv = Advection3D(grid=grid)
+        h = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        u = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        v = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        for method in ["weno7", "weno9"]:
+            with_mask = adv(h, u, v, method=method, mask=all_ocean)
+            without_mask = adv(h, u, v, method=method)
+            np.testing.assert_array_equal(with_mask, without_mask)
+
+    def test_coastal_mask_finite_everywhere(self):
+        """Coastal mask with 3D: result must be finite everywhere."""
+        import numpy as _np
+
+        h_mask = _np.ones((8, 8), dtype=bool)
+        h_mask[:, 3:5] = False
+        coastal = ArakawaCGridMask.from_mask(h_mask)
+        grid = ArakawaCGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+        adv = Advection3D(grid=grid)
+        h = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        u = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        v = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+        result = adv(h, u, v, method="weno5", mask=coastal)
+        assert jnp.all(jnp.isfinite(result)).item()

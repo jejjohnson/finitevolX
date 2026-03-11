@@ -121,7 +121,10 @@ ignore = [
     "E743",     # ambiguous function name
     "F821",     # undefined name (false positives with jaxtyping)
     "PLR2004",  # magic value comparison
+    "PLR0911",  # too many return statements
+    "PLR0912",  # too many branches
     "PLR0913",  # too many arguments
+    "PLR0915",  # too many statements
     "ISC001",   # conflicts with formatter
     "UP037",    # jaxtyping shape strings must remain quoted
     "RUF002",   # ambiguous unicode characters in docstrings
