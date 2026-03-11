@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 
 from finitevolx._src.difference import Difference1D, Difference2D, Difference3D
+from finitevolx._src.divergence import Divergence2D, divergence_2d
 from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
 from finitevolx._src.interpolation import (
     Interpolation1D,
@@ -244,6 +245,46 @@ class TestJitVorticity:
 
 
 # ---------------------------------------------------------------------------
+# Divergence operators under jit
+# ---------------------------------------------------------------------------
+
+
+class TestJitDivergence:
+    """jit-compiled divergence operators must match eager execution."""
+
+    def test_jit_divergence2d_matches_eager(self, grid2d):
+        div_op = Divergence2D(grid=grid2d)
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = 2.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+
+        eager = div_op(u, v)
+        jitted = jax.jit(div_op)(u, v)
+
+        np.testing.assert_allclose(jitted, eager, rtol=1e-7)
+
+    def test_jit_divergence2d_noflux_matches_eager(self, grid2d):
+        div_op = Divergence2D(grid=grid2d)
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((grid2d.Ny, grid2d.Nx))
+
+        eager = div_op.noflux(u, v)
+        jitted = jax.jit(div_op.noflux)(u, v)
+
+        np.testing.assert_allclose(jitted, eager, rtol=1e-7)
+
+    def test_jit_divergence_2d_functional_matches_eager(self, grid2d):
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((grid2d.Ny, grid2d.Nx))
+
+        eager = divergence_2d(u, v, dx=grid2d.dx, dy=grid2d.dy)
+        jitted = jax.jit(divergence_2d, static_argnums=(2, 3))(
+            u, v, grid2d.dx, grid2d.dy
+        )
+
+        np.testing.assert_allclose(jitted, eager, rtol=1e-7)
+
+
+# ---------------------------------------------------------------------------
 # Repeated calls are pure and deterministic
 # ---------------------------------------------------------------------------
 
@@ -312,5 +353,17 @@ class TestVmapOperators:
 
         loop_results = jnp.stack([interp.T_to_U(batch[i]) for i in range(3)])
         vmap_result = jax.vmap(interp.T_to_U)(batch)
+
+        np.testing.assert_allclose(vmap_result, loop_results, rtol=1e-7)
+
+    def test_vmap_divergence2d_matches_loop(self, grid2d):
+        """Divergence2D vmapped over a batch must match per-field eager calls."""
+        div_op = Divergence2D(grid=grid2d)
+        rng = jax.random.PRNGKey(2)
+        u_batch = jax.random.normal(rng, (4, grid2d.Ny, grid2d.Nx))
+        v_batch = jax.random.normal(jax.random.PRNGKey(3), (4, grid2d.Ny, grid2d.Nx))
+
+        loop_results = jnp.stack([div_op(u_batch[i], v_batch[i]) for i in range(4)])
+        vmap_result = jax.vmap(div_op)(u_batch, v_batch)
 
         np.testing.assert_allclose(vmap_result, loop_results, rtol=1e-7)
