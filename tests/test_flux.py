@@ -562,7 +562,9 @@ class TestUpwindFluxValidation:
         mask_hier = mask.get_adaptive_masks(direction="x", stencil_sizes=(2,))
         with pytest.raises(ValueError, match="missing masks"):
             upwind_flux(
-                q, u, dim=1,
+                q,
+                u,
+                dim=1,
                 rec_funcs={2: recon.upwind1_x, 6: recon.weno5_x},
                 mask_hierarchy=mask_hier,
             )
@@ -573,7 +575,9 @@ class TestUpwindFluxValidation:
         u = jnp.ones((grid2d.Ny, grid2d.Nx))
         with pytest.raises(ValueError, match="mask_hierarchy"):
             upwind_flux(
-                q, u, dim=1,
+                q,
+                u,
+                dim=1,
                 rec_funcs={2: recon.upwind1_x},
                 mask_hierarchy={},
             )

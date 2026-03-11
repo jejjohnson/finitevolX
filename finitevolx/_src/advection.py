@@ -38,9 +38,7 @@ _MASK_DISPATCHABLE_3D = frozenset({"weno3", "weno5"}) | _TVD_LIMITERS
 
 def _rec_funcs_for_method_2d(
     recon: Reconstruction2D, method: str
-) -> tuple[
-    dict[int, Callable], dict[int, Callable], tuple[int, ...]
-]:
+) -> tuple[dict[int, Callable], dict[int, Callable], tuple[int, ...]]:
     """Build stencil-hierarchy dicts for a given method name.
 
     Returns
@@ -83,9 +81,7 @@ def _rec_funcs_for_method_2d(
             },
             (2, 4),
         )
-    raise ValueError(
-        f"Method {method!r} does not support mask-based stencil dispatch"
-    )
+    raise ValueError(f"Method {method!r} does not support mask-based stencil dispatch")
 
 
 class Advection1D(eqx.Module):
