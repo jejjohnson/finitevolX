@@ -243,6 +243,11 @@ class Robin1D(eqx.Module):
         s = β · sign / spacing
         u_ghost = (γ - u_int · (α/2 - s)) / (α/2 + s)
 
+    The denominator ``α/2 + s`` is zero when ``α·spacing = -2·β·sign``.
+    This is a singular configuration that produces inf/NaN ghost values;
+    callers must choose (α, β) such that the denominator is non-zero for
+    the given face and grid spacing.
+
     Parameters
     ----------
     face : Literal["south", "north", "west", "east"]
@@ -295,6 +300,11 @@ class Extrapolation1D(eqx.Module):
         order 4: [ 5, -10,  10,  -5,   1]
         order 5: [ 6, -15,  20, -15,   6, -1]
 
+    The field must have at least ``order + 2`` points along the normal
+    axis (``order + 1`` interior points plus the ghost cell).  On smaller
+    grids the stencil will read into the opposite ghost ring and produce
+    incorrect results.
+
     Parameters
     ----------
     face : Literal["south", "north", "west", "east"]
@@ -312,7 +322,7 @@ class Extrapolation1D(eqx.Module):
             raise ValueError("Extrapolation1D order must be in [1, 5].")
         self.face = face
         self.order = order
-        # Lagrange extrapolation coefficients: (-1)^(k+1) * C(n, k+1)
+        # Lagrange extrapolation coefficients: (-1)^k * C(n, k+1)
         n = order + 1
         coeffs: list[float] = []
         c = 1.0
