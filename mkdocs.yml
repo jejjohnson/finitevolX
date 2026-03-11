@@ -43,6 +43,7 @@ plugins:
 nav:
   - Home: index.md
   - C-Grid Discretization: cgrid_discretization.md
+  - Multilayer vs. 3D: multilayer_vs_3d.md
   - Examples: examples.md
   - API Reference: api/reference.md
   - Changelog: CHANGELOG.md
