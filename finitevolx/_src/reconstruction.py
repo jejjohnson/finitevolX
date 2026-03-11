@@ -1126,9 +1126,8 @@ class Reconstruction2D(eqx.Module):
     ) -> Float[Array, "Ny Nx"]:
         """TVD east-face flux with mask-aware stencil selection.
 
-        Uses :func:`~finitevolx.upwind_flux` to choose between the TVD scheme
-        (requires 3-cell stencil, mapped to stencil size 4) and 1st-order
-        upwind near coastlines or irregular boundaries.
+        Delegates to :func:`~finitevolx._src.flux.upwind_flux` with a
+        two-tier hierarchy (upwind1 / TVD).
 
         Parameters
         ----------
@@ -1147,17 +1146,12 @@ class Reconstruction2D(eqx.Module):
         Float[Array, "Ny Nx"]
             East-face flux with zero ghost ring.
         """
-
-        def _tvd(h: Array, u: Array, limiter: str = limiter) -> Array:
-            return self.tvd_x(h, u, limiter=limiter)
-
-        return upwind_flux(
-            h,
-            u,
-            dim=1,
-            rec_funcs={2: self.upwind1_x, 4: _tvd},
-            mask_hierarchy=mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4)),
-        )
+        amasks = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4))
+        rec_funcs = {
+            2: self.upwind1_x,
+            4: lambda q, vel: self.tvd_x(q, vel, limiter=limiter),
+        }
+        return upwind_flux(h, u, dim=1, rec_funcs=rec_funcs, mask_hierarchy=amasks)
 
     def tvd_y_masked(
         self,
@@ -1168,8 +1162,8 @@ class Reconstruction2D(eqx.Module):
     ) -> Float[Array, "Ny Nx"]:
         """TVD north-face flux with mask-aware stencil selection.
 
-        Uses :func:`~finitevolx.upwind_flux` to choose between the TVD scheme
-        and 1st-order upwind near coastlines or irregular boundaries.
+        Delegates to :func:`~finitevolx._src.flux.upwind_flux` with a
+        two-tier hierarchy (upwind1 / TVD).
 
         Parameters
         ----------
@@ -1188,17 +1182,12 @@ class Reconstruction2D(eqx.Module):
         Float[Array, "Ny Nx"]
             North-face flux with zero ghost ring.
         """
-
-        def _tvd(h: Array, v: Array, limiter: str = limiter) -> Array:
-            return self.tvd_y(h, v, limiter=limiter)
-
-        return upwind_flux(
-            h,
-            v,
-            dim=0,
-            rec_funcs={2: self.upwind1_y, 4: _tvd},
-            mask_hierarchy=mask.get_adaptive_masks(direction="y", stencil_sizes=(2, 4)),
-        )
+        amasks = mask.get_adaptive_masks(direction="y", stencil_sizes=(2, 4))
+        rec_funcs = {
+            2: self.upwind1_y,
+            4: lambda q, vel: self.tvd_y(q, vel, limiter=limiter),
+        }
+        return upwind_flux(h, v, dim=0, rec_funcs=rec_funcs, mask_hierarchy=amasks)
 
     def weno5_x_masked(
         self,
@@ -1208,9 +1197,8 @@ class Reconstruction2D(eqx.Module):
     ) -> Float[Array, "Ny Nx"]:
         """5-point WENO east-face flux with mask-aware adaptive stencil selection.
 
-        Uses :func:`~finitevolx.upwind_flux` to adaptively choose the
-        highest-order WENO stencil available at each grid point, falling back
-        to WENO3 or 1st-order upwind near coastlines or irregular boundaries.
+        Delegates to :func:`~finitevolx._src.flux.upwind_flux` with a
+        three-tier hierarchy (upwind1 / WENO3 / WENO5).
 
         Parameters
         ----------
@@ -1226,15 +1214,9 @@ class Reconstruction2D(eqx.Module):
         Float[Array, "Ny Nx"]
             East-face flux with zero ghost ring.
         """
-        return upwind_flux(
-            h,
-            u,
-            dim=1,
-            rec_funcs={2: self.upwind1_x, 4: self.weno3_x, 6: self.weno5_x},
-            mask_hierarchy=mask.get_adaptive_masks(
-                direction="x", stencil_sizes=(2, 4, 6)
-            ),
-        )
+        amasks = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4, 6))
+        rec_funcs = {2: self.upwind1_x, 4: self.weno3_x, 6: self.weno5_x}
+        return upwind_flux(h, u, dim=1, rec_funcs=rec_funcs, mask_hierarchy=amasks)
 
     def weno5_y_masked(
         self,
@@ -1244,9 +1226,8 @@ class Reconstruction2D(eqx.Module):
     ) -> Float[Array, "Ny Nx"]:
         """5-point WENO north-face flux with mask-aware adaptive stencil selection.
 
-        Uses :func:`~finitevolx.upwind_flux` to adaptively choose the
-        highest-order WENO stencil available at each grid point, falling back
-        to WENO3 or 1st-order upwind near coastlines or irregular boundaries.
+        Delegates to :func:`~finitevolx._src.flux.upwind_flux` with a
+        three-tier hierarchy (upwind1 / WENO3 / WENO5).
 
         Parameters
         ----------
@@ -1262,15 +1243,9 @@ class Reconstruction2D(eqx.Module):
         Float[Array, "Ny Nx"]
             North-face flux with zero ghost ring.
         """
-        return upwind_flux(
-            h,
-            v,
-            dim=0,
-            rec_funcs={2: self.upwind1_y, 4: self.weno3_y, 6: self.weno5_y},
-            mask_hierarchy=mask.get_adaptive_masks(
-                direction="y", stencil_sizes=(2, 4, 6)
-            ),
-        )
+        amasks = mask.get_adaptive_masks(direction="y", stencil_sizes=(2, 4, 6))
+        rec_funcs = {2: self.upwind1_y, 4: self.weno3_y, 6: self.weno5_y}
+        return upwind_flux(h, v, dim=0, rec_funcs=rec_funcs, mask_hierarchy=amasks)
 
     def wenoz5_x_masked(
         self,
@@ -1280,10 +1255,8 @@ class Reconstruction2D(eqx.Module):
     ) -> Float[Array, "Ny Nx"]:
         """5-point WENO-Z east-face flux with mask-aware adaptive stencil selection.
 
-        Uses :func:`~finitevolx.upwind_flux` to adaptively choose the
-        highest-order WENO-Z stencil available at each grid point, falling
-        back to WENO-Z-3 or 1st-order upwind near coastlines or irregular
-        boundaries.
+        Delegates to :func:`~finitevolx._src.flux.upwind_flux` with a
+        three-tier hierarchy (upwind1 / WENO-Z-3 / WENO-Z-5).
 
         Parameters
         ----------
@@ -1299,15 +1272,9 @@ class Reconstruction2D(eqx.Module):
         Float[Array, "Ny Nx"]
             East-face flux with zero ghost ring.
         """
-        return upwind_flux(
-            h,
-            u,
-            dim=1,
-            rec_funcs={2: self.upwind1_x, 4: self.wenoz3_x, 6: self.wenoz5_x},
-            mask_hierarchy=mask.get_adaptive_masks(
-                direction="x", stencil_sizes=(2, 4, 6)
-            ),
-        )
+        amasks = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4, 6))
+        rec_funcs = {2: self.upwind1_x, 4: self.wenoz3_x, 6: self.wenoz5_x}
+        return upwind_flux(h, u, dim=1, rec_funcs=rec_funcs, mask_hierarchy=amasks)
 
     def wenoz5_y_masked(
         self,
@@ -1317,10 +1284,8 @@ class Reconstruction2D(eqx.Module):
     ) -> Float[Array, "Ny Nx"]:
         """5-point WENO-Z north-face flux with mask-aware adaptive stencil selection.
 
-        Uses :func:`~finitevolx.upwind_flux` to adaptively choose the
-        highest-order WENO-Z stencil available at each grid point, falling
-        back to WENO-Z-3 or 1st-order upwind near coastlines or irregular
-        boundaries.
+        Delegates to :func:`~finitevolx._src.flux.upwind_flux` with a
+        three-tier hierarchy (upwind1 / WENO-Z-3 / WENO-Z-5).
 
         Parameters
         ----------
@@ -1336,15 +1301,9 @@ class Reconstruction2D(eqx.Module):
         Float[Array, "Ny Nx"]
             North-face flux with zero ghost ring.
         """
-        return upwind_flux(
-            h,
-            v,
-            dim=0,
-            rec_funcs={2: self.upwind1_y, 4: self.wenoz3_y, 6: self.wenoz5_y},
-            mask_hierarchy=mask.get_adaptive_masks(
-                direction="y", stencil_sizes=(2, 4, 6)
-            ),
-        )
+        amasks = mask.get_adaptive_masks(direction="y", stencil_sizes=(2, 4, 6))
+        rec_funcs = {2: self.upwind1_y, 4: self.wenoz3_y, 6: self.wenoz5_y}
+        return upwind_flux(h, v, dim=0, rec_funcs=rec_funcs, mask_hierarchy=amasks)
 
 
 class Reconstruction3D(eqx.Module):
@@ -1819,80 +1778,6 @@ class Reconstruction3D(eqx.Module):
         out = out.at[1:-1, 1:-1, 1:-1].set(h_face * v[1:-1, 1:-1, 1:-1])
         return out
 
-    def weno3_x_masked(
-        self,
-        h: Float[Array, "Nz Ny Nx"],
-        u: Float[Array, "Nz Ny Nx"],
-        mask: ArakawaCGridMask,
-    ) -> Float[Array, "Nz Ny Nx"]:
-        """3-point WENO east-face flux over all z-levels with mask-aware stencil.
-
-        The 2-D ``mask`` is broadcast over the z-dimension.  Falls back to
-        1st-order upwind near coastlines where the 3-cell stencil crosses land.
-
-        Parameters
-        ----------
-        h : Float[Array, "Nz Ny Nx"]
-            Cell-centre tracer field.
-        u : Float[Array, "Nz Ny Nx"]
-            East-face velocity.
-        mask : ArakawaCGridMask
-            2-D Arakawa C-grid mask (broadcast over z).
-
-        Returns
-        -------
-        Float[Array, "Nz Ny Nx"]
-            East-face flux with zero ghost ring.
-        """
-        amasks = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4))
-        m3 = amasks[4]  # (Ny, Nx) — True where WENO3 stencil is available
-        fe_w3 = self.weno3_x(h, u)
-        fe_u1 = self.upwind1_x(h, u)
-        # Positive flow: upwind cell is (j, i)   → mask at [1:-1, 1:-1]
-        # Negative flow: upwind cell is (j, i+1) → mask at [1:-1, 2:]
-        pos_flow = u[1:-1, 1:-1, 1:-1] >= 0.0
-        use_w3 = jnp.where(pos_flow, m3[None, 1:-1, 1:-1], m3[None, 1:-1, 2:])
-        selected = jnp.where(use_w3, fe_w3[1:-1, 1:-1, 1:-1], fe_u1[1:-1, 1:-1, 1:-1])
-        out = jnp.zeros_like(h)
-        return out.at[1:-1, 1:-1, 1:-1].set(selected)
-
-    def weno3_y_masked(
-        self,
-        h: Float[Array, "Nz Ny Nx"],
-        v: Float[Array, "Nz Ny Nx"],
-        mask: ArakawaCGridMask,
-    ) -> Float[Array, "Nz Ny Nx"]:
-        """3-point WENO north-face flux over all z-levels with mask-aware stencil.
-
-        The 2-D ``mask`` is broadcast over the z-dimension.  Falls back to
-        1st-order upwind near coastlines where the 3-cell stencil crosses land.
-
-        Parameters
-        ----------
-        h : Float[Array, "Nz Ny Nx"]
-            Cell-centre tracer field.
-        v : Float[Array, "Nz Ny Nx"]
-            North-face velocity.
-        mask : ArakawaCGridMask
-            2-D Arakawa C-grid mask (broadcast over z).
-
-        Returns
-        -------
-        Float[Array, "Nz Ny Nx"]
-            North-face flux with zero ghost ring.
-        """
-        amasks = mask.get_adaptive_masks(direction="y", stencil_sizes=(2, 4))
-        m3 = amasks[4]  # (Ny, Nx) — True where WENO3 stencil is available
-        fn_w3 = self.weno3_y(h, v)
-        fn_u1 = self.upwind1_y(h, v)
-        # Positive flow: upwind cell is (j, i)   → mask at [1:-1, 1:-1]
-        # Negative flow: upwind cell is (j+1, i) → mask at [2:, 1:-1]
-        pos_flow = v[1:-1, 1:-1, 1:-1] >= 0.0
-        use_w3 = jnp.where(pos_flow, m3[None, 1:-1, 1:-1], m3[None, 2:, 1:-1])
-        selected = jnp.where(use_w3, fn_w3[1:-1, 1:-1, 1:-1], fn_u1[1:-1, 1:-1, 1:-1])
-        out = jnp.zeros_like(h)
-        return out.at[1:-1, 1:-1, 1:-1].set(selected)
-
     def tvd_x_masked(
         self,
         h: Float[Array, "Nz Ny Nx"],
@@ -1969,6 +1854,78 @@ class Reconstruction3D(eqx.Module):
         pos_flow = v[1:-1, 1:-1, 1:-1] >= 0.0
         use_tvd = jnp.where(pos_flow, m_tvd[None, 1:-1, 1:-1], m_tvd[None, 2:, 1:-1])
         selected = jnp.where(use_tvd, fn_tvd[1:-1, 1:-1, 1:-1], fn_u1[1:-1, 1:-1, 1:-1])
+        out = jnp.zeros_like(h)
+        out = out.at[1:-1, 1:-1, 1:-1].set(selected)
+        return out
+
+    def weno3_x_masked(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        u: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask,
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """3-point WENO east-face flux over all z-levels with mask-aware stencil selection.
+
+        The 2-D ``mask`` is broadcast over the z-dimension.  Falls back to
+        1st-order upwind near coastlines where the WENO3 stencil crosses land.
+
+        Parameters
+        ----------
+        h : Float[Array, "Nz Ny Nx"]
+            Cell-centre tracer field.
+        u : Float[Array, "Nz Ny Nx"]
+            East-face velocity.
+        mask : ArakawaCGridMask
+            2-D Arakawa C-grid mask (broadcast over z).
+
+        Returns
+        -------
+        Float[Array, "Nz Ny Nx"]
+            East-face flux with zero ghost ring.
+        """
+        amasks = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4))
+        m_w3 = amasks[4]
+        fe_w3 = self.weno3_x(h, u)
+        fe_u1 = self.upwind1_x(h, u)
+        pos_flow = u[1:-1, 1:-1, 1:-1] >= 0.0
+        use_w3 = jnp.where(pos_flow, m_w3[None, 1:-1, 1:-1], m_w3[None, 1:-1, 2:])
+        selected = jnp.where(use_w3, fe_w3[1:-1, 1:-1, 1:-1], fe_u1[1:-1, 1:-1, 1:-1])
+        out = jnp.zeros_like(h)
+        out = out.at[1:-1, 1:-1, 1:-1].set(selected)
+        return out
+
+    def weno3_y_masked(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        v: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask,
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """3-point WENO north-face flux over all z-levels with mask-aware stencil selection.
+
+        The 2-D ``mask`` is broadcast over the z-dimension.  Falls back to
+        1st-order upwind near coastlines where the WENO3 stencil crosses land.
+
+        Parameters
+        ----------
+        h : Float[Array, "Nz Ny Nx"]
+            Cell-centre tracer field.
+        v : Float[Array, "Nz Ny Nx"]
+            North-face velocity.
+        mask : ArakawaCGridMask
+            2-D Arakawa C-grid mask (broadcast over z).
+
+        Returns
+        -------
+        Float[Array, "Nz Ny Nx"]
+            North-face flux with zero ghost ring.
+        """
+        amasks = mask.get_adaptive_masks(direction="y", stencil_sizes=(2, 4))
+        m_w3 = amasks[4]
+        fn_w3 = self.weno3_y(h, v)
+        fn_u1 = self.upwind1_y(h, v)
+        pos_flow = v[1:-1, 1:-1, 1:-1] >= 0.0
+        use_w3 = jnp.where(pos_flow, m_w3[None, 1:-1, 1:-1], m_w3[None, 2:, 1:-1])
+        selected = jnp.where(use_w3, fn_w3[1:-1, 1:-1, 1:-1], fn_u1[1:-1, 1:-1, 1:-1])
         out = jnp.zeros_like(h)
         out = out.at[1:-1, 1:-1, 1:-1].set(selected)
         return out
