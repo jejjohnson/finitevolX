@@ -304,7 +304,7 @@ def save_animation_gif(
     plt.close(fig)
 
 
-def run_simulation(config: LinearShallowWaterConfig | None = None) -> xr.Dataset:  # noqa: PLR0915
+def run_simulation(config: LinearShallowWaterConfig | None = None) -> xr.Dataset:
     """Run the linear shallow-water double-gyre example.
 
     Parameters

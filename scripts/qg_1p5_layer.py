@@ -371,7 +371,7 @@ def make_preprocessing_dataset(
     )
 
 
-def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset:  # noqa: PLR0915
+def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset:
     """Run the 1.5-layer QG double-gyre example.
 
     Parameters

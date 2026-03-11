@@ -2,15 +2,24 @@
 Advection operators for Arakawa C-grids.
 
 Computes -div(h * u_vec) at T-points using face-value reconstruction.
+
+When an :class:`~finitevolx.ArakawaCGridMask` is supplied to the 2-D or 3-D
+operators, the flux computation automatically falls back to a lower-order
+stencil near irregular boundaries, using
+:func:`~finitevolx.upwind_flux` as the unified dispatch mechanism.
 """
 
 from __future__ import annotations
+
+from collections.abc import Callable
 
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
+from finitevolx._src.flux import upwind_flux
 from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.masks.cgrid_mask import ArakawaCGridMask
 from finitevolx._src.reconstruction import (
     Reconstruction1D,
     Reconstruction2D,
@@ -19,6 +28,60 @@ from finitevolx._src.reconstruction import (
 
 # TVD limiter names supported by the advection operators.
 _TVD_LIMITERS = frozenset({"minmod", "van_leer", "superbee", "mc"})
+
+# Methods that support mask-based stencil dispatch in 2D via upwind_flux.
+_MASK_DISPATCHABLE_2D = frozenset({"weno3", "weno5", "wenoz5"}) | _TVD_LIMITERS
+
+# Methods that support mask-based stencil dispatch in 3D via *_masked methods.
+_MASK_DISPATCHABLE_3D = frozenset({"weno3", "weno5"}) | _TVD_LIMITERS
+
+
+def _rec_funcs_for_method_2d(
+    recon: Reconstruction2D, method: str
+) -> tuple[dict[int, Callable], dict[int, Callable], tuple[int, ...]]:
+    """Build stencil-hierarchy dicts for a given method name.
+
+    Returns
+    -------
+    rec_funcs_x : dict[int, Callable]
+        {stencil_size: reconstruction_fn} for x-direction.
+    rec_funcs_y : dict[int, Callable]
+        {stencil_size: reconstruction_fn} for y-direction.
+    stencil_sizes : tuple[int, ...]
+        Stencil sizes used (for ``get_adaptive_masks``).
+    """
+    if method == "weno5":
+        return (
+            {2: recon.upwind1_x, 4: recon.weno3_x, 6: recon.weno5_x},
+            {2: recon.upwind1_y, 4: recon.weno3_y, 6: recon.weno5_y},
+            (2, 4, 6),
+        )
+    if method == "wenoz5":
+        return (
+            {2: recon.upwind1_x, 4: recon.wenoz3_x, 6: recon.wenoz5_x},
+            {2: recon.upwind1_y, 4: recon.wenoz3_y, 6: recon.wenoz5_y},
+            (2, 4, 6),
+        )
+    if method == "weno3":
+        return (
+            {2: recon.upwind1_x, 4: recon.weno3_x},
+            {2: recon.upwind1_y, 4: recon.weno3_y},
+            (2, 4),
+        )
+    # TVD limiters
+    if method in _TVD_LIMITERS:
+        return (
+            {
+                2: recon.upwind1_x,
+                4: lambda q, u, _lim=method: recon.tvd_x(q, u, limiter=_lim),
+            },
+            {
+                2: recon.upwind1_y,
+                4: lambda q, v, _lim=method: recon.tvd_y(q, v, limiter=_lim),
+            },
+            (2, 4),
+        )
+    raise ValueError(f"Method {method!r} does not support mask-based stencil dispatch")
 
 
 class Advection1D(eqx.Module):
@@ -115,6 +178,7 @@ class Advection2D(eqx.Module):
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
         method: str = "upwind1",
+        mask: ArakawaCGridMask | None = None,
     ) -> Float[Array, "Ny Nx"]:
         """Advective tendency -div(h * u_vec) at T-points.
 
@@ -132,15 +196,28 @@ class Advection2D(eqx.Module):
         method : str
             Reconstruction method: ``'naive'``, ``'upwind1'``, ``'upwind2'``,
             ``'upwind3'``, ``'weno3'``, ``'weno5'``, ``'weno7'``, ``'weno9'``,
-            or a flux-limiter TVD scheme: ``'minmod'``, ``'van_leer'``,
-            ``'superbee'``, ``'mc'``.
+            ``'wenoz5'``, or a flux-limiter TVD scheme: ``'minmod'``,
+            ``'van_leer'``, ``'superbee'``, ``'mc'``.
+        mask : ArakawaCGridMask | None
+            When provided and *method* supports mask dispatch (``'weno3'``,
+            ``'weno5'``, ``'wenoz5'``, or any TVD limiter), stencil-width
+            fallback is applied via :func:`upwind_flux`.  ``None`` (default)
+            uses the standard unmasked path.
 
         Returns
         -------
         Float[Array, "Ny Nx"]
             Advective tendency at T-points.
         """
-        if method == "naive":
+        # ── masked path: route through upwind_flux ──────────────────────
+        if mask is not None and method in _MASK_DISPATCHABLE_2D:
+            rfx, rfy, sizes = _rec_funcs_for_method_2d(self.recon, method)
+            mask_x = mask.get_adaptive_masks(direction="x", stencil_sizes=sizes)
+            mask_y = mask.get_adaptive_masks(direction="y", stencil_sizes=sizes)
+            fe = upwind_flux(h, u, dim=1, rec_funcs=rfx, mask_hierarchy=mask_x)
+            fn = upwind_flux(h, v, dim=0, rec_funcs=rfy, mask_hierarchy=mask_y)
+        # ── unmasked path: existing dispatch ────────────────────────────
+        elif method == "naive":
             fe = self.recon.naive_x(h, u)
             fn = self.recon.naive_y(h, v)
         elif method == "upwind1":
@@ -158,6 +235,9 @@ class Advection2D(eqx.Module):
         elif method == "weno5":
             fe = self.recon.weno5_x(h, u)
             fn = self.recon.weno5_y(h, v)
+        elif method == "wenoz5":
+            fe = self.recon.wenoz5_x(h, u)
+            fn = self.recon.wenoz5_y(h, v)
         elif method == "weno7":
             fe = self.recon.weno7_x(h, u)
             fn = self.recon.weno7_y(h, v)
@@ -208,6 +288,7 @@ class Advection3D(eqx.Module):
         u: Float[Array, "Nz Ny Nx"],
         v: Float[Array, "Nz Ny Nx"],
         method: str = "upwind1",
+        mask: ArakawaCGridMask | None = None,
     ) -> Float[Array, "Nz Ny Nx"]:
         """Advective tendency -div(h * u_vec) at T-points over all z-levels.
 
@@ -223,13 +304,32 @@ class Advection3D(eqx.Module):
             Reconstruction method: ``'naive'``, ``'upwind1'``, ``'weno3'``,
             ``'weno5'``, ``'weno7'``, ``'weno9'``, or a flux-limiter TVD
             scheme: ``'minmod'``, ``'van_leer'``, ``'superbee'``, ``'mc'``.
+        mask : ArakawaCGridMask | None
+            When provided and *method* supports mask dispatch (``'weno3'``,
+            ``'weno5'``, or any TVD limiter), the masked reconstruction
+            variants are used.  The 2-D mask is broadcast over the
+            z-dimension.  ``None`` (default) uses the standard unmasked path.
 
         Returns
         -------
         Float[Array, "Nz Ny Nx"]
             Advective tendency at T-points.
         """
-        if method == "naive":
+        # ── masked path: route to Reconstruction3D.*_masked methods ─────
+        if mask is not None and method in _MASK_DISPATCHABLE_3D:
+            if method == "weno3":
+                fe = self.recon.weno3_x_masked(h, u, mask)
+                fn = self.recon.weno3_y_masked(h, v, mask)
+            elif method == "weno5":
+                fe = self.recon.weno5_x_masked(h, u, mask)
+                fn = self.recon.weno5_y_masked(h, v, mask)
+            elif method in _TVD_LIMITERS:
+                fe = self.recon.tvd_x_masked(h, u, mask, limiter=method)
+                fn = self.recon.tvd_y_masked(h, v, mask, limiter=method)
+            else:
+                raise ValueError(f"Unknown masked method: {method!r}")
+        # ── unmasked path: existing dispatch ────────────────────────────
+        elif method == "naive":
             fe = self.recon.naive_x(h, u)
             fn = self.recon.naive_y(h, v)
         elif method == "upwind1":
