@@ -89,7 +89,8 @@ def upwind_flux(
     Raises
     ------
     ValueError
-        If *rec_funcs* is empty or *dim* is not 0 or 1.
+        If *rec_funcs* is empty, *dim* is not 0 or 1, or
+        *mask_hierarchy* is missing keys present in *rec_funcs*.
 
     Notes
     -----
@@ -132,7 +133,16 @@ def upwind_flux(
     if dim not in (0, 1):
         raise ValueError(f"dim must be 0 (y) or 1 (x), got {dim!r}")
 
+    if not mask_hierarchy:
+        raise ValueError("mask_hierarchy must not be empty")
+
     stencil_sizes = sorted(rec_funcs.keys())
+    missing_masks = set(stencil_sizes) - set(mask_hierarchy.keys())
+    if missing_masks:
+        raise ValueError(
+            "mask_hierarchy is missing masks for stencil sizes "
+            f"{sorted(missing_masks)}; got keys {sorted(mask_hierarchy.keys())}"
+        )
 
     # Compute each face-flux field: fn(q, u) → same shape as q, ghost ring = 0
     fluxes = {s: rec_funcs[s](q, u) for s in stencil_sizes}
@@ -162,7 +172,10 @@ def upwind_flux(
     interior = jnp.zeros_like(q[1:-1, 1:-1])
     for s in stencil_sizes:
         face_mask = _upwind_mask(mask_hierarchy[s])
-        interior = interior + face_mask * fluxes[s][1:-1, 1:-1]
+        # Use jnp.where instead of face_mask * flux to avoid propagating
+        # NaNs/Infs from unused stencil tiers into the result.
+        safe_flux = jnp.where(face_mask, fluxes[s][1:-1, 1:-1], 0.0)
+        interior = interior + safe_flux
 
     out = jnp.zeros_like(q)
     return out.at[1:-1, 1:-1].set(interior)
