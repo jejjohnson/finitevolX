@@ -136,8 +136,12 @@ class TestBiharmonicDiffusion2D:
         )
 
     def test_negative_sign_convention(self, grid2d):
-        """Biharmonic tendency is −κ · ∇⁴h; the sign must be negative for
-        a field whose ∇⁴h is positive (e.g. a peak)."""
+        """Biharmonic tendency is −κ · ∇⁴h; the sign must be negative.
+
+        Uses h = sin(x) · sin(y) which has a nonzero biharmonic.  The
+        field is periodic so ghost cells are filled before calling the
+        operator; results are compared in the deep interior [2:-2, 2:-2].
+        """
         from finitevolx._src.difference import Difference2D
 
         op = BiharmonicDiffusion2D(grid=grid2d)
@@ -145,14 +149,22 @@ class TestBiharmonicDiffusion2D:
 
         ix = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
         jy = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
-        h = ix[None, :] ** 2 + jy[:, None] ** 2
+        # sin(x)*sin(y): ∇²h = -2*sin(x)*sin(y) ≠ const, so ∇⁴h ≠ 0
+        h = jnp.sin(ix[None, :]) * jnp.sin(jy[:, None])
+        h = enforce_periodic(h)
 
-        # ∇⁴h = ∇²(∇²h); compute independently
+        # ∇⁴h = ∇²(∇²h); compute independently using the same operator
         lap1 = diff.laplacian(h)
         lap2 = diff.laplacian(lap1)
 
         kappa = 3.0
         tend = op(h, kappa=kappa)
+
+        # Verify deep interior: tend = -kappa * nabla^4 h = -kappa * lap2
+        # Also verify that lap2 is not identically zero (sign test is meaningful)
+        assert float(jnp.max(jnp.abs(lap2[2:-2, 2:-2]))) > 0, (
+            "lap2 is zero — test is vacuous"
+        )
         np.testing.assert_allclose(
             tend[2:-2, 2:-2], -kappa * lap2[2:-2, 2:-2], rtol=1e-6
         )
@@ -233,13 +245,15 @@ class TestBiharmonicDiffusion2D:
         tend_harm = harm_op(h, kappa=1.0)
         tend_biharm = biharm_op(h, kappa=1.0)
 
-        # Mask out near-zero crossings of sin(k*x) to avoid division artefacts
-        mask = jnp.abs(jnp.sin(k * x[4:-4])) > 0.5
-        abs_harm = jnp.abs(tend_harm[4:-4, 4:-4])[:, mask]
-        abs_biharm = jnp.abs(tend_biharm[4:-4, 4:-4])[:, mask]
+        # Mask out near-zero crossings of sin(k*x) to avoid division artefacts.
+        # Use float multiplication instead of boolean indexing (JAX doesn't
+        # support non-concrete boolean advanced indexing).
+        mask = (jnp.abs(jnp.sin(k * x[4:-4])) > 0.5).astype(float)
+        abs_harm = jnp.abs(tend_harm[4:-4, 4:-4])
+        abs_biharm = jnp.abs(tend_biharm[4:-4, 4:-4])
 
-        # biharmonic amplitude > harmonic amplitude for all non-zero interior cells
-        assert jnp.all(abs_biharm > abs_harm)
+        # biharmonic amplitude > harmonic amplitude at all masked (non-zero) cells
+        assert jnp.all((abs_biharm > abs_harm) | (mask[None, :] == 0))
 
 
 # ---------------------------------------------------------------------------

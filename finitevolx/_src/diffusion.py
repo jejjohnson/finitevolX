@@ -22,9 +22,10 @@ With a positive κ both operators provide dissipation.
 
 The biharmonic operator is implemented as two successive Laplacians in
 flux form.  The ghost ring of the intermediate Laplacian is zero (Dirichlet-0
-at the halo), which is equivalent to a zero-normal-gradient BC on the
-intermediate field.  Use ``enforce_periodic`` or set ghost cells explicitly
-before calling if a different intermediate BC is required.
+at the halo), i.e. a Dirichlet-0 boundary condition is imposed on the
+intermediate field.  This is not a zero-normal-gradient (Neumann) BC.
+Use ``enforce_periodic`` or set ghost cells explicitly before calling if a
+different intermediate BC is required.
 
 References
 ----------
@@ -123,11 +124,15 @@ class BiharmonicDiffusion2D(eqx.Module):
 
     Notes
     -----
-    The ghost ring of the intermediate Laplacian ∇²h is zero (Dirichlet-0).
-    For problems with periodic boundaries, call ``enforce_periodic`` on ``h``
-    before invoking this operator so that the ghost cells of the input are
-    correctly set; the intermediate Laplacian then also inherits sensible
-    ghost values from the periodic input.
+    The ghost ring of the intermediate Laplacian ∇²h is zero (Dirichlet-0),
+    not a zero-normal-gradient (Neumann) BC.  This means the second Laplacian
+    pass reads a zero halo for the intermediate field, which contaminate the
+    outermost interior row/column of the final tendency even if the input ``h``
+    had correctly set ghost cells.  Only results in the deep interior
+    ``[2:-2, 2:-2]`` are fully BC-consistent.  For periodic domains, call
+    ``enforce_periodic`` on ``h`` before invoking this operator; this sets the
+    input ghost ring correctly and reduces (but does not eliminate) the
+    Dirichlet-0 contamination of the intermediate field.
 
     Parameters
     ----------
