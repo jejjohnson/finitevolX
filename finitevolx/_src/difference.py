@@ -20,7 +20,6 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
-from finitevolx._src.interpolation import Interpolation2D
 
 
 class Difference1D(eqx.Module):
@@ -370,15 +369,16 @@ class Difference2D(eqx.Module):
         Maps a streamfunction ψ at T-points to face-centred geostrophic
         velocities (u, v) = (-∂ψ/∂y, ∂ψ/∂x) on an Arakawa C-grid.
 
-        The streamfunction is first averaged to X-points (corners) so that the
-        orthogonal differences land directly on U and V faces:
+        Expanding the T→X bilinear interpolation into the backward X→U / X→V
+        differences gives a compact stencil that reads the T-point ghost cells
+        of ψ directly:
 
-        ψ_x[j+1/2, i+1/2] = 1/4 * (ψ[j,i] + ψ[j,i+1] + ψ[j+1,i] + ψ[j+1,i+1])
-        u[j, i+1/2] = -(ψ_x[j+1/2, i+1/2] - ψ_x[j-1/2, i+1/2]) / dy
-        v[j+1/2, i] =  (ψ_x[j+1/2, i+1/2] - ψ_x[j+1/2, i-1/2]) / dx
+        u[j, i+1/2] = -(ψ[j+1,i] + ψ[j+1,i+1] - ψ[j-1,i] - ψ[j-1,i+1]) / (4·dy)
+        v[j+1/2, i] =  (ψ[j,i+1] + ψ[j+1,i+1] - ψ[j,i-1] - ψ[j+1,i-1]) / (4·dx)
 
-        The resulting velocity field is discretely non-divergent:
-        div(u, v) = 0 at T-points.
+        The resulting (unmasked) velocity field is discretely non-divergent:
+        div(u, v) = 0 at T-points. When masks are applied, the divergence-free
+        property no longer holds in general.
 
         Parameters
         ----------
@@ -410,19 +410,20 @@ class Difference2D(eqx.Module):
         >>> psi = jnp.ones((grid.Ny, grid.Nx))
         >>> u, v = diff.grad_perp(psi)
         """
-        # Step 1: interpolate ψ from T-points to X-points (bilinear average)
-        # ψ_x[j+1/2, i+1/2] = 1/4 * (ψ[j,i] + ψ[j,i+1] + ψ[j+1,i] + ψ[j+1,i+1])
-        psi_x = Interpolation2D(grid=self.grid).T_to_X(psi)
+        # u[j, i+1/2] = -(ψ[j+1,i] + ψ[j+1,i+1] - ψ[j-1,i] - ψ[j-1,i+1]) / (4·dy)
+        u = jnp.zeros_like(psi)
+        u = u.at[1:-1, 1:-1].set(
+            -(psi[2:, 1:-1] + psi[2:, 2:] - psi[:-2, 1:-1] - psi[:-2, 2:])
+            / (4.0 * self.grid.dy)
+        )
 
-        # Step 2: u = -∂ψ_x/∂y at U-points (backward y-difference X→U)
-        # u[j, i+1/2] = -(ψ_x[j+1/2, i+1/2] - ψ_x[j-1/2, i+1/2]) / dy
-        u = -self.diff_y_X_to_U(psi_x)
+        # v[j+1/2, i] = (ψ[j,i+1] + ψ[j+1,i+1] - ψ[j,i-1] - ψ[j+1,i-1]) / (4·dx)
+        v = jnp.zeros_like(psi)
+        v = v.at[1:-1, 1:-1].set(
+            (psi[1:-1, 2:] + psi[2:, 2:] - psi[1:-1, :-2] - psi[2:, :-2])
+            / (4.0 * self.grid.dx)
+        )
 
-        # Step 3: v = ∂ψ_x/∂x at V-points (backward x-difference X→V)
-        # v[j+1/2, i] = (ψ_x[j+1/2, i+1/2] - ψ_x[j+1/2, i-1/2]) / dx
-        v = self.diff_x_X_to_V(psi_x)
-
-        # Step 4: apply masks if provided
         if mask_u is not None:
             u = u * mask_u
         if mask_v is not None:

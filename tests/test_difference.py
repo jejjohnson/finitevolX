@@ -296,16 +296,12 @@ class TestGradPerp2D:
         assert v.shape == (grid2d.Ny, grid2d.Nx)
 
     def test_constant_psi_gives_zero_velocity(self, grid2d):
-        """Uniform ψ → zero velocity: grad_perp(const) = (0, 0).
-
-        Deep interior [2:-2, 2:-2] avoids ghost-cell contamination from the
-        intermediate X-point field whose ghost ring is zero.
-        """
+        """Uniform ψ → zero velocity everywhere in the interior: grad_perp(const) = (0, 0)."""
         diff = Difference2D(grid=grid2d)
         psi = 5.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
         u, v = diff.grad_perp(psi)
-        np.testing.assert_allclose(u[2:-2, 2:-2], 0.0, atol=1e-12)
-        np.testing.assert_allclose(v[2:-2, 2:-2], 0.0, atol=1e-12)
+        np.testing.assert_allclose(u[1:-1, 1:-1], 0.0, atol=1e-12)
+        np.testing.assert_allclose(v[1:-1, 1:-1], 0.0, atol=1e-12)
 
     def test_ghost_ring_is_zero(self, grid2d):
         diff = Difference2D(grid=grid2d)
@@ -323,17 +319,21 @@ class TestGradPerp2D:
         np.testing.assert_array_equal(v[:, -1], 0.0)
 
     def test_nondivergent(self, grid2d):
-        """grad_perp(ψ) is discretely non-divergent: div(u, v) = 0."""
+        """grad_perp(ψ) is discretely non-divergent: div(u, v) = 0.
+
+        Deep interior [2:-2, 2:-2] avoids ghost-ring contamination from the
+        chained divergence operator reading the zero ghost ring of u/v.
+        """
         diff = Difference2D(grid=grid2d)
         x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
         y = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
         psi = x[None, :] * y[:, None]  # ψ = x * y
         u, v = diff.grad_perp(psi)
         divergence = diff.divergence(u, v)
-        np.testing.assert_allclose(divergence[1:-1, 1:-1], 0.0, atol=1e-12)
+        np.testing.assert_allclose(divergence[2:-2, 2:-2], 0.0, atol=1e-12)
 
     def test_linear_psi_x(self, grid2d):
-        """ψ = c * x → u = 0, v = c at deep interior.
+        """ψ = c * x → u = 0, v = c at full interior.
 
         ∂ψ/∂y = 0 → u = 0
         ∂ψ/∂x = c → v = c
@@ -343,11 +343,11 @@ class TestGradPerp2D:
         x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
         psi = jnp.broadcast_to(c * x, (grid2d.Ny, grid2d.Nx))
         u, v = diff.grad_perp(psi)
-        np.testing.assert_allclose(u[2:-2, 2:-2], 0.0, atol=1e-12)
-        np.testing.assert_allclose(v[2:-2, 2:-2], c, rtol=1e-5)
+        np.testing.assert_allclose(u[1:-1, 1:-1], 0.0, atol=1e-12)
+        np.testing.assert_allclose(v[1:-1, 1:-1], c, rtol=1e-5)
 
     def test_linear_psi_y(self, grid2d):
-        """ψ = c * y → u = -c, v = 0 at deep interior.
+        """ψ = c * y → u = -c, v = 0 at full interior.
 
         ∂ψ/∂y = c → u = -c
         ∂ψ/∂x = 0 → v = 0
@@ -357,11 +357,17 @@ class TestGradPerp2D:
         y = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
         psi = jnp.broadcast_to(c * y[:, None], (grid2d.Ny, grid2d.Nx))
         u, v = diff.grad_perp(psi)
-        np.testing.assert_allclose(u[2:-2, 2:-2], -c, rtol=1e-5)
-        np.testing.assert_allclose(v[2:-2, 2:-2], 0.0, atol=1e-12)
+        np.testing.assert_allclose(u[1:-1, 1:-1], -c, rtol=1e-5)
+        np.testing.assert_allclose(v[1:-1, 1:-1], 0.0, atol=1e-12)
 
     def test_matches_manual_decomposition(self, grid2d):
-        """grad_perp must agree with manual T→X→(X→U, X→V) decomposition."""
+        """grad_perp agrees with T→X→(X→U, X→V) at the deep interior.
+
+        The composed approach has zero X-point ghost ring, so the first
+        interior strip differs.  The direct stencil used by grad_perp reads
+        the T-point ghost cells of ψ, giving correct values everywhere in
+        [1:-1, 1:-1].  Both approaches agree at [2:-2, 2:-2].
+        """
         diff = Difference2D(grid=grid2d)
         interp = Interpolation2D(grid=grid2d)
         x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
@@ -373,8 +379,8 @@ class TestGradPerp2D:
         psi_x = interp.T_to_X(psi)
         u_expected = -diff.diff_y_X_to_U(psi_x)
         v_expected = diff.diff_x_X_to_V(psi_x)
-        np.testing.assert_allclose(u, u_expected, atol=1e-12)
-        np.testing.assert_allclose(v, v_expected, atol=1e-12)
+        np.testing.assert_allclose(u[2:-2, 2:-2], u_expected[2:-2, 2:-2], rtol=1e-5)
+        np.testing.assert_allclose(v[2:-2, 2:-2], v_expected[2:-2, 2:-2], rtol=1e-5)
 
     def test_anisotropic_grid(self):
         """grad_perp respects different dx and dy spacings."""
@@ -384,8 +390,8 @@ class TestGradPerp2D:
         y = jnp.arange(grid.Ny, dtype=float) * grid.dy
         psi = jnp.broadcast_to(c * y[:, None], (grid.Ny, grid.Nx))
         u, _v = diff.grad_perp(psi)
-        # ∂ψ/∂y = c, so u = -c at deep interior
-        np.testing.assert_allclose(u[2:-2, 2:-2], -c, rtol=1e-5)
+        # ∂ψ/∂y = c, so u = -c at full interior
+        np.testing.assert_allclose(u[1:-1, 1:-1], -c, rtol=1e-5)
 
     def test_mask_u_zeros_velocity(self, grid2d):
         """mask_u zeroes u at masked points."""
