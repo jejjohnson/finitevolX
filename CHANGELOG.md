@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.0.19](https://github.com/jejjohnson/finitevolX/compare/v0.0.18...v0.0.19) (2026-03-11)
+
+
+### Features
+
+* add Arakawa (1966) Jacobian operator for energy- and enstrophy-conserving advection ([beb6e9a](https://github.com/jejjohnson/finitevolX/commit/beb6e9a0dadfc7dee7ef96ffacb0010b50ee3e98))
+* add Arakawa (1966) Jacobian operator for energy- and enstrophy-conserving advection ([c7610f6](https://github.com/jejjohnson/finitevolX/commit/c7610f62a8562b2cd91e3ccfdf8d9c94906d071b))
+* add energy-conserving momentum advection operator for C-grid models ([8ea2a21](https://github.com/jejjohnson/finitevolX/commit/8ea2a21f639665025b78f91709689112103496c5))
+* add energy-conserving momentum advection operator for C-grid models ([db36273](https://github.com/jejjohnson/finitevolX/commit/db36273a49a36e931cf9e2c8bec5b1fb2ec6146f))
+* add multi-layer vertical coupling matrix and layer↔mode transforms ([8cdafe9](https://github.com/jejjohnson/finitevolX/commit/8cdafe9e05824a82265d4ab774217ea3b9f5e9b0))
+* add vertical coupling matrix (A) and layer↔mode transforms ([aa45bcc](https://github.com/jejjohnson/finitevolX/commit/aa45bcce97e107aed545e171517efe365d82caec))
+
+
+### Bug Fixes
+
+* address PR review - JAX-jittable vertical modes, fix annotations and docstring ([8fbf23a](https://github.com/jejjohnson/finitevolX/commit/8fbf23a4f389b6a9344985856d2f951a02395f2f))
+* address PR review comments - fix jaxtyping shape annotation and test import path ([3ed8077](https://github.com/jejjohnson/finitevolX/commit/3ed80778639f8793bb6824f6fb46d39e04791ee3))
+* resolve I001 import-sort error in tests and run ruff check on full repo ([9316961](https://github.com/jejjohnson/finitevolX/commit/93169614b7061983c41bc38fa0bb49e0923405ea))
+* resolve ruff lint errors in test_momentum.py ([6faa3a2](https://github.com/jejjohnson/finitevolX/commit/6faa3a2f99976d203a96e18094703c6d3464800d))
+* restrict momentum advection write region and enable x64 in tests ([3686fae](https://github.com/jejjohnson/finitevolX/commit/3686faee4debfddf08f7ec4fa1bf1890996d53fc))
+
 ## [0.0.18](https://github.com/jejjohnson/finitevolX/compare/v0.0.17...v0.0.18) (2026-03-11)
 
 
