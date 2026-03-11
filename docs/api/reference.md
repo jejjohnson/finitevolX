@@ -38,6 +38,10 @@
 
 ::: finitevolx.Vorticity2D
 
+### Jacobian
+
+::: finitevolx.arakawa_jacobian
+
 ## Boundary Conditions
 
 ::: finitevolx.enforce_periodic
