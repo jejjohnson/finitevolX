@@ -76,8 +76,8 @@ For multi-step tasks, state a brief plan:
 **All agents must** verify that every one of the following passes before creating a commit or reporting progress. No exceptions.
 
 1. **Tests** – `uv run pytest tests -v` (or `make test`) must have 0 failures.
-2. **Lint** – `uv run ruff check finitevolx/` (or `make uv-lint`) must report no issues.
-3. **Format** – `uv run ruff format --check finitevolx/` must report no files to reformat.
+2. **Lint** – `uv run ruff check .` (or `make uv-lint`) must report no issues.
+3. **Format** – `uv run ruff format --check .` must report no files to reformat.
 4. **Type checks** – `uv run ty check finitevolx` must report no errors in changed files.
 
 ## Development Environment
