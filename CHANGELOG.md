@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.23](https://github.com/jejjohnson/finitevolX/compare/v0.0.22...v0.0.23) (2026-03-11)
+
+
+### Features
+
+* **bc:** add Robin and Extrapolation boundary conditions ([9c1fec3](https://github.com/jejjohnson/finitevolX/commit/9c1fec30650a200948c70a0169ccaffde01f24d6))
+* **bc:** add Robin and Extrapolation boundary conditions ([36ea563](https://github.com/jejjohnson/finitevolX/commit/36ea56353d12cd208bc2934cd50eadb74c664927))
+
 ## [0.0.22](https://github.com/jejjohnson/finitevolX/compare/v0.0.21...v0.0.22) (2026-03-11)
 
 
