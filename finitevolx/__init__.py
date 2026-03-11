@@ -15,8 +15,9 @@ from finitevolx._src.difference import Difference1D, Difference2D, Difference3D
 from finitevolx._src.diffusion import (
     BiharmonicDiffusion2D,
     BiharmonicDiffusion3D,
-    HarmonicDiffusion2D,
-    HarmonicDiffusion3D,
+    Diffusion2D,
+    Diffusion3D,
+    diffusion_2d,
 )
 from finitevolx._src.divergence import Divergence2D, divergence_2d
 from finitevolx._src.elliptic import (
@@ -99,10 +100,11 @@ __all__ = [
     "Difference2D",
     "Difference3D",
     # Diffusion
-    "HarmonicDiffusion2D",
     "BiharmonicDiffusion2D",
-    "HarmonicDiffusion3D",
     "BiharmonicDiffusion3D",
+    "Diffusion2D",
+    "Diffusion3D",
+    "diffusion_2d",
     # Divergence
     "Divergence2D",
     "divergence_2d",
