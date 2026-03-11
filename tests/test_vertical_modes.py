@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """Tests for vertical coupling matrix and layer/mode transforms."""
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -303,3 +304,80 @@ class TestLayerModeTransforms:
         np.testing.assert_allclose(
             np.array(reconstructed), np.array(field), atol=1e-5
         )
+
+
+# ---------------------------------------------------------------------------
+# JAX-transform compatibility
+# ---------------------------------------------------------------------------
+
+
+class TestJITCompatibility:
+    """Verify that all four public functions are compatible with jax.jit."""
+
+    def test_jit_build_coupling_matrix(self):
+        """jax.jit(build_coupling_matrix) matches eager output."""
+        H = jnp.array([500.0, 500.0])
+        g_prime = jnp.array([0.02, 0.02])
+        A_eager = build_coupling_matrix(H, g_prime)
+        A_jit = jax.jit(build_coupling_matrix)(H, g_prime)
+        np.testing.assert_allclose(np.array(A_jit), np.array(A_eager), rtol=1e-6)
+
+    def test_jit_build_coupling_matrix_three_layer(self):
+        """jax.jit(build_coupling_matrix) works for the 3-layer case."""
+        H = jnp.array([300.0, 400.0, 300.0])
+        g_prime = jnp.array([0.02, 0.015, 0.015])
+        A_eager = build_coupling_matrix(H, g_prime)
+        A_jit = jax.jit(build_coupling_matrix)(H, g_prime)
+        np.testing.assert_allclose(np.array(A_jit), np.array(A_eager), rtol=1e-6)
+
+    def test_jit_decompose_vertical_modes(self):
+        """jax.jit(decompose_vertical_modes) matches eager output."""
+        H = jnp.array([500.0, 500.0])
+        g_prime = jnp.array([0.02, 0.02])
+        A = build_coupling_matrix(H, g_prime)
+        f0 = jnp.array(1e-4)
+        radii_eager, Cl2m_eager, Cm2l_eager = decompose_vertical_modes(A, f0)
+        radii_jit, Cl2m_jit, Cm2l_jit = jax.jit(decompose_vertical_modes)(A, f0)
+        np.testing.assert_allclose(
+            np.array(radii_jit), np.array(radii_eager), rtol=1e-5
+        )
+        np.testing.assert_allclose(
+            np.array(Cl2m_jit), np.array(Cl2m_eager), rtol=1e-5
+        )
+        np.testing.assert_allclose(
+            np.array(Cm2l_jit), np.array(Cm2l_eager), rtol=1e-5
+        )
+
+    def test_jit_layer_to_mode(self):
+        """jax.jit(layer_to_mode) matches eager output."""
+        Cl2m = jnp.eye(2)
+        field = jnp.array([1.0, 2.0])
+        result_eager = layer_to_mode(field, Cl2m)
+        result_jit = jax.jit(layer_to_mode)(field, Cl2m)
+        np.testing.assert_allclose(
+            np.array(result_jit), np.array(result_eager), rtol=1e-6
+        )
+
+    def test_jit_mode_to_layer(self):
+        """jax.jit(mode_to_layer) matches eager output."""
+        Cm2l = jnp.eye(2)
+        field = jnp.array([1.0, 2.0])
+        result_eager = mode_to_layer(field, Cm2l)
+        result_jit = jax.jit(mode_to_layer)(field, Cm2l)
+        np.testing.assert_allclose(
+            np.array(result_jit), np.array(result_eager), rtol=1e-6
+        )
+
+    def test_jit_round_trip(self):
+        """JIT-compiled round-trip mode_to_layer(layer_to_mode(field)) ≈ field."""
+        H = jnp.array([500.0, 500.0])
+        g_prime = jnp.array([0.02, 0.02])
+        A = build_coupling_matrix(H, g_prime)
+        _radii, Cl2m, Cm2l = decompose_vertical_modes(A, f0=1e-4)
+        field = jnp.array([1.0, 3.0])
+
+        def round_trip(f: jnp.ndarray) -> jnp.ndarray:
+            return mode_to_layer(layer_to_mode(f, Cl2m), Cm2l)
+
+        result = jax.jit(round_trip)(field)
+        np.testing.assert_allclose(np.array(result), np.array(field), atol=1e-5)

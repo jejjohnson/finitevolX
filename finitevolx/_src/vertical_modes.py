@@ -45,17 +45,18 @@ References
 
 import jax.numpy as jnp
 from jaxtyping import Array, Float
-import numpy as np
 
 
 def build_coupling_matrix(
-    H: Float[Array, " nl"],
-    g_prime: Float[Array, " nl"],
+    H: Float[Array, "nl"],
+    g_prime: Float[Array, "nl"],
 ) -> Float[Array, "nl nl"]:
     """Build the tridiagonal vertical coupling (stratification) matrix A.
 
     A encodes the buoyancy coupling between layers via layer thicknesses and
-    reduced gravities.  It is symmetric and positive-semi-definite.
+    reduced gravities.  For positive ``H`` and ``g_prime``, A is tridiagonal
+    and diagonally similar to a symmetric positive-definite matrix; it
+    becomes exactly symmetric when all layer thicknesses are equal.
 
     Parameters
     ----------
@@ -96,49 +97,44 @@ def build_coupling_matrix(
     g_prime = jnp.asarray(g_prime, dtype=float)
     nl = H.shape[0]
 
-    A = np.zeros((nl, nl), dtype=float)
+    # Build A using JAX primitives so the function is JIT-compatible.
+    A = jnp.zeros((nl, nl), dtype=H.dtype)
 
     if nl == 1:
         # Single-layer: A[0,0] = 1 / (H[0] * g'[0])
-        A[0, 0] = 1.0 / (float(H[0]) * float(g_prime[0]))
+        A = A.at[0, 0].set(1.0 / (H[0] * g_prime[0]))
     else:
         # Top row (layer 0)
-        A[0, 0] = 1.0 / (float(H[0]) * float(g_prime[0])) + 1.0 / (
-            float(H[0]) * float(g_prime[1])
-        )
-        A[0, 1] = -1.0 / (float(H[0]) * float(g_prime[1]))
+        A = A.at[0, 0].set(1.0 / (H[0] * g_prime[0]) + 1.0 / (H[0] * g_prime[1]))
+        A = A.at[0, 1].set(-1.0 / (H[0] * g_prime[1]))
 
         # Interior rows
         for i in range(1, nl - 1):
-            A[i, i - 1] = -1.0 / (float(H[i]) * float(g_prime[i]))
-            A[i, i] = (
-                1.0
-                / float(H[i])
-                * (1.0 / float(g_prime[i + 1]) + 1.0 / float(g_prime[i]))
-            )
-            A[i, i + 1] = -1.0 / (float(H[i]) * float(g_prime[i + 1]))
+            A = A.at[i, i - 1].set(-1.0 / (H[i] * g_prime[i]))
+            A = A.at[i, i].set((1.0 / H[i]) * (1.0 / g_prime[i + 1] + 1.0 / g_prime[i]))
+            A = A.at[i, i + 1].set(-1.0 / (H[i] * g_prime[i + 1]))
 
         # Bottom row (layer nl-1)
-        A[-1, -1] = 1.0 / (float(H[nl - 1]) * float(g_prime[nl - 1]))
-        A[-1, -2] = -1.0 / (float(H[nl - 1]) * float(g_prime[nl - 1]))
+        A = A.at[-1, -1].set(1.0 / (H[nl - 1] * g_prime[nl - 1]))
+        A = A.at[-1, -2].set(-1.0 / (H[nl - 1] * g_prime[nl - 1]))
 
-    return jnp.array(A)
+    return A
 
 
 def decompose_vertical_modes(
     A: Float[Array, "nl nl"],
     f0: float,
-) -> tuple[Float[Array, " nl"], Float[Array, "nl nl"], Float[Array, "nl nl"]]:
+) -> tuple[Float[Array, "nl"], Float[Array, "nl nl"], Float[Array, "nl nl"]]:
     """Eigendecompose the coupling matrix A to get Rossby radii and transforms.
 
-    Uses the biorthogonal normalisation from louity/qgsw-pytorch for numerical
-    stability::
+    Uses ``jnp.linalg.eigh`` (Hermitian eigendecomposition) for numerical
+    stability and JAX-JIT compatibility.  A is treated as symmetric
+    positive-semi-definite, which is exact when all layer thicknesses are equal.
+    The eigenvectors R are orthonormal, so::
 
-        Cl2m = diag(1 / diag(Lᵀ R))  ·  Lᵀ
+        Cl2m = Rᵀ
         Cm2l = R
-
-    where R (right eigenvectors) and L (left eigenvectors, i.e. right
-    eigenvectors of Aᵀ) are real parts of the complex eigenvector matrices.
+        Cl2m @ Cm2l = Rᵀ R = I
 
     Parameters
     ----------
@@ -171,42 +167,33 @@ def decompose_vertical_modes(
     >>> Cl2m.shape
     (2, 2)
     """
-    A_np = np.array(A)
-    f0 = float(f0)
+    # Use the Hermitian eigendecomposition; eigenvectors are orthonormal so
+    # left and right eigenvectors coincide and Lᵀ R = I.
+    lambd, R = jnp.linalg.eigh(jnp.asarray(A, dtype=float))
+    f0_arr = jnp.asarray(f0, dtype=float)
 
-    # Right eigenvectors: A R = R diag(lambda)
-    lambd_r, R = np.linalg.eig(A_np)
-    # Left eigenvectors: A^T L = L diag(lambda_l)
-    _lambd_l, L = np.linalg.eig(A_np.T)
-
-    # Use real parts (A is real-symmetric in practice)
-    lambd = lambd_r.real
-    R = R.real
-    L = L.real
-
-    # Biorthogonal normalisation: Cl2m = diag(1/diag(L^T R)) @ L^T
-    # This ensures Cl2m @ Cm2l == I
-    diag_LtR = np.diag(L.T @ R)
-    Cl2m_np = np.diag(1.0 / diag_LtR) @ L.T
-    Cm2l_np = R
+    # With orthonormal R: Cl2m = Rᵀ, Cm2l = R  →  Cl2m @ Cm2l = I
+    Cm2l = R
+    Cl2m = R.T
 
     # Rossby deformation radii: Rd = 1 / (|f0| * sqrt(lambda))
     # Only positive eigenvalues yield a finite radius.  Eigenvalues that are
     # zero (barotropic mode, rigid lid) or negative (numerical noise in a
     # near-singular A) are mapped to inf; A is positive-semi-definite so
     # negative eigenvalues indicate floating-point rounding, not physics.
-    with np.errstate(divide="ignore", invalid="ignore"):
-        rossby_radii_np = np.where(
-            lambd > 0, 1.0 / (np.abs(f0) * np.sqrt(lambd)), np.inf
-        )
+    # Use jnp.where with a safe fallback to avoid NaN under JIT.
+    positive = lambd > 0
+    safe_lambd = jnp.where(positive, lambd, 1.0)
+    finite_r = 1.0 / (jnp.abs(f0_arr) * jnp.sqrt(safe_lambd))
+    rossby_radii = jnp.where(positive, finite_r, jnp.inf)
 
-    return jnp.array(rossby_radii_np), jnp.array(Cl2m_np), jnp.array(Cm2l_np)
+    return rossby_radii, Cl2m, Cm2l
 
 
 def layer_to_mode(
-    field: Float[Array, " nl *rest"],
+    field: Float[Array, "nl *rest"],
     Cl2m: Float[Array, "nl nl"],
-) -> Float[Array, " nl *rest"]:
+) -> Float[Array, "nl *rest"]:
     """Transform a field from layer space to mode space.
 
     Applies the layer-to-mode transform matrix along the leading (layer) axis.
@@ -241,9 +228,9 @@ def layer_to_mode(
 
 
 def mode_to_layer(
-    field: Float[Array, " nl *rest"],
+    field: Float[Array, "nl *rest"],
     Cm2l: Float[Array, "nl nl"],
-) -> Float[Array, " nl *rest"]:
+) -> Float[Array, "nl *rest"]:
     """Transform a field from mode space to layer space.
 
     Applies the mode-to-layer transform matrix along the leading (mode) axis.
