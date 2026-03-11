@@ -484,18 +484,17 @@ class ArakawaCGridMask(eqx.Module):
         psi_np = _pool2d_bool(hf, ky=2, kx=2, threshold=7.0 / 8.0)
 
         # ── vorticity boundary classification ─────────────────────────────
-        # For w[j, i] (SW corner of h[j, i]):
-        #   y-adjacent u-faces: u[j, i] and u[j+1, i]  (shift u up by one)
-        #   x-adjacent v-faces: v[j, i] and v[j, i+1]  (shift v left by one)
-        u_up = np.pad(u_np[1:, :], ((0, 1), (0, 0)))  # u[j+1, i], pad bottom
-        v_left = np.pad(v_np[:, 1:], ((0, 0), (0, 1)))  # v[j, i+1], pad right
+        # For w[j, i] at SW corner of h[j, i], the 4 adjacent velocity faces
+        # are u[j,i] (east), u[j,i-1] (west), v[j,i] (north), v[j-1,i] (south).
+        u_west = np.pad(u_np[:, :-1], ((0, 0), (1, 0)))  # u[j, i-1]
+        v_south = np.pad(v_np[:-1, :], ((1, 0), (0, 0)))  # v[j-1, i]
 
-        # vertical boundary: w wet AND at least one y-adjacent u-face dry
-        w_vb = w_np & (~u_np | ~u_up)
-        # horizontal boundary: w wet AND at least one x-adjacent v-face dry
-        w_hb = w_np & (~v_np | ~v_left)
+        # vertical boundary: wall along y → v-face (north or south) dry
+        w_vb = w_np & (~v_np | ~v_south)
+        # horizontal boundary: wall along x → u-face (east or west) dry
+        w_hb = w_np & (~u_np | ~u_west)
         w_co = w_vb & w_hb  # corner-out: both
-        w_va = w_np & u_np & u_up & v_np & v_left  # valid interior
+        w_va = w_np & u_np & u_west & v_np & v_south  # valid interior
 
         # ── irregular psi boundary indices ────────────────────────────────
         # Dry psi cells in [1:-1, 1:-1] with >=1 wet psi cell in 3x3 hood.
