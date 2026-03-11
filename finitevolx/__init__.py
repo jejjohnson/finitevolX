@@ -1,10 +1,12 @@
 from finitevolx._src.advection import Advection1D, Advection2D, Advection3D
 from finitevolx._src.bc_1d import (
     Dirichlet1D,
+    Extrapolation1D,
     Neumann1D,
     Outflow1D,
     Periodic1D,
     Reflective1D,
+    Robin1D,
     Slip1D,
     Sponge1D,
 )
@@ -98,11 +100,13 @@ __all__ = [
     # Boundary condition sets and 1D BCs
     "BoundaryConditionSet",
     "Dirichlet1D",
+    "Extrapolation1D",
     "FieldBCSet",
     "Neumann1D",
     "Outflow1D",
     "Periodic1D",
     "Reflective1D",
+    "Robin1D",
     "Slip1D",
     "Sponge1D",
     # Finite difference
