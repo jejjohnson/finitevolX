@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.masks.cgrid_mask import (
+from finitevolx._src.grid.cgrid_mask import (
     ArakawaCGridMask,
     StencilCapability,
     _count_contiguous,
@@ -291,10 +291,10 @@ class TestIrregularBoundary:
     def test_within_interior_bounds(self, rect_cgrid):
         m = rect_cgrid
         Ny, Nx = m.h.shape
-        assert bool(jnp.all(m.psi_irrbound_xids >= 0))
-        assert bool(jnp.all(m.psi_irrbound_xids < Ny - 2))
-        assert bool(jnp.all(m.psi_irrbound_yids >= 0))
-        assert bool(jnp.all(m.psi_irrbound_yids < Nx - 2))
+        assert bool(jnp.all(m.psi_irrbound_yids >= 1))
+        assert bool(jnp.all(m.psi_irrbound_yids < Ny - 1))
+        assert bool(jnp.all(m.psi_irrbound_xids >= 1))
+        assert bool(jnp.all(m.psi_irrbound_xids < Nx - 1))
 
 
 # ── land / coast classification ───────────────────────────────────────────────
@@ -403,3 +403,316 @@ class TestAdaptiveMasks:
         masks = m.get_adaptive_masks(direction="x", source="h")
         assert bool(masks[2][5, 1])
         assert not bool(masks[4][5, 1])
+
+
+# ── geometric correctness of staggered masks ─────────────────────────────────
+#
+# These tests verify exact grid-point values against the Arakawa C-grid layout:
+#
+#     w-----v-----w
+#     |           |
+#     u     h     u
+#     |           |
+#     w-----v-----w
+#
+# Convention:
+#   h[j, i]   — cell centre
+#   u[j, i]   — interface between h[j-1, i] and h[j, i]  (y-face)
+#   v[j, i]   — interface between h[j, i-1] and h[j, i]  (x-face)
+#   w[j, i]   — SW corner of h[j, i], uses h[j-1:j+1, i-1:i+1]
+#   psi[j, i] — strict version of w (all 4 h-cells must be wet)
+
+
+class TestStaggeredMaskGeometry:
+    """Verify staggered mask values at specific grid points."""
+
+    @pytest.fixture
+    def basin6(self):
+        """6×6 basin: land border, 4×4 ocean interior."""
+        h = np.ones((6, 6), dtype=bool)
+        h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
+        return h, ArakawaCGridMask.from_mask(h)
+
+    # ── u mask: interface between h[j-1,i] and h[j,i] ────────────────
+
+    def test_u_wet_when_both_h_neighbours_wet(self, basin6):
+        _, m = basin6
+        u = np.asarray(m.u)
+        # u[2,2]: between h[1,2] (wet) and h[2,2] (wet) → wet
+        assert u[2, 2]
+
+    def test_u_dry_when_h_below_is_land(self, basin6):
+        _, m = basin6
+        u = np.asarray(m.u)
+        # u[1,2]: between h[0,2] (land) and h[1,2] (wet) → dry
+        assert not u[1, 2]
+
+    def test_u_dry_when_h_above_is_land(self, basin6):
+        _, m = basin6
+        u = np.asarray(m.u)
+        # u[5,2]: between h[4,2] (wet) and h[5,2] (land) → dry
+        assert not u[5, 2]
+
+    def test_u_dry_at_row_0_padding(self, basin6):
+        _, m = basin6
+        u = np.asarray(m.u)
+        # u[0,i]: between padded zero and h[0,i] → always dry
+        np.testing.assert_array_equal(u[0, :], False)
+
+    # ── v mask: interface between h[j,i-1] and h[j,i] ────────────────
+
+    def test_v_wet_when_both_h_neighbours_wet(self, basin6):
+        _, m = basin6
+        v = np.asarray(m.v)
+        # v[2,2]: between h[2,1] (wet) and h[2,2] (wet) → wet
+        assert v[2, 2]
+
+    def test_v_dry_when_h_left_is_land(self, basin6):
+        _, m = basin6
+        v = np.asarray(m.v)
+        # v[2,1]: between h[2,0] (land) and h[2,1] (wet) → dry
+        assert not v[2, 1]
+
+    def test_v_dry_at_col_0_padding(self, basin6):
+        _, m = basin6
+        v = np.asarray(m.v)
+        # v[j,0]: between padded zero and h[j,0] → always dry
+        np.testing.assert_array_equal(v[:, 0], False)
+
+    # ── w mask (lenient): at least 1 of 4 SW-corner h-cells wet ──────
+
+    def test_w_wet_near_single_wet_cell(self):
+        h = np.zeros((4, 4), dtype=bool)
+        h[1, 1] = True  # single wet cell
+        m = ArakawaCGridMask.from_mask(h)
+        w = np.asarray(m.w)
+        # w at corners of h[1,1]: (1,1), (1,2), (2,1), (2,2)
+        assert w[1, 1]
+        assert w[1, 2]
+        assert w[2, 1]
+        assert w[2, 2]
+
+    def test_w_dry_far_from_wet_cells(self):
+        h = np.zeros((6, 6), dtype=bool)
+        h[1, 1] = True
+        m = ArakawaCGridMask.from_mask(h)
+        w = np.asarray(m.w)
+        # w[4,4]: SW corner uses h[3,3], h[3,4], h[4,3], h[4,4] — all dry
+        assert not w[4, 4]
+
+    # ── psi mask (strict): all 4 SW-corner h-cells wet ────────────────
+
+    def test_psi_wet_interior(self, basin6):
+        _, m = basin6
+        psi = np.asarray(m.psi)
+        # psi[2,2]: uses h[1,1], h[1,2], h[2,1], h[2,2] — all wet
+        assert psi[2, 2]
+
+    def test_psi_dry_at_land_boundary(self, basin6):
+        _, m = basin6
+        psi = np.asarray(m.psi)
+        # psi[1,2]: uses h[0,1] (land) → dry
+        assert not psi[1, 2]
+
+
+class TestVorticityBoundaryGeometry:
+    """Verify vorticity boundary classification at specific grid points.
+
+    For w[j,i] at the SW corner of cell (j,i), the 4 adjacent velocity
+    faces are:
+      - u[j, i]   (east)   — y-face between h[j-1,i] and h[j,i]
+      - u[j, i-1] (west)   — y-face between h[j-1,i-1] and h[j,i-1]
+      - v[j, i]   (north)  — x-face between h[j,i-1] and h[j,i]
+      - v[j-1, i] (south)  — x-face between h[j-1,i-1] and h[j-1,i]
+    """
+
+    @pytest.fixture
+    def basin8(self):
+        """8×8 basin: land border, 6×6 ocean interior."""
+        h = np.ones((8, 8), dtype=bool)
+        h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
+        return ArakawaCGridMask.from_mask(h)
+
+    @pytest.fixture
+    def channel8(self):
+        """8×8 zonal channel: walls at j=0 and j=7, open in x."""
+        h = np.ones((8, 8), dtype=bool)
+        h[0, :] = h[-1, :] = False
+        return ArakawaCGridMask.from_mask(h)
+
+    # ── w_valid: all 4 adjacent velocity faces wet ────────────────────
+
+    def test_w_valid_deep_interior(self, basin8):
+        m = basin8
+        # w[4,4] is deep interior — all 4 adjacent faces should be wet
+        assert bool(m.w_valid[4, 4])
+
+    def test_w_valid_not_at_boundary(self, basin8):
+        m = basin8
+        # w[1,2] is near the bottom wall — u[1,2] is dry → not valid
+        assert not bool(m.w_valid[1, 2])
+
+    def test_w_valid_checks_correct_four_faces(self):
+        """Build a domain where only the correct adjacency passes."""
+        # 5x5, all ocean except h[2,2] = land.
+        # This makes specific u/v faces dry, testing that w_valid checks
+        # the right 4 faces (not shifted ones).
+        h = np.ones((5, 5), dtype=bool)
+        h[2, 2] = False
+        m = ArakawaCGridMask.from_mask(h)
+        va = np.asarray(m.w_valid)
+
+        # w[3,3]: SW corner of cell (3,3). Adjacent faces:
+        #   u[3,3] = mean(h[2,3], h[3,3]) = mean(1,1) → wet
+        #   u[3,2] = mean(h[2,2], h[3,2]) = mean(0,1) → dry!
+        #   v[3,3] = mean(h[3,2], h[3,3]) = mean(1,1) → wet
+        #   v[2,3] = mean(h[2,2], h[2,3]) = mean(0,1) → dry!
+        assert not va[3, 3], "w[3,3] should NOT be valid (u[3,2] and v[2,3] dry)"
+
+        # w[2,2]: Adjacent faces:
+        #   u[2,2] = mean(h[1,2], h[2,2]) = mean(1,0) → dry!
+        #   u[2,1] = mean(h[1,1], h[2,1]) = mean(1,1) → wet
+        #   v[2,2] = mean(h[2,1], h[2,2]) = mean(1,0) → dry!
+        #   v[1,2] = mean(h[1,1], h[1,2]) = mean(1,1) → wet
+        assert not va[2, 2], "w[2,2] should NOT be valid (u[2,2] and v[2,2] dry)"
+
+        # w[2,4]: far from the hole. Adjacent faces:
+        #   u[2,4] = mean(h[1,4], h[2,4]) = mean(1,1) → wet
+        #   u[2,3] = mean(h[1,3], h[2,3]) = mean(1,1) → wet
+        #   v[2,4] = mean(h[2,3], h[2,4]) = mean(1,1) → wet
+        #   v[1,4] = mean(h[1,3], h[1,4]) = mean(1,1) → wet
+        assert va[2, 4], "w[2,4] should be valid (all 4 faces wet)"
+
+    def test_w_valid_would_fail_with_wrong_adjacency(self):
+        """Regression: the old code checked u[j+1,i] and v[j,i+1].
+
+        This test passes with correct adjacency but would fail with the
+        old (wrong) shifts.
+        """
+        # 5x5 all-ocean, then kill one cell to create a single-face gap.
+        h = np.ones((5, 5), dtype=bool)
+        h[3, 1] = False  # makes u[3,1] dry and u[4,1] dry, v[3,1] dry, v[3,2] dry
+        m = ArakawaCGridMask.from_mask(h)
+        va = np.asarray(m.w_valid)
+        u = np.asarray(m.u)
+        v = np.asarray(m.v)
+
+        # w[3,2]: adjacent faces are u[3,2], u[3,1], v[3,2], v[2,2]
+        #   u[3,2] = mean(h[2,2], h[3,2]) → wet
+        #   u[3,1] = mean(h[2,1], h[3,1]) = mean(1,0) → dry!
+        #   v[3,2] = mean(h[3,1], h[3,2]) = mean(0,1) → dry!
+        #   v[2,2] = mean(h[2,1], h[2,2]) → wet
+        assert not va[3, 2], "u[3,1] and v[3,2] are dry"
+
+        # Old code would have checked u[4,2] and v[3,3] instead,
+        # both of which are wet — wrongly declaring this point valid.
+        assert u[4, 2], "u[4,2] is wet (old code checked this)"
+        assert v[3, 3], "v[3,3] is wet (old code checked this)"
+
+    # ── channel: horizontal walls only ────────────────────────────────
+
+    def test_channel_interior_is_valid(self, channel8):
+        m = channel8
+        # w[4,4] is in the interior of a channel → should be valid
+        # (checking i≥2 to avoid left-padding artifacts)
+        assert bool(m.w_valid[4, 4])
+
+    def test_channel_near_wall_not_valid(self, channel8):
+        m = channel8
+        # w[1,4] is near the bottom wall (j=0 is land)
+        # u[1,4] = mean(h[0,4], h[1,4]) = mean(0,1) → dry
+        assert not bool(m.w_valid[1, 4])
+
+    def test_channel_horizontal_bound_near_wall(self, channel8):
+        m = channel8
+        # w[1,4]: u[1,4] is dry → horizontal boundary
+        assert bool(m.w_horizontal_bound[1, 4])
+
+
+class TestIrregularBoundaryGeometry:
+    """Verify irregular psi boundary indices point to correct cells."""
+
+    def test_irrbound_cells_are_dry_psi(self):
+        """Every irregular boundary cell must be a dry psi cell."""
+        h = np.ones((10, 10), dtype=bool)
+        h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
+        h[4:7, 4:7] = False
+        m = ArakawaCGridMask.from_mask(h)
+        psi = np.asarray(m.psi)
+        yids = np.asarray(m.psi_irrbound_yids)
+        xids = np.asarray(m.psi_irrbound_xids)
+        for y, x in zip(yids, xids, strict=True):
+            assert not psi[y, x], f"psi[{y},{x}] should be dry"
+
+    def test_irrbound_has_wet_psi_neighbour(self):
+        """Every irr. boundary cell must have ≥1 wet psi in its 3×3 hood."""
+        h = np.ones((10, 10), dtype=bool)
+        h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
+        h[4:7, 4:7] = False
+        m = ArakawaCGridMask.from_mask(h)
+        psi = np.asarray(m.psi)
+        yids = np.asarray(m.psi_irrbound_yids)
+        xids = np.asarray(m.psi_irrbound_xids)
+        Ny, Nx = psi.shape
+        for y, x in zip(yids, xids, strict=True):
+            patch = psi[
+                max(0, y - 1) : min(Ny, y + 2),
+                max(0, x - 1) : min(Nx, x + 2),
+            ]
+            assert patch.any(), f"irr boundary ({y},{x}) has no wet psi neighbour"
+
+    def test_irrbound_not_on_array_edge(self):
+        """Irregular boundary cells are in [1:-1, 1:-1], not on the edge."""
+        h = np.ones((10, 10), dtype=bool)
+        h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
+        m = ArakawaCGridMask.from_mask(h)
+        Ny, Nx = h.shape
+        yids = np.asarray(m.psi_irrbound_yids)
+        xids = np.asarray(m.psi_irrbound_xids)
+        assert np.all(yids >= 1) and np.all(yids < Ny - 1)
+        assert np.all(xids >= 1) and np.all(xids < Nx - 1)
+
+
+class TestClassificationGeometry:
+    """Verify land/coast classification at specific grid points."""
+
+    def test_coast_is_ocean_adjacent_to_land(self):
+        """Coast cells must be wet and have ≥1 land 4-neighbour."""
+        h = np.ones((10, 10), dtype=bool)
+        h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
+        m = ArakawaCGridMask.from_mask(h)
+        cls = np.asarray(m.classification)
+        coast = cls == 1
+        # Every coast cell must be wet
+        assert np.all(h[coast])
+        # Every coast cell must touch land (4-connected)
+        land = ~h
+        dilated_land = _dilate2d(land)
+        assert np.all(dilated_land[coast])
+
+    def test_near_coast_not_adjacent_to_land(self):
+        """Near-coast cells must NOT directly touch land."""
+        h = np.ones((20, 20), dtype=bool)
+        h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
+        m = ArakawaCGridMask.from_mask(h)
+        cls = np.asarray(m.classification)
+        near_coast = cls == 2
+        land = ~h
+        dilated_land = _dilate2d(land)
+        # Near-coast should NOT be in the first dilation ring
+        assert not np.any(near_coast & dilated_land & ~_dilate2d(dilated_land))
+        # But should be in the second ring
+        dilated_land_2 = _dilate2d(dilated_land)
+        assert np.all(dilated_land_2[near_coast])
+
+    def test_open_ocean_far_from_land(self):
+        """Open-ocean cells must be >2 hops from any land cell."""
+        h = np.ones((20, 20), dtype=bool)
+        h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
+        m = ArakawaCGridMask.from_mask(h)
+        cls = np.asarray(m.classification)
+        ocean = cls == 3
+        land = ~h
+        dilated_2 = _dilate2d(_dilate2d(land))
+        # Open ocean must NOT overlap with 2-dilation of land
+        assert not np.any(ocean & dilated_2)

@@ -9,9 +9,9 @@ import pytest
 
 jax.config.update("jax_enable_x64", True)
 
-from finitevolx._src.coriolis import Coriolis2D, Coriolis3D
-from finitevolx._src.grid import ArakawaCGrid2D, ArakawaCGrid3D
-from finitevolx._src.masks.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.operators.coriolis import Coriolis2D, Coriolis3D
 
 
 @pytest.fixture

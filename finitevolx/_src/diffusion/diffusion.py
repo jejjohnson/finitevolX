@@ -56,7 +56,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 
-from finitevolx._src.grid import ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
 
 
 def diffusion_2d(

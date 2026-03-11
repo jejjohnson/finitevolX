@@ -56,7 +56,7 @@ Eigenvalue helpers
 Usage example
 -------------
 >>> import jax.numpy as jnp
->>> from finitevolx._src.elliptic import solve_poisson_dst
+>>> from finitevolx._src.solvers.elliptic import solve_poisson_dst
 >>> Ny, Nx = 10, 12
 >>> dx, dy = 1.0 / (Nx + 1), 1.0 / (Ny + 1)
 >>> # DST-I eigenfunction (exact solution)
@@ -84,7 +84,7 @@ from jaxtyping import Array, Float
 import lineax as lx
 import numpy as np
 
-from finitevolx._src.spectral_transforms import dctn, dstn, idctn, idstn
+from finitevolx._src.solvers.spectral_transforms import dctn, dstn, idctn, idstn
 
 # ---------------------------------------------------------------------------
 # Eigenvalue helpers
@@ -210,7 +210,10 @@ def solve_helmholtz_dst(
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from finitevolx._src.elliptic import solve_helmholtz_dst, dst1_eigenvalues
+    >>> from finitevolx._src.solvers.elliptic import (
+    ...     solve_helmholtz_dst,
+    ...     dst1_eigenvalues,
+    ... )
     >>> Ny, Nx = 8, 10
     >>> dx, dy = 0.1, 0.1
     >>> lam_x = dst1_eigenvalues(Nx, dx)[0]
@@ -517,7 +520,7 @@ def solve_cg(
     Solve a 2-D Helmholtz problem on a periodic domain:
 
     >>> import jax.numpy as jnp
-    >>> from finitevolx._src.elliptic import (
+    >>> from finitevolx._src.solvers.elliptic import (
     ...     solve_cg,
     ...     fft_eigenvalues,
     ...     make_spectral_preconditioner,
@@ -708,7 +711,7 @@ class CapacitanceSolver(eqx.Module):
     Examples
     --------
     >>> import numpy as np, jax.numpy as jnp
-    >>> from finitevolx._src.elliptic import build_capacitance_solver
+    >>> from finitevolx._src.solvers.elliptic import build_capacitance_solver
     >>> # small 8×10 ocean basin with a 2-cell land border
     >>> mask = np.ones((8, 10), dtype=bool)
     >>> mask[:, 0] = mask[:, -1] = mask[0, :] = mask[-1, :] = False

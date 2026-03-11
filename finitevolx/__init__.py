@@ -1,5 +1,12 @@
-from finitevolx._src.advection import Advection1D, Advection2D, Advection3D
-from finitevolx._src.bc_1d import (
+from finitevolx._src.advection.advection import Advection1D, Advection2D, Advection3D
+from finitevolx._src.advection.flux import upwind_flux
+from finitevolx._src.advection.limiters import mc, minmod, superbee, van_leer
+from finitevolx._src.advection.reconstruction import (
+    Reconstruction1D,
+    Reconstruction2D,
+    Reconstruction3D,
+)
+from finitevolx._src.boundary.bc_1d import (
     Dirichlet1D,
     Extrapolation1D,
     Neumann1D,
@@ -10,20 +17,34 @@ from finitevolx._src.bc_1d import (
     Slip1D,
     Sponge1D,
 )
-from finitevolx._src.bc_field import FieldBCSet
-from finitevolx._src.bc_set import BoundaryConditionSet
-from finitevolx._src.boundary import enforce_periodic, pad_interior
-from finitevolx._src.coriolis import Coriolis2D, Coriolis3D
-from finitevolx._src.difference import Difference1D, Difference2D, Difference3D
-from finitevolx._src.diffusion import (
+from finitevolx._src.boundary.bc_field import FieldBCSet
+from finitevolx._src.boundary.bc_set import BoundaryConditionSet
+from finitevolx._src.boundary.boundary import enforce_periodic, pad_interior
+from finitevolx._src.diffusion.diffusion import (
     BiharmonicDiffusion2D,
     BiharmonicDiffusion3D,
     Diffusion2D,
     Diffusion3D,
     diffusion_2d,
 )
-from finitevolx._src.divergence import Divergence2D, divergence_2d
-from finitevolx._src.elliptic import (
+from finitevolx._src.diffusion.momentum import MomentumAdvection2D, MomentumAdvection3D
+from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask, StencilCapability
+from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.operators.coriolis import Coriolis2D, Coriolis3D
+from finitevolx._src.operators.difference import (
+    Difference1D,
+    Difference2D,
+    Difference3D,
+)
+from finitevolx._src.operators.divergence import Divergence2D, divergence_2d
+from finitevolx._src.operators.interpolation import (
+    Interpolation1D,
+    Interpolation2D,
+    Interpolation3D,
+)
+from finitevolx._src.operators.jacobian import arakawa_jacobian
+from finitevolx._src.operators.vorticity import Vorticity2D, Vorticity3D
+from finitevolx._src.solvers.elliptic import (
     CapacitanceSolver,
     CGInfo,
     build_capacitance_solver,
@@ -40,24 +61,7 @@ from finitevolx._src.elliptic import (
     solve_poisson_dst,
     solve_poisson_fft,
 )
-from finitevolx._src.flux import upwind_flux
-from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
-from finitevolx._src.interpolation import (
-    Interpolation1D,
-    Interpolation2D,
-    Interpolation3D,
-)
-from finitevolx._src.jacobian import arakawa_jacobian
-from finitevolx._src.masks.cgrid_mask import ArakawaCGridMask, StencilCapability
-from finitevolx._src.momentum import MomentumAdvection2D, MomentumAdvection3D
-from finitevolx._src.multilayer import multilayer
-from finitevolx._src.reconstruction import (
-    Reconstruction1D,
-    Reconstruction2D,
-    Reconstruction3D,
-)
-from finitevolx._src.reconstructions.limiters import mc, minmod, superbee, van_leer
-from finitevolx._src.spectral_transforms import (
+from finitevolx._src.solvers.spectral_transforms import (
     dct,
     dctn,
     dst,
@@ -67,13 +71,13 @@ from finitevolx._src.spectral_transforms import (
     idst,
     idstn,
 )
-from finitevolx._src.vertical_modes import (
+from finitevolx._src.vertical.multilayer import multilayer
+from finitevolx._src.vertical.vertical_modes import (
     build_coupling_matrix,
     decompose_vertical_modes,
     layer_to_mode,
     mode_to_layer,
 )
-from finitevolx._src.vorticity import Vorticity2D, Vorticity3D
 
 __all__ = [
     # Upwind flux dispatch

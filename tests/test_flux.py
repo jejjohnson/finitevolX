@@ -6,11 +6,11 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.advection import Advection2D, Advection3D
-from finitevolx._src.flux import upwind_flux
-from finitevolx._src.grid import ArakawaCGrid2D, ArakawaCGrid3D
-from finitevolx._src.masks.cgrid_mask import ArakawaCGridMask
-from finitevolx._src.reconstruction import Reconstruction2D
+from finitevolx._src.advection.advection import Advection2D, Advection3D
+from finitevolx._src.advection.flux import upwind_flux
+from finitevolx._src.advection.reconstruction import Reconstruction2D
+from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
 

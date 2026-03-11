@@ -10,8 +10,8 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from finitevolx._src.difference import Difference2D
-from finitevolx._src.grid import ArakawaCGrid2D
+from finitevolx._src.grid.grid import ArakawaCGrid2D
+from finitevolx._src.operators.difference import Difference2D
 
 
 def divergence_2d(

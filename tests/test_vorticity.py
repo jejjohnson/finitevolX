@@ -4,8 +4,8 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.grid import ArakawaCGrid2D, ArakawaCGrid3D
-from finitevolx._src.vorticity import Vorticity2D, Vorticity3D
+from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.operators.vorticity import Vorticity2D, Vorticity3D
 
 
 @pytest.fixture

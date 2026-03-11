@@ -4,13 +4,13 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
-from finitevolx._src.masks.cgrid_mask import ArakawaCGridMask
-from finitevolx._src.reconstruction import (
+from finitevolx._src.advection.reconstruction import (
     Reconstruction1D,
     Reconstruction2D,
     Reconstruction3D,
 )
+from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
 
 
 @pytest.fixture

@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.elliptic import (
+from finitevolx._src.solvers.elliptic import (
     CapacitanceSolver,
     CGInfo,
     build_capacitance_solver,

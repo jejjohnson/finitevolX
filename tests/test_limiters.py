@@ -1,10 +1,10 @@
-"""Tests for flux limiter functions in finitevolx._src.reconstructions.limiters."""
+"""Tests for flux limiter functions in finitevolx._src.advection.limiters."""
 
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.reconstructions.limiters import mc, minmod, superbee, van_leer
+from finitevolx._src.advection.limiters import mc, minmod, superbee, van_leer
 
 
 class TestMinmod:

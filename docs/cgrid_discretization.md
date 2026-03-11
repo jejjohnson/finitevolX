@@ -239,7 +239,7 @@ for interior column indices `i = 1 … Nx-2`.
 
 ## Kinetic Energy and Bernoulli Potential
 
-These operators live in `finitevolx._src.operators.operators` and
+These operators live in `finitevolx._src.operators.diagnostics` and
 follow the same conventions.
 
 ### Kinetic energy at T-points
@@ -368,7 +368,7 @@ q     = vort.potential_vorticity(u, v, h, f)   # X-points
 qu, qv = vort.pv_flux_arakawa_lamb(q, u, v)   # U- and V-points
 
 # 3. Kinetic energy and Bernoulli potential
-from finitevolx._src.operators.operators import bernoulli_potential
+from finitevolx._src.operators.diagnostics import bernoulli_potential
 p = bernoulli_potential(h=h, u=u, v=v)         # T-points
 
 # 4. Tendencies

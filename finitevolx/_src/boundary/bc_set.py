@@ -5,7 +5,7 @@ from __future__ import annotations
 import equinox as eqx
 from jaxtyping import Array, Float
 
-from finitevolx._src.bc_1d import BoundaryCondition1D, Outflow1D, Periodic1D
+from finitevolx._src.boundary.bc_1d import BoundaryCondition1D, Outflow1D, Periodic1D
 
 
 class BoundaryConditionSet(eqx.Module):
