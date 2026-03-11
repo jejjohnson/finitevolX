@@ -120,6 +120,9 @@ ignore = [
     "E741",     # ambiguous variable name
     "E743",     # ambiguous function name
     "F821",     # undefined name (false positives with jaxtyping)
+    "PLR0911",  # too many return statements
+    "PLR0912",  # too many branches
+    "PLR0915",  # too many statements
     "PLR2004",  # magic value comparison
     "PLR0911",  # too many return statements
     "PLR0912",  # too many branches
