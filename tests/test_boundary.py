@@ -1,10 +1,9 @@
 """Tests for boundary condition helpers."""
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-
-import jax
 
 from finitevolx import (
     BoundaryConditionSet,
