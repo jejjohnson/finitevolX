@@ -9,7 +9,7 @@ from finitevolx import (
     Dirichlet1D,
     FieldBCSet,
     Neumann1D,
-    SlipBC1D,
+    Slip1D,
     Sponge1D,
 )
 from finitevolx._src.bc_1d import Outflow1D, Periodic1D, Reflective1D
@@ -169,7 +169,7 @@ class TestBoundaryConditionAtoms:
         np.testing.assert_array_equal(result[0, :], field[-2, :])
 
 
-class TestSlipBC1D:
+class TestSlip1D:
     """Unit tests for the slip boundary condition."""
 
     @staticmethod
@@ -183,33 +183,33 @@ class TestSlipBC1D:
     def test_free_slip_ghost_equals_interior(self):
         # coefficient=1: ghost = +interior (same as Reflective1D)
         field = self._field()
-        result = SlipBC1D("west", coefficient=1.0)(field, dx=1.0, dy=1.0)
+        result = Slip1D("west", coefficient=1.0)(field, dx=1.0, dy=1.0)
         np.testing.assert_array_equal(result[:, 0], field[:, 1])
 
     def test_no_slip_ghost_negates_interior(self):
         # coefficient=0: ghost = -interior -> wall value = 0
         field = self._field()
-        result = SlipBC1D("west", coefficient=0.0)(field, dx=1.0, dy=1.0)
+        result = Slip1D("west", coefficient=0.0)(field, dx=1.0, dy=1.0)
         np.testing.assert_array_equal(result[:, 0], -field[:, 1])
 
     def test_no_slip_wall_value_is_zero(self):
         # wall value = 0.5·(ghost + interior) = 0
         field = self._field()
-        result = SlipBC1D("south", coefficient=0.0)(field, dx=1.0, dy=1.0)
+        result = Slip1D("south", coefficient=0.0)(field, dx=1.0, dy=1.0)
         wall = 0.5 * (result[0, :] + result[1, :])
         np.testing.assert_allclose(wall, 0.0)
 
     def test_free_slip_wall_value_equals_interior(self):
         # wall value = 0.5·(ghost + interior) = interior
         field = self._field()
-        result = SlipBC1D("north", coefficient=1.0)(field, dx=1.0, dy=1.0)
+        result = Slip1D("north", coefficient=1.0)(field, dx=1.0, dy=1.0)
         wall = 0.5 * (result[-1, :] + result[-2, :])
         np.testing.assert_allclose(wall, field[-2, :])
 
     def test_partial_slip_ghost_is_interpolated(self):
         # coefficient=0.5: ghost = 0 * interior, wall value = 0.5 * interior
         field = self._field()
-        result = SlipBC1D("east", coefficient=0.5)(field, dx=1.0, dy=1.0)
+        result = Slip1D("east", coefficient=0.5)(field, dx=1.0, dy=1.0)
         expected = 0.0 * field[:, -2]
         np.testing.assert_allclose(result[:, -1], expected)
 
@@ -217,7 +217,7 @@ class TestSlipBC1D:
         # wall value = coefficient * interior
         field = self._field()
         alpha = 0.3
-        result = SlipBC1D("south", coefficient=alpha)(field, dx=1.0, dy=1.0)
+        result = Slip1D("south", coefficient=alpha)(field, dx=1.0, dy=1.0)
         wall = 0.5 * (result[0, :] + result[1, :])
         np.testing.assert_allclose(wall, alpha * field[1, :])
 
@@ -230,18 +230,18 @@ class TestSlipBC1D:
             ("west", (slice(None), 0), (slice(None), 1)),
             ("east", (slice(None), -1), (slice(None), -2)),
         ]:
-            result = SlipBC1D(face, coefficient=0.0)(field, dx=1.0, dy=1.0)
+            result = Slip1D(face, coefficient=0.0)(field, dx=1.0, dy=1.0)
             np.testing.assert_array_equal(
                 result[ghost_slice], -field[interior_slice], err_msg=f"face={face}"
             )
 
     def test_invalid_coefficient_raises(self):
         with pytest.raises(ValueError, match=r"\[0, 1\]"):
-            SlipBC1D("south", coefficient=1.5)
+            Slip1D("south", coefficient=1.5)
 
     def test_invalid_negative_coefficient_raises(self):
         with pytest.raises(ValueError, match=r"\[0, 1\]"):
-            SlipBC1D("north", coefficient=-0.1)
+            Slip1D("north", coefficient=-0.1)
 
 
 class TestBoundaryConditionSet:

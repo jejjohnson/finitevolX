@@ -224,7 +224,7 @@ class Sponge1D(eqx.Module):
         return _set_face(field, self.face, ghost)
 
 
-class SlipBC1D(eqx.Module):
+class Slip1D(eqx.Module):
     """Slip boundary condition for tangential velocity at a solid wall.
 
     Controls the tangential velocity at the wall via a slip coefficient
@@ -253,17 +253,17 @@ class SlipBC1D(eqx.Module):
     --------
     Free-slip on the west wall (tangential velocity preserved):
 
-    >>> bc = SlipBC1D("west", coefficient=1.0)
+    >>> bc = Slip1D("west", coefficient=1.0)
     >>> field_out = bc(field, dx=1.0, dy=1.0)
 
     No-slip on the north wall (tangential velocity -> 0):
 
-    >>> bc = SlipBC1D("north", coefficient=0.0)
+    >>> bc = Slip1D("north", coefficient=0.0)
     >>> field_out = bc(field, dx=1.0, dy=1.0)
 
     Partial-slip on the south wall:
 
-    >>> bc = SlipBC1D("south", coefficient=0.5)
+    >>> bc = Slip1D("south", coefficient=0.5)
     >>> field_out = bc(field, dx=1.0, dy=1.0)
     """
 
@@ -272,7 +272,7 @@ class SlipBC1D(eqx.Module):
 
     def __check_init__(self) -> None:
         if not 0.0 <= self.coefficient <= 1.0:
-            raise ValueError("SlipBC1D coefficient must lie in [0, 1].")
+            raise ValueError("Slip1D coefficient must lie in [0, 1].")
 
     def __call__(
         self, field: Float[Array, "Ny Nx"], dx: float, dy: float
@@ -302,11 +302,5 @@ class SlipBC1D(eqx.Module):
 
 
 type BoundaryCondition1D = (
-    Dirichlet1D
-    | Neumann1D
-    | Periodic1D
-    | Outflow1D
-    | Reflective1D
-    | Sponge1D
-    | SlipBC1D
+    Dirichlet1D | Neumann1D | Periodic1D | Outflow1D | Reflective1D | Sponge1D | Slip1D
 )
