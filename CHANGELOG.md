@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.0.21](https://github.com/jejjohnson/finitevolX/compare/v0.0.20...v0.0.21) (2026-03-11)
+
+
+### Features
+
+* add `multilayer()` vmap helper to lift 2D operators over layer/mode batch axis ([0848cfd](https://github.com/jejjohnson/finitevolX/commit/0848cfddbea7627ecbc878a4d248657d647b846a))
+* add multilayer() vmap helper, tests, and docs page ([e1f8c8b](https://github.com/jejjohnson/finitevolX/commit/e1f8c8bddbcc62d39116dffd8d3ea8226087cce2))
+
+
+### Bug Fixes
+
+* address review comments on multilayer helper ([20bd2ba](https://github.com/jejjohnson/finitevolX/commit/20bd2ba9f1ff1c5cb149be543bec1bcf75f620a0))
+
 ## [0.0.20](https://github.com/jejjohnson/finitevolX/compare/v0.0.19...v0.0.20) (2026-03-11)
 
 
