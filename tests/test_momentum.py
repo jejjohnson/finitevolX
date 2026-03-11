@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+
+jax.config.update("jax_enable_x64", True)
 
 from finitevolx._src.grid import ArakawaCGrid2D, ArakawaCGrid3D
 from finitevolx._src.momentum import MomentumAdvection2D, MomentumAdvection3D
@@ -130,12 +133,12 @@ class TestMomentumAdvection2D:
         v_on_u = interp.V_to_U(v)
         u_on_v = interp.U_to_V(u)
 
-        # vorticity-flux cross terms at interior points
-        cross_u = jnp.sum(u[1:-1, 1:-1] * (zeta_on_u[1:-1, 1:-1] * v_on_u[1:-1, 1:-1]))
-        cross_v = jnp.sum(v[1:-1, 1:-1] * (zeta_on_v[1:-1, 1:-1] * u_on_v[1:-1, 1:-1]))
+        # vorticity-flux cross terms at strict interior points (avoid ghost-adjacent ring)
+        cross_u = jnp.sum(u[2:-2, 2:-2] * (zeta_on_u[2:-2, 2:-2] * v_on_u[2:-2, 2:-2]))
+        cross_v = jnp.sum(v[2:-2, 2:-2] * (zeta_on_v[2:-2, 2:-2] * u_on_v[2:-2, 2:-2]))
         # For non-periodic BCs the exact cancellation holds only approximately;
         # check that the imbalance is small relative to the signal.
-        np.testing.assert_allclose(cross_u, cross_v, rtol=0.1)
+        np.testing.assert_allclose(cross_u, cross_v, rtol=1e-6)
 
     def test_zero_velocity_zero_tendency(self, grid2d):
         """Zero velocity gives zero advection tendency."""

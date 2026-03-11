@@ -200,9 +200,9 @@ class MomentumAdvection2D(eqx.Module):
         du_adv = jnp.zeros_like(u)
         dv_adv = jnp.zeros_like(v)
         # du_adv[j, i+1/2] = +(zeta*v)_u - dK/dx
-        du_adv = du_adv.at[1:-1, 1:-1].set(zv_u[1:-1, 1:-1] - dK_dx[1:-1, 1:-1])
+        du_adv = du_adv.at[2:-2, 2:-2].set(zv_u[2:-2, 2:-2] - dK_dx[2:-2, 2:-2])
         # dv_adv[j+1/2, i] = -(zeta*u)_v - dK/dy
-        dv_adv = dv_adv.at[1:-1, 1:-1].set(-zu_v[1:-1, 1:-1] - dK_dy[1:-1, 1:-1])
+        dv_adv = dv_adv.at[2:-2, 2:-2].set(-zu_v[2:-2, 2:-2] - dK_dy[2:-2, 2:-2])
         return du_adv, dv_adv
 
 
@@ -210,8 +210,9 @@ class MomentumAdvection3D(eqx.Module):
     """Energy-conserving momentum advection on a 3-D Arakawa C-grid.
 
     Applies ``MomentumAdvection2D``-equivalent stencils independently at
-    each z-level of a ``[Nz, Ny, Nx]`` array.  The output ghost ring is
-    zero in all three dimensions.
+    each z-level of a ``[Nz, Ny, Nx]`` array.  The output write region is
+    ``[1:-1, 2:-2, 2:-2]`` (all interior z-levels, strict horizontal interior),
+    matching the ``Advection3D`` convention.  All other cells are zero.
 
     Three vorticity-flux schemes are available via the ``scheme`` argument:
 
@@ -446,11 +447,11 @@ class MomentumAdvection3D(eqx.Module):
         du_adv = jnp.zeros_like(u)
         dv_adv = jnp.zeros_like(v)
         # du_adv[k, j, i+1/2] = +(zeta*v)_u - dK/dx
-        du_adv = du_adv.at[1:-1, 1:-1, 1:-1].set(
-            zv_u[1:-1, 1:-1, 1:-1] - dK_dx[1:-1, 1:-1, 1:-1]
+        du_adv = du_adv.at[1:-1, 2:-2, 2:-2].set(
+            zv_u[1:-1, 2:-2, 2:-2] - dK_dx[1:-1, 2:-2, 2:-2]
         )
         # dv_adv[k, j+1/2, i] = -(zeta*u)_v - dK/dy
-        dv_adv = dv_adv.at[1:-1, 1:-1, 1:-1].set(
-            -zu_v[1:-1, 1:-1, 1:-1] - dK_dy[1:-1, 1:-1, 1:-1]
+        dv_adv = dv_adv.at[1:-1, 2:-2, 2:-2].set(
+            -zu_v[1:-1, 2:-2, 2:-2] - dK_dy[1:-1, 2:-2, 2:-2]
         )
         return du_adv, dv_adv
