@@ -53,6 +53,12 @@ from finitevolx._src.spectral_transforms import (
     idst,
     idstn,
 )
+from finitevolx._src.vertical_modes import (
+    build_coupling_matrix,
+    decompose_vertical_modes,
+    layer_to_mode,
+    mode_to_layer,
+)
 from finitevolx._src.vorticity import Vorticity2D, Vorticity3D
 
 __all__ = [
@@ -103,6 +109,11 @@ __all__ = [
     # Vorticity
     "Vorticity2D",
     "Vorticity3D",
+    # Vertical coupling and mode transforms
+    "build_coupling_matrix",
+    "decompose_vertical_modes",
+    "layer_to_mode",
+    "mode_to_layer",
     # Spectral transforms
     "dct",
     "dctn",
