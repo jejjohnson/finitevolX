@@ -6,6 +6,7 @@ import pytest
 
 from finitevolx._src.difference import Difference1D, Difference2D, Difference3D
 from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.interpolation import Interpolation2D
 
 
 @pytest.fixture
@@ -361,8 +362,6 @@ class TestGradPerp2D:
 
     def test_matches_manual_decomposition(self, grid2d):
         """grad_perp must agree with manual T→X→(X→U, X→V) decomposition."""
-        from finitevolx._src.interpolation import Interpolation2D
-
         diff = Difference2D(grid=grid2d)
         interp = Interpolation2D(grid=grid2d)
         x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx

@@ -20,6 +20,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.interpolation import Interpolation2D
 
 
 class Difference1D(eqx.Module):
@@ -411,10 +412,7 @@ class Difference2D(eqx.Module):
         """
         # Step 1: interpolate ψ from T-points to X-points (bilinear average)
         # ψ_x[j+1/2, i+1/2] = 1/4 * (ψ[j,i] + ψ[j,i+1] + ψ[j+1,i] + ψ[j+1,i+1])
-        psi_x = jnp.zeros_like(psi)
-        psi_x = psi_x.at[1:-1, 1:-1].set(
-            0.25 * (psi[1:-1, 1:-1] + psi[1:-1, 2:] + psi[2:, 1:-1] + psi[2:, 2:])
-        )
+        psi_x = Interpolation2D(grid=self.grid).T_to_X(psi)
 
         # Step 2: u = -∂ψ_x/∂y at U-points (backward y-difference X→U)
         # u[j, i+1/2] = -(ψ_x[j+1/2, i+1/2] - ψ_x[j-1/2, i+1/2]) / dy
