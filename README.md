@@ -14,21 +14,26 @@
 ---
 ## Key Features
 
+**Grid & Masks**.
+Arakawa C-grid classes (`ArakawaCGrid1D/2D/3D`) with stencil-aware mask utilities for land/ocean boundaries.
+
 **Operators**.
-This package has simple operators that are useful for calculating differences.
-These include the standard `difference` and `laplacian` operators.
-It also has some geostrophic specific operators like the `divergence` and `vorticity`.
+Finite-difference, interpolation, divergence, vorticity, Coriolis, and Jacobian operators on staggered grids. Diagnostic quantities like kinetic energy and Bernoulli potential.
 
-**Masks**.
-This package includes mask utilities that are consistent with Arakawa grids.
+**Advection & Reconstruction**.
+Advection operators with pluggable reconstruction methods including upwind, TVD (minmod, van Leer, superbee, MC), and WENO (3rd, 5th, 7th, 9th order) schemes. Mask-aware stencil dispatch for irregular domains.
 
-**Interpolation**.
-This package includes interpolation schemes for moving between grid spaces.
+**Diffusion**.
+Harmonic and biharmonic diffusion operators, plus energy/enstrophy-conserving momentum advection in vector-invariant form.
 
-**Reconstructions**.
-This package includes reconstruction methods to calculate the fluxes typically found within the advection terms.
-For example, the flux found in the vector invariant formulation for the Shallow Water equations ([example](https://jejjohnson.github.io/jaxsw/sw-formulation#vector-invariant-formulation)).
-Another example is the flux found in the advection term for the QG equations ([example](https://jejjohnson.github.io/jaxsw/qg-formulation#eq-qg-general)).
+**Boundary Conditions**.
+Composable per-face boundary conditions (Dirichlet, Neumann, periodic, sponge, slip, Robin, etc.) with ghost-cell enforcement.
+
+**Elliptic Solvers**.
+Spectral Poisson/Helmholtz solvers (DST, DCT, FFT), capacitance matrix method for masked domains, and preconditioned conjugate gradient.
+
+**Vertical Modes**.
+Vertical mode decomposition and multilayer vmap helper for 3D simulations.
 
 ---
 ## 🛠️ Installation<a id="installation"></a>
@@ -120,8 +125,6 @@ of the scripts.
 
 **Software**
 
-* [kernex](https://github.com/ASEM000/kernex) - differentiable stencils
-* [FiniteDiffX](https://github.com/ASEM000/finitediffX) - finite difference tools in JAX
 * [PyFVTool](https://github.com/simulkade/PyFVTool) - Finite Volume Tool in Python
 * [jaxinterp2d](https://github.com/adam-coogan/jaxinterp2d) - CartesianGrid interpolator for JAX
 * [ndimsplinejax](https://github.com/nmoteki/ndimsplinejax) - SplineGrid interpolator for JAX
