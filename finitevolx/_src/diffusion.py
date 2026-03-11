@@ -7,6 +7,10 @@ face fluxes via forward-then-backward finite differences.
 Biharmonic diffusion applies the harmonic operator twice to give
 ∂h/∂t = -κ ∇⁴h = -κ ∇²(∇²h), providing scale-selective dissipation that
 damps short-wave modes much more strongly than long-wave modes.
+Horizontal diffusion operator (flux form) on Arakawa C-grids.
+
+Computes the tracer diffusion tendency ∂h/∂t = ∇·(κ ∇h) at T-points from
+staggered face fluxes via forward-then-backward finite differences.
 
 Algorithm (2-D uniform grid with spacing dx, dy)
 -------------------------------------------------
