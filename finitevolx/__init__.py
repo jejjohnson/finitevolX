@@ -12,6 +12,7 @@ from finitevolx._src.bc_field import FieldBCSet
 from finitevolx._src.bc_set import BoundaryConditionSet
 from finitevolx._src.boundary import enforce_periodic, pad_interior
 from finitevolx._src.difference import Difference1D, Difference2D, Difference3D
+from finitevolx._src.diffusion import Diffusion2D, Diffusion3D, diffusion_2d
 from finitevolx._src.divergence import Divergence2D, divergence_2d
 from finitevolx._src.elliptic import (
     CapacitanceSolver,
@@ -92,6 +93,10 @@ __all__ = [
     "Difference1D",
     "Difference2D",
     "Difference3D",
+    # Diffusion
+    "Diffusion2D",
+    "Diffusion3D",
+    "diffusion_2d",
     # Divergence
     "Divergence2D",
     "divergence_2d",
