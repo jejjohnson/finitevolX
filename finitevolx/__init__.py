@@ -11,6 +11,7 @@ from finitevolx._src.bc_1d import (
 from finitevolx._src.bc_field import FieldBCSet
 from finitevolx._src.bc_set import BoundaryConditionSet
 from finitevolx._src.boundary import enforce_periodic, pad_interior
+from finitevolx._src.coriolis import Coriolis2D, Coriolis3D
 from finitevolx._src.difference import Difference1D, Difference2D, Difference3D
 from finitevolx._src.diffusion import (
     BiharmonicDiffusion2D,
@@ -75,6 +76,9 @@ __all__ = [
     "Advection1D",
     "Advection2D",
     "Advection3D",
+    # Coriolis
+    "Coriolis2D",
+    "Coriolis3D",
     # Momentum advection
     "MomentumAdvection2D",
     "MomentumAdvection3D",
