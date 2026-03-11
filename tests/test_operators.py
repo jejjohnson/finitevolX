@@ -14,7 +14,7 @@ import pytest
 
 from finitevolx._src.grid.constants import GRAVITY
 from finitevolx._src.grid.grid import ArakawaCGrid2D
-from finitevolx._src.operators.operators import (
+from finitevolx._src.operators.diagnostics import (
     bernoulli_potential,
     kinetic_energy,
 )
