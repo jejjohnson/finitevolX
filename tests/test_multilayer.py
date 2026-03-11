@@ -9,12 +9,15 @@ Covers:
 
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
 import finitevolx as fvx
 from finitevolx import multilayer
+
+jax.config.update("jax_enable_x64", True)
 
 
 @pytest.fixture
@@ -38,7 +41,7 @@ class TestMultilayerOutputShape:
         assert result.shape == (nl, grid2d.Ny, grid2d.Nx)
 
     def test_multi_arg_shape(self, grid2d):
-        """multilayer with a lambda handles multi-argument operators."""
+        """multilayer handles multi-argument operators passed directly."""
         diff2d = fvx.Difference2D(grid=grid2d)
         nl = 5
         u = jnp.ones((nl, grid2d.Ny, grid2d.Nx))

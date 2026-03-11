@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Convenience wrapper to lift 2D horizontal operators to multilayer fields.
 
 Multilayer models (e.g., baroclinic shallow water, quasi-geostrophic with
@@ -21,9 +19,11 @@ Use :func:`multilayer` to lift any 2D callable (e.g., a bound method of
     >>> import finitevolx as fvx
     >>> grid = fvx.ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> diff2d = fvx.Difference2D(grid=grid)
-    >>> h = jnp.ones((4, grid.Ny, grid.Nx))   # 4 layers
-    >>> dh_dx = fvx.multilayer(diff2d.diff_x_T_to_U)(h)   # shape [4, Ny, Nx]
+    >>> h = jnp.ones((4, grid.Ny, grid.Nx))  # 4 layers
+    >>> dh_dx = fvx.multilayer(diff2d.diff_x_T_to_U)(h)  # shape [4, Ny, Nx]
 """
+
+from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Any

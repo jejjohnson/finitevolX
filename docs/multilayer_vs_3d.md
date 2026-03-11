@@ -35,7 +35,7 @@ holds a real physical field.
 The JAX-idiomatic way to apply any 2D horizontal operator to all layers at
 once is `jax.vmap`, which vectorises the call over the leading axis without
 any overhead.  `finitevolX` exposes this pattern through the
-[`multilayer`][finitevolx.multilayer] helper:
+`multilayer` helper:
 
 ```python
 import jax.numpy as jnp
