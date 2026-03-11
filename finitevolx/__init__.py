@@ -37,6 +37,7 @@ from finitevolx._src.interpolation import (
     Interpolation3D,
 )
 from finitevolx._src.masks.cgrid_mask import ArakawaCGridMask, StencilCapability
+from finitevolx._src.momentum import MomentumAdvection2D, MomentumAdvection3D
 from finitevolx._src.reconstruction import (
     Reconstruction1D,
     Reconstruction2D,
@@ -60,6 +61,9 @@ __all__ = [
     "Advection1D",
     "Advection2D",
     "Advection3D",
+    # Momentum advection
+    "MomentumAdvection2D",
+    "MomentumAdvection3D",
     # Grid
     "ArakawaCGrid1D",
     "ArakawaCGrid2D",
