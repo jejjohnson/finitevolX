@@ -72,6 +72,16 @@ class TestDivergence2DFunctional:
         result = divergence_2d(u, v, dx=grid.dx, dy=grid.dy)
         np.testing.assert_allclose(result[1:-1, 1:-1], c_x, atol=1e-8)
 
+    def test_mixed_dtype_output_uses_result_type(self, grid):
+        """When u is float64 and v is float32, output dtype follows JAX promotion."""
+        u = jnp.ones((grid.Ny, grid.Nx), dtype=jnp.float64)
+        v = jnp.ones((grid.Ny, grid.Nx), dtype=jnp.float32)
+        result = divergence_2d(u, v, dx=grid.dx, dy=grid.dy)
+        expected_dtype = jnp.result_type(u, v)
+        assert result.dtype == expected_dtype, (
+            f"Expected dtype {expected_dtype}, got {result.dtype}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Class-based API: Divergence2D
@@ -160,18 +170,17 @@ class TestDivergence2DNoFlux:
         v = jnp.zeros((grid.Ny, grid.Nx))
         assert div_op.noflux(u, v).shape == (grid.Ny, grid.Nx)
 
-    def test_zero_ghost_cells_same_as_standard(self, div_op, grid):
-        """When ghost cells are already zero, noflux and __call__ agree."""
-        # zeros_like gives zero ghost cells
-        u = jnp.ones((grid.Ny, grid.Nx)).at[:, 0].set(0.0)
-        v = jnp.ones((grid.Ny, grid.Nx)).at[0, :].set(0.0)
+    def test_zero_all_walls_same_as_standard(self, div_op, grid):
+        """When all four wall faces are already zero, noflux and __call__ agree."""
+        u = jnp.ones((grid.Ny, grid.Nx)).at[:, 0].set(0.0).at[:, -2].set(0.0)
+        v = jnp.ones((grid.Ny, grid.Nx)).at[0, :].set(0.0).at[-2, :].set(0.0)
         np.testing.assert_allclose(
             div_op.noflux(u, v), div_op(u, v), atol=1e-12
         )
 
     def test_noflux_zeros_west_ghost(self, div_op, grid):
         """noflux makes result independent of the west ghost of u."""
-        u_base = jnp.ones((grid.Ny, grid.Nx))
+        u_base = jnp.ones((grid.Ny, grid.Nx)).at[:, -2].set(0.0)
         v = jnp.zeros((grid.Ny, grid.Nx))
         # Two inputs that differ only in the west ghost
         u_ghost_a = u_base.at[:, 0].set(0.0)
@@ -183,10 +192,22 @@ class TestDivergence2DNoFlux:
             atol=1e-12,
         )
 
+    def test_noflux_zeros_east_wall(self, div_op, grid):
+        """noflux makes result independent of the east wall U-face u[:, -2]."""
+        u_base = jnp.ones((grid.Ny, grid.Nx)).at[:, 0].set(0.0)
+        v = jnp.zeros((grid.Ny, grid.Nx))
+        u_wall_a = u_base.at[:, -2].set(0.0)
+        u_wall_b = u_base.at[:, -2].set(999.0)
+        np.testing.assert_allclose(
+            div_op.noflux(u_wall_a, v),
+            div_op.noflux(u_wall_b, v),
+            atol=1e-12,
+        )
+
     def test_noflux_zeros_south_ghost(self, div_op, grid):
         """noflux makes result independent of the south ghost of v."""
         u = jnp.zeros((grid.Ny, grid.Nx))
-        v_base = jnp.ones((grid.Ny, grid.Nx))
+        v_base = jnp.ones((grid.Ny, grid.Nx)).at[-2, :].set(0.0)
         # Two inputs that differ only in the south ghost
         v_ghost_a = v_base.at[0, :].set(0.0)
         v_ghost_b = v_base.at[0, :].set(999.0)
@@ -194,6 +215,18 @@ class TestDivergence2DNoFlux:
         np.testing.assert_allclose(
             div_op.noflux(u, v_ghost_a),
             div_op.noflux(u, v_ghost_b),
+            atol=1e-12,
+        )
+
+    def test_noflux_zeros_north_wall(self, div_op, grid):
+        """noflux makes result independent of the north wall V-face v[-2, :]."""
+        u = jnp.zeros((grid.Ny, grid.Nx))
+        v_base = jnp.ones((grid.Ny, grid.Nx)).at[0, :].set(0.0)
+        v_wall_a = v_base.at[-2, :].set(0.0)
+        v_wall_b = v_base.at[-2, :].set(999.0)
+        np.testing.assert_allclose(
+            div_op.noflux(u, v_wall_a),
+            div_op.noflux(u, v_wall_b),
             atol=1e-12,
         )
 

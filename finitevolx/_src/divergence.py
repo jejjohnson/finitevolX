@@ -54,7 +54,7 @@ def divergence_2d(
     >>> div.shape
     (10, 10)
     """
-    out = jnp.zeros_like(u)
+    out = jnp.zeros(u.shape, dtype=jnp.result_type(u, v))
     # delta[j, i] = du/dx + dv/dy  (backward differences U→T, V→T)
     # du_dx[j, i] = (u[j, i+1/2] - u[j, i-1/2]) / dx  →  (u[1:-1,1:-1] - u[1:-1,:-2]) / dx
     du_dx = (u[1:-1, 1:-1] - u[1:-1, :-2]) / dx
@@ -122,17 +122,19 @@ class Divergence2D(eqx.Module):
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
     ) -> Float[Array, "Ny Nx"]:
-        """Divergence with no-flux boundary conditions.
+        """Divergence with closed-basin no-flux boundary conditions.
 
-        Zeros the west ghost of u (``u[:, 0]``) and the south ghost of v
-        (``v[0, :]``) before computing the backward-difference divergence.
-        This enforces zero normal velocity at the west and south walls,
-        consistent with a closed-basin no-flux boundary condition.
+        Zeros all four normal-flow boundary faces before computing the
+        backward-difference divergence:
 
-        delta_noflux[j, i] = (u_bc[j, i+1/2] - u_bc[j, i-1/2]) / dx
-                           + (v_bc[j+1/2, i] - v_bc[j-1/2, i]) / dy
+        - ``u_bc[:, 0]   = 0``  west wall U-face   (ghost, read by backward diff at i=1)
+        - ``u_bc[:, -2]  = 0``  east wall U-face   (last interior U-face, read at i=Nx-2)
+        - ``v_bc[0, :]   = 0``  south wall V-face  (ghost, read by backward diff at j=1)
+        - ``v_bc[-2, :]  = 0``  north wall V-face  (last interior V-face, read at j=Ny-2)
 
-        where ``u_bc[:, 0] = 0`` and ``v_bc[0, :] = 0``.
+        This enforces zero normal velocity on all four sides of a closed basin,
+        consistent with the no-flux reference implementations
+        (louity/qgsw-pytorch ``div_nofluxbc``).
 
         Parameters
         ----------
@@ -144,8 +146,8 @@ class Divergence2D(eqx.Module):
         Returns
         -------
         Float[Array, "Ny Nx"]
-            Divergence at T-points with no-flux BCs applied.
+            Divergence at T-points with closed-basin no-flux BCs applied.
         """
-        u_bc = u.at[:, 0].set(0.0)  # zero west ghost U-face
-        v_bc = v.at[0, :].set(0.0)  # zero south ghost V-face
+        u_bc = u.at[:, 0].set(0.0).at[:, -2].set(0.0)  # zero west & east wall U-faces
+        v_bc = v.at[0, :].set(0.0).at[-2, :].set(0.0)  # zero south & north wall V-faces
         return self.diff.divergence(u_bc, v_bc)
