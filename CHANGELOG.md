@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.0.20](https://github.com/jejjohnson/finitevolX/compare/v0.0.19...v0.0.20) (2026-03-11)
+
+
+### Features
+
+* add biharmonic (∇⁴) diffusion operator for C-grid staggered models ([80c22ad](https://github.com/jejjohnson/finitevolX/commit/80c22ad306e0a86ff4f21f32fcfaa1752b5410ee))
+* add Coriolis force operator for staggered C-grid models ([9ce3f8d](https://github.com/jejjohnson/finitevolX/commit/9ce3f8d69ba5cafe20f2cbf71b9f5175f3c60f08))
+* add Coriolis force operator for staggered C-grid models ([b0d70b6](https://github.com/jejjohnson/finitevolX/commit/b0d70b6a0406faa61160325fed220fdcbcac918a))
+* add harmonic and biharmonic (∇⁴) diffusion operators for C-grid staggered models ([6a31f5d](https://github.com/jejjohnson/finitevolX/commit/6a31f5da02d3d41d58e76f147590d50c39aa6074))
+* add horizontal diffusion operator (flux-form) for C-grid staggered models ([319ce69](https://github.com/jejjohnson/finitevolX/commit/319ce69865ed97ae14e310aeac7cca7fc858b3a7))
+* add horizontal diffusion operator (flux-form) for C-grid staggered models ([44c0638](https://github.com/jejjohnson/finitevolX/commit/44c063852372880e07f28804d4d47e5270771702))
+* merge main (PR [#97](https://github.com/jejjohnson/finitevolX/issues/97)) — reconcile with Diffusion2D/3D/diffusion_2d ([1a3408d](https://github.com/jejjohnson/finitevolX/commit/1a3408d225223a13a2d2caa6a9b6174efb0dea3f))
+
+
+### Bug Fixes
+
+* address PR review comments on diffusion module ([d8d9390](https://github.com/jejjohnson/finitevolX/commit/d8d9390425416c6faf6fd8291793d89e7864ccc8))
+* address PR review comments on diffusion operator ([8442ead](https://github.com/jejjohnson/finitevolX/commit/8442eadeabed36e7c0a0881b9af0a94e866090bb))
+
 ## [0.0.19](https://github.com/jejjohnson/finitevolX/compare/v0.0.18...v0.0.19) (2026-03-11)
 
 
