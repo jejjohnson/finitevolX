@@ -358,6 +358,80 @@ class Difference2D(eqx.Module):
         out = out.at[1:-1, 1:-1].set(d2x + d2y)
         return out
 
+    def grad_perp(
+        self,
+        psi: Float[Array, "Ny Nx"],
+        mask_u: Float[Array, "Ny Nx"] | None = None,
+        mask_v: Float[Array, "Ny Nx"] | None = None,
+    ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
+        """Perpendicular gradient: T-point streamfunction to geostrophic velocity.
+
+        Maps a streamfunction ψ at T-points to face-centred geostrophic
+        velocities (u, v) = (-∂ψ/∂y, ∂ψ/∂x) on an Arakawa C-grid.
+
+        The streamfunction is first averaged to X-points (corners) so that the
+        orthogonal differences land directly on U and V faces:
+
+        ψ_x[j+1/2, i+1/2] = 1/4 * (ψ[j,i] + ψ[j,i+1] + ψ[j+1,i] + ψ[j+1,i+1])
+        u[j, i+1/2] = -(ψ_x[j+1/2, i+1/2] - ψ_x[j-1/2, i+1/2]) / dy
+        v[j+1/2, i] =  (ψ_x[j+1/2, i+1/2] - ψ_x[j+1/2, i-1/2]) / dx
+
+        The resulting velocity field is discretely non-divergent:
+        div(u, v) = 0 at T-points.
+
+        Parameters
+        ----------
+        psi : Float[Array, "Ny Nx"]
+            Streamfunction at T-points.
+        mask_u : Float[Array, "Ny Nx"] | None, optional
+            Binary mask at U-points. If provided, u is zeroed where mask is 0.
+        mask_v : Float[Array, "Ny Nx"] | None, optional
+            Binary mask at V-points. If provided, v is zeroed where mask is 0.
+
+        Returns
+        -------
+        tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]
+            (u, v) — zonal velocity at U-points and meridional velocity at
+            V-points.
+
+        References
+        ----------
+        .. [1] louity/MQGeometry ``fd.py`` — ``grad_perp`` function.
+           https://github.com/louity/MQGeometry/blob/main/fd.py
+        .. [2] louity/qgsw-pytorch ``finite_diff.py`` — ``grad_perp`` function.
+           https://github.com/louity/qgsw-pytorch/blob/main/src/finite_diff.py
+
+        Examples
+        --------
+        >>> from finitevolx import ArakawaCGrid2D, Difference2D
+        >>> grid = ArakawaCGrid2D.from_interior(8, 8, 1e3, 1e3)
+        >>> diff = Difference2D(grid=grid)
+        >>> psi = jnp.ones((grid.Ny, grid.Nx))
+        >>> u, v = diff.grad_perp(psi)
+        """
+        # Step 1: interpolate ψ from T-points to X-points (bilinear average)
+        # ψ_x[j+1/2, i+1/2] = 1/4 * (ψ[j,i] + ψ[j,i+1] + ψ[j+1,i] + ψ[j+1,i+1])
+        psi_x = jnp.zeros_like(psi)
+        psi_x = psi_x.at[1:-1, 1:-1].set(
+            0.25 * (psi[1:-1, 1:-1] + psi[1:-1, 2:] + psi[2:, 1:-1] + psi[2:, 2:])
+        )
+
+        # Step 2: u = -∂ψ_x/∂y at U-points (backward y-difference X→U)
+        # u[j, i+1/2] = -(ψ_x[j+1/2, i+1/2] - ψ_x[j-1/2, i+1/2]) / dy
+        u = -self.diff_y_X_to_U(psi_x)
+
+        # Step 3: v = ∂ψ_x/∂x at V-points (backward x-difference X→V)
+        # v[j+1/2, i] = (ψ_x[j+1/2, i+1/2] - ψ_x[j+1/2, i-1/2]) / dx
+        v = self.diff_x_X_to_V(psi_x)
+
+        # Step 4: apply masks if provided
+        if mask_u is not None:
+            u = u * mask_u
+        if mask_v is not None:
+            v = v * mask_v
+
+        return u, v
+
 
 class Difference3D(eqx.Module):
     """Finite-difference operators on a 3-D Arakawa C-grid.

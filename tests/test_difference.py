@@ -280,6 +280,142 @@ class TestDifference2D:
 
 
 # ---------------------------------------------------------------------------
+# Perpendicular gradient (grad_perp) tests
+# ---------------------------------------------------------------------------
+
+
+class TestGradPerp2D:
+    """Tests for Difference2D.grad_perp: ψ(T) → (u(U), v(V))."""
+
+    def test_output_shapes(self, grid2d):
+        diff = Difference2D(grid=grid2d)
+        psi = jnp.ones((grid2d.Ny, grid2d.Nx))
+        u, v = diff.grad_perp(psi)
+        assert u.shape == (grid2d.Ny, grid2d.Nx)
+        assert v.shape == (grid2d.Ny, grid2d.Nx)
+
+    def test_constant_psi_gives_zero_velocity(self, grid2d):
+        """Uniform ψ → zero velocity: grad_perp(const) = (0, 0).
+
+        Deep interior [2:-2, 2:-2] avoids ghost-cell contamination from the
+        intermediate X-point field whose ghost ring is zero.
+        """
+        diff = Difference2D(grid=grid2d)
+        psi = 5.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        u, v = diff.grad_perp(psi)
+        np.testing.assert_allclose(u[2:-2, 2:-2], 0.0, atol=1e-12)
+        np.testing.assert_allclose(v[2:-2, 2:-2], 0.0, atol=1e-12)
+
+    def test_ghost_ring_is_zero(self, grid2d):
+        diff = Difference2D(grid=grid2d)
+        psi = jnp.ones((grid2d.Ny, grid2d.Nx))
+        u, v = diff.grad_perp(psi)
+        # u ghost ring
+        np.testing.assert_array_equal(u[0, :], 0.0)
+        np.testing.assert_array_equal(u[-1, :], 0.0)
+        np.testing.assert_array_equal(u[:, 0], 0.0)
+        np.testing.assert_array_equal(u[:, -1], 0.0)
+        # v ghost ring
+        np.testing.assert_array_equal(v[0, :], 0.0)
+        np.testing.assert_array_equal(v[-1, :], 0.0)
+        np.testing.assert_array_equal(v[:, 0], 0.0)
+        np.testing.assert_array_equal(v[:, -1], 0.0)
+
+    def test_nondivergent(self, grid2d):
+        """grad_perp(ψ) is discretely non-divergent: div(u, v) = 0."""
+        diff = Difference2D(grid=grid2d)
+        x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
+        y = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
+        psi = x[None, :] * y[:, None]  # ψ = x * y
+        u, v = diff.grad_perp(psi)
+        divergence = diff.divergence(u, v)
+        np.testing.assert_allclose(divergence[1:-1, 1:-1], 0.0, atol=1e-12)
+
+    def test_linear_psi_x(self, grid2d):
+        """ψ = c * x → u = 0, v = c at deep interior.
+
+        ∂ψ/∂y = 0 → u = 0
+        ∂ψ/∂x = c → v = c
+        """
+        diff = Difference2D(grid=grid2d)
+        c = 3.0
+        x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
+        psi = jnp.broadcast_to(c * x, (grid2d.Ny, grid2d.Nx))
+        u, v = diff.grad_perp(psi)
+        np.testing.assert_allclose(u[2:-2, 2:-2], 0.0, atol=1e-12)
+        np.testing.assert_allclose(v[2:-2, 2:-2], c, rtol=1e-5)
+
+    def test_linear_psi_y(self, grid2d):
+        """ψ = c * y → u = -c, v = 0 at deep interior.
+
+        ∂ψ/∂y = c → u = -c
+        ∂ψ/∂x = 0 → v = 0
+        """
+        diff = Difference2D(grid=grid2d)
+        c = 2.0
+        y = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
+        psi = jnp.broadcast_to(c * y[:, None], (grid2d.Ny, grid2d.Nx))
+        u, v = diff.grad_perp(psi)
+        np.testing.assert_allclose(u[2:-2, 2:-2], -c, rtol=1e-5)
+        np.testing.assert_allclose(v[2:-2, 2:-2], 0.0, atol=1e-12)
+
+    def test_matches_manual_decomposition(self, grid2d):
+        """grad_perp must agree with manual T→X→(X→U, X→V) decomposition."""
+        from finitevolx._src.interpolation import Interpolation2D
+
+        diff = Difference2D(grid=grid2d)
+        interp = Interpolation2D(grid=grid2d)
+        x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
+        y = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
+        psi = jnp.sin(x[None, :]) * jnp.cos(y[:, None])
+
+        u, v = diff.grad_perp(psi)
+
+        psi_x = interp.T_to_X(psi)
+        u_expected = -diff.diff_y_X_to_U(psi_x)
+        v_expected = diff.diff_x_X_to_V(psi_x)
+        np.testing.assert_allclose(u, u_expected, atol=1e-12)
+        np.testing.assert_allclose(v, v_expected, atol=1e-12)
+
+    def test_anisotropic_grid(self):
+        """grad_perp respects different dx and dy spacings."""
+        grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 2.0)
+        diff = Difference2D(grid=grid)
+        c = 1.5
+        y = jnp.arange(grid.Ny, dtype=float) * grid.dy
+        psi = jnp.broadcast_to(c * y[:, None], (grid.Ny, grid.Nx))
+        u, _v = diff.grad_perp(psi)
+        # ∂ψ/∂y = c, so u = -c at deep interior
+        np.testing.assert_allclose(u[2:-2, 2:-2], -c, rtol=1e-5)
+
+    def test_mask_u_zeros_velocity(self, grid2d):
+        """mask_u zeroes u at masked points."""
+        diff = Difference2D(grid=grid2d)
+        y = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
+        psi = jnp.broadcast_to(y[:, None], (grid2d.Ny, grid2d.Nx))
+        mask_u = jnp.zeros((grid2d.Ny, grid2d.Nx))
+        u, _v = diff.grad_perp(psi, mask_u=mask_u)
+        np.testing.assert_allclose(u, 0.0, atol=1e-12)
+
+    def test_mask_v_zeros_velocity(self, grid2d):
+        """mask_v zeroes v at masked points."""
+        diff = Difference2D(grid=grid2d)
+        x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
+        psi = jnp.broadcast_to(x, (grid2d.Ny, grid2d.Nx))
+        mask_v = jnp.zeros((grid2d.Ny, grid2d.Nx))
+        _u, v = diff.grad_perp(psi, mask_v=mask_v)
+        np.testing.assert_allclose(v, 0.0, atol=1e-12)
+
+    def test_no_nan_output(self, grid2d):
+        """grad_perp must not produce NaN for well-defined inputs."""
+        diff = Difference2D(grid=grid2d)
+        psi = jnp.ones((grid2d.Ny, grid2d.Nx))
+        u, v = diff.grad_perp(psi)
+        assert jnp.all(jnp.isfinite(u)), "u contains NaN or Inf"
+        assert jnp.all(jnp.isfinite(v)), "v contains NaN or Inf"
+
+
+# ---------------------------------------------------------------------------
 # Ghost-cell interaction tests for difference operators
 # ---------------------------------------------------------------------------
 
