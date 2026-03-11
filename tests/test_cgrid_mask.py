@@ -554,7 +554,7 @@ class TestVorticityBoundaryGeometry:
 
     def test_w_valid_checks_correct_four_faces(self):
         """Build a domain where only the correct adjacency passes."""
-        # 5×5, all ocean except h[2,2] = land.
+        # 5x5, all ocean except h[2,2] = land.
         # This makes specific u/v faces dry, testing that w_valid checks
         # the right 4 faces (not shifted ones).
         h = np.ones((5, 5), dtype=bool)
@@ -589,7 +589,7 @@ class TestVorticityBoundaryGeometry:
         This test passes with correct adjacency but would fail with the
         old (wrong) shifts.
         """
-        # 5×5 all-ocean, then kill one cell to create a single-face gap.
+        # 5x5 all-ocean, then kill one cell to create a single-face gap.
         h = np.ones((5, 5), dtype=bool)
         h[3, 1] = False  # makes u[3,1] dry and u[4,1] dry, v[3,1] dry, v[3,2] dry
         m = ArakawaCGridMask.from_mask(h)
