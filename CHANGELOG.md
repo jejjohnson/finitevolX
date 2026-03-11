@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.22](https://github.com/jejjohnson/finitevolX/compare/v0.0.21...v0.0.22) (2026-03-11)
+
+
+### Features
+
+* add mask parameter to Advection2D and Advection3D ([4545060](https://github.com/jejjohnson/finitevolX/commit/454506071816df1a79fc32793a9531a1daff4fdd))
+
+
+### Bug Fixes
+
+* add input validation and NaN-safe blending to upwind_flux ([87357c4](https://github.com/jejjohnson/finitevolX/commit/87357c422a6fe52ca739997240aecaf6c9718159))
+
 ## [0.0.21](https://github.com/jejjohnson/finitevolX/compare/v0.0.20...v0.0.21) (2026-03-11)
 
 
