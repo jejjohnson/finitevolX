@@ -35,6 +35,7 @@ from finitevolx._src.interpolation import (
     Interpolation2D,
     Interpolation3D,
 )
+from finitevolx._src.jacobian import arakawa_jacobian
 from finitevolx._src.masks.cgrid_mask import ArakawaCGridMask, StencilCapability
 from finitevolx._src.reconstruction import (
     Reconstruction1D,
@@ -59,6 +60,8 @@ __all__ = [
     "Advection1D",
     "Advection2D",
     "Advection3D",
+    # Jacobian
+    "arakawa_jacobian",
     # Grid
     "ArakawaCGrid1D",
     "ArakawaCGrid2D",
