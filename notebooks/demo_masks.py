@@ -212,7 +212,7 @@ print(
 
 # %%
 # Demonstrate with a grid + masks for a small basin
-grid = ArakawaCGrid2D.from_interior(8, 8, dx=1e4, dy=1e4)
+grid = ArakawaCGrid2D.from_interior(8, 8, Lx=8e4, Ly=8e4)
 masks = ArakawaCGridMask.from_dimensions(ny=grid.Ny, nx=grid.Nx)
 print(f"Grid: {grid.Ny}x{grid.Nx} (8 interior + ghost ring)")
 print(f"  dx = {grid.dx:.0f} m, dy = {grid.dy:.0f} m")
