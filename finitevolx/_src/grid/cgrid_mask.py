@@ -508,6 +508,9 @@ class ArakawaCGridMask(eqx.Module):
             pool3 /= 9.0
             irrbound = (~psi_np[1:-1, 1:-1]) & (pool3 > 1.0 / 18.0)
             rows, cols = np.where(irrbound)
+            # Map back from interior slice to full-array coordinates.
+            rows = rows + 1
+            cols = cols + 1
         else:
             rows = np.empty(0, dtype=np.int32)
             cols = np.empty(0, dtype=np.int32)
@@ -554,8 +557,8 @@ class ArakawaCGridMask(eqx.Module):
             w_horizontal_bound=jnp.asarray(w_hb),
             w_cornerout_bound=jnp.asarray(w_co),
             w_valid=jnp.asarray(w_va),
-            psi_irrbound_xids=jnp.asarray(rows.astype(np.int32)),
-            psi_irrbound_yids=jnp.asarray(cols.astype(np.int32)),
+            psi_irrbound_yids=jnp.asarray(rows.astype(np.int32)),
+            psi_irrbound_xids=jnp.asarray(cols.astype(np.int32)),
             classification=jnp.asarray(classification),
             stencil_capability=sc,
             sponge=jnp.asarray(sponge_np),

@@ -291,10 +291,10 @@ class TestIrregularBoundary:
     def test_within_interior_bounds(self, rect_cgrid):
         m = rect_cgrid
         Ny, Nx = m.h.shape
-        assert bool(jnp.all(m.psi_irrbound_xids >= 0))
-        assert bool(jnp.all(m.psi_irrbound_xids < Ny - 2))
-        assert bool(jnp.all(m.psi_irrbound_yids >= 0))
-        assert bool(jnp.all(m.psi_irrbound_yids < Nx - 2))
+        assert bool(jnp.all(m.psi_irrbound_yids >= 1))
+        assert bool(jnp.all(m.psi_irrbound_yids < Ny - 1))
+        assert bool(jnp.all(m.psi_irrbound_xids >= 1))
+        assert bool(jnp.all(m.psi_irrbound_xids < Nx - 1))
 
 
 # ── land / coast classification ───────────────────────────────────────────────
