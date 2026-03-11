@@ -13,13 +13,13 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.difference import Difference1D, Difference2D
-from finitevolx._src.diffusion import Diffusion2D, diffusion_2d
-from finitevolx._src.divergence import Divergence2D, divergence_2d
-from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D
-from finitevolx._src.interpolation import Interpolation2D
-from finitevolx._src.reconstruction import Reconstruction1D, Reconstruction2D
-from finitevolx._src.vorticity import Vorticity2D
+from finitevolx._src.advection.reconstruction import Reconstruction1D, Reconstruction2D
+from finitevolx._src.diffusion.diffusion import Diffusion2D, diffusion_2d
+from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D
+from finitevolx._src.operators.difference import Difference1D, Difference2D
+from finitevolx._src.operators.divergence import Divergence2D, divergence_2d
+from finitevolx._src.operators.interpolation import Interpolation2D
+from finitevolx._src.operators.vorticity import Vorticity2D
 
 jax.config.update("jax_enable_x64", True)
 

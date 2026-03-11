@@ -15,8 +15,8 @@ from finitevolx import (
     Slip1D,
     Sponge1D,
 )
-from finitevolx._src.bc_1d import Outflow1D, Periodic1D, Reflective1D
-from finitevolx._src.boundary import enforce_periodic, pad_interior
+from finitevolx._src.boundary.bc_1d import Outflow1D, Periodic1D, Reflective1D
+from finitevolx._src.boundary.boundary import enforce_periodic, pad_interior
 
 
 class TestPadInterior:

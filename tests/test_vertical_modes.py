@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.vertical_modes import (
+from finitevolx._src.vertical.vertical_modes import (
     build_coupling_matrix,
     decompose_vertical_modes,
     layer_to_mode,

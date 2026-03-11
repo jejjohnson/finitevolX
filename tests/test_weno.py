@@ -16,7 +16,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.reconstructions.weno import (
+from finitevolx._src.advection.weno import (
     weno_3pts,
     weno_3pts_improved,
     weno_5pts,

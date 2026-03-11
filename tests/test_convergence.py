@@ -14,8 +14,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from finitevolx._src.difference import Difference1D, Difference2D
-from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D
+from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D
+from finitevolx._src.operators.difference import Difference1D, Difference2D
 
 jax.config.update("jax_enable_x64", True)
 

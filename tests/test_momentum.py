@@ -9,8 +9,8 @@ import pytest
 
 jax.config.update("jax_enable_x64", True)
 
-from finitevolx._src.grid import ArakawaCGrid2D, ArakawaCGrid3D
-from finitevolx._src.momentum import MomentumAdvection2D, MomentumAdvection3D
+from finitevolx._src.diffusion.momentum import MomentumAdvection2D, MomentumAdvection3D
+from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
 
 
 @pytest.fixture
@@ -114,8 +114,8 @@ class TestMomentumAdvection2D:
         This must be zero (up to floating point) for any velocity field,
         verifying that the scheme conserves kinetic energy from the cross term.
         """
-        from finitevolx._src.difference import Difference2D
-        from finitevolx._src.interpolation import Interpolation2D
+        from finitevolx._src.operators.difference import Difference2D
+        from finitevolx._src.operators.interpolation import Interpolation2D
 
         diff = Difference2D(grid=grid2d)
         interp = Interpolation2D(grid=grid2d)

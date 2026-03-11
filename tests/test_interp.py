@@ -6,8 +6,8 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
-from finitevolx._src.interpolation import (
+from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.operators.interpolation import (
     Interpolation1D,
     Interpolation2D,
     Interpolation3D,

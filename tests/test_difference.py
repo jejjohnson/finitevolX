@@ -4,9 +4,13 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.difference import Difference1D, Difference2D, Difference3D
-from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
-from finitevolx._src.interpolation import Interpolation2D
+from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.operators.difference import (
+    Difference1D,
+    Difference2D,
+    Difference3D,
+)
+from finitevolx._src.operators.interpolation import Interpolation2D
 
 
 @pytest.fixture

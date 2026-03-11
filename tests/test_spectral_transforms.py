@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import scipy.fft as sf
 
-from finitevolx._src.spectral_transforms import (
+from finitevolx._src.solvers.spectral_transforms import (
     dct,
     dctn,
     dst,
