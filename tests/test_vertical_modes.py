@@ -14,7 +14,6 @@ from finitevolx._src.vertical_modes import (
     mode_to_layer,
 )
 
-
 # ---------------------------------------------------------------------------
 # build_coupling_matrix
 # ---------------------------------------------------------------------------
@@ -62,9 +61,7 @@ class TestBuildCouplingMatrix:
         )
         np.testing.assert_allclose(float(A[0, 1]), -1.0 / (H0 * g1), rtol=1e-6)
         # Bottom row
-        np.testing.assert_allclose(
-            float(A[1, 1]), 1.0 / (H1 * g1), rtol=1e-6
-        )
+        np.testing.assert_allclose(float(A[1, 1]), 1.0 / (H1 * g1), rtol=1e-6)
         np.testing.assert_allclose(float(A[1, 0]), -1.0 / (H1 * g1), rtol=1e-6)
 
     def test_three_layer_shape(self):
@@ -92,15 +89,11 @@ class TestBuildCouplingMatrix:
         g_prime = jnp.array([g0, g1, g2])
         A = build_coupling_matrix(H, g_prime)
         H1 = 400.0
-        np.testing.assert_allclose(
-            float(A[1, 0]), -1.0 / (H1 * g1), rtol=1e-6
-        )
+        np.testing.assert_allclose(float(A[1, 0]), -1.0 / (H1 * g1), rtol=1e-6)
         np.testing.assert_allclose(
             float(A[1, 1]), 1.0 / H1 * (1.0 / g2 + 1.0 / g1), rtol=1e-6
         )
-        np.testing.assert_allclose(
-            float(A[1, 2]), -1.0 / (H1 * g2), rtol=1e-6
-        )
+        np.testing.assert_allclose(float(A[1, 2]), -1.0 / (H1 * g2), rtol=1e-6)
 
     def test_positive_diagonal(self):
         """Diagonal elements must be positive (A is positive-semi-definite)."""
@@ -161,9 +154,7 @@ class TestDecomposeVerticalModes:
         _radii, Cl2m, Cm2l = decompose_vertical_modes(A, f0)
         field = jnp.array([1.0, 3.0])
         reconstructed = mode_to_layer(layer_to_mode(field, Cl2m), Cm2l)
-        np.testing.assert_allclose(
-            np.array(reconstructed), np.array(field), atol=1e-5
-        )
+        np.testing.assert_allclose(np.array(reconstructed), np.array(field), atol=1e-5)
 
     def test_round_trip_3layer_1d(self, three_layer_setup):
         """Round-trip for 3-layer 1-D field."""
@@ -171,9 +162,7 @@ class TestDecomposeVerticalModes:
         _radii, Cl2m, Cm2l = decompose_vertical_modes(A, f0)
         field = jnp.array([1.0, 2.0, 3.0])
         reconstructed = mode_to_layer(layer_to_mode(field, Cl2m), Cm2l)
-        np.testing.assert_allclose(
-            np.array(reconstructed), np.array(field), atol=1e-5
-        )
+        np.testing.assert_allclose(np.array(reconstructed), np.array(field), atol=1e-5)
 
     def test_round_trip_2d_field(self, two_layer_setup):
         """Round-trip for a 2-layer, 2-D spatial field [nl, Ny, Nx]."""
@@ -181,9 +170,7 @@ class TestDecomposeVerticalModes:
         _radii, Cl2m, Cm2l = decompose_vertical_modes(A, f0)
         field = jnp.ones((2, 4, 4))
         reconstructed = mode_to_layer(layer_to_mode(field, Cl2m), Cm2l)
-        np.testing.assert_allclose(
-            np.array(reconstructed), np.array(field), atol=1e-5
-        )
+        np.testing.assert_allclose(np.array(reconstructed), np.array(field), atol=1e-5)
 
     def test_rossby_radii_positive(self, two_layer_setup):
         """All finite Rossby radii must be positive."""
@@ -227,7 +214,7 @@ class TestDecomposeVerticalModes:
         assert len(finite_radii) > 0, "Expected at least one finite Rossby radius"
         # All finite Rossby radii should be in [1 km, 1000 km]
         assert np.all(finite_radii > 1e3) and np.all(finite_radii < 1e6), (
-            f"Rossby radii {finite_radii/1e3} km outside expected range [1, 1000] km"
+            f"Rossby radii {finite_radii / 1e3} km outside expected range [1, 1000] km"
         )
 
     def test_cl2m_cm2l_inverse(self, two_layer_setup):
@@ -301,9 +288,7 @@ class TestLayerModeTransforms:
         rng = np.random.default_rng(42)
         field = jnp.array(rng.standard_normal((2, ny, nx)))
         reconstructed = mode_to_layer(layer_to_mode(field, Cl2m), Cm2l)
-        np.testing.assert_allclose(
-            np.array(reconstructed), np.array(field), atol=1e-5
-        )
+        np.testing.assert_allclose(np.array(reconstructed), np.array(field), atol=1e-5)
 
 
 # ---------------------------------------------------------------------------
@@ -341,12 +326,8 @@ class TestJITCompatibility:
         np.testing.assert_allclose(
             np.array(radii_jit), np.array(radii_eager), rtol=1e-5
         )
-        np.testing.assert_allclose(
-            np.array(Cl2m_jit), np.array(Cl2m_eager), rtol=1e-5
-        )
-        np.testing.assert_allclose(
-            np.array(Cm2l_jit), np.array(Cm2l_eager), rtol=1e-5
-        )
+        np.testing.assert_allclose(np.array(Cl2m_jit), np.array(Cl2m_eager), rtol=1e-5)
+        np.testing.assert_allclose(np.array(Cm2l_jit), np.array(Cm2l_eager), rtol=1e-5)
 
     def test_jit_layer_to_mode(self):
         """jax.jit(layer_to_mode) matches eager output."""
