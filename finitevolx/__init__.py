@@ -5,6 +5,7 @@ from finitevolx._src.bc_1d import (
     Outflow1D,
     Periodic1D,
     Reflective1D,
+    SlipBC1D,
     Sponge1D,
 )
 from finitevolx._src.bc_field import FieldBCSet
@@ -71,6 +72,7 @@ __all__ = [
     "Outflow1D",
     "Periodic1D",
     "Reflective1D",
+    "SlipBC1D",
     "Sponge1D",
     # Finite difference
     "Difference1D",
