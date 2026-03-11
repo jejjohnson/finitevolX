@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.0.18](https://github.com/jejjohnson/finitevolX/compare/v0.0.17...v0.0.18) (2026-03-11)
+
+
+### Features
+
+* add `grad_perp` operator to `Difference2D` for geostrophic velocity ([09ecb96](https://github.com/jejjohnson/finitevolX/commit/09ecb964cba85ccb17bd5d38fa1b4be9778d1e91))
+* add grad_perp operator to Difference2D for geostrophic velocity ([fad6966](https://github.com/jejjohnson/finitevolX/commit/fad6966aad5272ecc85763443f54552be522a0cd))
+* add Slip1D — free/no/partial-slip boundary condition for tangential velocity ([591a551](https://github.com/jejjohnson/finitevolX/commit/591a5511b2300caffb36dbb2038ee912bf051950))
+* add SlipBC1D boundary condition for tangential velocity at solid walls ([8e7a9fa](https://github.com/jejjohnson/finitevolX/commit/8e7a9fad52563a60f4cb960795e4c93b0d3e3e9b))
+* add standalone `Divergence2D` / `divergence_2d` operator ([56e4f0f](https://github.com/jejjohnson/finitevolX/commit/56e4f0f67e73029a50bd42a41a1a4b511105a825))
+* add standalone Divergence2D / divergence_2d operator ([522c98b](https://github.com/jejjohnson/finitevolX/commit/522c98b798802b425a9f7b7068897a7edddf1a29))
+
+
+### Bug Fixes
+
+* address PR review - noflux 4-wall BC, dtype promotion, transform coverage ([940035b](https://github.com/jejjohnson/finitevolX/commit/940035b64ff262de1eeb073ecb9bf8c0edaceeb7))
+* use direct stencil in grad_perp to avoid ghost-cell contamination ([1d80ccc](https://github.com/jejjohnson/finitevolX/commit/1d80ccc6cd21803e3ac5e297058eb55eac3076cd))
+
 ## [0.0.17](https://github.com/jejjohnson/finitevolX/compare/v0.0.16...v0.0.17) (2026-03-10)
 
 
