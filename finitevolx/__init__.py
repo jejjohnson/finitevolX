@@ -38,6 +38,7 @@ from finitevolx._src.elliptic import (
     solve_poisson_dst,
     solve_poisson_fft,
 )
+from finitevolx._src.flux import upwind_flux
 from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
 from finitevolx._src.interpolation import (
     Interpolation1D,
@@ -72,6 +73,8 @@ from finitevolx._src.vertical_modes import (
 from finitevolx._src.vorticity import Vorticity2D, Vorticity3D
 
 __all__ = [
+    # Upwind flux dispatch
+    "upwind_flux",
     # Advection
     "Advection1D",
     "Advection2D",
