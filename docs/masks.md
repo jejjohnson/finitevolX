@@ -59,9 +59,24 @@ masks = ArakawaCGridMask.from_ssh(ssh_field)
 ## Staggered variable locations
 
 Each variable type sits at a different position within a grid cell.
-The figure below shows the actual staggered positions for an island domain:
+The figures below show the actual staggered positions for several
+domain topologies:
 
-![Staggered variable locations](images/demo_masks_staggered.png)
+### Rectangular basin
+
+![Rectangular basin](images/demo_masks_staggered_basin.png)
+
+### Basin with island
+
+![Basin with island](images/demo_masks_staggered_island.png)
+
+### Zonal channel
+
+![Zonal channel](images/demo_masks_staggered_channel.png)
+
+### Irregular coastline
+
+![Irregular coastline](images/demo_masks_staggered_irregular.png)
 
 ## Land / coast classification
 
