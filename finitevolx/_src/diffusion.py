@@ -19,9 +19,19 @@ Step 3 – Tendency at T-points (backward diff of fluxes, U → T and V → T):
     dh[j, i] = (flux_x[j, i+1/2] - flux_x[j, i-1/2]) / dx
              + (flux_y[j+1/2, i] - flux_y[j-1/2, i]) / dy
 
-Zero-initialized ghost cells on the flux arrays give zero-flux (no-flux) BCs
-at domain walls by default.  The caller may overwrite ghost cells before
-calling the operator to impose other flux BCs.
+Boundary conditions
+-------------------
+Face fluxes at domain walls are zero by construction:
+
+* West boundary face (U-point col 0) is never written — stays zero.
+* East boundary face (U-point col Nx-2) is not computed — stays zero.
+* South boundary face (V-point row 0) is never written — stays zero.
+* North boundary face (V-point row Ny-2) is not computed — stays zero.
+
+This gives no-flux (closed-wall) BCs at all four domain walls by default.
+Custom boundary conditions must be imposed via the tracer field ``h``, the
+diffusivity ``kappa``, or the mask arrays rather than by directly editing the
+internally-constructed flux arrays.
 
 Masking
 -------
@@ -36,7 +46,7 @@ from __future__ import annotations
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxtyping import Array, Float
+from jaxtyping import Array, Bool, Float
 
 from finitevolx._src.grid import ArakawaCGrid2D, ArakawaCGrid3D
 
@@ -46,9 +56,9 @@ def diffusion_2d(
     kappa: float | Float[Array, "Ny Nx"],
     dx: float,
     dy: float,
-    mask_h: Float[Array, "Ny Nx"] | None = None,
-    mask_u: Float[Array, "Ny Nx"] | None = None,
-    mask_v: Float[Array, "Ny Nx"] | None = None,
+    mask_h: Bool[Array, "Ny Nx"] | Float[Array, "Ny Nx"] | None = None,
+    mask_u: Bool[Array, "Ny Nx"] | Float[Array, "Ny Nx"] | None = None,
+    mask_v: Bool[Array, "Ny Nx"] | Float[Array, "Ny Nx"] | None = None,
 ) -> Float[Array, "Ny Nx"]:
     """Horizontal tracer diffusion tendency at T-points (flux form).
 
@@ -56,8 +66,8 @@ def diffusion_2d(
     at interior T-points using forward-then-backward finite differences.
 
     Only interior cells ``[1:-1, 1:-1]`` are written; the ghost ring is left
-    as zero.  Zero ghost cells on the intermediate flux arrays correspond to
-    zero-flux (no-flux) BCs at domain walls.
+    as zero.  East and north boundary faces are not computed, giving no-flux
+    (closed-wall) BCs at all four domain walls by default.
 
     Parameters
     ----------
@@ -72,15 +82,15 @@ def diffusion_2d(
         Grid spacing in x.
     dy : float
         Grid spacing in y.
-    mask_h : Float[Array, "Ny Nx"] | None, optional
-        Ocean mask at T-points (1 = ocean, 0 = land).  If provided, land-cell
-        tendencies are zeroed.
-    mask_u : Float[Array, "Ny Nx"] | None, optional
-        Ocean mask at U-points (1 = ocean, 0 = land).  If provided, east-face
-        fluxes through land boundaries are zeroed.
-    mask_v : Float[Array, "Ny Nx"] | None, optional
-        Ocean mask at V-points (1 = ocean, 0 = land).  If provided, north-face
-        fluxes through land boundaries are zeroed.
+    mask_h : Bool[Array, "Ny Nx"] or Float[Array, "Ny Nx"] or None, optional
+        Ocean mask at T-points (1/True = ocean, 0/False = land).  If provided,
+        land-cell tendencies are zeroed.
+    mask_u : Bool[Array, "Ny Nx"] or Float[Array, "Ny Nx"] or None, optional
+        Ocean mask at U-points (1/True = ocean, 0/False = land).  If provided,
+        east-face fluxes through land boundaries are zeroed.
+    mask_v : Bool[Array, "Ny Nx"] or Float[Array, "Ny Nx"] or None, optional
+        Ocean mask at V-points (1/True = ocean, 0/False = land).  If provided,
+        north-face fluxes through land boundaries are zeroed.
 
     Returns
     -------
@@ -95,23 +105,32 @@ def diffusion_2d(
     >>> tendency.shape
     (10, 10)
     """
-    # Support both scalar κ and T-point array κ.  When κ is a full [Ny, Nx]
-    # array, slice to interior T-cells [1:-1, 1:-1] — the source cell for
-    # each face flux (western cell for east face, southern cell for north face).
+    # Prepare kappa slices for each face direction.
+    # When kappa is a full [Ny, Nx] array, use the western/southern source
+    # T-cell value for each face:
+    #   flux_x at (j, i+½) uses κ[j, i] → slice kappa_arr[1:-1, 1:-2]
+    #   flux_y at (j+½, i) uses κ[j, i] → slice kappa_arr[1:-2, 1:-1]
     kappa_arr = jnp.asarray(kappa)
-    kappa_int = kappa_arr[1:-1, 1:-1] if kappa_arr.ndim >= 2 else kappa_arr
+    if kappa_arr.ndim >= 2:
+        kappa_x = kappa_arr[1:-1, 1:-2]  # (Ny-2, Nx-3) — source T-cell for east faces
+        kappa_y = kappa_arr[1:-2, 1:-1]  # (Ny-3, Nx-2) — source T-cell for north faces
+    else:
+        kappa_x = kappa_arr
+        kappa_y = kappa_arr
 
     # Step 1: East-face flux at U-points
     # flux_x[j, i+1/2] = κ * (h[j, i+1] - h[j, i]) / dx
+    # Written for i = 1 ... Nx-3 only; east boundary face (i=Nx-2) stays 0.
     flux_x = jnp.zeros_like(h)
-    flux_x = flux_x.at[1:-1, 1:-1].set(kappa_int * (h[1:-1, 2:] - h[1:-1, 1:-1]) / dx)
+    flux_x = flux_x.at[1:-1, 1:-2].set(kappa_x * (h[1:-1, 2:-1] - h[1:-1, 1:-2]) / dx)
     if mask_u is not None:
         flux_x = flux_x * mask_u
 
     # Step 2: North-face flux at V-points
     # flux_y[j+1/2, i] = κ * (h[j+1, i] - h[j, i]) / dy
+    # Written for j = 1 ... Ny-3 only; north boundary face (j=Ny-2) stays 0.
     flux_y = jnp.zeros_like(h)
-    flux_y = flux_y.at[1:-1, 1:-1].set(kappa_int * (h[2:, 1:-1] - h[1:-1, 1:-1]) / dy)
+    flux_y = flux_y.at[1:-2, 1:-1].set(kappa_y * (h[2:-1, 1:-1] - h[1:-2, 1:-1]) / dy)
     if mask_v is not None:
         flux_y = flux_y * mask_v
 
@@ -157,9 +176,9 @@ class Diffusion2D(eqx.Module):
         self,
         h: Float[Array, "Ny Nx"],
         kappa: float | Float[Array, "Ny Nx"],
-        mask_h: Float[Array, "Ny Nx"] | None = None,
-        mask_u: Float[Array, "Ny Nx"] | None = None,
-        mask_v: Float[Array, "Ny Nx"] | None = None,
+        mask_h: Bool[Array, "Ny Nx"] | Float[Array, "Ny Nx"] | None = None,
+        mask_u: Bool[Array, "Ny Nx"] | Float[Array, "Ny Nx"] | None = None,
+        mask_v: Bool[Array, "Ny Nx"] | Float[Array, "Ny Nx"] | None = None,
     ) -> Float[Array, "Ny Nx"]:
         """Diffusion tendency ∂h/∂t = ∇·(κ ∇h) at T-points.
 
@@ -176,12 +195,12 @@ class Diffusion2D(eqx.Module):
             Tracer field at T-points.
         kappa : float or Float[Array, "Ny Nx"]
             Diffusion coefficient (scalar or T-point field).
-        mask_h : Float[Array, "Ny Nx"] | None, optional
-            Ocean mask at T-points (1 = ocean, 0 = land).
-        mask_u : Float[Array, "Ny Nx"] | None, optional
-            Ocean mask at U-points (1 = ocean, 0 = land).
-        mask_v : Float[Array, "Ny Nx"] | None, optional
-            Ocean mask at V-points (1 = ocean, 0 = land).
+        mask_h : Bool[Array, "Ny Nx"] or Float[Array, "Ny Nx"] or None, optional
+            Ocean mask at T-points (1/True = ocean, 0/False = land).
+        mask_u : Bool[Array, "Ny Nx"] or Float[Array, "Ny Nx"] or None, optional
+            Ocean mask at U-points (1/True = ocean, 0/False = land).
+        mask_v : Bool[Array, "Ny Nx"] or Float[Array, "Ny Nx"] or None, optional
+            Ocean mask at V-points (1/True = ocean, 0/False = land).
 
         Returns
         -------
@@ -202,8 +221,8 @@ class Diffusion2D(eqx.Module):
         self,
         h: Float[Array, "Ny Nx"],
         kappa: float | Float[Array, "Ny Nx"],
-        mask_u: Float[Array, "Ny Nx"] | None = None,
-        mask_v: Float[Array, "Ny Nx"] | None = None,
+        mask_u: Bool[Array, "Ny Nx"] | Float[Array, "Ny Nx"] | None = None,
+        mask_v: Bool[Array, "Ny Nx"] | Float[Array, "Ny Nx"] | None = None,
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
         """Diagnostic diffusive face fluxes at U- and V-points.
 
@@ -220,10 +239,10 @@ class Diffusion2D(eqx.Module):
             Tracer field at T-points.
         kappa : float or Float[Array, "Ny Nx"]
             Diffusion coefficient (scalar or T-point field).
-        mask_u : Float[Array, "Ny Nx"] | None, optional
-            Ocean mask at U-points (1 = ocean, 0 = land).
-        mask_v : Float[Array, "Ny Nx"] | None, optional
-            Ocean mask at V-points (1 = ocean, 0 = land).
+        mask_u : Bool[Array, "Ny Nx"] or Float[Array, "Ny Nx"] or None, optional
+            Ocean mask at U-points (1/True = ocean, 0/False = land).
+        mask_v : Bool[Array, "Ny Nx"] or Float[Array, "Ny Nx"] or None, optional
+            Ocean mask at V-points (1/True = ocean, 0/False = land).
 
         Returns
         -------
@@ -231,24 +250,33 @@ class Diffusion2D(eqx.Module):
             ``(flux_x, flux_y)`` — east-face fluxes at U-points and
             north-face fluxes at V-points.
         """
-        # Support both scalar κ and T-point array κ.  When κ is a full [Ny, Nx]
-        # array, slice to interior T-cells — the source cell for each face flux
-        # (western cell for east face, southern cell for north face).
+        # Prepare kappa slices for each face direction (same logic as diffusion_2d).
         kappa_arr = jnp.asarray(kappa)
-        kappa_int = kappa_arr[1:-1, 1:-1] if kappa_arr.ndim >= 2 else kappa_arr
+        if kappa_arr.ndim >= 2:
+            kappa_x = kappa_arr[
+                1:-1, 1:-2
+            ]  # (Ny-2, Nx-3) — source T-cell for east faces
+            kappa_y = kappa_arr[
+                1:-2, 1:-1
+            ]  # (Ny-3, Nx-2) — source T-cell for north faces
+        else:
+            kappa_x = kappa_arr
+            kappa_y = kappa_arr
 
         # flux_x[j, i+1/2] = κ * (h[j, i+1] - h[j, i]) / dx
+        # Written for i = 1 ... Nx-3; east boundary face (i=Nx-2) stays 0.
         flux_x = jnp.zeros_like(h)
-        flux_x = flux_x.at[1:-1, 1:-1].set(
-            kappa_int * (h[1:-1, 2:] - h[1:-1, 1:-1]) / self.grid.dx
+        flux_x = flux_x.at[1:-1, 1:-2].set(
+            kappa_x * (h[1:-1, 2:-1] - h[1:-1, 1:-2]) / self.grid.dx
         )
         if mask_u is not None:
             flux_x = flux_x * mask_u
 
         # flux_y[j+1/2, i] = κ * (h[j+1, i] - h[j, i]) / dy
+        # Written for j = 1 ... Ny-3; north boundary face (j=Ny-2) stays 0.
         flux_y = jnp.zeros_like(h)
-        flux_y = flux_y.at[1:-1, 1:-1].set(
-            kappa_int * (h[2:, 1:-1] - h[1:-1, 1:-1]) / self.grid.dy
+        flux_y = flux_y.at[1:-2, 1:-1].set(
+            kappa_y * (h[2:-1, 1:-1] - h[1:-2, 1:-1]) / self.grid.dy
         )
         if mask_v is not None:
             flux_y = flux_y * mask_v
@@ -283,9 +311,9 @@ class Diffusion3D(eqx.Module):
         self,
         h: Float[Array, "Nz Ny Nx"],
         kappa: float | Float[Array, "Nz Ny Nx"],
-        mask_h: Float[Array, "Nz Ny Nx"] | None = None,
-        mask_u: Float[Array, "Nz Ny Nx"] | None = None,
-        mask_v: Float[Array, "Nz Ny Nx"] | None = None,
+        mask_h: Bool[Array, "Nz Ny Nx"] | Float[Array, "Nz Ny Nx"] | None = None,
+        mask_u: Bool[Array, "Nz Ny Nx"] | Float[Array, "Nz Ny Nx"] | None = None,
+        mask_v: Bool[Array, "Nz Ny Nx"] | Float[Array, "Nz Ny Nx"] | None = None,
     ) -> Float[Array, "Nz Ny Nx"]:
         """Diffusion tendency ∂h/∂t = ∇·(κ ∇h) at T-points over all z-levels.
 
@@ -299,36 +327,43 @@ class Diffusion3D(eqx.Module):
             Tracer field at T-points.
         kappa : float or Float[Array, "Nz Ny Nx"]
             Diffusion coefficient (scalar or T-point field).
-        mask_h : Float[Array, "Nz Ny Nx"] | None, optional
-            Ocean mask at T-points (1 = ocean, 0 = land).
-        mask_u : Float[Array, "Nz Ny Nx"] | None, optional
-            Ocean mask at U-points (1 = ocean, 0 = land).
-        mask_v : Float[Array, "Nz Ny Nx"] | None, optional
-            Ocean mask at V-points (1 = ocean, 0 = land).
+        mask_h : Bool[Array, "Nz Ny Nx"] or Float[Array, "Nz Ny Nx"] or None, optional
+            Ocean mask at T-points (1/True = ocean, 0/False = land).
+        mask_u : Bool[Array, "Nz Ny Nx"] or Float[Array, "Nz Ny Nx"] or None, optional
+            Ocean mask at U-points (1/True = ocean, 0/False = land).
+        mask_v : Bool[Array, "Nz Ny Nx"] or Float[Array, "Nz Ny Nx"] or None, optional
+            Ocean mask at V-points (1/True = ocean, 0/False = land).
 
         Returns
         -------
         Float[Array, "Nz Ny Nx"]
             Diffusion tendency at T-points.
         """
-        # Support both scalar κ and T-point array κ (slice to interior).
+        # Prepare kappa slices for each face direction.
         kappa_arr = jnp.asarray(kappa)
-        kappa_int = kappa_arr[1:-1, 1:-1, 1:-1] if kappa_arr.ndim >= 3 else kappa_arr
+        if kappa_arr.ndim >= 3:
+            kappa_x = kappa_arr[1:-1, 1:-1, 1:-2]  # source T-cell for east faces
+            kappa_y = kappa_arr[1:-1, 1:-2, 1:-1]  # source T-cell for north faces
+        else:
+            kappa_x = kappa_arr
+            kappa_y = kappa_arr
 
         # Step 1: East-face flux at U-points over all z-levels
         # flux_x[k, j, i+1/2] = κ * (h[k, j, i+1] - h[k, j, i]) / dx
+        # Written for i = 1 ... Nx-3; east boundary face (i=Nx-2) stays 0.
         flux_x = jnp.zeros_like(h)
-        flux_x = flux_x.at[1:-1, 1:-1, 1:-1].set(
-            kappa_int * (h[1:-1, 1:-1, 2:] - h[1:-1, 1:-1, 1:-1]) / self.grid.dx
+        flux_x = flux_x.at[1:-1, 1:-1, 1:-2].set(
+            kappa_x * (h[1:-1, 1:-1, 2:-1] - h[1:-1, 1:-1, 1:-2]) / self.grid.dx
         )
         if mask_u is not None:
             flux_x = flux_x * mask_u
 
         # Step 2: North-face flux at V-points over all z-levels
         # flux_y[k, j+1/2, i] = κ * (h[k, j+1, i] - h[k, j, i]) / dy
+        # Written for j = 1 ... Ny-3; north boundary face (j=Ny-2) stays 0.
         flux_y = jnp.zeros_like(h)
-        flux_y = flux_y.at[1:-1, 1:-1, 1:-1].set(
-            kappa_int * (h[1:-1, 2:, 1:-1] - h[1:-1, 1:-1, 1:-1]) / self.grid.dy
+        flux_y = flux_y.at[1:-1, 1:-2, 1:-1].set(
+            kappa_y * (h[1:-1, 2:-1, 1:-1] - h[1:-1, 1:-2, 1:-1]) / self.grid.dy
         )
         if mask_v is not None:
             flux_y = flux_y * mask_v
@@ -350,8 +385,8 @@ class Diffusion3D(eqx.Module):
         self,
         h: Float[Array, "Nz Ny Nx"],
         kappa: float | Float[Array, "Nz Ny Nx"],
-        mask_u: Float[Array, "Nz Ny Nx"] | None = None,
-        mask_v: Float[Array, "Nz Ny Nx"] | None = None,
+        mask_u: Bool[Array, "Nz Ny Nx"] | Float[Array, "Nz Ny Nx"] | None = None,
+        mask_v: Bool[Array, "Nz Ny Nx"] | Float[Array, "Nz Ny Nx"] | None = None,
     ) -> tuple[Float[Array, "Nz Ny Nx"], Float[Array, "Nz Ny Nx"]]:
         """Diagnostic diffusive face fluxes at U- and V-points, all z-levels.
 
@@ -361,10 +396,10 @@ class Diffusion3D(eqx.Module):
             Tracer field at T-points.
         kappa : float or Float[Array, "Nz Ny Nx"]
             Diffusion coefficient (scalar or T-point field).
-        mask_u : Float[Array, "Nz Ny Nx"] | None, optional
-            Ocean mask at U-points (1 = ocean, 0 = land).
-        mask_v : Float[Array, "Nz Ny Nx"] | None, optional
-            Ocean mask at V-points (1 = ocean, 0 = land).
+        mask_u : Bool[Array, "Nz Ny Nx"] or Float[Array, "Nz Ny Nx"] or None, optional
+            Ocean mask at U-points (1/True = ocean, 0/False = land).
+        mask_v : Bool[Array, "Nz Ny Nx"] or Float[Array, "Nz Ny Nx"] or None, optional
+            Ocean mask at V-points (1/True = ocean, 0/False = land).
 
         Returns
         -------
@@ -372,24 +407,29 @@ class Diffusion3D(eqx.Module):
             ``(flux_x, flux_y)`` — east-face fluxes at U-points and
             north-face fluxes at V-points.
         """
-        # Support both scalar κ and T-point array κ.  When κ is a full
-        # [Nz, Ny, Nx] array, slice to interior T-cells — the source cell for
-        # each face flux (western cell for east face, southern cell for north face).
+        # Prepare kappa slices for each face direction (same logic as __call__).
         kappa_arr = jnp.asarray(kappa)
-        kappa_int = kappa_arr[1:-1, 1:-1, 1:-1] if kappa_arr.ndim >= 3 else kappa_arr
+        if kappa_arr.ndim >= 3:
+            kappa_x = kappa_arr[1:-1, 1:-1, 1:-2]  # source T-cell for east faces
+            kappa_y = kappa_arr[1:-1, 1:-2, 1:-1]  # source T-cell for north faces
+        else:
+            kappa_x = kappa_arr
+            kappa_y = kappa_arr
 
         # flux_x[k, j, i+1/2] = κ * (h[k, j, i+1] - h[k, j, i]) / dx
+        # Written for i = 1 ... Nx-3; east boundary face (i=Nx-2) stays 0.
         flux_x = jnp.zeros_like(h)
-        flux_x = flux_x.at[1:-1, 1:-1, 1:-1].set(
-            kappa_int * (h[1:-1, 1:-1, 2:] - h[1:-1, 1:-1, 1:-1]) / self.grid.dx
+        flux_x = flux_x.at[1:-1, 1:-1, 1:-2].set(
+            kappa_x * (h[1:-1, 1:-1, 2:-1] - h[1:-1, 1:-1, 1:-2]) / self.grid.dx
         )
         if mask_u is not None:
             flux_x = flux_x * mask_u
 
         # flux_y[k, j+1/2, i] = κ * (h[k, j+1, i] - h[k, j, i]) / dy
+        # Written for j = 1 ... Ny-3; north boundary face (j=Ny-2) stays 0.
         flux_y = jnp.zeros_like(h)
-        flux_y = flux_y.at[1:-1, 1:-1, 1:-1].set(
-            kappa_int * (h[1:-1, 2:, 1:-1] - h[1:-1, 1:-1, 1:-1]) / self.grid.dy
+        flux_y = flux_y.at[1:-1, 1:-2, 1:-1].set(
+            kappa_y * (h[1:-1, 2:-1, 1:-1] - h[1:-1, 1:-2, 1:-1]) / self.grid.dy
         )
         if mask_v is not None:
             flux_y = flux_y * mask_v

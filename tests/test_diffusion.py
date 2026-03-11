@@ -204,14 +204,14 @@ class TestDiffusion2DFluxes:
         np.testing.assert_allclose(fy, 0.0, atol=1e-12)
 
     def test_linear_x_flux_is_constant(self, diff_op, grid):
-        """For h = c*x, east-face flux = κ*c everywhere (constant gradient)."""
+        """For h = c*x, east-face flux = κ*c for all interior-interior faces."""
         c = 2.0
         kappa = 1.5
         x = jnp.arange(grid.Nx, dtype=float) * grid.dx
         h = jnp.broadcast_to(c * x, (grid.Ny, grid.Nx))
         fx, fy = diff_op.fluxes(h, kappa=kappa)
-        # flux_x = κ * c (constant forward difference of linear field)
-        np.testing.assert_allclose(fx[1:-1, 1:-1], kappa * c, rtol=1e-8)
+        # flux_x = κ * c for faces i=1 ... Nx-3 (east boundary face i=Nx-2 is 0)
+        np.testing.assert_allclose(fx[1:-1, 1:-2], kappa * c, rtol=1e-8)
         # flux_y = 0 (no y-variation)
         np.testing.assert_allclose(fy[1:-1, 1:-1], 0.0, atol=1e-12)
 

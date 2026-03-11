@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 
 from finitevolx._src.difference import Difference1D, Difference2D
+from finitevolx._src.diffusion import Diffusion2D, diffusion_2d
 from finitevolx._src.divergence import Divergence2D, divergence_2d
 from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D
 from finitevolx._src.interpolation import Interpolation2D
@@ -179,6 +180,35 @@ class TestFloat32Float64Agreement:
             rtol=1e-4,
         )
 
+    def test_diffusion_2d_functional_f32_f64_agree(self, grid2d):
+        x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
+        h64 = jnp.broadcast_to(x**2, (grid2d.Ny, grid2d.Nx)).astype(jnp.float64)
+        h32 = h64.astype(jnp.float32)
+
+        res64 = diffusion_2d(h64, kappa=1.0, dx=grid2d.dx, dy=grid2d.dy)
+        res32 = diffusion_2d(h32, kappa=1.0, dx=grid2d.dx, dy=grid2d.dy)
+
+        np.testing.assert_allclose(
+            res32[1:-1, 1:-1].astype(float),
+            res64[1:-1, 1:-1].astype(float),
+            rtol=1e-4,
+        )
+
+    def test_diffusion2d_class_f32_f64_agree(self, grid2d):
+        diff_op = Diffusion2D(grid=grid2d)
+        x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
+        h64 = jnp.broadcast_to(x**2, (grid2d.Ny, grid2d.Nx)).astype(jnp.float64)
+        h32 = h64.astype(jnp.float32)
+
+        res64 = diff_op(h64, kappa=1.0)
+        res32 = diff_op(h32, kappa=1.0)
+
+        np.testing.assert_allclose(
+            res32[1:-1, 1:-1].astype(float),
+            res64[1:-1, 1:-1].astype(float),
+            rtol=1e-4,
+        )
+
 
 # ---------------------------------------------------------------------------
 # No-NaN / no-Inf checks for all operators on valid inputs
@@ -267,6 +297,21 @@ class TestNoNanOnValidInputs:
         v = jnp.broadcast_to(jnp.cos(y[:, None]), (grid2d.Ny, grid2d.Nx))
         result = divergence_2d(u, v, dx=grid2d.dx, dy=grid2d.dy)
         assert jnp.all(jnp.isfinite(result)), "NaN or Inf in divergence_2d output"
+
+    def test_diffusion2d_no_nan(self, grid2d):
+        diff_op = Diffusion2D(grid=grid2d)
+        x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
+        y = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
+        h = jnp.sin(x[None, :]) * jnp.cos(y[:, None])
+        result = diff_op(h, kappa=1e-2)
+        assert jnp.all(jnp.isfinite(result)), "NaN or Inf in Diffusion2D output"
+
+    def test_diffusion_2d_functional_no_nan(self, grid2d):
+        x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
+        y = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
+        h = jnp.sin(x[None, :]) * jnp.cos(y[:, None])
+        result = diffusion_2d(h, kappa=1e-2, dx=grid2d.dx, dy=grid2d.dy)
+        assert jnp.all(jnp.isfinite(result)), "NaN or Inf in diffusion_2d output"
 
 
 # ---------------------------------------------------------------------------

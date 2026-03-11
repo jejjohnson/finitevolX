@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 
 from finitevolx._src.difference import Difference1D, Difference2D, Difference3D
+from finitevolx._src.diffusion import Diffusion2D, diffusion_2d
 from finitevolx._src.divergence import Divergence2D, divergence_2d
 from finitevolx._src.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
 from finitevolx._src.interpolation import (
@@ -285,6 +286,47 @@ class TestJitDivergence:
 
 
 # ---------------------------------------------------------------------------
+# Diffusion operators under jit
+# ---------------------------------------------------------------------------
+
+
+class TestJitDiffusion:
+    """jit-compiled diffusion operators must match eager execution."""
+
+    def test_jit_diffusion2d_matches_eager(self, grid2d):
+        diff_op = Diffusion2D(grid=grid2d)
+        x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
+        h = jnp.broadcast_to(x**2, (grid2d.Ny, grid2d.Nx))
+
+        eager = diff_op(h, kappa=1e-2)
+        jitted = jax.jit(lambda h: diff_op(h, kappa=1e-2))(h)
+
+        np.testing.assert_allclose(jitted, eager, rtol=1e-7)
+
+    def test_jit_diffusion2d_fluxes_matches_eager(self, grid2d):
+        diff_op = Diffusion2D(grid=grid2d)
+        x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
+        h = jnp.broadcast_to(x**2, (grid2d.Ny, grid2d.Nx))
+
+        fx_eager, fy_eager = diff_op.fluxes(h, kappa=0.5)
+        fx_jit, fy_jit = jax.jit(lambda h: diff_op.fluxes(h, kappa=0.5))(h)
+
+        np.testing.assert_allclose(fx_jit, fx_eager, rtol=1e-7)
+        np.testing.assert_allclose(fy_jit, fy_eager, rtol=1e-7)
+
+    def test_jit_diffusion_2d_functional_matches_eager(self, grid2d):
+        x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
+        h = jnp.broadcast_to(x**2, (grid2d.Ny, grid2d.Nx))
+
+        eager = diffusion_2d(h, kappa=1.0, dx=grid2d.dx, dy=grid2d.dy)
+        jitted = jax.jit(diffusion_2d, static_argnums=(2, 3))(
+            h, 1.0, grid2d.dx, grid2d.dy
+        )
+
+        np.testing.assert_allclose(jitted, eager, rtol=1e-7)
+
+
+# ---------------------------------------------------------------------------
 # Repeated calls are pure and deterministic
 # ---------------------------------------------------------------------------
 
@@ -365,5 +407,17 @@ class TestVmapOperators:
 
         loop_results = jnp.stack([div_op(u_batch[i], v_batch[i]) for i in range(4)])
         vmap_result = jax.vmap(div_op)(u_batch, v_batch)
+
+        np.testing.assert_allclose(vmap_result, loop_results, rtol=1e-7)
+
+    def test_vmap_diffusion2d_matches_loop(self, grid2d):
+        """Diffusion2D vmapped over a batch must match per-field eager calls."""
+        diff_op = Diffusion2D(grid=grid2d)
+        rng = jax.random.PRNGKey(4)
+        batch = jax.random.normal(rng, (4, grid2d.Ny, grid2d.Nx))
+        kappa = 1e-2
+
+        loop_results = jnp.stack([diff_op(batch[i], kappa=kappa) for i in range(4)])
+        vmap_result = jax.vmap(lambda h: diff_op(h, kappa=kappa))(batch)
 
         np.testing.assert_allclose(vmap_result, loop_results, rtol=1e-7)
