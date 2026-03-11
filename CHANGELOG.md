@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.0.24](https://github.com/jejjohnson/finitevolX/compare/v0.0.23...v0.0.24) (2026-03-11)
+
+
+### Bug Fixes
+
+* **masks:** correct psi_irrbound index offset and x/y swap ([add4d36](https://github.com/jejjohnson/finitevolX/commit/add4d36cfd22404a7abb453c08cca9c458cb7727))
+* **masks:** correct vorticity boundary adjacency at w-points ([648099f](https://github.com/jejjohnson/finitevolX/commit/648099f06e331cbfbbc6d6bb788c7d51ba42495c))
+* **notebooks:** use correct from_interior API (Lx/Ly not dx/dy) ([a158663](https://github.com/jejjohnson/finitevolX/commit/a158663d9851edcb93ef000fa6aa1bbe4cfb37f1))
+* **tests:** replace ambiguous multiplication sign with ASCII x ([84332db](https://github.com/jejjohnson/finitevolX/commit/84332db6dff25ce9283c9d6326dfdadb305b489a))
+
 ## [0.0.23](https://github.com/jejjohnson/finitevolX/compare/v0.0.22...v0.0.23) (2026-03-11)
 
 
