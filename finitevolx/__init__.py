@@ -104,6 +104,10 @@ from finitevolx._src.solvers.spectral_transforms import (
     idst,
     idstn,
 )
+from finitevolx._src.solvers.tridiagonal import (
+    solve_tridiagonal,
+    solve_tridiagonal_batched,
+)
 from finitevolx._src.timestepping._solve import solve_ocean_pde
 from finitevolx._src.timestepping.diffrax_solvers import (
     IMEX_SSP2,
@@ -272,6 +276,9 @@ __all__ = [
     "make_spectral_preconditioner",
     "masked_laplacian",
     "solve_cg",
+    # Tridiagonal (TDMA) solver
+    "solve_tridiagonal",
+    "solve_tridiagonal_batched",
     # Time integration — pure functional
     "euler_step",
     "heun_step",
