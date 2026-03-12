@@ -170,10 +170,17 @@ def build_capacitance_solver(
     mask : np.ndarray of bool shape (Ny, Nx), or ArakawaCGridMask
         Physical domain mask.  ``True`` = interior (ocean/fluid),
         ``False`` = exterior (land/walls).
+
+        When a plain array is passed, inner-boundary points are computed
+        as wet (``True``) cells that are 4-connected to at least one dry
+        (``False``) cell.
+
         When an :class:`ArakawaCGridMask` is passed, the ``psi``
-        staggering mask is used (strict: all 4 surrounding h-cells wet),
-        and the precomputed ``psi_irrbound_xids`` / ``psi_irrbound_yids``
-        are used as irregular-boundary indices.
+        staggering mask is used and the precomputed
+        ``psi_irrbound_xids`` / ``psi_irrbound_yids`` supply the
+        inner-boundary indices directly.  These are **wet** points on
+        the psi grid that border at least one dry cell — the same
+        convention as the plain-array path.
     dx : float
         Grid spacing in x.
     dy : float
@@ -278,7 +285,7 @@ def _resolve_mask_arr(
     if mask is None:
         return None
     if isinstance(mask, ArakawaCGridMask):
-        return mask.psi.astype(float)
+        return jnp.asarray(mask.psi, dtype=jnp.float32)
     return mask
 
 
@@ -568,15 +575,11 @@ def pv_inversion(
     # lam_i is a JAX tracer inside vmap and Python-level ``if lam == 0``
     # branches in _spectral_solve would fail.
     if method == "capacitance":
-        if capacitance_solver is None:
-            raise ValueError(
-                "method='capacitance' requires a pre-built CapacitanceSolver"
-            )
-
-        def _solve_layer(
-            rhs: Float[Array, "Ny Nx"], _lam_i: float
-        ) -> Float[Array, "Ny Nx"]:
-            return capacitance_solver(rhs)
+        raise ValueError(
+            "method='capacitance' does not support array-valued lambda_; "
+            "solve each layer separately or use method='spectral' or 'cg' "
+            "for multi-layer problems."
+        )
 
     elif method == "cg":
         mask_arr = _resolve_mask_arr(mask)
@@ -614,8 +617,14 @@ def pv_inversion(
             f"method must be 'spectral', 'cg', or 'capacitance'; got {method!r}"
         )
 
-    # Reshape to (nl, Ny, Nx) for the vmap, then reshape back
+    # Flatten any leading batch dims: (..., nl, Ny, Nx) -> (batch, nl, Ny, Nx)
     shape = pv.shape
-    pv_3d = pv.reshape(nl, shape[-2], shape[-1])
-    out = jax.vmap(_solve_layer)(pv_3d, lam)
-    return out.reshape(shape)
+    ny, nx = shape[-2], shape[-1]
+    pv_4d = pv.reshape(-1, nl, ny, nx)
+
+    # vmap over layer axis (pairing each layer with its lambda)
+    _solve_layers = jax.vmap(_solve_layer, in_axes=(0, 0))
+
+    # vmap over the (flattened) batch axis
+    out_4d = jax.vmap(lambda batch: _solve_layers(batch, lam))(pv_4d)
+    return out_4d.reshape(shape)
