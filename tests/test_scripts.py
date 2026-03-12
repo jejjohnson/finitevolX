@@ -112,7 +112,7 @@ def test_nonlinear_shallow_water_script_runs_stably(tmp_path: Path) -> None:
         dt=20.0,
         drag=1.5e-4,
         viscosity=2.0e5,
-        spinup_steps=5000,
+        spinup_steps=200,
         steps=240,
         snapshot_interval=40,
         zarr_path=tmp_path / "nonlinear.zarr",

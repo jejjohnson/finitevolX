@@ -283,7 +283,7 @@ class QuasiGeostrophicConfig:
 
     Use a smaller test case for CI smoke checks::
 
-        config = QuasiGeostrophicConfig(nx=64, ny=64, steps=400)
+        config = QuasiGeostrophicConfig(nx=24, ny=24, steps=400)
     """
 
     nx: int = 64

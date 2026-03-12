@@ -59,7 +59,7 @@ jax.config.update("jax_enable_x64", True)
 
 
 def to_wall_field(field: xr.DataArray) -> Array:
-    """Pad an interior ``xarray`` field with zero (no-normal-flow wall) ghost cells."""
+    """Pad an interior ``xarray`` field with homogeneous Dirichlet (zero) ghost cells."""
     interior = jnp.asarray(field.to_numpy())
     return jnp.pad(interior, pad_width=1, mode="constant")
 
@@ -322,7 +322,18 @@ def run_simulation(config: ShallowWaterConfig | None = None) -> xr.Dataset:
     u = jnp.zeros_like(eta)
     v = jnp.zeros_like(eta)
     coriolis = to_wall_field(forcing["coriolis"])
+    # Edge-pad Coriolis so interpolations (T->U/V) near walls see physical
+    # values instead of artificially vanishing ghost cells.
+    coriolis = coriolis.at[0, :].set(coriolis[1, :])
+    coriolis = coriolis.at[-1, :].set(coriolis[-2, :])
+    coriolis = coriolis.at[:, 0].set(coriolis[:, 1])
+    coriolis = coriolis.at[:, -1].set(coriolis[:, -2])
     wind_u = to_wall_field(forcing["wind_u"])
+    # Edge-pad wind forcing for the same reason as Coriolis above.
+    wind_u = wind_u.at[0, :].set(wind_u[1, :])
+    wind_u = wind_u.at[-1, :].set(wind_u[-2, :])
+    wind_u = wind_u.at[:, 0].set(wind_u[:, 1])
+    wind_u = wind_u.at[:, -1].set(wind_u[:, -2])
 
     viscosity = config.viscosity
     gravity = config.gravity

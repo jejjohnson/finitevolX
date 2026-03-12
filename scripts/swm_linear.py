@@ -198,7 +198,12 @@ def make_preprocessing_dataset(
 
 
 def to_wall_field(field: xr.DataArray) -> Float[Array, "Ny Nx"]:
-    """Pad an interior ``xarray`` field with zero (no-normal-flow wall) ghost cells.
+    """Pad an interior ``xarray`` field with homogeneous Dirichlet (zero) ghost cells.
+
+    All ghost cells are set to zero.  This is appropriate for prognostic
+    fields (eta, u, v) where a literal zero boundary value is desired.
+    For static fields like Coriolis or wind forcing, consider overwriting
+    the ghost cells with edge values after calling this function.
 
     Parameters
     ----------
@@ -209,7 +214,7 @@ def to_wall_field(field: xr.DataArray) -> Float[Array, "Ny Nx"]:
     -------
     Float[Array, "Ny Nx"]
         Full field of shape ``[Ny+2, Nx+2]`` with interior values preserved and
-        ghost cells set to zero (homogeneous Dirichlet wall boundary condition).
+        ghost cells set to zero (homogeneous Dirichlet boundary condition).
 
     Examples
     --------
@@ -340,7 +345,18 @@ def run_simulation(config: LinearShallowWaterConfig | None = None) -> xr.Dataset
     u = jnp.zeros_like(eta)
     v = jnp.zeros_like(eta)
     coriolis = to_wall_field(forcing["coriolis"])
+    # Edge-pad Coriolis so interpolations (T->U/V) near walls see physical
+    # values instead of artificially vanishing ghost cells.
+    coriolis = coriolis.at[0, :].set(coriolis[1, :])
+    coriolis = coriolis.at[-1, :].set(coriolis[-2, :])
+    coriolis = coriolis.at[:, 0].set(coriolis[:, 1])
+    coriolis = coriolis.at[:, -1].set(coriolis[:, -2])
     wind_u = to_wall_field(forcing["wind_u"])
+    # Edge-pad wind forcing for the same reason as Coriolis above.
+    wind_u = wind_u.at[0, :].set(wind_u[1, :])
+    wind_u = wind_u.at[-1, :].set(wind_u[-2, :])
+    wind_u = wind_u.at[:, 0].set(wind_u[:, 1])
+    wind_u = wind_u.at[:, -1].set(wind_u[:, -2])
 
     viscosity = config.viscosity
     gravity = config.gravity
