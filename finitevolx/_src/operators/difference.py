@@ -21,6 +21,49 @@ from jaxtyping import Array, Float
 
 from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
 
+# ======================================================================
+# Shared primitive implementations (used by both class and functional APIs)
+# ======================================================================
+
+
+def _curl_2d(
+    u: Float[Array, "Ny Nx"],
+    v: Float[Array, "Ny Nx"],
+    dx: float,
+    dy: float,
+) -> Float[Array, "Ny Nx"]:
+    """Curl (relative vorticity) at X-points.  Shared implementation.
+
+    zeta[j+1/2, i+1/2] = (v[j+1/2, i+1] - v[j+1/2, i]) / dx
+                        - (u[j+1, i+1/2] - u[j, i+1/2]) / dy
+    """
+    out = jnp.zeros_like(u)
+    # dv_dx[j+1/2, i+1/2] = (v[j+1/2, i+1] - v[j+1/2, i]) / dx
+    # du_dy[j+1/2, i+1/2] = (u[j+1, i+1/2] - u[j, i+1/2]) / dy
+    out = out.at[1:-1, 1:-1].set(
+        (v[1:-1, 2:] - v[1:-1, 1:-1]) / dx - (u[2:, 1:-1] - u[1:-1, 1:-1]) / dy
+    )
+    return out
+
+
+def _divergence_2d(
+    u: Float[Array, "Ny Nx"],
+    v: Float[Array, "Ny Nx"],
+    dx: float,
+    dy: float,
+) -> Float[Array, "Ny Nx"]:
+    """Divergence at T-points.  Shared implementation.
+
+    delta[j, i] = (u[j, i+1/2] - u[j, i-1/2]) / dx
+                + (v[j+1/2, i] - v[j-1/2, i]) / dy
+    """
+    out = jnp.zeros(u.shape, dtype=jnp.result_type(u, v))
+    # du_dx[j, i] = (u[j, i+1/2] - u[j, i-1/2]) / dx  →  (u[1:-1,1:-1] - u[1:-1,:-2]) / dx
+    du_dx = (u[1:-1, 1:-1] - u[1:-1, :-2]) / dx
+    # dv_dy[j, i] = (v[j+1/2, i] - v[j-1/2, i]) / dy  →  (v[1:-1,1:-1] - v[:-2,1:-1]) / dy
+    dv_dy = (v[1:-1, 1:-1] - v[:-2, 1:-1]) / dy
+    return out.at[1:-1, 1:-1].set(du_dx + dv_dy)
+
 
 class Difference1D(eqx.Module):
     """Finite-difference operators on a 1-D Arakawa C-grid.
@@ -300,7 +343,7 @@ class Difference2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Divergence at T-points.
         """
-        return self.diff_x_U_to_T(u) + self.diff_y_V_to_T(v)
+        return _divergence_2d(u, v, self.grid.dx, self.grid.dy)
 
     def curl(
         self,
@@ -325,15 +368,7 @@ class Difference2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Relative vorticity at X-points (corners).
         """
-        out = jnp.zeros_like(u)
-        # zeta[j+1/2, i+1/2] = dv/dx - du/dy
-        out = out.at[
-            1:-1, 1:-1
-        ].set(
-            (v[1:-1, 2:] - v[1:-1, 1:-1]) / self.grid.dx  # dv_dx[j+1/2, i+1/2]
-            - (u[2:, 1:-1] - u[1:-1, 1:-1]) / self.grid.dy  # du_dy[j+1/2, i+1/2]
-        )
-        return out
+        return _curl_2d(u, v, self.grid.dx, self.grid.dy)
 
     def laplacian(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """Laplacian at T-points.

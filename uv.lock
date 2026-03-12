@@ -489,7 +489,7 @@ wheels = [
 
 [[package]]
 name = "finitevolx"
-version = "0.0.20"
+version = "0.0.24"
 source = { editable = "." }
 dependencies = [
     { name = "beartype" },
