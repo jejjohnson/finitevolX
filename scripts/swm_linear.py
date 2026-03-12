@@ -7,6 +7,8 @@ wind-driven linear shallow-water model on a beta-plane with closed-basin BCs. Th
 script uses ``xarray`` for coordinate-aware preprocessing and postprocessing,
 writes sampled fields to a Zarr store, and saves a static before/after figure.
 
+Time integration uses ``finitevolx.heun_step`` (Heun/RK2 predictor-corrector).
+
 The prognostic variables are the free-surface anomaly ``eta`` at T-points and the
 velocity components ``u`` and ``v`` on the C-grid faces. The linearised equations
 are
@@ -49,6 +51,7 @@ from finitevolx import (
     Difference2D,
     Interpolation2D,
     Vorticity2D,
+    heun_step,
     pad_interior,
 )
 
@@ -387,6 +390,18 @@ def run_simulation(config: LinearShallowWaterConfig | None = None) -> xr.Dataset
         v_rhs = v_rhs - drag * v_field + viscosity * diff.laplacian(v_field)
         return eta_rhs, u_rhs, v_rhs
 
+    def apply_bc(
+        state: tuple[Float[Array, "Ny Nx"], ...],
+    ) -> tuple[Float[Array, "Ny Nx"], ...]:
+        """Re-apply wall (zero ghost-cell) boundary conditions."""
+        return tuple(pad_interior(f, mode="constant") for f in state)
+
+    def rhs(
+        state: tuple[Float[Array, "Ny Nx"], ...],
+    ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
+        """Tendency with BC enforcement, for use with heun_step."""
+        return tendency(*apply_bc(state))
+
     @jax.jit
     def step(
         eta_field: Float[Array, "Ny Nx"],
@@ -394,17 +409,8 @@ def run_simulation(config: LinearShallowWaterConfig | None = None) -> xr.Dataset
         v_field: Float[Array, "Ny Nx"],
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
         """Advance one Heun step and refill the wall ghost cells."""
-        k1_eta, k1_u, k1_v = tendency(eta_field, u_field, v_field)
-        eta_stage = pad_interior(eta_field + dt * k1_eta, mode="constant")
-        u_stage = pad_interior(u_field + dt * k1_u, mode="constant")
-        v_stage = pad_interior(v_field + dt * k1_v, mode="constant")
-        k2_eta, k2_u, k2_v = tendency(eta_stage, u_stage, v_stage)
-        eta_next = pad_interior(
-            eta_field + 0.5 * dt * (k1_eta + k2_eta), mode="constant"
-        )
-        u_next = pad_interior(u_field + 0.5 * dt * (k1_u + k2_u), mode="constant")
-        v_next = pad_interior(v_field + 0.5 * dt * (k1_v + k2_v), mode="constant")
-        return eta_next, u_next, v_next
+        state = heun_step((eta_field, u_field, v_field), rhs, dt)
+        return apply_bc(state)
 
     snapshot_times: list[float] = []
     eta_snapshots: list[np.ndarray] = []

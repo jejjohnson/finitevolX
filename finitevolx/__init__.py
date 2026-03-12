@@ -104,6 +104,34 @@ from finitevolx._src.solvers.spectral_transforms import (
     idst,
     idstn,
 )
+from finitevolx._src.timestepping._solve import solve_ocean_pde
+from finitevolx._src.timestepping.diffrax_solvers import (
+    IMEX_SSP2,
+    RK3SSP,
+    SSP_RK2,
+    SSP_RK104,
+    AB2Solver,
+    ForwardEulerDfx,
+    LeapfrogRAFSolver,
+    RK2Heun,
+    RK4Classic,
+    SemiLagrangianSolver,
+    SplitExplicitRKSolver,
+)
+from finitevolx._src.timestepping.explicit_rk import (
+    euler_step,
+    heun_step,
+    rk3_ssp_step,
+    rk4_step,
+)
+from finitevolx._src.timestepping.imex import imex_ssp2_step
+from finitevolx._src.timestepping.multistep import (
+    ab2_step,
+    ab3_step,
+    leapfrog_raf_step,
+)
+from finitevolx._src.timestepping.semi_lagrangian import semi_lagrangian_step
+from finitevolx._src.timestepping.split_explicit import split_explicit_step
 from finitevolx._src.vertical.multilayer import multilayer
 from finitevolx._src.vertical.vertical_modes import (
     build_coupling_matrix,
@@ -244,4 +272,28 @@ __all__ = [
     "make_spectral_preconditioner",
     "masked_laplacian",
     "solve_cg",
+    # Time integration — pure functional
+    "euler_step",
+    "heun_step",
+    "rk3_ssp_step",
+    "rk4_step",
+    "ab2_step",
+    "ab3_step",
+    "leapfrog_raf_step",
+    "imex_ssp2_step",
+    "split_explicit_step",
+    "semi_lagrangian_step",
+    # Time integration — diffrax solvers
+    "ForwardEulerDfx",
+    "RK2Heun",
+    "RK3SSP",
+    "RK4Classic",
+    "SSP_RK2",
+    "SSP_RK104",
+    "IMEX_SSP2",
+    "AB2Solver",
+    "LeapfrogRAFSolver",
+    "SplitExplicitRKSolver",
+    "SemiLagrangianSolver",
+    "solve_ocean_pde",
 ]

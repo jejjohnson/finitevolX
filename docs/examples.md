@@ -1,9 +1,9 @@
 # Double-Gyre Example Scripts
 
-The repository now ships three example scripts that all use the current
-`finitevolx` API, use `xarray` for preprocessing and postprocessing, write
-sampled fields to Zarr, and save a static before/after comparison figure.
-None of the examples open a free-running interactive plot.
+The repository ships three example scripts that use the `finitevolx` API for
+spatial operators and `finitevolx.heun_step` for time integration.  Each script
+uses `xarray` for preprocessing and postprocessing, writes sampled fields to
+Zarr, and saves an animated GIF showing the field evolution over time.
 
 ## Running the examples
 
@@ -24,7 +24,7 @@ uv run python scripts/qg_1p5_layer.py
 Each script writes two artifacts by default:
 
 - a `*.zarr` directory with sampled model fields and diagnostics
-- a `*.png` comparison figure showing the initial and final state
+- a `*.gif` animated figure showing the field evolution over time
 
 Use `--output-dir` to choose a different location for the artifacts.
 
@@ -37,7 +37,7 @@ Script: `scripts/swm_linear.py`
 - `xarray` coordinates for the initial height anomaly, Coriolis field, and wind forcing
 - Zarr output fields: `eta`, `u`, `v`, `speed`, `relative_vorticity`, `kinetic_energy`, `mass_anomaly`
 
-![Linear shallow-water double gyre](images/linear_shallow_water_double_gyre.png)
+![Linear shallow-water double gyre](images/linear_shallow_water_double_gyre.gif)
 
 ## Nonlinear shallow-water model
 
@@ -48,7 +48,7 @@ Script: `scripts/shallow_water.py`
 - Compact Bernoulli and advective closure in the momentum equation
 - Zarr output fields: `eta`, `u`, `v`, `speed`, `relative_vorticity`, `kinetic_energy`, `minimum_depth`
 
-![Nonlinear shallow-water double gyre](images/shallow_water_double_gyre.png)
+![Nonlinear shallow-water double gyre](images/shallow_water_double_gyre.gif)
 
 ## 1.5-layer QG model
 
@@ -61,7 +61,7 @@ Script: `scripts/qg_1p5_layer.py`
 - Saved figure shows **relative vorticity** rather than streamfunction so the eddy field matches the expected diagnostic
 - Zarr output fields: `q`, `psi`, `u`, `v`, `speed`, `relative_vorticity`, `pv_enstrophy`
 
-![1.5-layer QG double gyre](images/qg_1p5_layer_double_gyre.png)
+![1.5-layer QG double gyre](images/qg_1p5_layer_double_gyre.gif)
 
 ## Stability checks
 

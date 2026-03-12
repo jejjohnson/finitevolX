@@ -489,10 +489,11 @@ wheels = [
 
 [[package]]
 name = "finitevolx"
-version = "0.0.25"
+version = "0.0.26"
 source = { editable = "." }
 dependencies = [
     { name = "beartype" },
+    { name = "diffrax" },
     { name = "equinox" },
     { name = "jax" },
     { name = "jaxlib" },
@@ -516,7 +517,6 @@ docs = [
 ]
 examples = [
     { name = "cyclopts" },
-    { name = "diffrax" },
     { name = "loguru" },
     { name = "matplotlib" },
     { name = "numpy" },
@@ -548,7 +548,7 @@ requires-dist = [
     { name = "beartype", specifier = ">=0.18.0" },
     { name = "coverage", marker = "extra == 'test'", specifier = ">=7.4.0" },
     { name = "cyclopts", marker = "extra == 'examples'", specifier = ">=0.8.0" },
-    { name = "diffrax", marker = "extra == 'examples'", specifier = ">=0.5.0" },
+    { name = "diffrax", specifier = ">=0.5.0" },
     { name = "equinox" },
     { name = "jax", specifier = ">=0.4.30" },
     { name = "jaxlib", specifier = ">=0.4.30" },

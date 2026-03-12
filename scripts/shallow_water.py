@@ -9,6 +9,8 @@ full layer thickness and the momentum equation includes the nonlinear advection
 term. ``xarray`` handles the coordinate-aware forcing and saved diagnostics, and
 the sampled fields are written to Zarr instead of being shown in a live plot.
 
+Time integration uses ``finitevolx.heun_step`` (Heun/RK2 predictor-corrector).
+
 The nonlinear model integrates
 
 - d(eta)/dt = -nabla . ((H + eta) * u_vec) + nu * nabla^2(eta)
@@ -52,6 +54,7 @@ from finitevolx import (
     Difference2D,
     Interpolation2D,
     Vorticity2D,
+    heun_step,
     pad_interior,
 )
 
@@ -396,22 +399,21 @@ def run_simulation(config: ShallowWaterConfig | None = None) -> xr.Dataset:
         v_rhs = v_rhs - drag * v_field + viscosity * diff.laplacian(v_field)
         return eta_rhs, u_rhs, v_rhs
 
+    def apply_bc(state: tuple[Array, ...]) -> tuple[Array, ...]:
+        """Re-apply wall (zero ghost-cell) boundary conditions."""
+        return tuple(pad_interior(f, mode="constant") for f in state)
+
+    def rhs(state: tuple[Array, ...]) -> tuple[Array, Array, Array]:
+        """Tendency with BC enforcement, for use with heun_step."""
+        return tendency(*apply_bc(state))
+
     @jax.jit
     def step(
         eta_field: Array, u_field: Array, v_field: Array
     ) -> tuple[Array, Array, Array]:
         """Advance one Heun step and refill the wall ghost cells."""
-        k1_eta, k1_u, k1_v = tendency(eta_field, u_field, v_field)
-        eta_stage = pad_interior(eta_field + dt * k1_eta, mode="constant")
-        u_stage = pad_interior(u_field + dt * k1_u, mode="constant")
-        v_stage = pad_interior(v_field + dt * k1_v, mode="constant")
-        k2_eta, k2_u, k2_v = tendency(eta_stage, u_stage, v_stage)
-        eta_next = pad_interior(
-            eta_field + 0.5 * dt * (k1_eta + k2_eta), mode="constant"
-        )
-        u_next = pad_interior(u_field + 0.5 * dt * (k1_u + k2_u), mode="constant")
-        v_next = pad_interior(v_field + 0.5 * dt * (k1_v + k2_v), mode="constant")
-        return eta_next, u_next, v_next
+        state = heun_step((eta_field, u_field, v_field), rhs, dt)
+        return apply_bc(state)
 
     snapshot_times: list[float] = []
     eta_snapshots: list[np.ndarray] = []
