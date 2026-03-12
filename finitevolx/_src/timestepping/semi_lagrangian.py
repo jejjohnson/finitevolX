@@ -73,14 +73,11 @@ def semi_lagrangian_step(
     x_dep = x_coords - u * dt / dx
     y_dep = y_coords - v * dt / dy
 
-    # Stack for map_coordinates: (ndim, Ny, Nx) with row=y, col=x
-    coords = jnp.stack([y_dep, x_dep], axis=0)
-
     mode = "wrap" if bc == "periodic" else "nearest"
 
     return jax.scipy.ndimage.map_coordinates(
         field,
-        coords,
+        [y_dep, x_dep],
         order=interp_order,
         mode=mode,
     )

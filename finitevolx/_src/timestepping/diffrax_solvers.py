@@ -40,6 +40,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jaxtyping import PyTree
+import numpy as np
 
 # ---------------------------------------------------------------------------
 # Explicit Runge-Kutta solvers (Butcher tableau)
@@ -88,10 +89,10 @@ class RK2Heun(dfx.AbstractERK):
     """
 
     tableau: ClassVar[dfx.ButcherTableau] = dfx.ButcherTableau(
-        c=jnp.array([1.0]),
-        b_sol=jnp.array([0.5, 0.5]),
-        b_error=jnp.zeros(2),
-        a_lower=(jnp.array([1.0]),),
+        c=np.array([1.0]),
+        b_sol=np.array([0.5, 0.5]),
+        b_error=np.zeros(2),
+        a_lower=(np.array([1.0]),),
     )
     interpolation_cls: ClassVar[Any] = (
         dfx.ThirdOrderHermitePolynomialInterpolation.from_k
@@ -114,12 +115,12 @@ class RK3SSP(dfx.AbstractERK):
     """
 
     tableau: ClassVar[dfx.ButcherTableau] = dfx.ButcherTableau(
-        c=jnp.array([1.0, 0.5]),
-        b_sol=jnp.array([1.0 / 6, 1.0 / 6, 2.0 / 3]),
-        b_error=jnp.zeros(3),
+        c=np.array([1.0, 0.5]),
+        b_sol=np.array([1.0 / 6, 1.0 / 6, 2.0 / 3]),
+        b_error=np.zeros(3),
         a_lower=(
-            jnp.array([1.0]),
-            jnp.array([0.25, 0.25]),
+            np.array([1.0]),
+            np.array([0.25, 0.25]),
         ),
     )
     interpolation_cls: ClassVar[Any] = (
@@ -143,13 +144,13 @@ class RK4Classic(dfx.AbstractERK):
     """
 
     tableau: ClassVar[dfx.ButcherTableau] = dfx.ButcherTableau(
-        c=jnp.array([0.5, 0.5, 1.0]),
-        b_sol=jnp.array([1.0 / 6, 1.0 / 3, 1.0 / 3, 1.0 / 6]),
-        b_error=jnp.zeros(4),
+        c=np.array([0.5, 0.5, 1.0]),
+        b_sol=np.array([1.0 / 6, 1.0 / 3, 1.0 / 3, 1.0 / 6]),
+        b_error=np.zeros(4),
         a_lower=(
-            jnp.array([0.5]),
-            jnp.array([0.0, 0.5]),
-            jnp.array([0.0, 0.0, 1.0]),
+            np.array([0.5]),
+            np.array([0.0, 0.5]),
+            np.array([0.0, 0.0, 1.0]),
         ),
     )
     interpolation_cls: ClassVar[Any] = (
@@ -164,10 +165,10 @@ class SSP_RK2(dfx.AbstractERK):
     """
 
     tableau: ClassVar[dfx.ButcherTableau] = dfx.ButcherTableau(
-        c=jnp.array([1.0]),
-        b_sol=jnp.array([0.5, 0.5]),
-        b_error=jnp.zeros(2),
-        a_lower=(jnp.array([1.0]),),
+        c=np.array([1.0]),
+        b_sol=np.array([0.5, 0.5]),
+        b_error=np.zeros(2),
+        a_lower=(np.array([1.0]),),
     )
     interpolation_cls: ClassVar[Any] = (
         dfx.ThirdOrderHermitePolynomialInterpolation.from_k
@@ -186,7 +187,7 @@ class SSP_RK104(dfx.AbstractERK):
 
     tableau: ClassVar[dfx.ButcherTableau] = dfx.ButcherTableau(
         # c[i] = sum(a_lower[i]) for i = 0..8 (excludes first stage c=0)
-        c=jnp.array(
+        c=np.array(
             [
                 1.0 / 6,
                 1.0 / 3,
@@ -199,22 +200,22 @@ class SSP_RK104(dfx.AbstractERK):
                 1.0,
             ]
         ),
-        b_sol=jnp.array([1.0 / 10] * 10),
-        b_error=jnp.zeros(10),
+        b_sol=np.array([1.0 / 10] * 10),
+        b_error=np.zeros(10),
         a_lower=(
             # Rows 1-4: all entries 1/6
-            jnp.array([1.0 / 6]),
-            jnp.array([1.0 / 6, 1.0 / 6]),
-            jnp.array([1.0 / 6, 1.0 / 6, 1.0 / 6]),
-            jnp.array([1.0 / 6, 1.0 / 6, 1.0 / 6, 1.0 / 6]),
+            np.array([1.0 / 6]),
+            np.array([1.0 / 6, 1.0 / 6]),
+            np.array([1.0 / 6, 1.0 / 6, 1.0 / 6]),
+            np.array([1.0 / 6, 1.0 / 6, 1.0 / 6, 1.0 / 6]),
             # Rows 5-9: 1/15 for cols 0-4, then 1/6 for later cols
             # (convex combination at stage 6: 3/5*y0 + 2/5*y5 maps 1/6 -> 1/15)
-            jnp.array([1.0 / 15, 1.0 / 15, 1.0 / 15, 1.0 / 15, 1.0 / 15]),
-            jnp.array([1.0 / 15, 1.0 / 15, 1.0 / 15, 1.0 / 15, 1.0 / 15, 1.0 / 6]),
-            jnp.array(
+            np.array([1.0 / 15, 1.0 / 15, 1.0 / 15, 1.0 / 15, 1.0 / 15]),
+            np.array([1.0 / 15, 1.0 / 15, 1.0 / 15, 1.0 / 15, 1.0 / 15, 1.0 / 6]),
+            np.array(
                 [1.0 / 15, 1.0 / 15, 1.0 / 15, 1.0 / 15, 1.0 / 15, 1.0 / 6, 1.0 / 6]
             ),
-            jnp.array(
+            np.array(
                 [
                     1.0 / 15,
                     1.0 / 15,
@@ -226,7 +227,7 @@ class SSP_RK104(dfx.AbstractERK):
                     1.0 / 6,
                 ]
             ),
-            jnp.array(
+            np.array(
                 [
                     1.0 / 15,
                     1.0 / 15,
@@ -286,21 +287,21 @@ class IMEX_SSP2(dfx.AbstractRungeKutta, dfx.AbstractImplicitSolver):
     tableau: ClassVar[dfx.MultiButcherTableau] = dfx.MultiButcherTableau(
         # Explicit part
         dfx.ButcherTableau(
-            c=jnp.array([1.0]),
-            b_sol=jnp.array([0.5, 0.5]),
-            b_error=jnp.zeros(2),
-            a_lower=(jnp.array([1.0]),),
+            c=np.array([1.0]),
+            b_sol=np.array([0.5, 0.5]),
+            b_error=np.zeros(2),
+            a_lower=(np.array([1.0]),),
         ),
         # Implicit part (SDIRK)
         # c1 = gamma (first stage), c[0] = a_lower[0][0] + a_diagonal[1]
         #    = (1 - 2*gamma) + gamma = 1 - gamma
         dfx.ButcherTableau(
-            c=jnp.array([1.0 - _GAMMA]),
-            b_sol=jnp.array([0.5, 0.5]),
-            b_error=jnp.zeros(2),
-            a_lower=(jnp.array([1.0 - 2.0 * _GAMMA]),),
-            a_diagonal=jnp.array([_GAMMA, _GAMMA]),
-            a_predictor=(jnp.array([1.0]),),
+            c=np.array([1.0 - _GAMMA]),
+            b_sol=np.array([0.5, 0.5]),
+            b_error=np.zeros(2),
+            a_lower=(np.array([1.0 - 2.0 * _GAMMA]),),
+            a_diagonal=np.array([_GAMMA, _GAMMA]),
+            a_predictor=(np.array([1.0]),),
             c1=_GAMMA,
         ),
     )
@@ -533,10 +534,9 @@ class SemiLagrangianSolver(dfx.AbstractSolver):
 
         x_dep = x_coords - u * dt
         y_dep = y_coords - v * dt
-        coords = jnp.stack([y_dep, x_dep], axis=0)
 
         y1 = jax.scipy.ndimage.map_coordinates(
-            y0, coords, order=self.interpolation_order, mode="wrap"
+            y0, [y_dep, x_dep], order=self.interpolation_order, mode="wrap"
         )
 
         dense_info = dict(y0=y0, y1=y1)
