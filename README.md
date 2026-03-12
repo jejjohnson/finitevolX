@@ -29,6 +29,9 @@ Harmonic and biharmonic diffusion operators, plus energy/enstrophy-conserving mo
 **Boundary Conditions**.
 Composable per-face boundary conditions (Dirichlet, Neumann, periodic, sponge, slip, Robin, etc.) with ghost-cell enforcement.
 
+**Time Integration**.
+Pure functional time steppers (Euler, Heun/RK2, SSP-RK3, RK4, AB2/AB3, Leapfrog+RAF, IMEX-SSP2, split-explicit) and [diffrax](https://docs.kidger.site/diffrax/)-based Butcher tableau solvers for adaptive stepping, checkpointing, and `SaveAt`. Semi-Lagrangian advection for large-CFL transport.
+
 **Elliptic Solvers**.
 Spectral Poisson/Helmholtz solvers (DST, DCT, FFT), capacitance matrix method for masked domains, and preconditioned conjugate gradient.
 
@@ -59,12 +62,13 @@ uv sync --all-extras
 ---
 ## ⏩ Examples<a id="examples"></a>
 
-The repository now ships three double-gyre examples that all use the current
-`finitevolx` API, use `xarray` for preprocessing and postprocessing, write
-sampled model fields to Zarr, and save an **animated GIF** showing the field
-evolution over time.  Each script accepts an optional `--spinup-steps` argument
-to run a silent spin-up phase before recording frames, which helps produce a
-recognisable double-gyre structure in the animation.
+The repository ships three double-gyre examples that use the `finitevolx` API
+for spatial operators and `finitevolx.heun_step` for time integration.  Each
+script uses `xarray` for preprocessing and postprocessing, writes sampled model
+fields to Zarr, and saves an **animated GIF** showing the field evolution over
+time.  Each script accepts an optional `--spinup-steps` argument to run a silent
+spin-up phase before recording frames, which helps produce a recognisable
+double-gyre structure in the animation.
 
 ### Linear shallow-water model
 
@@ -128,8 +132,11 @@ of the scripts.
 * [PyFVTool](https://github.com/simulkade/PyFVTool) - Finite Volume Tool in Python
 * [jaxinterp2d](https://github.com/adam-coogan/jaxinterp2d) - CartesianGrid interpolator for JAX
 * [ndimsplinejax](https://github.com/nmoteki/ndimsplinejax) - SplineGrid interpolator for JAX
+* [diffrax](https://docs.kidger.site/diffrax/) - JAX-native ODE/SDE solvers (used by finitevolX's time integration module)
 
 **Algorithms**
 
 * [Thiry et al, 2023](https://egusphere.copernicus.org/preprints/2023/egusphere-2023-1715/) | [MQGeometry 1.0](https://github.com/louity/MQGeometry) - the WENO reconstructions applied to the multilayer Quasi-Geostrophic equations, Arakawa Grid masks
 * [Roullet & Gaillard, 2021](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2021MS002663) | [pyRSW](https://github.com/pvthinker/pyRSW#pyrsw) - the WENO reconstructions applied to the shallow water equations
+* [Gottlieb, Shu & Tadmor, 2001](https://doi.org/10.1137/S003614450036757X) - Strong Stability-Preserving High-Order Time Discretization Methods (SSP-RK schemes)
+* [Ketcheson, 2008](https://doi.org/10.1137/07070485X) - Highly efficient SSP methods: SSP-RK(10,4) with 10 stages and effective CFL coefficient of 6
