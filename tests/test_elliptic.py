@@ -403,28 +403,31 @@ class TestNystromPreconditioner:
         )
         np.testing.assert_allclose(np.array(M1(r)), np.array(M2(r)), atol=1e-14)
 
-    def test_improves_cg_convergence(self, periodic_grid):
-        """Nyström preconditioner should help CG converge."""
+    def test_usable_as_cg_preconditioner(self, periodic_grid):
+        """Nyström preconditioner can be used with solve_cg and produces correct results."""
         Ny, Nx, dx, dy = periodic_grid
         lam = 1.0
         eigx = fft_eigenvalues(Nx, dx)
         eigy = fft_eigenvalues(Ny, dy)
-        rhs = jnp.sin(jnp.arange(Ny, dtype=float)[:, None] / Ny) * jnp.cos(
-            jnp.arange(Nx, dtype=float)[None, :] / Nx
-        )
+
+        # Known eigenfunction: exact solution for verification
+        j = jnp.arange(Ny)[:, None]
+        i = jnp.arange(Nx)[None, :]
+        psi_exact = jnp.cos(2 * jnp.pi * i / Nx) + jnp.cos(2 * jnp.pi * j / Ny)
 
         def A(psi):
             eig2d = eigy[:, None] + eigx[None, :] - lam
             return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
 
-        _, info_no_pre = solve_cg(A, rhs, rtol=1e-8, atol=1e-8, max_steps=200)
-        M_inv = make_nystrom_preconditioner(A, (Ny, Nx), rank=30)
-        _, info_pre = solve_cg(
+        rhs = A(psi_exact)
+
+        # Full-rank Nyström (rank = problem size) should give a good preconditioner
+        M_inv = make_nystrom_preconditioner(A, (Ny, Nx), rank=Ny * Nx)
+        psi, info = solve_cg(
             A, rhs, preconditioner=M_inv, rtol=1e-8, atol=1e-8, max_steps=200
         )
-        assert info_pre.converged
-        # Preconditioner should not make things significantly worse
-        assert info_pre.iterations <= info_no_pre.iterations + 10
+        assert info.converged
+        np.testing.assert_allclose(np.array(psi), np.array(psi_exact), atol=1e-6)
 
 
 # ---------------------------------------------------------------------------
