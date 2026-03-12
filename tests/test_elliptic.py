@@ -479,3 +479,194 @@ class TestCapacitanceSolver:
         np.testing.assert_allclose(
             np.array(psi_dst[s_dst._j_b, s_dst._i_b]), 0.0, atol=1e-10
         )
+
+
+# ---------------------------------------------------------------------------
+# Batched (vmap) solver tests
+# ---------------------------------------------------------------------------
+
+
+class TestVmapSpectralSolvers:
+    """Verify all solvers work under jax.vmap for multi-layer / batched solves."""
+
+    def test_helmholtz_dst_vmap(self, dirichlet_grid):
+        """Batched DST Helmholtz: each layer matches the single-layer solve."""
+        Ny, Nx, dx, dy = dirichlet_grid
+        nl = 3
+        lambdas = jnp.array([-0.5, -1.0, -2.0])
+        rhs = jnp.stack(
+            [
+                jnp.sin(jnp.arange(Ny, dtype=float)[:, None] * (l + 1))
+                * jnp.cos(jnp.arange(Nx, dtype=float)[None, :])
+                for l in range(nl)
+            ]
+        )
+        psi_batched = jax.vmap(lambda r, l: solve_helmholtz_dst(r, dx, dy, l))(
+            rhs, lambdas
+        )
+        assert psi_batched.shape == (nl, Ny, Nx)
+        for i in range(nl):
+            psi_single = solve_helmholtz_dst(rhs[i], dx, dy, float(lambdas[i]))
+            np.testing.assert_allclose(
+                np.array(psi_batched[i]), np.array(psi_single), atol=1e-12
+            )
+
+    def test_helmholtz_dct_vmap(self, neumann_grid):
+        """Batched DCT Helmholtz with per-mode lambda, including lambda=0."""
+        Ny, Nx, dx, dy = neumann_grid
+        nl = 4
+        lambdas = jnp.array([0.0, -0.5, -1.0, -2.0])
+        rhs = jnp.stack(
+            [
+                jnp.sin(jnp.arange(Ny, dtype=float)[:, None] * (l + 1))
+                * jnp.cos(jnp.arange(Nx, dtype=float)[None, :])
+                for l in range(nl)
+            ]
+        )
+        psi_batched = jax.vmap(lambda r, l: solve_helmholtz_dct(r, dx, dy, l))(
+            rhs, lambdas
+        )
+        assert psi_batched.shape == (nl, Ny, Nx)
+        for i in range(nl):
+            psi_single = solve_helmholtz_dct(rhs[i], dx, dy, float(lambdas[i]))
+            np.testing.assert_allclose(
+                np.array(psi_batched[i]), np.array(psi_single), atol=1e-12
+            )
+        # lambda=0 slice should match Poisson
+        psi_poisson = solve_poisson_dct(rhs[0], dx, dy)
+        np.testing.assert_allclose(
+            np.array(psi_batched[0]), np.array(psi_poisson), atol=1e-12
+        )
+
+    def test_helmholtz_fft_vmap(self, periodic_grid):
+        """Batched FFT Helmholtz with per-mode lambda, including lambda=0."""
+        Ny, Nx, dx, dy = periodic_grid
+        nl = 4
+        lambdas = jnp.array([0.0, -0.5, -1.0, -2.0])
+        rhs = jnp.stack(
+            [
+                jnp.sin(jnp.arange(Ny, dtype=float)[:, None] * (l + 1))
+                * jnp.cos(jnp.arange(Nx, dtype=float)[None, :])
+                for l in range(nl)
+            ]
+        )
+        psi_batched = jax.vmap(lambda r, l: solve_helmholtz_fft(r, dx, dy, l))(
+            rhs, lambdas
+        )
+        assert psi_batched.shape == (nl, Ny, Nx)
+        for i in range(nl):
+            psi_single = solve_helmholtz_fft(rhs[i], dx, dy, float(lambdas[i]))
+            np.testing.assert_allclose(
+                np.array(psi_batched[i]), np.array(psi_single), atol=1e-12
+            )
+        # lambda=0 slice should match Poisson
+        psi_poisson = solve_poisson_fft(rhs[0], dx, dy)
+        np.testing.assert_allclose(
+            np.array(psi_batched[0]), np.array(psi_poisson), atol=1e-12
+        )
+
+    def test_poisson_dst_vmap(self, dirichlet_grid):
+        """Batched DST Poisson."""
+        Ny, Nx, dx, dy = dirichlet_grid
+        nl = 3
+        rhs = jnp.stack(
+            [
+                jnp.sin(jnp.arange(Ny, dtype=float)[:, None] * (l + 1))
+                * jnp.cos(jnp.arange(Nx, dtype=float)[None, :])
+                for l in range(nl)
+            ]
+        )
+        psi_batched = jax.vmap(lambda r: solve_poisson_dst(r, dx, dy))(rhs)
+        assert psi_batched.shape == (nl, Ny, Nx)
+        for i in range(nl):
+            psi_single = solve_poisson_dst(rhs[i], dx, dy)
+            np.testing.assert_allclose(
+                np.array(psi_batched[i]), np.array(psi_single), atol=1e-12
+            )
+
+    def test_poisson_dct_vmap(self, neumann_grid):
+        """Batched DCT Poisson."""
+        Ny, Nx, dx, dy = neumann_grid
+        rhs = jnp.ones((3, Ny, Nx))
+        psi = jax.vmap(lambda r: solve_poisson_dct(r, dx, dy))(rhs)
+        assert psi.shape == (3, Ny, Nx)
+
+    def test_poisson_fft_vmap(self, periodic_grid):
+        """Batched FFT Poisson."""
+        Ny, Nx, dx, dy = periodic_grid
+        rhs = jnp.ones((3, Ny, Nx))
+        psi = jax.vmap(lambda r: solve_poisson_fft(r, dx, dy))(rhs)
+        assert psi.shape == (3, Ny, Nx)
+
+    def test_helmholtz_dct_vmap_lambda0(self, neumann_grid):
+        """Batched DCT Helmholtz with lambda=0 under vmap matches Poisson."""
+        Ny, Nx, dx, dy = neumann_grid
+        nl = 3
+        rhs = jnp.stack(
+            [
+                jnp.sin(jnp.arange(Ny, dtype=float)[:, None] * (l + 1))
+                * jnp.cos(jnp.arange(Nx, dtype=float)[None, :] * (l + 1))
+                for l in range(nl)
+            ]
+        )
+        psi_helm = jax.vmap(lambda r: solve_helmholtz_dct(r, dx, dy, lambda_=0.0))(rhs)
+        psi_pois = jax.vmap(lambda r: solve_poisson_dct(r, dx, dy))(rhs)
+        np.testing.assert_allclose(np.array(psi_helm), np.array(psi_pois), atol=1e-12)
+
+    def test_helmholtz_fft_vmap_lambda0(self, periodic_grid):
+        """Batched FFT Helmholtz with lambda=0 under vmap matches Poisson."""
+        Ny, Nx, dx, dy = periodic_grid
+        nl = 3
+        rhs = jnp.stack(
+            [
+                jnp.sin(jnp.arange(Ny, dtype=float)[:, None] * (l + 1))
+                * jnp.cos(jnp.arange(Nx, dtype=float)[None, :] * (l + 1))
+                for l in range(nl)
+            ]
+        )
+        psi_helm = jax.vmap(lambda r: solve_helmholtz_fft(r, dx, dy, lambda_=0.0))(rhs)
+        psi_pois = jax.vmap(lambda r: solve_poisson_fft(r, dx, dy))(rhs)
+        np.testing.assert_allclose(np.array(psi_helm), np.array(psi_pois), atol=1e-12)
+
+
+class TestVmapCapacitanceSolver:
+    """Verify CapacitanceSolver works under jax.vmap."""
+
+    def test_batched_matches_loop(self):
+        """Batched capacitance solve matches individual solves."""
+        Ny, Nx = 10, 12
+        mask = _build_rect_mask(Ny, Nx)
+        dx = 1.0 / (Nx - 1)
+        dy = 1.0 / (Ny - 1)
+        solver = build_capacitance_solver(mask, dx, dy, lambda_=-1.0, base_bc="fft")
+
+        nl = 3
+        j = jnp.arange(Ny)[:, None]
+        i = jnp.arange(Nx)[None, :]
+        rhs = jnp.stack(
+            [
+                jnp.sin(jnp.pi * j * (l + 1) / Ny) * jnp.cos(jnp.pi * i / Nx)
+                for l in range(nl)
+            ]
+        )
+        psi_batched = jax.vmap(solver)(rhs)
+        assert psi_batched.shape == (nl, Ny, Nx)
+        for l in range(nl):
+            psi_single = solver(rhs[l])
+            np.testing.assert_allclose(
+                np.array(psi_batched[l]), np.array(psi_single), atol=1e-10
+            )
+
+    def test_batched_bc_enforced(self):
+        """Boundary condition is enforced for every batch element."""
+        Ny, Nx = 10, 12
+        mask = _build_rect_mask(Ny, Nx)
+        dx = 1.0 / (Nx - 1)
+        dy = 1.0 / (Ny - 1)
+        solver = build_capacitance_solver(mask, dx, dy, lambda_=-1.0, base_bc="fft")
+
+        rhs = jnp.ones((4, Ny, Nx))
+        psi = jax.vmap(solver)(rhs)
+        for l in range(4):
+            bc_vals = psi[l][solver._j_b, solver._i_b]
+            np.testing.assert_allclose(np.array(bc_vals), 0.0, atol=1e-10)
