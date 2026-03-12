@@ -400,23 +400,13 @@ def _spectral_solve(
     lambda_: float,
     bc: str,
 ) -> Float[Array, "Ny Nx"]:
-    """Dispatch to the appropriate rectangular spectral solver."""
-    if bc == "fft":
-        return (
-            solve_poisson_fft(rhs, dx, dy)
-            if lambda_ == 0.0
-            else solve_helmholtz_fft(rhs, dx, dy, lambda_)
-        )
-    if bc == "dst":
-        return (
-            solve_poisson_dst(rhs, dx, dy)
-            if lambda_ == 0.0
-            else solve_helmholtz_dst(rhs, dx, dy, lambda_)
-        )
-    if bc == "dct":
-        return (
-            solve_poisson_dct(rhs, dx, dy)
-            if lambda_ == 0.0
-            else solve_helmholtz_dct(rhs, dx, dy, lambda_)
-        )
-    raise ValueError(f"base_bc must be 'fft', 'dst', or 'dct'; got {bc!r}")
+    """Dispatch to the appropriate rectangular spectral solver.
+
+    Uses the Helmholtz solvers unconditionally (they handle lambda=0
+    internally via null-mode guards) so that this function is safe to
+    call when *lambda_* is a JAX tracer (e.g. inside ``vmap``).
+    """
+    solver = _HELMHOLTZ_DISPATCH.get(bc)
+    if solver is None:
+        raise ValueError(f"base_bc must be 'fft', 'dst', or 'dct'; got {bc!r}")
+    return solver(rhs, dx, dy, lambda_)
