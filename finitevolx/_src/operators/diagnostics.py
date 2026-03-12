@@ -422,9 +422,9 @@ def qg_potential_vorticity(
         from finitevolx import multilayer, qg_potential_vorticity
 
         # Per-layer PV (vmapped over the layer axis)
-        q = multilayer(
-            lambda p: qg_potential_vorticity(p, f0, beta, dx, dy, y, y0)
-        )(psi)   # psi: [nl, Ny, Nx] -> q: [nl, Ny, Nx]
+        q = multilayer(lambda p: qg_potential_vorticity(p, f0, beta, dx, dy, y, y0))(
+            psi
+        )  # psi: [nl, Ny, Nx] -> q: [nl, Ny, Nx]
 
         # Cross-layer stretching (A couples layers, cannot be vmapped)
         q = q - stretching_term(A, psi)
@@ -494,9 +494,9 @@ def stretching_term(
     # Flatten spatial dims, matmul along layer axis, reshape back.
     nl = A.shape[0]
     Ny, Nx = psi.shape[-2], psi.shape[-1]
-    psi_flat = psi.reshape(nl, -1)       # [nl, Ny*Nx]
-    Ap_flat = A @ psi_flat               # [nl, Ny*Nx]
-    Ap = Ap_flat.reshape(nl, Ny, Nx)     # [nl, Ny, Nx]
+    psi_flat = psi.reshape(nl, -1)  # [nl, Ny*Nx]
+    Ap_flat = A @ psi_flat  # [nl, Ny*Nx]
+    Ap = Ap_flat.reshape(nl, Ny, Nx)  # [nl, Ny, Nx]
     out = jnp.zeros_like(psi)
     out = out.at[:, 1:-1, 1:-1].set(Ap[:, 1:-1, 1:-1])
     return out
@@ -613,13 +613,9 @@ def vertical_velocity(
     # du/dx[k, j, i] = (u[k, j, i] - u[k, j, i-1]) / dx
     # dv/dy[k, j, i] = (v[k, j, i] - v[k, j-1, i]) / dy
     du_dx = jnp.zeros_like(u)
-    du_dx = du_dx.at[:, 1:-1, 1:-1].set(
-        (u[:, 1:-1, 1:-1] - u[:, 1:-1, :-2]) / dx
-    )
+    du_dx = du_dx.at[:, 1:-1, 1:-1].set((u[:, 1:-1, 1:-1] - u[:, 1:-1, :-2]) / dx)
     dv_dy = jnp.zeros_like(v)
-    dv_dy = dv_dy.at[:, 1:-1, 1:-1].set(
-        (v[:, 1:-1, 1:-1] - v[:, :-2, 1:-1]) / dy
-    )
+    dv_dy = dv_dy.at[:, 1:-1, 1:-1].set((v[:, 1:-1, 1:-1] - v[:, :-2, 1:-1]) / dy)
     div_h = du_dx + dv_dy  # [Nz, Ny, Nx]
 
     if mask is not None:

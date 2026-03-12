@@ -57,9 +57,7 @@ def diff_lon_T_to_U(
     out = jnp.zeros_like(h)
     cos_on_U = 0.5 * (cos_lat_T[1:-1, 1:-1] + cos_lat_T[1:-1, 2:])
     metric = R * cos_on_U * dlon
-    out = out.at[1:-1, 1:-1].set(
-        (h[1:-1, 2:] - h[1:-1, 1:-1]) / metric
-    )
+    out = out.at[1:-1, 1:-1].set((h[1:-1, 2:] - h[1:-1, 1:-1]) / metric)
     return out
 
 
@@ -87,9 +85,7 @@ def diff_lat_T_to_V(
         Meridional derivative at V-points.
     """
     out = jnp.zeros_like(h)
-    out = out.at[1:-1, 1:-1].set(
-        (h[2:, 1:-1] - h[1:-1, 1:-1]) / (R * dlat)
-    )
+    out = out.at[1:-1, 1:-1].set((h[2:, 1:-1] - h[1:-1, 1:-1]) / (R * dlat))
     return out
 
 
@@ -123,9 +119,7 @@ def diff_lon_V_to_X(
     out = jnp.zeros_like(v)
     cos_on_X = 0.5 * (cos_lat_V[1:-1, 1:-1] + cos_lat_V[1:-1, 2:])
     metric = R * cos_on_X * dlon
-    out = out.at[1:-1, 1:-1].set(
-        (v[1:-1, 2:] - v[1:-1, 1:-1]) / metric
-    )
+    out = out.at[1:-1, 1:-1].set((v[1:-1, 2:] - v[1:-1, 1:-1]) / metric)
     return out
 
 
@@ -153,9 +147,7 @@ def diff_lat_U_to_X(
         Meridional derivative at X-points.
     """
     out = jnp.zeros_like(u)
-    out = out.at[1:-1, 1:-1].set(
-        (u[2:, 1:-1] - u[1:-1, 1:-1]) / (R * dlat)
-    )
+    out = out.at[1:-1, 1:-1].set((u[2:, 1:-1] - u[1:-1, 1:-1]) / (R * dlat))
     return out
 
 
@@ -193,9 +185,7 @@ def diff_lon_U_to_T(
     out = jnp.zeros_like(u)
     cos_T = cos_lat_T[1:-1, 1:-1]
     metric = R * cos_T * dlon
-    out = out.at[1:-1, 1:-1].set(
-        (u[1:-1, 1:-1] - u[1:-1, :-2]) / metric
-    )
+    out = out.at[1:-1, 1:-1].set((u[1:-1, 1:-1] - u[1:-1, :-2]) / metric)
     return out
 
 
@@ -223,9 +213,7 @@ def diff_lat_V_to_T(
         Meridional derivative at T-points.
     """
     out = jnp.zeros_like(v)
-    out = out.at[1:-1, 1:-1].set(
-        (v[1:-1, 1:-1] - v[:-2, 1:-1]) / (R * dlat)
-    )
+    out = out.at[1:-1, 1:-1].set((v[1:-1, 1:-1] - v[:-2, 1:-1]) / (R * dlat))
     return out
 
 
@@ -357,13 +345,11 @@ def divergence_sphere(
     # du/dlon at T: backward diff U -> T
     du_dlon = (u[1:-1, 1:-1] - u[1:-1, :-2]) / dlon
     # d(v*cos)/dlat at T: backward diff V -> T
-    v_cos_N = v[1:-1, 1:-1] * cos_lat_V[1:-1, 1:-1]   # north face
-    v_cos_S = v[:-2, 1:-1] * cos_lat_V[:-2, 1:-1]      # south face
+    v_cos_N = v[1:-1, 1:-1] * cos_lat_V[1:-1, 1:-1]  # north face
+    v_cos_S = v[:-2, 1:-1] * cos_lat_V[:-2, 1:-1]  # south face
     dvc_dlat = (v_cos_N - v_cos_S) / dlat
     cos_T = cos_lat_T[1:-1, 1:-1]
-    out = out.at[1:-1, 1:-1].set(
-        (du_dlon + dvc_dlat) / (R * cos_T)
-    )
+    out = out.at[1:-1, 1:-1].set((du_dlon + dvc_dlat) / (R * cos_T))
     return out
 
 
@@ -412,9 +398,7 @@ def curl_sphere(
     u_cos_S = u[1:-1, 1:-1] * cos_lat_U[1:-1, 1:-1]
     duc_dlat = (u_cos_N - u_cos_S) / dlat
     cos_X = cos_lat_X[1:-1, 1:-1]
-    out = out.at[1:-1, 1:-1].set(
-        (dv_dlon - duc_dlat) / (R * cos_X)
-    )
+    out = out.at[1:-1, 1:-1].set((dv_dlon - duc_dlat) / (R * cos_X))
     return out
 
 
@@ -514,22 +498,14 @@ def geostrophic_velocity_sphere(
     # Use the compact 4-point stencil (like grad_perp)
     # u_g[j, i+1/2] = -g/(f_on_U * R) * (h[j+1,i]+h[j+1,i+1]-h[j-1,i]-h[j-1,i+1])/(4*dlat)
     f_on_U = 0.5 * (f[1:-1, 1:-1] + f[1:-1, 2:])
-    dh_dlat_U = (
-        h[2:, 1:-1] + h[2:, 2:] - h[:-2, 1:-1] - h[:-2, 2:]
-    ) / (4.0 * dlat)
-    u_g = u_g.at[1:-1, 1:-1].set(
-        -gravity / (f_on_U * R) * dh_dlat_U
-    )
+    dh_dlat_U = (h[2:, 1:-1] + h[2:, 2:] - h[:-2, 1:-1] - h[:-2, 2:]) / (4.0 * dlat)
+    u_g = u_g.at[1:-1, 1:-1].set(-gravity / (f_on_U * R) * dh_dlat_U)
 
     # dh/dlon at V-points: average T→V of dh/dlon
     f_on_V = 0.5 * (f[1:-1, 1:-1] + f[2:, 1:-1])
     cos_on_V = 0.5 * (cos_lat_T[1:-1, 1:-1] + cos_lat_T[2:, 1:-1])
-    dh_dlon_V = (
-        h[1:-1, 2:] + h[2:, 2:] - h[1:-1, :-2] - h[2:, :-2]
-    ) / (4.0 * dlon)
-    v_g = v_g.at[1:-1, 1:-1].set(
-        gravity / (f_on_V * R * cos_on_V) * dh_dlon_V
-    )
+    dh_dlon_V = (h[1:-1, 2:] + h[2:, 2:] - h[1:-1, :-2] - h[2:, :-2]) / (4.0 * dlon)
+    v_g = v_g.at[1:-1, 1:-1].set(gravity / (f_on_V * R * cos_on_V) * dh_dlon_V)
 
     return u_g, v_g
 
@@ -585,7 +561,5 @@ def potential_vorticity_sphere(
 
     out = jnp.zeros_like(u)
     num = zeta[1:-1, 1:-1] + f_on_X
-    out = out.at[1:-1, 1:-1].set(
-        jnp.where(h_on_X == 0, jnp.nan, num / h_on_X)
-    )
+    out = out.at[1:-1, 1:-1].set(jnp.where(h_on_X == 0, jnp.nan, num / h_on_X))
     return out

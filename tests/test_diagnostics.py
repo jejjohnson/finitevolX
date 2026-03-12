@@ -269,7 +269,9 @@ class TestQGPotentialVorticity:
             jnp.arange(grid2d.Ny, dtype=float)[:, None] * grid2d.dy,
             (grid2d.Ny, grid2d.Nx),
         )
-        result = qg_potential_vorticity(psi, f0=1e-4, beta=1e-11, dx=grid2d.dx, dy=grid2d.dy, y=y, y0=0.0)
+        result = qg_potential_vorticity(
+            psi, f0=1e-4, beta=1e-11, dx=grid2d.dx, dy=grid2d.dy, y=y, y0=0.0
+        )
         assert result.shape == (grid2d.Ny, grid2d.Nx)
 
     def test_ghost_ring_zero(self, grid2d):
@@ -278,7 +280,9 @@ class TestQGPotentialVorticity:
             jnp.arange(grid2d.Ny, dtype=float)[:, None] * grid2d.dy,
             (grid2d.Ny, grid2d.Nx),
         )
-        result = qg_potential_vorticity(psi, f0=1e-4, beta=0.0, dx=grid2d.dx, dy=grid2d.dy, y=y, y0=0.0)
+        result = qg_potential_vorticity(
+            psi, f0=1e-4, beta=0.0, dx=grid2d.dx, dy=grid2d.dy, y=y, y0=0.0
+        )
         np.testing.assert_allclose(result[0, :], 0.0, atol=1e-10)
         np.testing.assert_allclose(result[-1, :], 0.0, atol=1e-10)
 
@@ -290,7 +294,9 @@ class TestQGPotentialVorticity:
             jnp.arange(grid2d.Ny, dtype=float)[:, None] * grid2d.dy,
             (grid2d.Ny, grid2d.Nx),
         )
-        result = qg_potential_vorticity(psi, f0=f0, beta=beta, dx=grid2d.dx, dy=grid2d.dy, y=y, y0=y0)
+        result = qg_potential_vorticity(
+            psi, f0=f0, beta=beta, dx=grid2d.dx, dy=grid2d.dy, y=y, y0=y0
+        )
         expected = beta * (y[1:-1, 1:-1] - y0) / f0
         np.testing.assert_allclose(result[1:-1, 1:-1], expected, rtol=1e-5)
 
@@ -302,7 +308,9 @@ class TestQGPotentialVorticity:
         y_arr = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
         X, Y = jnp.meshgrid(x, y_arr)
         psi = 0.5 * c * (X**2 + Y**2)
-        result = qg_potential_vorticity(psi, f0=f0, beta=beta, dx=grid2d.dx, dy=grid2d.dy, y=Y, y0=y0)
+        result = qg_potential_vorticity(
+            psi, f0=f0, beta=beta, dx=grid2d.dx, dy=grid2d.dy, y=Y, y0=y0
+        )
         np.testing.assert_allclose(result[1:-1, 1:-1], 2.0 * c / f0, rtol=1e-5)
 
     def test_multilayer_output_shape(self, grid2d):
@@ -314,7 +322,9 @@ class TestQGPotentialVorticity:
             (grid2d.Ny, grid2d.Nx),
         )
         qg_pv = multilayer(
-            lambda p: qg_potential_vorticity(p, f0=1e-4, beta=1e-11, dx=grid2d.dx, dy=grid2d.dy, y=y, y0=0.0)
+            lambda p: qg_potential_vorticity(
+                p, f0=1e-4, beta=1e-11, dx=grid2d.dx, dy=grid2d.dy, y=y, y0=0.0
+            )
         )
         A = jnp.eye(nl) * 0.01
         result = qg_pv(psi) - stretching_term(A, psi)
@@ -332,7 +342,9 @@ class TestQGPotentialVorticity:
         a_val = 0.1
         A = a_val * jnp.eye(nl)
         qg_pv = multilayer(
-            lambda p: qg_potential_vorticity(p, f0=f0, beta=0.0, dx=grid2d.dx, dy=grid2d.dy, y=y, y0=0.0)
+            lambda p: qg_potential_vorticity(
+                p, f0=f0, beta=0.0, dx=grid2d.dx, dy=grid2d.dy, y=y, y0=0.0
+            )
         )
         result = qg_pv(psi) - stretching_term(A, psi)
         # Laplacian of constant = 0, beta term = 0, so q = 0 - a_val*c
@@ -346,7 +358,9 @@ class TestQGPotentialVorticity:
         y = jnp.zeros((grid2d.Ny, grid2d.Nx))
         A = 0.01 * jnp.eye(nl)
         qg_pv = multilayer(
-            lambda p: qg_potential_vorticity(p, f0=1.0, beta=0.0, dx=grid2d.dx, dy=grid2d.dy, y=y, y0=0.0)
+            lambda p: qg_potential_vorticity(
+                p, f0=1.0, beta=0.0, dx=grid2d.dx, dy=grid2d.dy, y=y, y0=0.0
+            )
         )
         result = qg_pv(psi) - stretching_term(A, psi)
         for layer in range(nl):
@@ -366,7 +380,9 @@ class TestQGPotentialVorticity:
         psi_1 = 0.5 * Y**2
         psi = jnp.stack([psi_0, psi_1], axis=0)
         qg_pv = multilayer(
-            lambda p: qg_potential_vorticity(p, f0=f0, beta=beta, dx=grid2d.dx, dy=grid2d.dy, y=Y, y0=y0)
+            lambda p: qg_potential_vorticity(
+                p, f0=f0, beta=beta, dx=grid2d.dx, dy=grid2d.dy, y=Y, y0=y0
+            )
         )
         result = qg_pv(psi)
         # Both layers: laplacian = 1.0, q = 1.0/f0 = 1.0
@@ -445,8 +461,10 @@ class TestVerticalVelocity:
         for k in range(grid3d.Nz):
             expected_w = -(k + 1) * c * grid3d.dz
             np.testing.assert_allclose(
-                w[k + 1, 1:-1, 1:-1], expected_w, rtol=1e-5,
-                err_msg=f"w mismatch at level {k+1}",
+                w[k + 1, 1:-1, 1:-1],
+                expected_w,
+                rtol=1e-5,
+                err_msg=f"w mismatch at level {k + 1}",
             )
 
     def test_mask_zeroes_divergence(self, grid3d):
@@ -587,7 +605,9 @@ class TestJITCompatibility:
     def test_qg_pv_jit(self, grid2d):
         psi = jnp.ones((grid2d.Ny, grid2d.Nx))
         y = jnp.zeros((grid2d.Ny, grid2d.Nx))
-        fn = lambda p: qg_potential_vorticity(p, f0=1.0, beta=0.0, dx=grid2d.dx, dy=grid2d.dy, y=y, y0=0.0)
+        fn = lambda p: qg_potential_vorticity(
+            p, f0=1.0, beta=0.0, dx=grid2d.dx, dy=grid2d.dy, y=y, y0=0.0
+        )
         result_eager = fn(psi)
         result_jit = jax.jit(fn)(psi)
         np.testing.assert_allclose(result_jit, result_eager, atol=1e-10)
