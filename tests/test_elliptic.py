@@ -512,11 +512,17 @@ class TestVmapSpectralSolvers:
             )
 
     def test_helmholtz_dct_vmap(self, neumann_grid):
-        """Batched DCT Helmholtz with per-mode lambda."""
+        """Batched DCT Helmholtz with per-mode lambda, including lambda=0."""
         Ny, Nx, dx, dy = neumann_grid
-        nl = 3
-        lambdas = jnp.array([-0.5, -1.0, -2.0])
-        rhs = jnp.ones((nl, Ny, Nx))
+        nl = 4
+        lambdas = jnp.array([0.0, -0.5, -1.0, -2.0])
+        rhs = jnp.stack(
+            [
+                jnp.sin(jnp.arange(Ny, dtype=float)[:, None] * (l + 1))
+                * jnp.cos(jnp.arange(Nx, dtype=float)[None, :])
+                for l in range(nl)
+            ]
+        )
         psi_batched = jax.vmap(lambda r, l: solve_helmholtz_dct(r, dx, dy, l))(
             rhs, lambdas
         )
@@ -526,13 +532,24 @@ class TestVmapSpectralSolvers:
             np.testing.assert_allclose(
                 np.array(psi_batched[i]), np.array(psi_single), atol=1e-12
             )
+        # lambda=0 slice should match Poisson
+        psi_poisson = solve_poisson_dct(rhs[0], dx, dy)
+        np.testing.assert_allclose(
+            np.array(psi_batched[0]), np.array(psi_poisson), atol=1e-12
+        )
 
     def test_helmholtz_fft_vmap(self, periodic_grid):
-        """Batched FFT Helmholtz with per-mode lambda."""
+        """Batched FFT Helmholtz with per-mode lambda, including lambda=0."""
         Ny, Nx, dx, dy = periodic_grid
-        nl = 3
-        lambdas = jnp.array([-0.5, -1.0, -2.0])
-        rhs = jnp.ones((nl, Ny, Nx))
+        nl = 4
+        lambdas = jnp.array([0.0, -0.5, -1.0, -2.0])
+        rhs = jnp.stack(
+            [
+                jnp.sin(jnp.arange(Ny, dtype=float)[:, None] * (l + 1))
+                * jnp.cos(jnp.arange(Nx, dtype=float)[None, :])
+                for l in range(nl)
+            ]
+        )
         psi_batched = jax.vmap(lambda r, l: solve_helmholtz_fft(r, dx, dy, l))(
             rhs, lambdas
         )
@@ -542,6 +559,11 @@ class TestVmapSpectralSolvers:
             np.testing.assert_allclose(
                 np.array(psi_batched[i]), np.array(psi_single), atol=1e-12
             )
+        # lambda=0 slice should match Poisson
+        psi_poisson = solve_poisson_fft(rhs[0], dx, dy)
+        np.testing.assert_allclose(
+            np.array(psi_batched[0]), np.array(psi_poisson), atol=1e-12
+        )
 
     def test_poisson_dst_vmap(self, dirichlet_grid):
         """Batched DST Poisson."""
@@ -577,23 +599,33 @@ class TestVmapSpectralSolvers:
         assert psi.shape == (3, Ny, Nx)
 
     def test_helmholtz_dct_vmap_lambda0(self, neumann_grid):
-        """Batched DCT Helmholtz with lambda=0 matches Poisson (zero-mean gauge)."""
+        """Batched DCT Helmholtz with lambda=0 under vmap matches Poisson."""
         Ny, Nx, dx, dy = neumann_grid
-        rhs = jnp.sin(jnp.arange(Ny, dtype=float)[:, None]) * jnp.cos(
-            jnp.arange(Nx, dtype=float)[None, :]
+        nl = 3
+        rhs = jnp.stack(
+            [
+                jnp.sin(jnp.arange(Ny, dtype=float)[:, None] * (l + 1))
+                * jnp.cos(jnp.arange(Nx, dtype=float)[None, :] * (l + 1))
+                for l in range(nl)
+            ]
         )
-        psi_helm = solve_helmholtz_dct(rhs, dx, dy, lambda_=0.0)
-        psi_pois = solve_poisson_dct(rhs, dx, dy)
+        psi_helm = jax.vmap(lambda r: solve_helmholtz_dct(r, dx, dy, lambda_=0.0))(rhs)
+        psi_pois = jax.vmap(lambda r: solve_poisson_dct(r, dx, dy))(rhs)
         np.testing.assert_allclose(np.array(psi_helm), np.array(psi_pois), atol=1e-12)
 
     def test_helmholtz_fft_vmap_lambda0(self, periodic_grid):
-        """Batched FFT Helmholtz with lambda=0 matches Poisson (zero-mean gauge)."""
+        """Batched FFT Helmholtz with lambda=0 under vmap matches Poisson."""
         Ny, Nx, dx, dy = periodic_grid
-        rhs = jnp.sin(jnp.arange(Ny, dtype=float)[:, None]) * jnp.cos(
-            jnp.arange(Nx, dtype=float)[None, :]
+        nl = 3
+        rhs = jnp.stack(
+            [
+                jnp.sin(jnp.arange(Ny, dtype=float)[:, None] * (l + 1))
+                * jnp.cos(jnp.arange(Nx, dtype=float)[None, :] * (l + 1))
+                for l in range(nl)
+            ]
         )
-        psi_helm = solve_helmholtz_fft(rhs, dx, dy, lambda_=0.0)
-        psi_pois = solve_poisson_fft(rhs, dx, dy)
+        psi_helm = jax.vmap(lambda r: solve_helmholtz_fft(r, dx, dy, lambda_=0.0))(rhs)
+        psi_pois = jax.vmap(lambda r: solve_poisson_fft(r, dx, dy))(rhs)
         np.testing.assert_allclose(np.array(psi_helm), np.array(psi_pois), atol=1e-12)
 
 

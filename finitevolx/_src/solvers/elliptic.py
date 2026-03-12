@@ -311,12 +311,13 @@ def solve_helmholtz_dct(
     eigx = dct2_eigenvalues(Nx, dx)
     eigy = dct2_eigenvalues(Ny, dy)
     eig2d = eigy[:, None] + eigx[None, :] - lambda_
-    # Guard the (0,0) null mode when lambda_==0 (Poisson case).
-    # When lambda_!=0, eig2d[0,0] = -lambda_ which is safe.
-    eig2d_safe = jnp.where(eig2d == 0.0, 1.0, eig2d)
+    # Guard only the (0,0) null mode (Laplacian eigenvalues are ≤0 for DCT-II,
+    # so eig2d[0,0] = -lambda_ is zero only when lambda_==0).
+    is_null = eig2d[0, 0] == 0.0
+    eig2d_safe = eig2d.at[0, 0].set(jnp.where(is_null, 1.0, eig2d[0, 0]))
     psi_hat = rhs_hat / eig2d_safe
-    # Zero the (0,0) mode when it was singular (enforces zero-mean gauge)
-    psi_hat = jnp.where(eig2d == 0.0, 0.0, psi_hat)
+    # Zero the (0,0) mode when it was singular (enforces zero-mean gauge).
+    psi_hat = psi_hat.at[0, 0].set(jnp.where(is_null, 0.0, psi_hat[0, 0]))
     # Inverse 2-D DCT-II
     return idctn(psi_hat, type=2, axes=[0, 1])
 
@@ -399,10 +400,15 @@ def solve_helmholtz_fft(
     eigx = fft_eigenvalues(Nx, dx)
     eigy = fft_eigenvalues(Ny, dy)
     eig2d = eigy[:, None] + eigx[None, :] - lambda_
-    # Guard the (0,0) null mode when lambda_==0 (Poisson case).
-    eig2d_safe = jnp.where(eig2d == 0.0, 1.0, eig2d)
+    # Guard only the (0,0) null mode (FFT eigenvalues are ≤0, so
+    # eig2d[0,0] = -lambda_ is zero only when lambda_==0).
+    is_null = eig2d[0, 0] == 0.0
+    eig2d_safe = eig2d.at[0, 0].set(jnp.where(is_null, 1.0, eig2d[0, 0]))
     psi_hat = rhs_hat / eig2d_safe
-    psi_hat = jnp.where(eig2d == 0.0, 0.0, psi_hat)
+    # Zero the (0,0) mode with matching complex dtype.
+    psi_hat = psi_hat.at[0, 0].set(
+        jnp.where(is_null, jnp.zeros_like(psi_hat[0, 0]), psi_hat[0, 0])
+    )
     return jnp.real(jnp.fft.ifft2(psi_hat))
 
 
