@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.26](https://github.com/jejjohnson/finitevolX/compare/v0.0.25...v0.0.26) (2026-03-12)
+
+
+### Features
+
+* **scripts:** add eta output and spinup phase to QG model ([ada93ea](https://github.com/jejjohnson/finitevolX/commit/ada93ea3b6bf18b8ba7b28c687a598305b63ef7a))
+
+
+### Bug Fixes
+
+* correct double-gyre script physics and BCs ([0432d2a](https://github.com/jejjohnson/finitevolX/commit/0432d2a312f04cdc9c80a78a68a9bf8b5d1e7ce5))
+* **scripts:** address PR review comments ([2495633](https://github.com/jejjohnson/finitevolX/commit/24956332da6a0ca00f4d0aad73f98e8206d27f0e))
+* **scripts:** correct wind sign and switch SWM to closed-basin BCs ([d526fc2](https://github.com/jejjohnson/finitevolX/commit/d526fc2316a25c6908f2ade14ff91ba85697a945))
+
 ## [0.0.25](https://github.com/jejjohnson/finitevolX/compare/v0.0.24...v0.0.25) (2026-03-12)
 
 
