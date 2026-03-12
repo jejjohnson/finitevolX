@@ -16,9 +16,10 @@ from __future__ import annotations
 from collections.abc import Callable
 
 import jax
+from jaxtyping import PyTree
 
 
-def euler_step(state, rhs_fn: Callable, dt: float):
+def euler_step(state: PyTree, rhs_fn: Callable[[PyTree], PyTree], dt: float) -> PyTree:
     """Forward Euler: y_{n+1} = y_n + dt * f(y_n).
 
     Parameters
@@ -39,7 +40,7 @@ def euler_step(state, rhs_fn: Callable, dt: float):
     return jax.tree.map(lambda y, f: y + dt * f, state, k1)
 
 
-def heun_step(state, rhs_fn: Callable, dt: float):
+def heun_step(state: PyTree, rhs_fn: Callable[[PyTree], PyTree], dt: float) -> PyTree:
     """Heun (RK2) predictor-corrector.
 
     .. math::
@@ -70,7 +71,9 @@ def heun_step(state, rhs_fn: Callable, dt: float):
     return jax.tree.map(lambda y, f1, f2: y + 0.5 * dt * (f1 + f2), state, k1, k2)
 
 
-def rk3_ssp_step(state, rhs_fn: Callable, dt: float):
+def rk3_ssp_step(
+    state: PyTree, rhs_fn: Callable[[PyTree], PyTree], dt: float
+) -> PyTree:
     """3rd-order Strong-Stability-Preserving Runge-Kutta (Shu-Osher form).
 
     .. math::
@@ -118,7 +121,7 @@ def rk3_ssp_step(state, rhs_fn: Callable, dt: float):
     )
 
 
-def rk4_step(state, rhs_fn: Callable, dt: float):
+def rk4_step(state: PyTree, rhs_fn: Callable[[PyTree], PyTree], dt: float) -> PyTree:
     """Classic 4th-order Runge-Kutta.
 
     .. math::

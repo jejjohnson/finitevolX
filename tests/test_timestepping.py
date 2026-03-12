@@ -357,21 +357,26 @@ class TestAB3:
         np.testing.assert_allclose(float(y), exact, rtol=5e-3)
 
     def test_convergence_rate(self):
-        """AB3 should converge at order ~3."""
+        """AB3 should converge at order ~3.
+
+        Bootstrap with RK3-SSP (order 3) so that startup error doesn't mask
+        the third-order asymptotic rate.
+        """
         y0 = jnp.array(1.0)
         t_final = 1.0
         exact = float(jnp.exp(-t_final))
         errors = []
 
-        for dt in [0.05, 0.025, 0.0125]:
+        for dt in [0.02, 0.01, 0.005]:
             n_steps = int(round(t_final / dt))
-            rhs_0 = _exponential_decay(y0)
-            y1 = euler_step(y0, _exponential_decay, dt)
-            rhs_1 = _exponential_decay(y1)
-            y2 = euler_step(y1, _exponential_decay, dt)
+            # Bootstrap two steps with RK3-SSP (order 3)
+            y1 = rk3_ssp_step(y0, _exponential_decay, dt)
+            y2 = rk3_ssp_step(y1, _exponential_decay, dt)
+            # At the first AB3 call (state=y2), rhs_n=f(y2) is computed
+            # internally, so rhs_nm1=f(y1) and rhs_nm2=f(y0).
+            rhs_nm2 = _exponential_decay(y0)
+            rhs_nm1 = _exponential_decay(y1)
             y = y2
-            rhs_nm1 = rhs_1
-            rhs_nm2 = rhs_0
             for _ in range(n_steps - 2):
                 y, rhs_n, _ = ab3_step(y, _exponential_decay, dt, rhs_nm1, rhs_nm2)
                 rhs_nm2 = rhs_nm1
@@ -379,7 +384,7 @@ class TestAB3:
             errors.append(abs(float(y) - exact))
 
         rate = np.log2(errors[-2] / errors[-1])
-        assert rate > 1.8, f"AB3 expected order >=2, got {rate:.2f}"
+        assert rate > 2.5, f"AB3 expected order ~3, got {rate:.2f}"
 
 
 class TestLeapfrogRAF:

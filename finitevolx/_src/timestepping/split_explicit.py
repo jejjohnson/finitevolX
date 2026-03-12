@@ -17,17 +17,18 @@ from __future__ import annotations
 from collections.abc import Callable
 
 import jax
+from jaxtyping import PyTree
 
 
 def split_explicit_step(
-    state_3d,
-    state_2d,
-    rhs_3d: Callable,
-    rhs_2d: Callable,
-    couple_2d_to_3d: Callable,
+    state_3d: PyTree,
+    state_2d: PyTree,
+    rhs_3d: Callable[[PyTree, PyTree], PyTree],
+    rhs_2d: Callable[[float, PyTree, PyTree], PyTree],
+    couple_2d_to_3d: Callable[[PyTree, PyTree], PyTree],
     dt_slow: float,
     n_substeps: int,
-):
+) -> tuple[PyTree, PyTree]:
     """Split-explicit barotropic/baroclinic time step.
 
     Algorithm::
@@ -64,6 +65,9 @@ def split_explicit_step(
     tuple[PyTree, PyTree]
         ``(new_state_3d, new_state_2d)`` after the split-explicit step.
     """
+    if n_substeps < 1:
+        raise ValueError(f"n_substeps must be >= 1, got {n_substeps}")
+
     dt_fast = dt_slow / n_substeps
 
     # --- Fast (barotropic) subcycling ---

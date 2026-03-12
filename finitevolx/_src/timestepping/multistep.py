@@ -15,9 +15,12 @@ from __future__ import annotations
 from collections.abc import Callable
 
 import jax
+from jaxtyping import PyTree
 
 
-def ab2_step(state, rhs_fn: Callable, dt: float, rhs_nm1):
+def ab2_step(
+    state: PyTree, rhs_fn: Callable[[PyTree], PyTree], dt: float, rhs_nm1: PyTree
+) -> tuple[PyTree, PyTree, PyTree]:
     """2nd-order Adams-Bashforth.
 
     .. math::
@@ -54,7 +57,13 @@ def ab2_step(state, rhs_fn: Callable, dt: float, rhs_nm1):
     return new_state, rhs_n, rhs_nm1
 
 
-def ab3_step(state, rhs_fn: Callable, dt: float, rhs_nm1, rhs_nm2):
+def ab3_step(
+    state: PyTree,
+    rhs_fn: Callable[[PyTree], PyTree],
+    dt: float,
+    rhs_nm1: PyTree,
+    rhs_nm2: PyTree,
+) -> tuple[PyTree, PyTree, PyTree]:
     """3rd-order Adams-Bashforth.
 
     .. math::
@@ -97,12 +106,12 @@ def ab3_step(state, rhs_fn: Callable, dt: float, rhs_nm1, rhs_nm2):
 
 
 def leapfrog_raf_step(
-    state,
-    state_nm1,
-    rhs_fn: Callable,
+    state: PyTree,
+    state_nm1: PyTree,
+    rhs_fn: Callable[[PyTree], PyTree],
     dt: float,
     alpha: float = 0.05,
-):
+) -> tuple[PyTree, PyTree]:
     """Leapfrog with Robert-Asselin filter.
 
     .. math::

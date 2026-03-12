@@ -340,12 +340,15 @@ class AB2Solver(eqx.Module):
     f_prev: PyTree | None = None
 
     def init(self, rhs_fn: Callable, t0: float, y0, dt: float):
-        """Bootstrap with an RK2 step, returning ``(updated_solver, y1)``."""
+        """Bootstrap with an RK2 step, returning ``(updated_solver, y1)``.
+
+        Stores ``f_prev = f(t0, y0)`` (i.e. the RHS at the start of the
+        bootstrap step) so that the first AB2 step uses the correct history.
+        """
         k1 = rhs_fn(t0, y0)
         k2 = rhs_fn(t0 + dt, jax.tree.map(lambda y, f: y + dt * f, y0, k1))
         y1 = jax.tree.map(lambda y, f1, f2: y + 0.5 * dt * (f1 + f2), y0, k1, k2)
-        f_prev = rhs_fn(t0 + dt, y1)
-        return eqx.tree_at(lambda s: s.f_prev, self, f_prev), y1
+        return eqx.tree_at(lambda s: s.f_prev, self, k1), y1
 
     def step(self, rhs_fn: Callable, t: float, y, dt: float):
         """AB2 step: ``y_{n+1} = y_n + (dt/2)(3 f_n - f_{n-1})``."""
@@ -503,10 +506,11 @@ class SemiLagrangianSolver(dfx.AbstractSolver):
     Parameters
     ----------
     interpolation_order : int
-        1 = linear (diffusive, monotone), 3 = cubic (accurate, may oscillate).
+        0 = nearest-neighbour, 1 = linear (diffusive, monotone).
+        JAX currently only supports ``order <= 1``.
     """
 
-    term_structure: ClassVar[Any] = dfx.ODETerm
+    term_structure: ClassVar[Any] = dfx.AbstractTerm
     interpolation_cls: ClassVar[Any] = (
         dfx.ThirdOrderHermitePolynomialInterpolation.from_k
     )

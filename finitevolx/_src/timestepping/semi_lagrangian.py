@@ -60,6 +60,13 @@ def semi_lagrangian_step(
     Array[Ny, Nx]
         Advected field.
     """
+    if bc not in {"periodic", "edge"}:
+        raise ValueError(f"bc must be 'periodic' or 'edge', got {bc!r}")
+    if interp_order not in {0, 1}:
+        raise ValueError(
+            f"interp_order must be 0 or 1 (JAX limitation), got {interp_order}"
+        )
+
     ny, nx = field.shape
 
     # Target grid coordinates (in index space)

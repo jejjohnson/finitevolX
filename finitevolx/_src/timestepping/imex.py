@@ -17,18 +17,19 @@ from collections.abc import Callable
 import math
 
 import jax
+from jaxtyping import PyTree
 
 #: IMEX-SSP2 parameter: gamma = 1 - 1/sqrt(2)
 _GAMMA = 1.0 - 1.0 / math.sqrt(2.0)
 
 
 def imex_ssp2_step(
-    state,
-    rhs_explicit: Callable,
-    rhs_implicit: Callable,
-    implicit_solve: Callable,
+    state: PyTree,
+    rhs_explicit: Callable[[PyTree], PyTree],
+    rhs_implicit: Callable[[PyTree], PyTree],
+    implicit_solve: Callable[[PyTree, float], PyTree],
     dt: float,
-):
+) -> PyTree:
     """IMEX-SSP2(2,2,2) time step.
 
     The explicit part is SSP with C = 1; the implicit part is A-stable and
