@@ -383,6 +383,40 @@ class TestPVInversionCG:
         np.testing.assert_allclose(outside, 0.0, atol=1e-12)
 
 
+class TestPVInversionBatchDims:
+    def test_array_lambda_with_batch_dims(self, dirichlet_grid):
+        """Array lambda with leading batch dims: (batch, nl, Ny, Nx)."""
+        Ny, Nx, dx, dy = dirichlet_grid
+        j = jnp.arange(Ny)[:, None]
+        i = jnp.arange(Nx)[None, :]
+        psi_exact = jnp.sin(jnp.pi * (j + 1) / (Ny + 1)) * jnp.sin(
+            jnp.pi * (i + 1) / (Nx + 1)
+        )
+        lx0 = dst1_eigenvalues(Nx, dx)[0]
+        ly0 = dst1_eigenvalues(Ny, dy)[0]
+
+        lambdas = jnp.array([-0.5, -1.0, -2.0])
+        nl = len(lambdas)
+        rhs_layers = jnp.stack(
+            [(lx0 + ly0 - lam) * psi_exact for lam in lambdas], axis=0
+        )
+        # Add a batch dimension: (2, nl, Ny, Nx)
+        rhs_batch = jnp.stack([rhs_layers, rhs_layers], axis=0)
+        assert rhs_batch.shape == (2, nl, Ny, Nx)
+
+        psi_out = pv_inversion(
+            rhs_batch, dx, dy, lambda_=lambdas, bc="dst", method="spectral"
+        )
+        assert psi_out.shape == (2, nl, Ny, Nx)
+        for b in range(2):
+            for k in range(nl):
+                np.testing.assert_allclose(
+                    np.array(psi_out[b, k]),
+                    np.array(psi_exact),
+                    atol=1e-9,
+                )
+
+
 class TestPVInversionErrors:
     def test_array_lambda_shape_mismatch(self, dirichlet_grid):
         """Mismatched lambda array length raises ValueError."""
@@ -399,6 +433,14 @@ class TestPVInversionErrors:
         lambdas = jnp.array([-0.5, -1.0])
         with pytest.raises(ValueError, match="at least 3 dims"):
             pv_inversion(pv, dx, dy, lambda_=lambdas, bc="dst")
+
+    def test_array_lambda_capacitance_raises(self, dirichlet_grid):
+        """Array lambda with method='capacitance' raises ValueError."""
+        Ny, Nx, dx, dy = dirichlet_grid
+        pv = jnp.ones((3, Ny, Nx))
+        lambdas = jnp.array([-0.5, -1.0, -2.0])
+        with pytest.raises(ValueError, match="does not support array-valued"):
+            pv_inversion(pv, dx, dy, lambda_=lambdas, bc="dst", method="capacitance")
 
 
 # ---------------------------------------------------------------------------

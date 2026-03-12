@@ -14,6 +14,7 @@ from finitevolx._src.solvers.elliptic import (
     dct2_eigenvalues,
     dst1_eigenvalues,
     fft_eigenvalues,
+    make_nystrom_preconditioner,
     make_spectral_preconditioner,
     masked_laplacian,
     solve_cg,
@@ -358,6 +359,72 @@ class TestSolveCG:
         _Ny, _Nx, dx, dy = periodic_grid
         with pytest.raises(ValueError, match="bc must be"):
             make_spectral_preconditioner(dx, dy, bc="invalid")
+
+
+# ---------------------------------------------------------------------------
+# Nyström preconditioner
+# ---------------------------------------------------------------------------
+
+
+class TestNystromPreconditioner:
+    def test_output_shape_and_dtype(self, periodic_grid):
+        """Preconditioner preserves shape and dtype."""
+        Ny, Nx, dx, dy = periodic_grid
+        lam = 1.0
+        eigx = fft_eigenvalues(Nx, dx)
+        eigy = fft_eigenvalues(Ny, dy)
+
+        def A(psi):
+            eig2d = eigy[:, None] + eigx[None, :] - lam
+            return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
+
+        M_inv = make_nystrom_preconditioner(A, (Ny, Nx), rank=20)
+        r = jnp.ones((Ny, Nx))
+        out = M_inv(r)
+        assert out.shape == (Ny, Nx)
+        assert out.dtype == r.dtype
+
+    def test_deterministic_with_fixed_key(self, periodic_grid):
+        """Same key produces identical preconditioners."""
+        Ny, Nx, dx, dy = periodic_grid
+        lam = 1.0
+        eigx = fft_eigenvalues(Nx, dx)
+        eigy = fft_eigenvalues(Ny, dy)
+
+        def A(psi):
+            eig2d = eigy[:, None] + eigx[None, :] - lam
+            return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
+
+        key = jax.random.PRNGKey(42)
+        M1 = make_nystrom_preconditioner(A, (Ny, Nx), rank=10, key=key)
+        M2 = make_nystrom_preconditioner(A, (Ny, Nx), rank=10, key=key)
+        r = jnp.sin(jnp.arange(Ny, dtype=float)[:, None]) * jnp.cos(
+            jnp.arange(Nx, dtype=float)[None, :]
+        )
+        np.testing.assert_allclose(np.array(M1(r)), np.array(M2(r)), atol=1e-14)
+
+    def test_improves_cg_convergence(self, periodic_grid):
+        """Nyström preconditioner should help CG converge."""
+        Ny, Nx, dx, dy = periodic_grid
+        lam = 1.0
+        eigx = fft_eigenvalues(Nx, dx)
+        eigy = fft_eigenvalues(Ny, dy)
+        rhs = jnp.sin(jnp.arange(Ny, dtype=float)[:, None] / Ny) * jnp.cos(
+            jnp.arange(Nx, dtype=float)[None, :] / Nx
+        )
+
+        def A(psi):
+            eig2d = eigy[:, None] + eigx[None, :] - lam
+            return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
+
+        _, info_no_pre = solve_cg(A, rhs, rtol=1e-8, atol=1e-8, max_steps=200)
+        M_inv = make_nystrom_preconditioner(A, (Ny, Nx), rank=30)
+        _, info_pre = solve_cg(
+            A, rhs, preconditioner=M_inv, rtol=1e-8, atol=1e-8, max_steps=200
+        )
+        assert info_pre.converged
+        # Preconditioner should not make things significantly worse
+        assert info_pre.iterations <= info_no_pre.iterations + 10
 
 
 # ---------------------------------------------------------------------------
