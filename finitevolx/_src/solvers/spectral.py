@@ -237,17 +237,19 @@ def solve_helmholtz_dct(
     Float[Array, "Ny Nx"]
         Solution ψ, same shape as *rhs*.
     """
-    if lambda_ == 0.0:
-        return solve_poisson_dct(rhs, dx, dy)
     Ny, Nx = rhs.shape
     # Forward 2-D DCT-II
     rhs_hat = dctn(rhs, type=2, axes=[0, 1])
-    # 2-D eigenvalue matrix: eig2d[0,0] = -lambda_ != 0 when lambda_ != 0
     eigx = dct2_eigenvalues(Nx, dx)
     eigy = dct2_eigenvalues(Ny, dy)
     eig2d = eigy[:, None] + eigx[None, :] - lambda_
-    # Spectral division
-    psi_hat = rhs_hat / eig2d
+    # Guard only the (0,0) null mode (Laplacian eigenvalues are ≤0 for DCT-II,
+    # so eig2d[0,0] = -lambda_ is zero only when lambda_==0).
+    is_null = eig2d[0, 0] == 0.0
+    eig2d_safe = eig2d.at[0, 0].set(jnp.where(is_null, 1.0, eig2d[0, 0]))
+    psi_hat = rhs_hat / eig2d_safe
+    # Zero the (0,0) mode when it was singular (enforces zero-mean gauge).
+    psi_hat = psi_hat.at[0, 0].set(jnp.where(is_null, 0.0, psi_hat[0, 0]))
     # Inverse 2-D DCT-II
     return idctn(psi_hat, type=2, axes=[0, 1])
 
@@ -325,15 +327,20 @@ def solve_helmholtz_fft(
     Float[Array, "Ny Nx"]
         Solution ψ (real), same shape as *rhs*.
     """
-    if lambda_ == 0.0:
-        return solve_poisson_fft(rhs, dx, dy)
     Ny, Nx = rhs.shape
     rhs_hat = jnp.fft.fft2(rhs)
     eigx = fft_eigenvalues(Nx, dx)
     eigy = fft_eigenvalues(Ny, dy)
-    # eig2d[0,0] = -lambda_ != 0 when lambda_ != 0
     eig2d = eigy[:, None] + eigx[None, :] - lambda_
-    psi_hat = rhs_hat / eig2d
+    # Guard only the (0,0) null mode (FFT eigenvalues are ≤0, so
+    # eig2d[0,0] = -lambda_ is zero only when lambda_==0).
+    is_null = eig2d[0, 0] == 0.0
+    eig2d_safe = eig2d.at[0, 0].set(jnp.where(is_null, 1.0, eig2d[0, 0]))
+    psi_hat = rhs_hat / eig2d_safe
+    # Zero the (0,0) mode with matching complex dtype.
+    psi_hat = psi_hat.at[0, 0].set(
+        jnp.where(is_null, jnp.zeros_like(psi_hat[0, 0]), psi_hat[0, 0])
+    )
     return jnp.real(jnp.fft.ifft2(psi_hat))
 
 
