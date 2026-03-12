@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.0.28](https://github.com/jejjohnson/finitevolX/compare/v0.0.27...v0.0.28) (2026-03-12)
+
+
+### Features
+
+* **elliptic:** make spectral Helmholtz solvers vmap-compatible ([9b6d51d](https://github.com/jejjohnson/finitevolX/commit/9b6d51db5193915123b23a131eb7c2cc7098b2db)), closes [#86](https://github.com/jejjohnson/finitevolX/issues/86)
+* **elliptic:** make spectral solvers vmap-compatible ([248ac5d](https://github.com/jejjohnson/finitevolX/commit/248ac5da988515b716c0411dae068f3e91ed9984))
+* **solvers:** add tridiagonal (TDMA) solver ([6d9e485](https://github.com/jejjohnson/finitevolX/commit/6d9e485e309761f67f76916e39f515132d9c121b))
+* **solvers:** add tridiagonal (TDMA) solver wrapping lineax ([1802ea6](https://github.com/jejjohnson/finitevolX/commit/1802ea6d1fab7f8828ed7c720b0bd9519caf48eb)), closes [#85](https://github.com/jejjohnson/finitevolX/issues/85)
+
+
+### Bug Fixes
+
+* **elliptic:** guard only (0,0) null mode, not full spectrum ([3c9f24e](https://github.com/jejjohnson/finitevolX/commit/3c9f24eec64769f329ca68dd0c174744d90e8901))
+* **tridiagonal:** document lineax throw=True error handling for singular systems ([60a0814](https://github.com/jejjohnson/finitevolX/commit/60a081439be07ae179be464d47a2ba5105bcb0cc))
+
 ## [0.0.27](https://github.com/jejjohnson/finitevolX/compare/v0.0.26...v0.0.27) (2026-03-12)
 
 
