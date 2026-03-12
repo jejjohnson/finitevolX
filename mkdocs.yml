@@ -49,6 +49,10 @@ nav:
       - Theory & Overview: time_integration.md
       - Usage Guide: time_integration_usage.md
       - API Reference: api/time_integration.md
+  - Elliptic Solvers:
+      - Theory & Overview: elliptic_solvers.md
+      - Usage Guide: elliptic_solvers_usage.md
+      - API Reference: api/elliptic.md
   - Examples: examples.md
   - API Reference:
       - Overview & Grids: api/index.md
@@ -62,7 +66,6 @@ nav:
       - Coriolis: api/coriolis.md
       - Momentum Advection: api/momentum.md
       - Boundary Conditions: api/boundary_conditions.md
-      - Elliptic Solvers: api/elliptic.md
   - Changelog: CHANGELOG.md
 
 markdown_extensions:
