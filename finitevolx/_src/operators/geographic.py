@@ -14,6 +14,10 @@ Grid point convention (same as Cartesian C-grid but with lon/lat):
 
 Interior-point idiom: output has the same shape as input, ghost ring
 is zero.
+
+**Pole handling**: operators that divide by ``cos(lat)`` produce
+``NaN`` where ``|cos(lat)| < eps`` (near the poles).  This makes
+pole singularities explicit rather than silently returning ``Inf``.
 """
 
 from __future__ import annotations
@@ -22,6 +26,24 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.constants import R_EARTH
+
+_COS_EPS = 1e-12  # guard against division by cos(lat) ≈ 0 near poles
+
+
+def _safe_div_cos(
+    numerator: Float[Array, "..."],
+    cos_val: Float[Array, "..."],
+    scale: float | Float[Array, "..."],
+) -> Float[Array, "..."]:
+    """Compute ``numerator / (scale * cos_val)`` with pole guard.
+
+    Returns NaN where ``|cos_val| < eps`` instead of Inf.
+    """
+    denom = scale * cos_val
+    safe_denom = jnp.where(jnp.abs(cos_val) < _COS_EPS, 1.0, denom)
+    result = numerator / safe_denom
+    return jnp.where(jnp.abs(cos_val) < _COS_EPS, jnp.nan, result)
+
 
 # ======================================================================
 # Spherical differences  (Issue #7)
@@ -56,8 +78,8 @@ def diff_lon_T_to_U(
     """
     out = jnp.zeros_like(h)
     cos_on_U = 0.5 * (cos_lat_T[1:-1, 1:-1] + cos_lat_T[1:-1, 2:])
-    metric = R * cos_on_U * dlon
-    out = out.at[1:-1, 1:-1].set((h[1:-1, 2:] - h[1:-1, 1:-1]) / metric)
+    numer = h[1:-1, 2:] - h[1:-1, 1:-1]
+    out = out.at[1:-1, 1:-1].set(_safe_div_cos(numer, cos_on_U, R * dlon))
     return out
 
 
@@ -118,8 +140,8 @@ def diff_lon_V_to_X(
     """
     out = jnp.zeros_like(v)
     cos_on_X = 0.5 * (cos_lat_V[1:-1, 1:-1] + cos_lat_V[1:-1, 2:])
-    metric = R * cos_on_X * dlon
-    out = out.at[1:-1, 1:-1].set((v[1:-1, 2:] - v[1:-1, 1:-1]) / metric)
+    numer = v[1:-1, 2:] - v[1:-1, 1:-1]
+    out = out.at[1:-1, 1:-1].set(_safe_div_cos(numer, cos_on_X, R * dlon))
     return out
 
 
@@ -184,8 +206,8 @@ def diff_lon_U_to_T(
     """
     out = jnp.zeros_like(u)
     cos_T = cos_lat_T[1:-1, 1:-1]
-    metric = R * cos_T * dlon
-    out = out.at[1:-1, 1:-1].set((u[1:-1, 1:-1] - u[1:-1, :-2]) / metric)
+    numer = u[1:-1, 1:-1] - u[1:-1, :-2]
+    out = out.at[1:-1, 1:-1].set(_safe_div_cos(numer, cos_T, R * dlon))
     return out
 
 
@@ -252,23 +274,25 @@ def diff2_lon_T(
     cos_T = cos_lat_T[1:-1, 1:-1]
     # (h[j,i+1] - 2*h[j,i] + h[j,i-1]) / dlon^2
     d2h = (h[1:-1, 2:] - 2.0 * h[1:-1, 1:-1] + h[1:-1, :-2]) / dlon**2
-    # d²h/dx² = d2h / (R² cos²(lat))
-    out = out.at[1:-1, 1:-1].set(d2h / (R**2 * cos_T**2))
+    # d²h/dx² = d2h / (R² cos²(lat));  NaN near poles
+    out = out.at[1:-1, 1:-1].set(_safe_div_cos(d2h, cos_T, R**2 * cos_T))
     return out
 
 
-def diff2_lat_T(
+def laplacian_merid_T(
     h: Float[Array, "Ny Nx"],
     cos_lat_T: Float[Array, "Ny Nx"],
     dlat: float,
     R: float = R_EARTH,
 ) -> Float[Array, "Ny Nx"]:
-    """Second meridional derivative at T-points on a sphere.
+    """Meridional term of the spherical Laplacian at T-points.
 
-    d²h/dy² = 1/(R² cos(lat)) * d/dlat(cos(lat) * dh/dlat)
+    1/(R² cos(lat)) * d/dlat(cos(lat) * dh/dlat)
 
-    This is the meridional part of the spherical Laplacian, accounting
-    for the convergence of meridians.
+    This is **not** a plain d²h/dy²; it includes the metric factor
+    ``1/cos(lat) * d/dlat(cos * ...)`` that accounts for convergence
+    of meridians.  Combined with :func:`diff2_lon_T` it gives the full
+    spherical Laplacian (see :func:`laplacian_sphere`).
 
     Parameters
     ----------
@@ -284,7 +308,8 @@ def diff2_lat_T(
     Returns
     -------
     Float[Array, "Ny Nx"]
-        Second meridional derivative at T-points.  Ghost ring is zero.
+        Meridional Laplacian term at T-points.  Ghost ring is zero.
+        NaN near the poles where ``|cos(lat)| < eps``.
     """
     out = jnp.zeros_like(h)
     cos_T = cos_lat_T[1:-1, 1:-1]
@@ -295,7 +320,7 @@ def diff2_lat_T(
     cos_N = 0.5 * (cos_T + cos_lat_T[2:, 1:-1])
     cos_S = 0.5 * (cos_T + cos_lat_T[:-2, 1:-1])
     d_cos_dh = (cos_N * dh_N - cos_S * dh_S) / dlat
-    out = out.at[1:-1, 1:-1].set(d_cos_dh / (R**2 * cos_T))
+    out = out.at[1:-1, 1:-1].set(_safe_div_cos(d_cos_dh, cos_T, R**2))
     return out
 
 
@@ -349,7 +374,7 @@ def divergence_sphere(
     v_cos_S = v[:-2, 1:-1] * cos_lat_V[:-2, 1:-1]  # south face
     dvc_dlat = (v_cos_N - v_cos_S) / dlat
     cos_T = cos_lat_T[1:-1, 1:-1]
-    out = out.at[1:-1, 1:-1].set((du_dlon + dvc_dlat) / (R * cos_T))
+    out = out.at[1:-1, 1:-1].set(_safe_div_cos(du_dlon + dvc_dlat, cos_T, R))
     return out
 
 
@@ -398,7 +423,7 @@ def curl_sphere(
     u_cos_S = u[1:-1, 1:-1] * cos_lat_U[1:-1, 1:-1]
     duc_dlat = (u_cos_N - u_cos_S) / dlat
     cos_X = cos_lat_X[1:-1, 1:-1]
-    out = out.at[1:-1, 1:-1].set((dv_dlon - duc_dlat) / (R * cos_X))
+    out = out.at[1:-1, 1:-1].set(_safe_div_cos(dv_dlon - duc_dlat, cos_X, R))
     return out
 
 
@@ -447,9 +472,9 @@ def laplacian_sphere(
     cos_V_S = 0.5 * (cos_T + cos_lat_T[:-2, 1:-1])
     d_coslat_dh = (cos_V_N * dh_dlat_N - cos_V_S * dh_dlat_S) / dlat
 
-    out = out.at[1:-1, 1:-1].set(
-        d2h_dlon2 / (R**2 * cos_T**2) + d_coslat_dh / (R**2 * cos_T)
-    )
+    lon_term = _safe_div_cos(d2h_dlon2, cos_T, R**2 * cos_T)
+    lat_term = _safe_div_cos(d_coslat_dh, cos_T, R**2)
+    out = out.at[1:-1, 1:-1].set(lon_term + lat_term)
     return out
 
 
@@ -505,7 +530,9 @@ def geostrophic_velocity_sphere(
     f_on_V = 0.5 * (f[1:-1, 1:-1] + f[2:, 1:-1])
     cos_on_V = 0.5 * (cos_lat_T[1:-1, 1:-1] + cos_lat_T[2:, 1:-1])
     dh_dlon_V = (h[1:-1, 2:] + h[2:, 2:] - h[1:-1, :-2] - h[2:, :-2]) / (4.0 * dlon)
-    v_g = v_g.at[1:-1, 1:-1].set(gravity / (f_on_V * R * cos_on_V) * dh_dlon_V)
+    v_g = v_g.at[1:-1, 1:-1].set(
+        _safe_div_cos(gravity * dh_dlon_V, cos_on_V, f_on_V * R)
+    )
 
     return u_g, v_g
 

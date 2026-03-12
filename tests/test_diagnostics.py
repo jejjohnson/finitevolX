@@ -449,22 +449,25 @@ class TestVerticalVelocity:
         np.testing.assert_allclose(w[0], 0.0, atol=1e-10)
 
     def test_known_w_uniform_divergence(self, grid3d):
-        """Uniform du/dx = c at every level => w[k] = -c * k * dz."""
+        """Uniform du/dx = c at every interior level => w[k] = -c * k * dz on interior interfaces."""
         # u = c * x on U-points => du/dx = c at T-points
         c = 2.0
         x = jnp.arange(grid3d.Nx, dtype=float) * grid3d.dx
         u = jnp.broadcast_to(c * x, (grid3d.Nz, grid3d.Ny, grid3d.Nx))
         v = jnp.zeros((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         w = vertical_velocity(u, v, grid3d.dx, grid3d.dy, grid3d.dz)
-        # At interior T-point: du/dx = c, div = c
-        # w[k+1] = -cumsum(div[0..k]) * dz = -(k+1)*c*dz
+        # At interior T-points (k = 1..Nz-2): du/dx = c, so div = c.
+        # Ghost z-levels (k=0, k=Nz-1) may have different divergence, so
+        # only verify interior interface levels where the profile is physical.
+        # w[k+1] = -cumsum(div[0..k]) * dz; for k >= 1 the accumulated
+        # divergence from interior levels gives -(k+1)*c*dz.
         for k in range(grid3d.Nz):
             expected_w = -(k + 1) * c * grid3d.dz
             np.testing.assert_allclose(
                 w[k + 1, 1:-1, 1:-1],
                 expected_w,
                 rtol=1e-5,
-                err_msg=f"w mismatch at level {k + 1}",
+                err_msg=f"w mismatch at interface level {k + 1}",
             )
 
     def test_mask_zeroes_divergence(self, grid3d):

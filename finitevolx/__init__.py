@@ -57,7 +57,6 @@ from finitevolx._src.operators.difference import (
 from finitevolx._src.operators.divergence import Divergence2D, divergence_2d
 from finitevolx._src.operators.geographic import (
     curl_sphere,
-    diff2_lat_T,
     diff2_lon_T,
     diff_lat_T_to_V,
     diff_lat_U_to_X,
@@ -67,6 +66,7 @@ from finitevolx._src.operators.geographic import (
     diff_lon_V_to_X,
     divergence_sphere,
     geostrophic_velocity_sphere,
+    laplacian_merid_T,
     laplacian_sphere,
     potential_vorticity_sphere,
 )
@@ -196,7 +196,7 @@ __all__ = [
     "vertical_velocity",
     # Geographic (spherical) operators
     "curl_sphere",
-    "diff2_lat_T",
+    "laplacian_merid_T",
     "diff2_lon_T",
     "diff_lat_T_to_V",
     "diff_lat_U_to_X",

@@ -6,34 +6,40 @@ import pytest
 
 from finitevolx._src.operators.geographic import (
     curl_sphere,
-    diff2_lat_T,
     diff2_lon_T,
     diff_lat_T_to_V,
+    diff_lat_U_to_X,
     diff_lat_V_to_T,
     diff_lon_T_to_U,
     diff_lon_U_to_T,
+    diff_lon_V_to_X,
     divergence_sphere,
     geostrophic_velocity_sphere,
+    laplacian_merid_T,
     laplacian_sphere,
     potential_vorticity_sphere,
 )
 
-# Use a small test sphere for numerical convenience
+# Use a small test sphere for numerical convenience.
+# The latitude range avoids the poles (±80° instead of ±90°) so that
+# cos(lat) is never near zero, which would trigger NaN from the pole
+# guard in the operators.
 R = 1.0
 Ny, Nx = 12, 12  # including ghost cells  (10x10 interior)
 dlon = 2.0 * jnp.pi / (Nx - 2)  # radians
-dlat = jnp.pi / (Ny - 2)
+_LAT_MAX = jnp.deg2rad(80.0)
+dlat = 2.0 * _LAT_MAX / (Ny - 2)  # span [-80°, +80°]
 
 
 @pytest.fixture
 def lat_lon_arrays():
     """Return (lat, lon, cos_lat_T, cos_lat_V, cos_lat_U, cos_lat_X) for a uniform sphere."""
     lon = jnp.arange(Nx, dtype=float) * dlon
-    lat = -jnp.pi / 2 + jnp.arange(Ny, dtype=float) * dlat
+    lat = -_LAT_MAX + jnp.arange(Ny, dtype=float) * dlat
     LON, LAT = jnp.meshgrid(lon, lat)  # [Ny, Nx]
     cos_T = jnp.cos(LAT)
     # V at j+1/2
-    lat_V = -jnp.pi / 2 + (jnp.arange(Ny, dtype=float) + 0.5) * dlat
+    lat_V = -_LAT_MAX + (jnp.arange(Ny, dtype=float) + 0.5) * dlat
     _, LAT_V = jnp.meshgrid(lon, lat_V)
     cos_V = jnp.cos(LAT_V)
     # U at i+1/2 — same latitude as T
@@ -80,6 +86,48 @@ class TestDiffLatTtoV:
         _, LAT, *_ = lat_lon_arrays
         h = LAT
         result = diff_lat_T_to_V(h, dlat, R)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 1.0 / R, rtol=1e-5)
+
+
+class TestDiffLonVtoX:
+    def test_output_shape(self, lat_lon_arrays):
+        _, _, _, cos_V, *_ = lat_lon_arrays
+        v = jnp.ones((Ny, Nx))
+        result = diff_lon_V_to_X(v, cos_V, dlon, R)
+        assert result.shape == (Ny, Nx)
+
+    def test_constant_field(self, lat_lon_arrays):
+        _, _, _, cos_V, *_ = lat_lon_arrays
+        v = 5.0 * jnp.ones((Ny, Nx))
+        result = diff_lon_V_to_X(v, cos_V, dlon, R)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
+
+    def test_linear_longitude(self, lat_lon_arrays):
+        """v = lon => dv/dlon = 1 => dv/dx = 1/(R cos(lat) dlon) * dlon = 1/(R cos(lat))."""
+        LON, _, _, cos_V, _, cos_X = lat_lon_arrays
+        v = LON
+        result = diff_lon_V_to_X(v, cos_V, dlon, R)
+        # Expected: 1 / (R * cos(lat_X)) at interior X-points
+        expected = 1.0 / (R * cos_X[1:-1, 1:-1])
+        np.testing.assert_allclose(result[1:-1, 1:-1], expected, rtol=1e-5)
+
+
+class TestDiffLatUtoX:
+    def test_output_shape(self):
+        u = jnp.ones((Ny, Nx))
+        result = diff_lat_U_to_X(u, dlat, R)
+        assert result.shape == (Ny, Nx)
+
+    def test_constant_field(self):
+        u = 5.0 * jnp.ones((Ny, Nx))
+        result = diff_lat_U_to_X(u, dlat, R)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
+
+    def test_linear_latitude(self, lat_lon_arrays):
+        """u = lat => du/dlat = 1 => du/dy = 1/R."""
+        _, LAT, *_ = lat_lon_arrays
+        u = LAT
+        result = diff_lat_U_to_X(u, dlat, R)
         np.testing.assert_allclose(result[1:-1, 1:-1], 1.0 / R, rtol=1e-5)
 
 
@@ -142,17 +190,17 @@ class TestDiff2LonT:
         np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
 
 
-class TestDiff2LatT:
+class TestLaplacianMeridT:
     def test_output_shape(self, lat_lon_arrays):
         _, _, cos_T, *_ = lat_lon_arrays
         h = jnp.ones((Ny, Nx))
-        result = diff2_lat_T(h, cos_T, dlat, R)
+        result = laplacian_merid_T(h, cos_T, dlat, R)
         assert result.shape == (Ny, Nx)
 
     def test_constant_field(self, lat_lon_arrays):
         _, _, cos_T, *_ = lat_lon_arrays
         h = 5.0 * jnp.ones((Ny, Nx))
-        result = diff2_lat_T(h, cos_T, dlat, R)
+        result = laplacian_merid_T(h, cos_T, dlat, R)
         np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
 
 
