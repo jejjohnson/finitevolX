@@ -52,16 +52,16 @@ from finitevolx import (
     Difference2D,
     Interpolation2D,
     Vorticity2D,
-    enforce_periodic,
+    pad_interior,
 )
 
 jax.config.update("jax_enable_x64", True)
 
 
-def to_periodic_field(field: xr.DataArray) -> Array:
-    """Pad an interior ``xarray`` field with a periodic ghost-cell ring."""
+def to_wall_field(field: xr.DataArray) -> Array:
+    """Pad an interior ``xarray`` field with zero (no-normal-flow wall) ghost cells."""
     interior = jnp.asarray(field.to_numpy())
-    return enforce_periodic(jnp.pad(interior, pad_width=1, mode="wrap"))
+    return jnp.pad(interior, pad_width=1, mode="constant")
 
 
 def save_animation_gif(
@@ -197,7 +197,7 @@ class ShallowWaterConfig:
 
     Reduce the runtime for a quick smoke test::
 
-        config = ShallowWaterConfig(nx=24, ny=24, steps=160)
+        config = ShallowWaterConfig(nx=24, ny=24, steps=200)
     """
 
     nx: int = 64
@@ -208,13 +208,13 @@ class ShallowWaterConfig:
     mean_depth: float = 500.0
     f0: float = 9.375e-5
     beta: float = 1.754e-11
-    drag: float = 1.5e-4
-    viscosity: float = 2.0e5
+    drag: float = 5.0e-6
+    viscosity: float = 5.0e5
     wind_acceleration: float = 2.0e-7
-    dt: float = 20.0
-    spinup_steps: int = 0
-    steps: int = 1200
-    snapshot_interval: int = 150
+    dt: float = 200.0
+    spinup_steps: int = 150000
+    steps: int = 15000
+    snapshot_interval: int = 1500
     zarr_path: Path = Path("outputs/shallow_water_double_gyre.zarr")
     figure_path: Path = Path("outputs/shallow_water_double_gyre.gif")
 
@@ -265,11 +265,12 @@ def make_preprocessing_dataset(
 
     eta0 = 0.01 * np.sin(np.pi * x2d / config.Lx) * np.sin(np.pi * y2d / config.Ly)
     coriolis = config.f0 + config.beta * (y2d - 0.5 * config.Ly)
-    # Double-gyre zonal wind body force F_x = A * cos(2*pi*y/Ly).
-    # Wind curl = d(F_x)/dy = -(2*pi*A/Ly) * sin(2*pi*y/Ly):
-    #   y in (0,  Ly/2): curl < 0 -> anticyclonic (subtropical gyre, south) ✓
-    #   y in (Ly/2, Ly): curl > 0 -> cyclonic    (subpolar    gyre, north) ✓
-    wind_u = config.wind_acceleration * np.cos(2.0 * np.pi * y2d / config.Ly)
+    # Double-gyre zonal wind body force F_x = -A * cos(2*pi*y/Ly).
+    # Westward (trade winds) at y=0, eastward (westerlies) at y=Ly/2.
+    # Vorticity source = -d(F_x)/dy = -A*(2*pi/Ly)*sin(2*pi*y/Ly):
+    #   y in (0,  Ly/2): < 0 -> anticyclonic (subtropical gyre, south) ✓
+    #   y in (Ly/2, Ly): > 0 -> cyclonic    (subpolar    gyre, north) ✓
+    wind_u = -config.wind_acceleration * np.cos(2.0 * np.pi * y2d / config.Ly)
 
     return xr.Dataset(
         data_vars={
@@ -281,7 +282,7 @@ def make_preprocessing_dataset(
         attrs={
             "model": "nonlinear shallow water",
             "configuration": "double gyre",
-            "boundary_conditions": "periodic in x and y",
+            "boundary_conditions": "closed basin (no-normal-flow solid walls)",
         },
     )
 
@@ -317,11 +318,11 @@ def run_simulation(config: ShallowWaterConfig | None = None) -> xr.Dataset:
     vort = Vorticity2D(grid=grid)
     forcing = make_preprocessing_dataset(config, grid)
 
-    eta = to_periodic_field(forcing["eta0"])
-    u = enforce_periodic(jnp.zeros_like(eta))
-    v = enforce_periodic(jnp.zeros_like(eta))
-    coriolis = to_periodic_field(forcing["coriolis"])
-    wind_u = to_periodic_field(forcing["wind_u"])
+    eta = to_wall_field(forcing["eta0"])
+    u = jnp.zeros_like(eta)
+    v = jnp.zeros_like(eta)
+    coriolis = to_wall_field(forcing["coriolis"])
+    wind_u = to_wall_field(forcing["wind_u"])
 
     viscosity = config.viscosity
     gravity = config.gravity
@@ -388,15 +389,17 @@ def run_simulation(config: ShallowWaterConfig | None = None) -> xr.Dataset:
     def step(
         eta_field: Array, u_field: Array, v_field: Array
     ) -> tuple[Array, Array, Array]:
-        """Advance one Heun step with periodic ghost-cell updates."""
+        """Advance one Heun step and refill the wall ghost cells."""
         k1_eta, k1_u, k1_v = tendency(eta_field, u_field, v_field)
-        eta_stage = enforce_periodic(eta_field + dt * k1_eta)
-        u_stage = enforce_periodic(u_field + dt * k1_u)
-        v_stage = enforce_periodic(v_field + dt * k1_v)
+        eta_stage = pad_interior(eta_field + dt * k1_eta, mode="constant")
+        u_stage = pad_interior(u_field + dt * k1_u, mode="constant")
+        v_stage = pad_interior(v_field + dt * k1_v, mode="constant")
         k2_eta, k2_u, k2_v = tendency(eta_stage, u_stage, v_stage)
-        eta_next = enforce_periodic(eta_field + 0.5 * dt * (k1_eta + k2_eta))
-        u_next = enforce_periodic(u_field + 0.5 * dt * (k1_u + k2_u))
-        v_next = enforce_periodic(v_field + 0.5 * dt * (k1_v + k2_v))
+        eta_next = pad_interior(
+            eta_field + 0.5 * dt * (k1_eta + k2_eta), mode="constant"
+        )
+        u_next = pad_interior(u_field + 0.5 * dt * (k1_u + k2_u), mode="constant")
+        v_next = pad_interior(v_field + 0.5 * dt * (k1_v + k2_v), mode="constant")
         return eta_next, u_next, v_next
 
     snapshot_times: list[float] = []
