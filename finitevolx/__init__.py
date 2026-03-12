@@ -31,12 +31,45 @@ from finitevolx._src.diffusion.momentum import MomentumAdvection2D, MomentumAdve
 from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask, StencilCapability
 from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
 from finitevolx._src.operators.coriolis import Coriolis2D, Coriolis3D
+from finitevolx._src.operators.diagnostics import (
+    available_potential_energy,
+    bernoulli_potential,
+    enstrophy,
+    kinetic_energy,
+    okubo_weiss,
+    potential_enstrophy,
+    potential_vorticity,
+    qg_potential_vorticity,
+    relative_vorticity_cgrid,
+    shear_strain,
+    strain_magnitude_squared,
+    stretching_term,
+    tensor_strain,
+    total_energy,
+    total_enstrophy,
+    vertical_velocity,
+)
 from finitevolx._src.operators.difference import (
     Difference1D,
     Difference2D,
     Difference3D,
 )
 from finitevolx._src.operators.divergence import Divergence2D, divergence_2d
+from finitevolx._src.operators.geographic import (
+    curl_sphere,
+    diff2_lat_T,
+    diff2_lon_T,
+    diff_lat_T_to_V,
+    diff_lat_U_to_X,
+    diff_lat_V_to_T,
+    diff_lon_T_to_U,
+    diff_lon_U_to_T,
+    diff_lon_V_to_X,
+    divergence_sphere,
+    geostrophic_velocity_sphere,
+    laplacian_sphere,
+    potential_vorticity_sphere,
+)
 from finitevolx._src.operators.interpolation import (
     Interpolation1D,
     Interpolation2D,
@@ -144,6 +177,37 @@ __all__ = [
     "van_leer",
     # Masks
     "StencilCapability",
+    # Diagnostics
+    "available_potential_energy",
+    "bernoulli_potential",
+    "enstrophy",
+    "kinetic_energy",
+    "okubo_weiss",
+    "potential_enstrophy",
+    "potential_vorticity",
+    "qg_potential_vorticity",
+    "relative_vorticity_cgrid",
+    "shear_strain",
+    "strain_magnitude_squared",
+    "stretching_term",
+    "tensor_strain",
+    "total_energy",
+    "total_enstrophy",
+    "vertical_velocity",
+    # Geographic (spherical) operators
+    "curl_sphere",
+    "diff2_lat_T",
+    "diff2_lon_T",
+    "diff_lat_T_to_V",
+    "diff_lat_U_to_X",
+    "diff_lat_V_to_T",
+    "diff_lon_T_to_U",
+    "diff_lon_U_to_T",
+    "diff_lon_V_to_X",
+    "divergence_sphere",
+    "geostrophic_velocity_sphere",
+    "laplacian_sphere",
+    "potential_vorticity_sphere",
     # Vorticity
     "Vorticity2D",
     "Vorticity3D",
