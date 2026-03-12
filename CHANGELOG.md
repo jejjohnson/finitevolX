@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.0.27](https://github.com/jejjohnson/finitevolX/compare/v0.0.26...v0.0.27) (2026-03-12)
+
+
+### Features
+
+* add time integration module (Epic [#111](https://github.com/jejjohnson/finitevolX/issues/111)) ([443d571](https://github.com/jejjohnson/finitevolX/commit/443d57119294be8dac0ecb047a3cbdc1aa7e656a))
+* **timestepping:** add diffrax Butcher tableau solvers and solve_ocean_pde ([95657c6](https://github.com/jejjohnson/finitevolX/commit/95657c66c542cea2815ad2a36bcbd58cd60907c2))
+* **timestepping:** add pure functional time integrators ([c9c7c03](https://github.com/jejjohnson/finitevolX/commit/c9c7c037a7b2edc2f20bf64e642a46b102533c78))
+* **timestepping:** export all time integration symbols from finitevolx ([1ae8f0c](https://github.com/jejjohnson/finitevolX/commit/1ae8f0c45d52b7cccf4a3d95fc510973c137e735))
+
+
+### Bug Fixes
+
+* address PR review comments for time integration module ([735a3b8](https://github.com/jejjohnson/finitevolX/commit/735a3b82c0aa05e694ee3e3516e34c1df28b6de3))
+* **timestepping:** resolve ty type checker errors in diffrax solvers ([d9c0c2d](https://github.com/jejjohnson/finitevolX/commit/d9c0c2d23e7c7f1a05b736fbfacb143f1685986c))
+
 ## [0.0.26](https://github.com/jejjohnson/finitevolX/compare/v0.0.25...v0.0.26) (2026-03-12)
 
 
