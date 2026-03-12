@@ -77,6 +77,7 @@ def solve_tridiagonal(
     (3,)
     """
     operator = lx.TridiagonalLinearOperator(diag, lower, upper)
+    # throw=True (default) makes lineax raise on singular/ill-conditioned systems.
     sol = lx.linear_solve(operator, rhs, solver=lx.Tridiagonal())
     return sol.value
 
