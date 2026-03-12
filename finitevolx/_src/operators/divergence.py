@@ -7,11 +7,10 @@ Computes ∇·(u, v) at T-points from staggered face velocities.
 from __future__ import annotations
 
 import equinox as eqx
-import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.grid import ArakawaCGrid2D
-from finitevolx._src.operators.difference import Difference2D
+from finitevolx._src.operators.difference import Difference2D, _divergence_2d
 
 
 def divergence_2d(
@@ -28,6 +27,9 @@ def divergence_2d(
     Only interior cells ``[1:-1, 1:-1]`` are written; the ghost ring is
     left as zero.  The caller is responsible for setting ghost-cell
     boundary conditions before calling this function.
+
+    This is a standalone functional form that shares the same underlying
+    implementation as :meth:`Difference2D.divergence`.
 
     Parameters
     ----------
@@ -54,13 +56,7 @@ def divergence_2d(
     >>> div.shape
     (10, 10)
     """
-    out = jnp.zeros(u.shape, dtype=jnp.result_type(u, v))
-    # delta[j, i] = du/dx + dv/dy  (backward differences U→T, V→T)
-    # du_dx[j, i] = (u[j, i+1/2] - u[j, i-1/2]) / dx  →  (u[1:-1,1:-1] - u[1:-1,:-2]) / dx
-    du_dx = (u[1:-1, 1:-1] - u[1:-1, :-2]) / dx
-    # dv_dy[j, i] = (v[j+1/2, i] - v[j-1/2, i]) / dy  →  (v[1:-1,1:-1] - v[:-2,1:-1]) / dy
-    dv_dy = (v[1:-1, 1:-1] - v[:-2, 1:-1]) / dy
-    return out.at[1:-1, 1:-1].set(du_dx + dv_dy)
+    return _divergence_2d(u, v, dx, dy)
 
 
 class Divergence2D(eqx.Module):
