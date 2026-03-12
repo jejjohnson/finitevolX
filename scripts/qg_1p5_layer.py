@@ -10,6 +10,8 @@ recovered from a Helmholtz inversion with homogeneous Dirichlet (psi = 0) wall
 boundary conditions using ``solve_helmholtz_dst``, and the output is saved
 through ``xarray``/Zarr together with a static before/after figure.
 
+Time integration uses ``finitevolx.heun_step`` (Heun/RK2 predictor-corrector).
+
 **Formulation B -- PV anomaly without the beta background**
 
 The prognostic variable is the PV anomaly
@@ -84,6 +86,7 @@ from finitevolx import (
     Difference2D,
     Interpolation2D,
     Vorticity2D,
+    heun_step,
     pad_interior,
     solve_helmholtz_dst,
 )
@@ -474,13 +477,19 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset:
         q_rhs = q_rhs + wind_curl - drag * zeta + viscosity * diff.laplacian(q_field)
         return q_rhs, psi_field, u_field, v_field
 
+    def apply_bc(q_field: Array) -> Array:
+        """Re-apply wall (zero ghost-cell) boundary conditions."""
+        return pad_interior(q_field, mode="constant")
+
+    def pv_tendency(q_field: Array) -> Array:
+        """PV tendency with BC enforcement, for use with heun_step."""
+        q_rhs, _, _, _ = tendency(apply_bc(q_field))
+        return q_rhs
+
     @jax.jit
     def step(q_field: Array) -> tuple[Array, Array, Array, Array]:
         """Advance one Heun step and diagnose the balanced velocity field."""
-        k1_q, _, _, _ = tendency(q_field)
-        q_stage = pad_interior(q_field + dt * k1_q, mode="constant")
-        k2_q, _, _, _ = tendency(q_stage)
-        q_next = pad_interior(q_field + 0.5 * dt * (k1_q + k2_q), mode="constant")
+        q_next = apply_bc(heun_step(q_field, pv_tendency, dt))
         psi_next = invert_streamfunction(q_next)
         u_next, v_next = geostrophic_velocity_from_streamfunction(
             psi_next, diff, interp
