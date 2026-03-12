@@ -72,6 +72,9 @@ def test_linear_shallow_water_script_runs_stably(tmp_path: Path) -> None:
     config = module.LinearShallowWaterConfig(
         nx=24,
         ny=24,
+        dt=30.0,
+        drag=1.0e-4,
+        viscosity=2.0e5,
         spinup_steps=20,
         steps=240,
         snapshot_interval=40,
@@ -106,6 +109,10 @@ def test_nonlinear_shallow_water_script_runs_stably(tmp_path: Path) -> None:
     config = module.ShallowWaterConfig(
         nx=24,
         ny=24,
+        dt=20.0,
+        drag=1.5e-4,
+        viscosity=2.0e5,
+        spinup_steps=200,
         steps=240,
         snapshot_interval=40,
         zarr_path=tmp_path / "nonlinear.zarr",
@@ -136,6 +143,7 @@ def test_qg_script_runs_stably(tmp_path: Path) -> None:
     config = module.QuasiGeostrophicConfig(
         nx=24,
         ny=24,
+        viscosity=5.0e4,
         steps=400,
         snapshot_interval=50,
         zarr_path=tmp_path / "qg.zarr",

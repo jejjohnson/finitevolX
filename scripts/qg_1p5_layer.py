@@ -248,6 +248,8 @@ class QuasiGeostrophicConfig:
         Reference Coriolis parameter [s^-1].
     beta : float, optional
         Meridional Coriolis gradient [m^-1 s^-1].
+    gravity : float, optional
+        Gravitational acceleration [m s^-2].
     rossby_radius : float, optional
         First baroclinic Rossby radius of deformation [m].
     drag : float, optional
@@ -271,7 +273,7 @@ class QuasiGeostrophicConfig:
         Steps between sampled outputs.
     zarr_path, figure_path : Path, optional
         Artifact paths written by the script. ``figure_path`` receives an
-        animated GIF of the relative vorticity field.
+        animated GIF of the free-surface anomaly field.
 
     Examples
     --------
@@ -290,12 +292,13 @@ class QuasiGeostrophicConfig:
     Ly: float = 5.12e6
     f0: float = 9.375e-5
     beta: float = 1.754e-11
+    gravity: float = 9.81
     rossby_radius: float = 4.0e4
     drag: float = 5.0e-8
     viscosity: float = 5.0e4
     wind_curl_forcing: float = 2.0e-12
     dt: float = 4000.0
-    spinup_steps: int = 0
+    spinup_steps: int = 5000
     steps: int = 10000
     snapshot_interval: int = 1000
     zarr_path: Path = Path("outputs/qg_1p5_layer_double_gyre.zarr")
@@ -487,9 +490,12 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset:
     psi = invert_streamfunction(q)
     u, v = geostrophic_velocity_from_streamfunction(psi, diff, interp)
 
+    eta_scale = config.f0 / config.gravity
+
     snapshot_times: list[float] = []
     q_snapshots: list[np.ndarray] = []
     psi_snapshots: list[np.ndarray] = []
+    eta_snapshots: list[np.ndarray] = []
     u_snapshots: list[np.ndarray] = []
     v_snapshots: list[np.ndarray] = []
     speed_snapshots: list[np.ndarray] = []
@@ -506,6 +512,7 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset:
         """Convert a sampled balanced state into ``xarray``-ready arrays."""
         q_np = np.asarray(jax.device_get(q_field[1:-1, 1:-1]))
         psi_np = np.asarray(jax.device_get(psi_field[1:-1, 1:-1]))
+        eta_np = eta_scale * psi_np
         u_center = interp.U_to_T(u_field)
         v_center = interp.V_to_T(v_field)
         zeta_corner = vort.relative_vorticity(u_field, v_field)
@@ -518,6 +525,7 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset:
         snapshot_times.append(step_index * dt)
         q_snapshots.append(q_np)
         psi_snapshots.append(psi_np)
+        eta_snapshots.append(eta_np)
         u_snapshots.append(u_np)
         v_snapshots.append(v_np)
         speed_snapshots.append(speed_np)
@@ -554,6 +562,11 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset:
                 ("time", "y", "x"),
                 np.stack(psi_snapshots, axis=0),
                 {"long_name": "streamfunction", "units": "m2 s-1"},
+            ),
+            "eta": (
+                ("time", "y", "x"),
+                np.stack(eta_snapshots, axis=0),
+                {"long_name": "free_surface_anomaly", "units": "m"},
             ),
             "u": (
                 ("time", "y", "x"),
@@ -617,10 +630,9 @@ def run_simulation(config: QuasiGeostrophicConfig | None = None) -> xr.Dataset:
     save_animation_gif(
         dataset=dataset,
         gif_path=config.figure_path,
-        variable_name="relative_vorticity",
-        title="1.5-layer QG double gyre: relative vorticity",
-        scale_factor=1.0e5,
-        colorbar_label=r"[$10^{-5}\ \mathrm{s}^{-1}$]",
+        variable_name="eta",
+        title="1.5-layer QG double gyre: free-surface anomaly",
+        colorbar_label="[m]",
     )
     return dataset
 
@@ -677,7 +689,9 @@ def main() -> None:
     dataset = run_simulation(config)
     print(f"Saved QG fields to {config.zarr_path}")
     print(f"Saved QG animation to {config.figure_path}")
-    print(f"Final max |q| = {float(np.abs(dataset['q'].isel(time=-1)).max()):.3e} s^-1")
+    print(
+        f"Final max |eta| = {float(np.abs(dataset['eta'].isel(time=-1)).max()):.3e} m"
+    )
 
 
 if __name__ == "__main__":
