@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.0.25](https://github.com/jejjohnson/finitevolX/compare/v0.0.24...v0.0.25) (2026-03-12)
+
+
+### Features
+
+* add diagnostic and geographic operators ([fe71938](https://github.com/jejjohnson/finitevolX/commit/fe719388864e0ecd573832d49b2db440edafdd7d))
+* **diagnostics:** add strain, enstrophy, QG PV, and conservation operators ([040079d](https://github.com/jejjohnson/finitevolX/commit/040079d02829fbbec6b73d657484ffdc16727f60))
+* export diagnostic and geographic operators from package ([2b4f7af](https://github.com/jejjohnson/finitevolX/commit/2b4f7af1d6d36641be8d2b557ed8e163d743dee3))
+* **operators:** add spherical geographic operators ([83f6274](https://github.com/jejjohnson/finitevolX/commit/83f6274a53ea148beaa540fefef44c5573a16e3c))
+
+
+### Bug Fixes
+
+* **geographic:** add pole guard and address PR review comments ([77fdb10](https://github.com/jejjohnson/finitevolX/commit/77fdb10689db184efb2236f661bace4d44ca81f1))
+
 ## [0.0.24](https://github.com/jejjohnson/finitevolX/compare/v0.0.23...v0.0.24) (2026-03-11)
 
 
