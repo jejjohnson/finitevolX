@@ -148,7 +148,7 @@ docstring-code-format = true
 unresolved-attribute = "ignore"
 invalid-return-type = "ignore"
 unresolved-import = "ignore"
-invalid-argument-type = "ignore"
+invalid-argument-type = "error"
 
 [tool.coverage.report]
 precision = 1
