@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.31](https://github.com/jejjohnson/finitevolX/compare/v0.0.30...v0.0.31) (2026-03-13)
+
+
+### Bug Fixes
+
+* resolve ty 0.0.23 invalid-argument-type errors in upwind_flux callers ([f94d008](https://github.com/jejjohnson/finitevolX/commit/f94d0086e3ff8dde16816d0c4a8ed4303ad091b0))
+
 ## [0.0.30](https://github.com/jejjohnson/finitevolX/compare/v0.0.29...v0.0.30) (2026-03-13)
 
 
