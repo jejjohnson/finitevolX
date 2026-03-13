@@ -1,9 +1,13 @@
 # Solver Comparison
 
-This page provides a visual comparison of finitevolX's four elliptic
-solver families across different domain geometries.  All benchmarks use a
+This page provides a visual comparison of finitevolX's elliptic solver
+families across different domain geometries.  All benchmarks use a
 64x64 grid with Helmholtz parameter $\lambda = 4$ and a smooth sinusoidal
 RHS.
+
+Each solver panel shows three fields: the **RHS** $f$, the computed
+**solution** $\hat{u}$, and the **error** $f - A\hat{u}$ (the pointwise
+residual).
 
 !!! note "Reproducing these figures"
     ```bash
@@ -16,8 +20,6 @@ RHS.
 
 ![Domain geometries](images/solvers_geometries.png)
 
-Four test domains of increasing difficulty:
-
 | Domain | Description | Coefficient |
 |---|---|---|
 | **Rectangle** | Full 64x64 grid, no mask | Constant |
@@ -27,13 +29,70 @@ Four test domains of increasing difficulty:
 
 ---
 
-## Solutions
+## Rectangle
 
-![Solutions by solver and geometry](images/solvers_solutions.png)
+The simplest geometry — all solvers applicable.
 
-Each row is a geometry; each column is a solver.  All solvers produce
-visually identical solutions on the wet cells — the differences are in
-speed and accuracy.
+### Spectral (DST)
+
+![Spectral on rectangle](images/solver_rect_spectral.png)
+
+### CG + spectral preconditioner
+
+![CG on rectangle](images/solver_rect_cg.png)
+
+### Multigrid (8 V-cycles)
+
+![Multigrid on rectangle](images/solver_rect_mg.png)
+
+---
+
+## Basin (land border)
+
+A rectangular ocean basin with a 4-cell land border.  The capacitance
+method extends the spectral solver to handle the mask.
+
+### Capacitance matrix (direct)
+
+![Capacitance on basin](images/solver_basin_cap.png)
+
+### CG + spectral preconditioner
+
+![CG on basin](images/solver_basin_cg.png)
+
+### Multigrid (8 V-cycles)
+
+![Multigrid on basin](images/solver_basin_mg.png)
+
+---
+
+## Circle
+
+A circular ocean basin — too many boundary points for efficient
+capacitance, so we use iterative solvers.
+
+### CG + spectral preconditioner
+
+![CG on circle](images/solver_circle_cg.png)
+
+### Multigrid (8 V-cycles)
+
+![Multigrid on circle](images/solver_circle_mg.png)
+
+---
+
+## Notch (variable coefficient)
+
+The hardest case: spatially varying $c(x,y)$ on a masked domain.
+Only multigrid handles variable coefficients natively.
+
+### Multigrid standalone (10 V-cycles)
+
+![Multigrid on notch](images/solver_notch_mg.png)
+
+### MG-preconditioned CG
+
+![MG+CG on notch](images/solver_notch_mgcg.png)
 
 ---
 

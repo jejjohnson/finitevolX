@@ -1,10 +1,9 @@
 """Generate solver comparison figures for the documentation.
 
-Produces PNG figures in docs/images/solvers_* showing:
-  1. Domain geometries used in the comparison
-  2. Solutions from each solver on each geometry
-  3. Relative residual norms (how well each solver satisfies its equation)
-  4. Timing bar chart
+Produces PNG figures in docs/images/ showing:
+  1. Domain geometries overview
+  2. Per-solver triplets: RHS | Solution | Error  (one PNG each)
+  3. Accuracy + timing bar chart summary
 
 Usage:
     uv run python scripts/generate_solver_figures.py
@@ -55,12 +54,7 @@ def _time_fn(fn, warmup=2, repeats=5):
 
 
 def _rel_residual(sol, rhs_loc, matvec, interior_mask=None):
-    """||rhs - A(sol)|| / ||rhs||, the relative residual norm.
-
-    If *interior_mask* is given, restrict the norm to interior cells.
-    This avoids spurious boundary mismatch when comparing solvers that
-    use different boundary treatments.
-    """
+    """||rhs - A(sol)|| / ||rhs||, restricted to interior cells if given."""
     residual = rhs_loc - matvec(sol)
     if interior_mask is not None:
         residual = residual * interior_mask
@@ -71,8 +65,49 @@ def _rel_residual(sol, rhs_loc, matvec, interior_mask=None):
     return float(jnp.linalg.norm(residual)) / rhs_norm
 
 
+def _save_triplet(rhs_field, sol_field, err_field, mask, geom_tag, solver_tag, info):
+    """Save a 3-panel figure: RHS | Solution | Error."""
+    rhs_np = np.where(mask > 0.5, np.asarray(rhs_field), np.nan)
+    sol_np = np.where(mask > 0.5, np.asarray(sol_field), np.nan)
+    err_np = np.where(mask > 0.5, np.asarray(err_field), np.nan)
+
+    fig, axes = plt.subplots(1, 3, figsize=(13, 3.5))
+
+    im0 = axes[0].imshow(rhs_np, origin="lower", cmap="RdBu_r", interpolation="nearest")
+    axes[0].set_title("RHS  $f$", fontsize=11)
+    fig.colorbar(im0, ax=axes[0], shrink=0.8)
+
+    im1 = axes[1].imshow(sol_np, origin="lower", cmap="RdBu_r", interpolation="nearest")
+    axes[1].set_title(f"Solution  ({info})", fontsize=11)
+    fig.colorbar(im1, ax=axes[1], shrink=0.8)
+
+    # Error: use symmetric log-scale colormap centred at 0
+    err_abs_max = np.nanmax(np.abs(err_np)) if np.any(np.isfinite(err_np)) else 1.0
+    if err_abs_max == 0.0:
+        err_abs_max = 1.0
+    im2 = axes[2].imshow(
+        err_np,
+        origin="lower",
+        cmap="RdBu_r",
+        interpolation="nearest",
+        vmin=-err_abs_max,
+        vmax=err_abs_max,
+    )
+    axes[2].set_title("Error  $f - A\\hat{u}$", fontsize=11)
+    fig.colorbar(im2, ax=axes[2], shrink=0.8)
+
+    for ax in axes:
+        ax.axis("off")
+
+    plt.tight_layout()
+    fname = f"solver_{geom_tag}_{solver_tag}.png"
+    fig.savefig(OUT / fname, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  Saved {fname}")
+
+
 # ======================================================================
-# 1. Domain geometries
+# 1. Domain geometries overview
 # ======================================================================
 mask_rect = np.ones((Ny, Nx))
 
@@ -110,24 +145,27 @@ print("Saved solvers_geometries.png")
 
 
 # ======================================================================
-# 2. Solve each geometry — collect solution, residual, timing
+# 2. Solve each geometry — collect results and save triplet PNGs
 # ======================================================================
-# Each entry: {solver_name: {sol, time_ms, rel_residual, label}}
-
+# Each entry: {solver_name: {sol, time_ms, rel_residual, label, matvec, rhs}}
 results: dict[str, dict] = {}
 
-# ── Rectangle ───────────────────────────────────────────────────────────
-# Spectral (exact for this geometry)
-sol_sp_rect = fvx.solve_helmholtz_dst(rhs, dx, dy, lambda_)
-t_sp_rect = _time_fn(lambda: fvx.solve_helmholtz_dst(rhs, dx, dy, lambda_))
-# Interior mask: exclude boundary cells where different BC treatments diverge
 interior_rect = jnp.zeros((Ny, Nx)).at[1:-1, 1:-1].set(1.0)
 
-# Spectral solves exactly via eigenvalue division — no iterative residual
-rr_sp_rect = 0.0  # exact by construction
+# ── Rectangle ───────────────────────────────────────────────────────────
+print("\nRectangle:")
+mask_rect_jnp = jnp.array(mask_rect)
+
+# Spectral (exact)
+sol_sp_rect = fvx.solve_helmholtz_dst(rhs, dx, dy, lambda_)
+t_sp_rect = _time_fn(lambda: fvx.solve_helmholtz_dst(rhs, dx, dy, lambda_))
+A_rect_sp = lambda x: fvx.masked_laplacian(x, mask_rect_jnp, dx, dy, lambda_=lambda_)
+err_sp_rect = rhs - A_rect_sp(sol_sp_rect)
+_save_triplet(
+    rhs, sol_sp_rect, err_sp_rect, mask_rect, "rect", "spectral", "exact, DST"
+)
 
 # CG + spectral preconditioner
-mask_rect_jnp = jnp.array(mask_rect)
 A_rect = lambda x: fvx.masked_laplacian(x, mask_rect_jnp, dx, dy, lambda_=lambda_)
 pc_rect = fvx.make_spectral_preconditioner(dx, dy, lambda_=lambda_, bc="dst")
 sol_cg_rect, info_cg_rect = fvx.solve_cg(
@@ -137,33 +175,34 @@ t_cg_rect = _time_fn(
     lambda: fvx.solve_cg(A_rect, rhs, preconditioner=pc_rect, rtol=1e-10, atol=1e-10)[0]
 )
 rr_cg_rect = _rel_residual(sol_cg_rect, rhs, A_rect, interior_mask=interior_rect)
+err_cg_rect = rhs - A_rect(sol_cg_rect)
+_save_triplet(
+    rhs,
+    sol_cg_rect,
+    err_cg_rect,
+    mask_rect,
+    "rect",
+    "cg",
+    f"CG, {info_cg_rect.iterations} iters",
+)
 
-# Multigrid standalone
+# Multigrid
 mg_rect = fvx.build_multigrid_solver(mask_rect, dx, dy, lambda_=lambda_, n_cycles=8)
 sol_mg_rect = mg_rect(rhs)
 t_mg_rect = _time_fn(lambda: mg_rect(rhs))
-rr_mg_rect = _rel_residual(
-    sol_mg_rect,
-    rhs,
-    lambda u: _apply_operator(u, mg_rect.levels[0]),
-    interior_mask=interior_rect,
-)
+A_mg_rect = lambda u: _apply_operator(u, mg_rect.levels[0])
+rr_mg_rect = _rel_residual(sol_mg_rect, rhs, A_mg_rect, interior_mask=interior_rect)
+err_mg_rect = rhs - A_mg_rect(sol_mg_rect)
+_save_triplet(rhs, sol_mg_rect, err_mg_rect, mask_rect, "rect", "mg", "MG, 8 V-cycles")
 
 results["Rectangle"] = {
-    "Spectral": {
-        "sol": sol_sp_rect,
-        "time_ms": t_sp_rect * 1000,
-        "rel_residual": rr_sp_rect,
-        "label": "exact",
-    },
+    "Spectral": {"time_ms": t_sp_rect * 1000, "rel_residual": 0.0, "label": "exact"},
     "CG": {
-        "sol": sol_cg_rect,
         "time_ms": t_cg_rect * 1000,
         "rel_residual": rr_cg_rect,
         "label": f"{info_cg_rect.iterations} iters",
     },
     "Multigrid": {
-        "sol": sol_mg_rect,
         "time_ms": t_mg_rect * 1000,
         "rel_residual": rr_mg_rect,
         "label": "8 V-cyc",
@@ -171,6 +210,7 @@ results["Rectangle"] = {
 }
 
 # ── Basin ───────────────────────────────────────────────────────────────
+print("\nBasin:")
 mask_basin_jnp = jnp.array(mask_basin)
 rhs_basin = rhs * mask_basin_jnp
 A_basin = lambda x: fvx.masked_laplacian(x, mask_basin_jnp, dx, dy, lambda_=lambda_)
@@ -181,8 +221,10 @@ cap = fvx.build_capacitance_solver(
 )
 sol_cap = cap(rhs_basin)
 t_cap = _time_fn(lambda: cap(rhs_basin))
-# Capacitance is a direct solver — exact by construction
-rr_cap = 0.0
+err_cap = rhs_basin - A_basin(sol_cap)
+_save_triplet(
+    rhs_basin, sol_cap, err_cap, mask_basin, "basin", "cap", "capacitance, direct"
+)
 
 # CG
 pc_basin = fvx.make_spectral_preconditioner(dx, dy, lambda_=lambda_, bc="dst")
@@ -201,33 +243,44 @@ t_cg_basin = _time_fn(
 rr_cg_basin = _rel_residual(
     sol_cg_basin, rhs_basin, A_basin, interior_mask=mask_basin_jnp
 )
+err_cg_basin = (rhs_basin - A_basin(sol_cg_basin)) * mask_basin_jnp
+_save_triplet(
+    rhs_basin,
+    sol_cg_basin,
+    err_cg_basin,
+    mask_basin,
+    "basin",
+    "cg",
+    f"CG, {info_cg_basin.iterations} iters",
+)
 
 # Multigrid
 mg_basin = fvx.build_multigrid_solver(mask_basin, dx, dy, lambda_=lambda_, n_cycles=8)
 sol_mg_basin = mg_basin(rhs_basin)
 t_mg_basin = _time_fn(lambda: mg_basin(rhs_basin))
+A_mg_basin = lambda u: _apply_operator(u, mg_basin.levels[0])
 rr_mg_basin = _rel_residual(
-    sol_mg_basin,
+    sol_mg_basin, rhs_basin, A_mg_basin, interior_mask=mask_basin_jnp
+)
+err_mg_basin = (rhs_basin - A_mg_basin(sol_mg_basin)) * mask_basin_jnp
+_save_triplet(
     rhs_basin,
-    lambda u: _apply_operator(u, mg_basin.levels[0]),
-    interior_mask=mask_basin_jnp,
+    sol_mg_basin,
+    err_mg_basin,
+    mask_basin,
+    "basin",
+    "mg",
+    "MG, 8 V-cycles",
 )
 
 results["Basin"] = {
-    "Capacitance": {
-        "sol": sol_cap,
-        "time_ms": t_cap * 1000,
-        "rel_residual": rr_cap,
-        "label": "direct",
-    },
+    "Capacitance": {"time_ms": t_cap * 1000, "rel_residual": 0.0, "label": "direct"},
     "CG": {
-        "sol": sol_cg_basin,
         "time_ms": t_cg_basin * 1000,
         "rel_residual": rr_cg_basin,
         "label": f"{info_cg_basin.iterations} iters",
     },
     "Multigrid": {
-        "sol": sol_mg_basin,
         "time_ms": t_mg_basin * 1000,
         "rel_residual": rr_mg_basin,
         "label": "8 V-cyc",
@@ -235,6 +288,7 @@ results["Basin"] = {
 }
 
 # ── Circle ──────────────────────────────────────────────────────────────
+print("\nCircle:")
 mask_circle_jnp = jnp.array(mask_circle)
 rhs_circle = rhs * mask_circle_jnp
 A_circle = lambda x: fvx.masked_laplacian(x, mask_circle_jnp, dx, dy, lambda_=lambda_)
@@ -256,27 +310,43 @@ t_cg_circle = _time_fn(
 rr_cg_circle = _rel_residual(
     sol_cg_circle, rhs_circle, A_circle, interior_mask=mask_circle_jnp
 )
+err_cg_circle = (rhs_circle - A_circle(sol_cg_circle)) * mask_circle_jnp
+_save_triplet(
+    rhs_circle,
+    sol_cg_circle,
+    err_cg_circle,
+    mask_circle,
+    "circle",
+    "cg",
+    f"CG, {info_cg_circle.iterations} iters",
+)
 
 # Multigrid
 mg_circle = fvx.build_multigrid_solver(mask_circle, dx, dy, lambda_=lambda_, n_cycles=8)
 sol_mg_circle = mg_circle(rhs_circle)
 t_mg_circle = _time_fn(lambda: mg_circle(rhs_circle))
+A_mg_circle = lambda u: _apply_operator(u, mg_circle.levels[0])
 rr_mg_circle = _rel_residual(
-    sol_mg_circle,
+    sol_mg_circle, rhs_circle, A_mg_circle, interior_mask=mask_circle_jnp
+)
+err_mg_circle = (rhs_circle - A_mg_circle(sol_mg_circle)) * mask_circle_jnp
+_save_triplet(
     rhs_circle,
-    lambda u: _apply_operator(u, mg_circle.levels[0]),
-    interior_mask=mask_circle_jnp,
+    sol_mg_circle,
+    err_mg_circle,
+    mask_circle,
+    "circle",
+    "mg",
+    "MG, 8 V-cycles",
 )
 
 results["Circle"] = {
     "CG": {
-        "sol": sol_cg_circle,
         "time_ms": t_cg_circle * 1000,
         "rel_residual": rr_cg_circle,
         "label": f"{info_cg_circle.iterations} iters",
     },
     "Multigrid": {
-        "sol": sol_mg_circle,
         "time_ms": t_mg_circle * 1000,
         "rel_residual": rr_mg_circle,
         "label": "8 V-cyc",
@@ -284,6 +354,7 @@ results["Circle"] = {
 }
 
 # ── Notch (variable coefficient) ────────────────────────────────────────
+print("\nNotch (variable coeff):")
 coeff = 1.0 + 0.8 * np.sin(2 * np.pi * X / Nx)
 mask_notch_jnp = jnp.array(mask_notch)
 rhs_notch = rhs * mask_notch_jnp
@@ -298,6 +369,16 @@ sol_mg_notch = mg_notch(rhs_notch)
 t_mg_notch = _time_fn(lambda: mg_notch(rhs_notch))
 rr_mg_notch = _rel_residual(
     sol_mg_notch, rhs_notch, A_notch, interior_mask=mask_notch_jnp
+)
+err_mg_notch = (rhs_notch - A_notch(sol_mg_notch)) * mask_notch_jnp
+_save_triplet(
+    rhs_notch,
+    sol_mg_notch,
+    err_mg_notch,
+    mask_notch,
+    "notch",
+    "mg",
+    "MG, 10 V-cycles",
 )
 
 # MG-preconditioned CG
@@ -317,16 +398,24 @@ t_mgcg_notch = _time_fn(
 rr_mgcg_notch = _rel_residual(
     sol_mgcg_notch, rhs_notch, A_notch, interior_mask=mask_notch_jnp
 )
+err_mgcg_notch = (rhs_notch - A_notch(sol_mgcg_notch)) * mask_notch_jnp
+_save_triplet(
+    rhs_notch,
+    sol_mgcg_notch,
+    err_mgcg_notch,
+    mask_notch,
+    "notch",
+    "mgcg",
+    f"MG+CG, {info_mgcg_notch.iterations} iters",
+)
 
 results["Notch\n(variable coeff)"] = {
     "Multigrid": {
-        "sol": sol_mg_notch,
         "time_ms": t_mg_notch * 1000,
         "rel_residual": rr_mg_notch,
         "label": "10 V-cyc",
     },
     "MG+CG": {
-        "sol": sol_mgcg_notch,
         "time_ms": t_mgcg_notch * 1000,
         "rel_residual": rr_mgcg_notch,
         "label": f"{info_mgcg_notch.iterations} iters",
@@ -335,49 +424,12 @@ results["Notch\n(variable coeff)"] = {
 
 
 # ======================================================================
-# 3. Solutions figure
+# 3. Accuracy + timing bar chart
 # ======================================================================
+print("\nSummary chart:")
 geom_order = list(results.keys())
-max_solvers = max(len(v) for v in results.values())
 
-fig, axes = plt.subplots(4, max_solvers, figsize=(5 * max_solvers, 16))
-
-for row, geom in enumerate(geom_order):
-    solvers = list(results[geom].keys())
-    mask = geometries[geom]
-    for col in range(max_solvers):
-        ax = axes[row, col]
-        if col < len(solvers):
-            sname = solvers[col]
-            sol = np.asarray(results[geom][sname]["sol"])
-            sol_masked = np.where(mask > 0.5, sol, np.nan)
-            im = ax.imshow(
-                sol_masked,
-                origin="lower",
-                cmap="RdBu_r",
-                interpolation="nearest",
-            )
-            label = results[geom][sname]["label"]
-            ax.set_title(f"{sname} ({label})", fontsize=10)
-            fig.colorbar(im, ax=ax, shrink=0.7)
-        else:
-            ax.axis("off")
-        ax.set_xticks([])
-        ax.set_yticks([])
-        if col == 0:
-            ax.set_ylabel(geom, fontsize=11, fontweight="bold")
-
-fig.suptitle("Solutions by Solver and Geometry", fontsize=15, y=1.01)
-plt.tight_layout()
-fig.savefig(OUT / "solvers_solutions.png", dpi=150, bbox_inches="tight")
-plt.close(fig)
-print("Saved solvers_solutions.png")
-
-
-# ======================================================================
-# 4. Residual + timing combined figure
-# ======================================================================
-fig, (ax_res, ax_time) = plt.subplots(1, 2, figsize=(16, 5))
+from matplotlib.patches import Patch
 
 colors = {
     "Spectral": "#2196F3",
@@ -387,36 +439,26 @@ colors = {
     "MG+CG": "#E91E63",
 }
 
-# Collect data for grouped bar chart
-all_entries = []  # (geom_short, solver, time_ms, rel_residual)
-for geom in geom_order:
-    geom_short = geom.split("\n")[0]  # strip "(variable coeff)" line
-    for sname, data in results[geom].items():
-        all_entries.append((geom_short, sname, data["time_ms"], data["rel_residual"]))
+fig, (ax_res, ax_time) = plt.subplots(1, 2, figsize=(16, 5))
 
-# Group by geometry for bar positions
 geom_shorts = [g.split("\n")[0] for g in geom_order]
 x_positions = []
-x_labels = []
 bar_colors = []
 times_list = []
 residuals_list = []
 solver_names = []
 group_width = 0.8
-idx = 0
+
 for gi, geom in enumerate(geom_order):
     solvers = list(results[geom].keys())
     n_s = len(solvers)
     bar_w = group_width / n_s
     for si, sname in enumerate(solvers):
-        x_pos = gi + (si - (n_s - 1) / 2) * bar_w
-        x_positions.append(x_pos)
-        x_labels.append(sname)
+        x_positions.append(gi + (si - (n_s - 1) / 2) * bar_w)
         bar_colors.append(colors.get(sname, "#888888"))
         times_list.append(results[geom][sname]["time_ms"])
         residuals_list.append(results[geom][sname]["rel_residual"])
         solver_names.append(sname)
-        idx += 1
 
 # Timing bars
 bars = ax_time.bar(
@@ -442,9 +484,8 @@ ax_time.set_ylabel("Time (ms)", fontsize=11)
 ax_time.set_title("Solve Time (JIT-compiled, 64x64)", fontsize=12)
 
 # Residual bars
-# Direct solvers have residual=0; floor at 1e-15 for log scale display
 residuals_plot = [max(r, 1e-15) for r in residuals_list]
-bars_r = ax_res.bar(
+ax_res.bar(
     x_positions,
     residuals_plot,
     width=group_width / 3.5,
@@ -459,9 +500,7 @@ ax_res.set_ylabel("Relative Residual ||r|| / ||b||", fontsize=11)
 ax_res.set_title("Accuracy (Relative Residual Norm)", fontsize=12)
 ax_res.set_ylim(bottom=1e-16)
 
-# Legend (unique solver names)
-from matplotlib.patches import Patch
-
+# Legend
 legend_entries = []
 seen = set()
 for sname in solver_names:
@@ -478,7 +517,7 @@ print("Saved solvers_accuracy_timing.png")
 
 
 # ======================================================================
-# 5. Print summary table
+# 4. Print summary table
 # ======================================================================
 print("\n" + "=" * 80)
 print(
