@@ -34,10 +34,7 @@ def upwind_flux(
     q: Float[Array, "Ny Nx"],
     u: Float[Array, "Ny Nx"],
     dim: int,
-    rec_funcs: dict[
-        int,
-        Callable[[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]], Float[Array, "Ny Nx"]],
-    ],
+    rec_funcs: dict[int, Callable[..., Float[Array, "Ny Nx"]]],
     mask_hierarchy: dict[int, Bool[Array, "Ny Nx"]],
 ) -> Float[Array, "Ny Nx"]:
     """Compute upwind flux with automatic stencil fallback near boundaries.

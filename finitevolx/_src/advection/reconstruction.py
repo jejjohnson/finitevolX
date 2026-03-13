@@ -9,6 +9,8 @@ Notation
   fn[j+1/2, i]  north-face flux
 """
 
+from collections.abc import Callable
+
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
@@ -1147,7 +1149,7 @@ class Reconstruction2D(eqx.Module):
             East-face flux with zero ghost ring.
         """
         amasks = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4))
-        rec_funcs = {
+        rec_funcs: dict[int, Callable[..., Float[Array, "Ny Nx"]]] = {
             2: self.upwind1_x,
             4: lambda q, vel: self.tvd_x(q, vel, limiter=limiter),
         }
@@ -1183,7 +1185,7 @@ class Reconstruction2D(eqx.Module):
             North-face flux with zero ghost ring.
         """
         amasks = mask.get_adaptive_masks(direction="y", stencil_sizes=(2, 4))
-        rec_funcs = {
+        rec_funcs: dict[int, Callable[..., Float[Array, "Ny Nx"]]] = {
             2: self.upwind1_y,
             4: lambda q, vel: self.tvd_y(q, vel, limiter=limiter),
         }
@@ -1215,7 +1217,11 @@ class Reconstruction2D(eqx.Module):
             East-face flux with zero ghost ring.
         """
         amasks = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4, 6))
-        rec_funcs = {2: self.upwind1_x, 4: self.weno3_x, 6: self.weno5_x}
+        rec_funcs: dict[int, Callable[..., Float[Array, "Ny Nx"]]] = {
+            2: self.upwind1_x,
+            4: self.weno3_x,
+            6: self.weno5_x,
+        }
         return upwind_flux(h, u, dim=1, rec_funcs=rec_funcs, mask_hierarchy=amasks)
 
     def weno5_y_masked(
@@ -1244,7 +1250,11 @@ class Reconstruction2D(eqx.Module):
             North-face flux with zero ghost ring.
         """
         amasks = mask.get_adaptive_masks(direction="y", stencil_sizes=(2, 4, 6))
-        rec_funcs = {2: self.upwind1_y, 4: self.weno3_y, 6: self.weno5_y}
+        rec_funcs: dict[int, Callable[..., Float[Array, "Ny Nx"]]] = {
+            2: self.upwind1_y,
+            4: self.weno3_y,
+            6: self.weno5_y,
+        }
         return upwind_flux(h, v, dim=0, rec_funcs=rec_funcs, mask_hierarchy=amasks)
 
     def wenoz5_x_masked(
@@ -1273,7 +1283,11 @@ class Reconstruction2D(eqx.Module):
             East-face flux with zero ghost ring.
         """
         amasks = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4, 6))
-        rec_funcs = {2: self.upwind1_x, 4: self.wenoz3_x, 6: self.wenoz5_x}
+        rec_funcs: dict[int, Callable[..., Float[Array, "Ny Nx"]]] = {
+            2: self.upwind1_x,
+            4: self.wenoz3_x,
+            6: self.wenoz5_x,
+        }
         return upwind_flux(h, u, dim=1, rec_funcs=rec_funcs, mask_hierarchy=amasks)
 
     def wenoz5_y_masked(
@@ -1302,7 +1316,11 @@ class Reconstruction2D(eqx.Module):
             North-face flux with zero ghost ring.
         """
         amasks = mask.get_adaptive_masks(direction="y", stencil_sizes=(2, 4, 6))
-        rec_funcs = {2: self.upwind1_y, 4: self.wenoz3_y, 6: self.wenoz5_y}
+        rec_funcs: dict[int, Callable[..., Float[Array, "Ny Nx"]]] = {
+            2: self.upwind1_y,
+            4: self.wenoz3_y,
+            6: self.wenoz5_y,
+        }
         return upwind_flux(h, v, dim=0, rec_funcs=rec_funcs, mask_hierarchy=amasks)
 
 
