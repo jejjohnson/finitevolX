@@ -57,6 +57,7 @@ nav:
       - Theory & Overview: multigrid_solver.md
       - Usage Guide: multigrid_solver_usage.md
       - API Reference: api/multigrid.md
+  - Solver Comparison: solver_comparison.md
   - Examples: examples.md
   - API Reference:
       - Overview & Grids: api/index.md
