@@ -126,17 +126,127 @@ Laplacian).
 
 ### Preconditioners
 
-Preconditioning transforms the system to improve the condition number,
-dramatically reducing the number of CG iterations.
+Preconditioning transforms the system $Ax = b$ into $M^{-1}Ax = M^{-1}b$
+where $M^{-1} \approx A^{-1}$.  A good preconditioner clusters the
+eigenvalues of $M^{-1}A$ near 1, dramatically reducing the number of CG
+iterations.
 
-| Preconditioner | How it works | Best for |
-|---|---|---|
-| **Spectral** | Applies the rectangular spectral solver as $M^{-1} \approx A_{\text{rect}}^{-1}$ | Domains that are close to rectangular |
-| **Nyström** | Low-rank approximate inverse from randomised probing of $A$ | Large or complex domains; operator-only access |
+finitevolX provides three preconditioners, each suited to different problem
+characteristics.  The table below ranks them from simplest to most powerful:
 
-The spectral preconditioner is essentially free (one FFT/DST/DCT pair) and
-is the default.  The Nyström preconditioner requires $k$ operator
-applications during setup but can capture more of the operator's structure.
+| Preconditioner | Setup cost | Per-iteration cost | Constant coeff | Variable coeff | Masked domain |
+|---|---|---|---|---|---|
+| **Spectral** | None | 1 FFT pair | Excellent | Poor | Fair |
+| **Nyström** | $k$ matvecs | $O(kN)$ dot product | Good | Fair | Good |
+| **Multigrid** | Offline hierarchy build | 1 V-cycle ($O(N)$) | Excellent | Excellent | Excellent |
+
+#### Spectral Preconditioner
+
+Applies the rectangular spectral solver (DST/DCT/FFT) as an approximate
+inverse: $M^{-1} r = L_{\text{rect}}^{-1} r$.
+
+**Pros:**
+
+- Essentially free — one forward + one inverse transform per iteration
+- No setup cost
+- Exact inverse for rectangular, constant-coefficient problems
+
+**Cons:**
+
+- Ignores the mask: the rectangular solve doesn't know about land cells,
+  so the preconditioner becomes less effective as the domain deviates from
+  a rectangle
+- Cannot handle variable coefficients $c(x,y)$ — it always assumes $c = 1$
+- Effectiveness degrades for highly irregular coastlines
+
+**Best for:** Constant-coefficient problems on rectangular or
+near-rectangular domains.  This is the default and a good first choice.
+
+#### Nyström Preconditioner
+
+Builds a low-rank approximate inverse by probing the operator with $k$
+random vectors.  The resulting preconditioner captures the dominant
+spectral directions of $A^{-1}$.
+
+**Pros:**
+
+- Operator-only access: works with any `matvec` callable, no need to know
+  the operator's structure
+- Can partially capture variable-coefficient and mask effects
+- Rank $k$ is tunable — trade setup cost for preconditioner quality
+
+**Cons:**
+
+- Setup requires $k$ operator applications (can be expensive for large $k$)
+- Low-rank: misses fine-scale structure, especially for poorly conditioned
+  problems
+- Per-iteration cost is $O(kN)$ rather than $O(N \log N)$ for spectral
+- Quality depends on the rank $k$ relative to the effective rank of
+  $A^{-1}$
+
+**Best for:** Problems where the operator is available only as a callable
+(no analytic structure to exploit), or as a complement when spectral
+preconditioning is insufficient but multigrid is not needed.
+
+#### Multigrid Preconditioner
+
+Applies a single multigrid V-cycle from a zero initial guess.  Because
+multigrid captures both high- and low-frequency components of $A^{-1}$
+across the grid hierarchy, it provides a spectrally complete approximation.
+
+**Pros:**
+
+- Handles variable coefficients $c(x,y)$ natively — the hierarchy is built
+  with the actual operator
+- Handles masked/irregular domains natively — masks are coarsened through
+  the hierarchy
+- $O(N)$ cost per iteration (geometric series over grid levels)
+- Typically reduces CG iterations from hundreds to 5–10
+
+**Cons:**
+
+- Requires an offline build step (`build_multigrid_solver`) that
+  precomputes the level hierarchy
+- Grid dimensions must be divisible by $2^{L-1}$ where $L$ is the number
+  of levels
+- More complex implementation; slightly higher constant factor than
+  spectral
+
+**Best for:** Variable-coefficient problems, complex masked domains, or any
+problem where spectral preconditioning converges too slowly.
+
+#### Decision Guide
+
+```
+Is c(x,y) spatially varying?
+├── Yes → Multigrid preconditioner
+│         (spectral and Nyström can't represent variable coefficients well)
+└── No (constant coefficient) ↓
+
+Is the domain nearly rectangular?
+├── Yes → Spectral preconditioner (cheapest, nearly exact)
+└── No (complex mask) ↓
+
+Is the mask moderately complex?
+├── Yes → Multigrid preconditioner
+│         (captures mask effects through coarsened hierarchy)
+└── Operator-only access / quick prototype ↓
+
+Default → Nyström preconditioner (rank 30–100)
+          or Multigrid if you can build the hierarchy
+```
+
+#### Factory Function
+
+`make_preconditioner` dispatches to any of the three preconditioners based
+on a string key, which is convenient when the preconditioner choice is
+configurable:
+
+```python
+pc = fvx.make_preconditioner("spectral", dx=dx, dy=dy, lambda_=1.0)
+pc = fvx.make_preconditioner("nystrom", matvec=A, shape=(64, 64), rank=50)
+pc = fvx.make_preconditioner("multigrid", mg_solver=mg)
+```
 
 ---
 
