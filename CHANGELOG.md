@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.0.29](https://github.com/jejjohnson/finitevolX/compare/v0.0.28...v0.0.29) (2026-03-13)
+
+
+### Features
+
+* **solvers:** add convenience wrappers and refactor elliptic module ([8b9d233](https://github.com/jejjohnson/finitevolX/commit/8b9d233003e3c2b87918916e0805bb994a274fc8)), closes [#87](https://github.com/jejjohnson/finitevolX/issues/87)
+* **solvers:** add elliptic solver wrappers and modularize solver package ([78b0d4d](https://github.com/jejjohnson/finitevolX/commit/78b0d4d4fe1ec7ad830d771bc9aea5a2563336f7))
+* **solvers:** add preconditioners module with spectral and Nyström methods ([b1e60fb](https://github.com/jejjohnson/finitevolX/commit/b1e60fbd1ad6b5e4613fdc092a827d963ce4b6e7))
+
+
+### Bug Fixes
+
+* **solvers:** address PR review comments on elliptic module ([014bf95](https://github.com/jejjohnson/finitevolX/commit/014bf95455bae9949d2a66cf55e917652c4ba35e))
+* **solvers:** make _spectral_solve vmap-safe by using Helmholtz dispatch unconditionally ([a19f5ca](https://github.com/jejjohnson/finitevolX/commit/a19f5ca00d68d98e3edfeb497ea643309d975ec7))
+* **tests:** make Nyström CG test robust to convergence edge cases ([62f3f34](https://github.com/jejjohnson/finitevolX/commit/62f3f342f5f6e8e31de0d988f765d3ff81933889))
+
 ## [0.0.28](https://github.com/jejjohnson/finitevolX/compare/v0.0.27...v0.0.28) (2026-03-12)
 
 
