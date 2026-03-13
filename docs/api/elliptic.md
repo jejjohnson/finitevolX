@@ -1,7 +1,16 @@
 # Elliptic Solvers & Spectral Transforms
 
-Spectral Poisson/Helmholtz solvers, capacitance-matrix methods, and discrete
-cosine/sine transform utilities for elliptic problems on C-grids.
+Spectral Poisson/Helmholtz solvers, capacitance-matrix methods, iterative
+solvers, preconditioners, and convenience wrappers for elliptic problems
+on C-grids.
+
+## Convenience Wrappers
+
+::: finitevolx.streamfunction_from_vorticity
+
+::: finitevolx.pressure_from_divergence
+
+::: finitevolx.pv_inversion
 
 ## Poisson / Helmholtz Solvers
 
@@ -37,9 +46,13 @@ cosine/sine transform utilities for elliptic problems on C-grids.
 
 ::: finitevolx.CGInfo
 
+::: finitevolx.solve_cg
+
+## Preconditioners
+
 ::: finitevolx.make_spectral_preconditioner
 
-::: finitevolx.solve_cg
+::: finitevolx.make_nystrom_preconditioner
 
 ## Spectral Transforms
 
