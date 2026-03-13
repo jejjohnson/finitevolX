@@ -253,7 +253,7 @@ print(f"Residual norm: {info.residual_norm:.2e}")
 
 ### Preconditioners
 
-=== "Spectral (default, recommended)"
+=== "Spectral (cheapest)"
 
     ```python
     M_inv = fvx.make_spectral_preconditioner(
@@ -263,9 +263,9 @@ print(f"Residual norm: {info.residual_norm:.2e}")
 
     Uses the rectangular spectral solver as an approximate inverse.
     Nearly free (one FFT pair) and very effective when the domain is
-    close to rectangular.
+    close to rectangular with constant coefficients.
 
-=== "Nyström (randomised)"
+=== "Nyström (operator-only)"
 
     ```python
     M_inv = fvx.make_nystrom_preconditioner(
@@ -274,8 +274,31 @@ print(f"Residual norm: {info.residual_norm:.2e}")
     ```
 
     Builds a low-rank approximate inverse by probing the operator with
-    random vectors.  Useful when the operator is expensive or when the
-    spectral preconditioner is not effective.
+    random vectors.  Useful when you only have `matvec` access to the
+    operator, or when the spectral preconditioner is not effective enough.
+
+=== "Multigrid (most powerful)"
+
+    ```python
+    mg = fvx.build_multigrid_solver(mask, dx, dy, lambda_=1.0, coeff=coeff)
+    M_inv = fvx.make_multigrid_preconditioner(mg)
+    ```
+
+    A single multigrid V-cycle as an approximate inverse.  Captures both
+    high- and low-frequency error across the grid hierarchy.  Handles
+    variable coefficients and masked domains natively.  Typically reduces
+    CG from hundreds of iterations to 5–10.
+
+=== "Factory (dispatches by name)"
+
+    ```python
+    # Dispatches to spectral, nystrom, or multigrid
+    M_inv = fvx.make_preconditioner("spectral", dx=dx, dy=dy, lambda_=1.0)
+    M_inv = fvx.make_preconditioner("nystrom", matvec=A, shape=(64, 64))
+    M_inv = fvx.make_preconditioner("multigrid", mg_solver=mg)
+    ```
+
+    Convenient when the preconditioner choice is a configurable parameter.
 
 === "Custom"
 
@@ -286,6 +309,12 @@ print(f"Residual norm: {info.residual_norm:.2e}")
 
     psi, info = fvx.solve_cg(A, rhs, preconditioner=my_preconditioner)
     ```
+
+!!! tip "Which preconditioner should I use?"
+    See the [Preconditioner Decision Guide](elliptic_solvers.md#decision-guide)
+    in the theory page for a full comparison.  **TL;DR**: start with spectral
+    (free, works well for constant-coefficient near-rectangular problems);
+    switch to multigrid for variable coefficients or complex masks.
 
 ---
 

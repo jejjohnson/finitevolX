@@ -84,7 +84,9 @@ from finitevolx._src.solvers.elliptic import (
     dct2_eigenvalues,
     dst1_eigenvalues,
     fft_eigenvalues,
+    make_multigrid_preconditioner,
     make_nystrom_preconditioner,
+    make_preconditioner,
     make_spectral_preconditioner,
     masked_laplacian,
     pressure_from_divergence,
@@ -97,6 +99,10 @@ from finitevolx._src.solvers.elliptic import (
     solve_poisson_dst,
     solve_poisson_fft,
     streamfunction_from_vorticity,
+)
+from finitevolx._src.solvers.multigrid import (
+    MultigridSolver,
+    build_multigrid_solver,
 )
 from finitevolx._src.solvers.spectral_transforms import (
     dct,
@@ -276,7 +282,9 @@ __all__ = [
     "CapacitanceSolver",
     "build_capacitance_solver",
     # Preconditioners
+    "make_multigrid_preconditioner",
     "make_nystrom_preconditioner",
+    "make_preconditioner",
     "make_spectral_preconditioner",
     # Preconditioned Conjugate Gradient
     "CGInfo",
@@ -286,6 +294,9 @@ __all__ = [
     "streamfunction_from_vorticity",
     "pressure_from_divergence",
     "pv_inversion",
+    # Multigrid Helmholtz solver
+    "MultigridSolver",
+    "build_multigrid_solver",
     # Tridiagonal (TDMA) solver
     "solve_tridiagonal",
     "solve_tridiagonal_batched",

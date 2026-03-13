@@ -1,26 +1,39 @@
 """Preconditioners for iterative elliptic solvers.
 
-Spectral preconditioner
------------------------
-:func:`make_spectral_preconditioner` returns a callable that applies a
-rectangular spectral solve (DST/DCT/FFT) as an approximate inverse of the
-Helmholtz operator ``(∇² − λ)``.  Effective for masked-domain problems
-where the physical domain is a subset of a rectangle.
+All preconditioners return a callable ``M_inv(r) -> Array`` that
+approximates the action of ``A^{-1}`` on a residual vector.  They are
+designed for use with :func:`~finitevolx._src.solvers.iterative.solve_cg`.
 
-Randomized Nyström preconditioner
----------------------------------
-:func:`make_nystrom_preconditioner` builds a low-rank approximate inverse
-from randomized probing of the operator.  Useful when the operator is
-expensive or when only matrix-vector products are available.
+Available preconditioners
+-------------------------
+``make_spectral_preconditioner``
+    Rectangular spectral solve (DST/DCT/FFT) as an approximate inverse.
+    Nearly free (one FFT pair).  Best when the domain is close to rectangular.
+
+``make_nystrom_preconditioner``
+    Low-rank approximate inverse from randomised operator probing.
+    Good when the operator is expensive or operator-only access is available.
+
+``make_multigrid_preconditioner``
+    Single multigrid V-cycle as an approximate inverse.  Captures both
+    high- and low-frequency components.  Best for variable-coefficient
+    problems or when spectral preconditioning is insufficient.
+
+``make_preconditioner``
+    Convenience factory that dispatches to the above based on a string key.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
+
+if TYPE_CHECKING:
+    from finitevolx._src.solvers.multigrid import MultigridSolver
 
 # ---------------------------------------------------------------------------
 # Spectral preconditioner
@@ -90,10 +103,11 @@ def make_nystrom_preconditioner(
     Algorithm
     ---------
     1. Draw a Gaussian random matrix ``Ω ∈ ℝ^{n × k}`` (``k = rank``).
-    2. Compute ``Y = A Ω`` (``k`` matvec applications).
-    3. Form the small matrix ``B = Ω^T Y ∈ ℝ^{k × k}``.
-    4. Compute ``B = U S U^T`` (eigendecomposition of the small matrix).
-    5. The preconditioner applies ``M^{-1} x ≈ (Ω U S^{-1} U^T Ω^T) x``.
+    2. QR-factorize: ``Ω = Q R`` to get orthonormal ``Q ∈ ℝ^{n × k}``.
+    3. Compute ``Y = A Q`` (``k`` matvec applications).
+    4. Form the small matrix ``B = Q^T Y ∈ ℝ^{k × k}``.
+    5. Compute ``B = U S U^T`` (eigendecomposition of the small matrix).
+    6. The preconditioner applies ``M^{-1} x ≈ (Q U S^{-1} U^T Q^T) x``.
 
     The operator ``A`` is assumed to be symmetric **negative definite**.
     The eigenvalues of ``B`` will be negative; their absolute values are
@@ -129,17 +143,18 @@ def make_nystrom_preconditioner(
     # Clamp rank to problem size
     k = min(rank, n)
 
-    # Step 1: Random probing matrix Omega in R^{n x k}
+    # Step 1: Random probing matrix Omega in R^{n x k}, then QR for stability
     omega = jax.random.normal(key, (n, k))
+    Q, _ = jnp.linalg.qr(omega)  # Q in R^{n x k}, orthonormal columns
 
-    # Step 2: Y = A Ω  (k matvec applications)
+    # Step 2: Y = A Q  (k matvec applications)
     def _apply_col(col: Float[Array, " n"]) -> Float[Array, " n"]:
         return matvec(col.reshape(Ny, Nx)).ravel()
 
-    Y = jax.vmap(_apply_col, in_axes=1, out_axes=1)(omega)  # [n, k]
+    Y = jax.vmap(_apply_col, in_axes=1, out_axes=1)(Q)  # [n, k]
 
-    # Step 3: Small matrix B = Omega^T Y in R^{k x k}
-    B = omega.T @ Y  # [k, k]
+    # Step 3: Small matrix B = Q^T Y = Q^T A Q in R^{k x k}
+    B = Q.T @ Y  # [k, k]
 
     # Step 4: Eigendecomposition of B (symmetric)
     eigvals, U = jnp.linalg.eigh(B)  # eigvals sorted ascending
@@ -152,11 +167,10 @@ def make_nystrom_preconditioner(
     # Preserve the sign: A^{-1} is also negative definite
     s_inv = -s_inv  # negate so preconditioner ≈ A^{-1} (negative)
 
-    # Precompute the projection matrix: P = Ω U diag(s_inv) Uᵀ Ωᵀ
-    # For memory efficiency, store the factor F = Ω U diag(sqrt|s_inv|)
-    # and apply as F Fᵀ x (with sign).
-    # But simpler: store W = Omega @ U in R^{n x k} and s_inv in R^{k}.
-    W = omega @ U  # [n, k]
+    # Basis vectors: W = Q U has orthonormal columns (product of orthonormal
+    # matrices), so M^{-1} = W diag(s_inv) W^T is a proper spectral
+    # decomposition of the rank-k approximate inverse.
+    W = Q @ U  # [n, k], orthonormal columns
 
     def _preconditioner(r: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         r_flat = r.ravel()  # [n]
@@ -166,3 +180,133 @@ def make_nystrom_preconditioner(
         return result.reshape(Ny, Nx)
 
     return _preconditioner
+
+
+# ---------------------------------------------------------------------------
+# Multigrid preconditioner
+# ---------------------------------------------------------------------------
+
+
+def make_multigrid_preconditioner(
+    mg_solver: MultigridSolver,
+) -> Callable[[Float[Array, "Ny Nx"]], Float[Array, "Ny Nx"]]:
+    """Return a preconditioner closure that applies a single multigrid V-cycle.
+
+    The returned callable approximates ``A^{-1} r`` by running one V-cycle
+    from a zero initial guess, which is sufficient as a preconditioner
+    (it doesn't need to converge — it just needs to be a good approximation).
+
+    This is compatible with :func:`~finitevolx._src.solvers.iterative.solve_cg`:
+    pass the returned closure as the ``preconditioner`` argument.  CG then
+    converges in very few iterations (typically 5-10 instead of hundreds)
+    because multigrid captures both high- and low-frequency components of
+    the inverse.
+
+    Parameters
+    ----------
+    mg_solver : MultigridSolver
+        A pre-built multigrid solver
+        (from :func:`~finitevolx._src.solvers.multigrid.build_multigrid_solver`).
+
+    Returns
+    -------
+    callable
+        ``preconditioner(r) -> approx_solution``, where ``r`` has shape
+        ``(Ny, Nx)`` and the output has the same shape.
+
+    Examples
+    --------
+    >>> mg = build_multigrid_solver(mask, dx, dy, lambda_=10.0)
+    >>> precond = make_multigrid_preconditioner(mg)
+    >>> u, info = solve_cg(A, rhs, preconditioner=precond)
+    """
+
+    def _preconditioner(r: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+        return mg_solver.v_cycle(jnp.zeros_like(r), r)
+
+    return _preconditioner
+
+
+# ---------------------------------------------------------------------------
+# Preconditioner factory
+# ---------------------------------------------------------------------------
+
+
+def make_preconditioner(
+    kind: str,
+    *,
+    dx: float | None = None,
+    dy: float | None = None,
+    lambda_: float = 0.0,
+    bc: str = "fft",
+    matvec: Callable[[Float[Array, "Ny Nx"]], Float[Array, "Ny Nx"]] | None = None,
+    shape: tuple[int, int] | None = None,
+    rank: int = 50,
+    key: jax.Array | None = None,
+    mg_solver: MultigridSolver | None = None,
+) -> Callable[[Float[Array, "Ny Nx"]], Float[Array, "Ny Nx"]]:
+    """Convenience factory that builds a preconditioner by name.
+
+    Dispatches to :func:`make_spectral_preconditioner`,
+    :func:`make_nystrom_preconditioner`, or
+    :func:`make_multigrid_preconditioner` based on *kind*.
+
+    Parameters
+    ----------
+    kind : {"spectral", "nystrom", "multigrid"}
+        Which preconditioner to build.
+
+    dx, dy : float or None
+        Grid spacings.  Required for ``kind="spectral"``.
+    lambda_ : float
+        Helmholtz parameter.  Used by ``kind="spectral"``.  Default: 0.0.
+    bc : {"fft", "dst", "dct"}
+        Spectral solver type.  Used by ``kind="spectral"``.  Default: ``"fft"``.
+
+    matvec : callable or None
+        Operator ``A``.  Required for ``kind="nystrom"``.
+    shape : (int, int) or None
+        Spatial shape ``(Ny, Nx)``.  Required for ``kind="nystrom"``.
+    rank : int
+        Approximation rank.  Used by ``kind="nystrom"``.  Default: 50.
+    key : jax.Array or None
+        PRNG key.  Used by ``kind="nystrom"``.
+
+    mg_solver : MultigridSolver or None
+        Pre-built multigrid solver.  Required for ``kind="multigrid"``.
+
+    Returns
+    -------
+    callable
+        A function ``M_inv(r: Array) -> Array`` that applies the
+        approximate inverse, compatible with :func:`solve_cg`.
+
+    Raises
+    ------
+    ValueError
+        If *kind* is unknown or required arguments are missing.
+
+    Examples
+    --------
+    >>> pc = make_preconditioner("spectral", dx=dx, dy=dy, lambda_=10.0)
+    >>> pc = make_preconditioner("nystrom", matvec=A, shape=(64, 64), rank=30)
+    >>> pc = make_preconditioner("multigrid", mg_solver=mg)
+    """
+    if kind == "spectral":
+        if dx is None or dy is None:
+            raise ValueError("kind='spectral' requires dx and dy")
+        return make_spectral_preconditioner(dx, dy, lambda_=lambda_, bc=bc)
+
+    if kind == "nystrom":
+        if matvec is None or shape is None:
+            raise ValueError("kind='nystrom' requires matvec and shape")
+        return make_nystrom_preconditioner(matvec, shape, rank=rank, key=key)
+
+    if kind == "multigrid":
+        if mg_solver is None:
+            raise ValueError("kind='multigrid' requires mg_solver")
+        return make_multigrid_preconditioner(mg_solver)
+
+    raise ValueError(
+        f"kind must be 'spectral', 'nystrom', or 'multigrid'; got {kind!r}"
+    )
