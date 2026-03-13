@@ -23,14 +23,14 @@ classifiers = [
     "Development Status :: 2 - Pre-Alpha",
 ]
 dependencies = [
-    "jax>=0.4.30",
-    "jaxlib>=0.4.30",
-    "jaxtyping>=0.2.28",
-    "beartype>=0.18.0",
-    "equinox",
-    "scipy>=1.13.0",
+    "jax>=0.4.38",
+    "jaxlib>=0.4.38",
+    "jaxtyping>=0.3.0",
+    "beartype>=0.20.0",
+    "equinox>=0.11.0",
+    "scipy>=1.14.0",
     "lineax>=0.1.0",
-    "diffrax>=0.5.0",
+    "diffrax>=0.6.0",
 ]
 
 [project.urls]
@@ -38,31 +38,31 @@ Repository = "https://github.com/jejjohnson/finitevolX"
 
 [project.optional-dependencies]
 test = [
-    "pytest>=8.0.0",
+    "pytest>=8.3.0",
     "pytest-cov>=5.0.0",
     "pytest-pretty>=1.2.0",
     "pytest-xdist>=3.5.0",
-    "networkx>=3.2",
-    "coverage>=7.4.0",
+    "networkx>=3.3",
+    "coverage>=7.6.0",
     "matplotlib>=3.9.0",
-    "pillow>=10.0.0",
-    "xarray>=2024.6.0",
+    "pillow>=11.0.0",
+    "xarray>=2025.1.0",
     "zarr>=3.1.5",
 ]
 dev = [
-    "ruff>=0.8.0",
+    "ruff>=0.15.0",
     "pre-commit>=4.0.0",
     "nbstripout>=0.7.1",
-    "ty>=0.0.19",
+    "ty>=0.0.23",
 ]
 examples = [
-    "cyclopts>=0.8.0",
+    "cyclopts>=2.0.0",
     "loguru>=0.7.2",
     "matplotlib>=3.9.0",
-    "pillow>=10.0.0",
-    "numpy>=1.26.0",
+    "pillow>=11.0.0",
+    "numpy>=2.0.0",
     "tqdm>=4.66.0",
-    "xarray>=2024.6.0",
+    "xarray>=2025.1.0",
     "zarr>=3.1.5",
 ]
 docs = [
@@ -148,6 +148,7 @@ docstring-code-format = true
 unresolved-attribute = "ignore"
 invalid-return-type = "ignore"
 unresolved-import = "ignore"
+invalid-argument-type = "ignore"
 
 [tool.coverage.report]
 precision = 1
