@@ -53,6 +53,10 @@ nav:
       - Theory & Overview: elliptic_solvers.md
       - Usage Guide: elliptic_solvers_usage.md
       - API Reference: api/elliptic.md
+  - Multigrid Solver:
+      - Theory & Overview: multigrid_solver.md
+      - Usage Guide: multigrid_solver_usage.md
+      - API Reference: api/multigrid.md
   - Examples: examples.md
   - API Reference:
       - Overview & Grids: api/index.md
@@ -70,6 +74,8 @@ nav:
 
 markdown_extensions:
   - admonition
+  - pymdownx.arithmatex:
+      generic: true
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.superfences
@@ -80,3 +86,7 @@ markdown_extensions:
       base_path: ['.']
   - attr_list
   - md_in_html
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
