@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.30](https://github.com/jejjohnson/finitevolX/compare/v0.0.29...v0.0.30) (2026-03-13)
+
+
+### Features
+
+* **solvers:** add geometric multigrid Helmholtz solver ([f33c687](https://github.com/jejjohnson/finitevolX/commit/f33c687e74f3392ce99f9374d34c67a0ec8f8d39)), closes [#71](https://github.com/jejjohnson/finitevolX/issues/71)
+
+
+### Bug Fixes
+
+* **docs:** configure MathJax equation rendering with $ delimiters ([51313c9](https://github.com/jejjohnson/finitevolX/commit/51313c9dd4a844f62857dd46a159bf1b3f403e80))
+* **solvers:** add QR orthogonalization to Nyström preconditioner ([981312d](https://github.com/jejjohnson/finitevolX/commit/981312dbc7854d33b4cd18136eaab5676035a897))
+* **solvers:** address PR review comments on multigrid ([c37166e](https://github.com/jejjohnson/finitevolX/commit/c37166e34657b0aecac23c948c8e06890e3c213a))
+
 ## [0.0.29](https://github.com/jejjohnson/finitevolX/compare/v0.0.28...v0.0.29) (2026-03-13)
 
 
