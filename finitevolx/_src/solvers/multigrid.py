@@ -343,18 +343,20 @@ def _apply_operator(
 
     Boundary treatment
     ~~~~~~~~~~~~~~~~~~
-    Neighbours that fall outside the array (e.g. ``u[j, -1]`` or
-    ``u[j, Nx]``) are replaced by zero.  This is equivalent to
-    **homogeneous Neumann BCs** (zero-flux) at the domain edges — the
-    natural choice for bounded ocean basins.  Unlike ``jnp.roll`` (which
-    wraps periodically), the zero-padding approach does not introduce
-    spurious fluxes across opposite edges.
+    Zero normal flux at the domain edges is enforced primarily by the
+    face coefficients ``cx``/``cy``: boundary faces have zero coefficient,
+    so no flux crosses the domain boundary regardless of ghost values.
+    Out-of-bounds neighbours are zero-padded as an implementation
+    convenience (avoids periodic wrapping from ``jnp.roll``).  Unlike
+    ``jnp.roll``, this does not introduce spurious fluxes across
+    opposite edges — the natural choice for bounded ocean basins.
 
     Implementation note
     ~~~~~~~~~~~~~~~~~~~
     Shifted arrays are constructed via ``jnp.zeros_like().at[].set()``
-    rather than ``jnp.roll``.  This avoids periodic wrapping and the
-    boundary condition is enforced implicitly by the zero padding::
+    rather than ``jnp.roll``.  The zero padding is a convenience that
+    avoids periodic wrapping; the actual BC is enforced by the zeroed
+    face coefficients at boundary faces::
 
         u_east[j, i] = u[j, i+1]   for i < Nx-1
                       = 0           for i = Nx-1   (ghost = 0)
@@ -376,7 +378,7 @@ def _apply_operator(
     dx2 = level.dx**2
     dy2 = level.dy**2
 
-    # --- Shifted neighbours (zero ghost at boundaries = Neumann BC) ---
+    # --- Shifted neighbours (zero-padded; actual BC via zeroed face coeffs) ---
     # u_east[j, i] = u[j, i+1];  u_east[j, Nx-1] = 0
     u_east = jnp.zeros_like(u_m).at[:, :-1].set(u_m[:, 1:])
     # u_west[j, i] = u[j, i-1];  u_west[j, 0] = 0
@@ -646,7 +648,9 @@ class MultigridSolver(eqx.Module):
       ``jax.lax.custom_linear_solve(symmetric=True)``.  The backward pass
       solves the adjoint system ``A^T v = dL/du`` with one multigrid call.
       Since ``A`` is symmetric, this costs the same as the forward pass.
-      O(1) memory, exact gradients.
+      O(1) memory, exact gradients for the linear system being solved
+      (gradient accuracy is limited by how well the V-cycles approximate
+      ``A^{-1}``, i.e. depends on ``n_cycles`` and smoother settings).
 
     * ``solve_onestep`` — **One-step differentiation** (Bolte, Pauwels &
       Vaiter, NeurIPS 2023).  Runs K V-cycles, applies ``stop_gradient``
@@ -655,7 +659,9 @@ class MultigridSolver(eqx.Module):
 
     * ``solve_unrolled`` — **Unrolled differentiation** via
       ``jax.lax.fori_loop``.  Backward replays all K iterations.
-      O(K) memory, exact through-iteration gradients.
+      O(K) memory, exact through-iteration gradients (reproduces the
+      forward computation exactly, so gradient accuracy matches the
+      forward solve accuracy).
 
     Parameters
     ----------

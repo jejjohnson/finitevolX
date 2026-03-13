@@ -99,10 +99,13 @@ boundaries.
 
 ### Boundary Conditions
 
-Ghost cells outside the domain are set to zero (homogeneous Neumann BCs).
-This is implemented via zero-padded shifted arrays rather than `jnp.roll`,
-which means **no periodic wrapping** at the domain edges — the natural
-choice for bounded ocean basins.
+Zero normal flux at domain edges is enforced by the face coefficients:
+boundary faces have zero coefficient, so no flux crosses the domain
+boundary.  Out-of-bounds neighbours are zero-padded as an implementation
+convenience (avoids periodic wrapping from `jnp.roll`), but the actual
+BC is determined by the zeroed face coefficients, **not** the ghost
+values.  This means **no periodic wrapping** at the domain edges — the
+natural choice for bounded ocean basins.
 
 ---
 

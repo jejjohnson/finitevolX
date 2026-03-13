@@ -18,7 +18,7 @@ jax.config.update("jax_enable_x64", True)
 
 # 1. Define a grid
 Ny, Nx = 64, 64
-dx, dy = 1.0 / Ny, 1.0 / Nx
+dx, dy = 1.0 / Nx, 1.0 / Ny
 mask = np.ones((Ny, Nx))  # rectangular domain
 
 # 2. Build the solver (offline, once)
