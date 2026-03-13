@@ -107,15 +107,21 @@ normal velocity is zero and the tangential velocity has zero normal gradient.
 
 ### `Slip1D`
 
-Anti-symmetric reflection (odd extension):
+General slip boundary condition controlled by a scalar `coefficient = a`:
 
 $$
-\phi_{\text{ghost}} = -\phi_{\text{interior}}
+\phi_{\text{ghost}} = (2a - 1)\,\phi_{\text{interior}}
 $$
 
-This enforces $\phi_{\text{wall}} = 0$ (equivalent to Dirichlet with $g=0$)
-and is more efficient than `Dirichlet1D(value=0)` because it avoids the
-division.  Used for **no-slip** velocity walls.
+where:
+
+- `a = 1.0` (default) gives **free-slip** (even reflection),
+- `a = 0.0` gives **no-slip** (odd reflection, equivalent to Dirichlet with $g=0$),
+- `0 < a < 1` gives **partial-slip**, interpolating smoothly between free-slip and no-slip.
+
+This BC is typically used for velocity components at solid walls, with the
+choice of `coefficient` controlling how strongly the tangential velocity is
+damped at the boundary.
 
 ### `Outflow1D`
 
