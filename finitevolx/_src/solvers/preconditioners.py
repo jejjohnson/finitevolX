@@ -103,10 +103,11 @@ def make_nystrom_preconditioner(
     Algorithm
     ---------
     1. Draw a Gaussian random matrix ``Ω ∈ ℝ^{n × k}`` (``k = rank``).
-    2. Compute ``Y = A Ω`` (``k`` matvec applications).
-    3. Form the small matrix ``B = Ω^T Y ∈ ℝ^{k × k}``.
-    4. Compute ``B = U S U^T`` (eigendecomposition of the small matrix).
-    5. The preconditioner applies ``M^{-1} x ≈ (Ω U S^{-1} U^T Ω^T) x``.
+    2. QR-factorize: ``Ω = Q R`` to get orthonormal ``Q ∈ ℝ^{n × k}``.
+    3. Compute ``Y = A Q`` (``k`` matvec applications).
+    4. Form the small matrix ``B = Q^T Y ∈ ℝ^{k × k}``.
+    5. Compute ``B = U S U^T`` (eigendecomposition of the small matrix).
+    6. The preconditioner applies ``M^{-1} x ≈ (Q U S^{-1} U^T Q^T) x``.
 
     The operator ``A`` is assumed to be symmetric **negative definite**.
     The eigenvalues of ``B`` will be negative; their absolute values are
@@ -142,17 +143,18 @@ def make_nystrom_preconditioner(
     # Clamp rank to problem size
     k = min(rank, n)
 
-    # Step 1: Random probing matrix Omega in R^{n x k}
+    # Step 1: Random probing matrix Omega in R^{n x k}, then QR for stability
     omega = jax.random.normal(key, (n, k))
+    Q, _ = jnp.linalg.qr(omega)  # Q in R^{n x k}, orthonormal columns
 
-    # Step 2: Y = A Ω  (k matvec applications)
+    # Step 2: Y = A Q  (k matvec applications)
     def _apply_col(col: Float[Array, " n"]) -> Float[Array, " n"]:
         return matvec(col.reshape(Ny, Nx)).ravel()
 
-    Y = jax.vmap(_apply_col, in_axes=1, out_axes=1)(omega)  # [n, k]
+    Y = jax.vmap(_apply_col, in_axes=1, out_axes=1)(Q)  # [n, k]
 
-    # Step 3: Small matrix B = Omega^T Y in R^{k x k}
-    B = omega.T @ Y  # [k, k]
+    # Step 3: Small matrix B = Q^T Y = Q^T A Q in R^{k x k}
+    B = Q.T @ Y  # [k, k]
 
     # Step 4: Eigendecomposition of B (symmetric)
     eigvals, U = jnp.linalg.eigh(B)  # eigvals sorted ascending
@@ -165,11 +167,10 @@ def make_nystrom_preconditioner(
     # Preserve the sign: A^{-1} is also negative definite
     s_inv = -s_inv  # negate so preconditioner ≈ A^{-1} (negative)
 
-    # Precompute the projection matrix: P = Ω U diag(s_inv) Uᵀ Ωᵀ
-    # For memory efficiency, store the factor F = Ω U diag(sqrt|s_inv|)
-    # and apply as F Fᵀ x (with sign).
-    # But simpler: store W = Omega @ U in R^{n x k} and s_inv in R^{k}.
-    W = omega @ U  # [n, k]
+    # Basis vectors: W = Q U has orthonormal columns (product of orthonormal
+    # matrices), so M^{-1} = W diag(s_inv) W^T is a proper spectral
+    # decomposition of the rank-k approximate inverse.
+    W = Q @ U  # [n, k], orthonormal columns
 
     def _preconditioner(r: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         r_flat = r.ravel()  # [n]
