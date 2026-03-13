@@ -45,6 +45,27 @@ nav:
   - C-Grid Discretization: cgrid_discretization.md
   - Multilayer vs. 3D: multilayer_vs_3d.md
   - Masks: masks.md
+  - Difference Operators:
+      - Theory & Overview: difference.md
+      - API Reference: api/difference.md
+  - Interpolation Operators:
+      - Theory & Overview: interpolation.md
+      - API Reference: api/interpolation.md
+  - Advection:
+      - Theory & Overview: advection.md
+      - API Reference: api/advection.md
+      - Reconstruction: api/reconstruction.md
+  - Boundary Conditions:
+      - Theory & Overview: boundary_conditions.md
+      - API Reference: api/boundary_conditions.md
+  - Spatial Operators:
+      - Theory & Overview: spatial_operators.md
+      - Divergence: api/divergence.md
+      - Vorticity: api/vorticity.md
+      - Diffusion: api/diffusion.md
+      - Coriolis: api/coriolis.md
+      - Momentum Advection: api/momentum.md
+      - Diagnostics: api/diagnostics.md
   - Time Integration:
       - Theory & Overview: time_integration.md
       - Usage Guide: time_integration_usage.md
@@ -71,6 +92,7 @@ nav:
       - Coriolis: api/coriolis.md
       - Momentum Advection: api/momentum.md
       - Boundary Conditions: api/boundary_conditions.md
+      - Diagnostics: api/diagnostics.md
   - Changelog: CHANGELOG.md
 
 markdown_extensions:
