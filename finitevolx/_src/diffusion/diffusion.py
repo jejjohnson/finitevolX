@@ -58,6 +58,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 
 from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 
 
 def diffusion_2d(
@@ -146,10 +147,9 @@ def diffusion_2d(
     # Step 3: Tendency at T-points (divergence of flux)
     # dh[j, i] = (flux_x[j, i+1/2] - flux_x[j, i-1/2]) / dx
     #           + (flux_y[j+1/2, i] - flux_y[j-1/2, i]) / dy
-    out = jnp.zeros_like(h)
     du = (flux_x[1:-1, 1:-1] - flux_x[1:-1, :-2]) / dx
     dv = (flux_y[1:-1, 1:-1] - flux_y[:-2, 1:-1]) / dy
-    out = out.at[1:-1, 1:-1].set(du + dv)
+    out = interior(du + dv, h)
 
     if mask_h is not None:
         out = out * mask_h
@@ -374,7 +374,7 @@ class Diffusion3D(eqx.Module):
             h, kappa_arr, mh, mu, mv
         )
         # Zero z-ghost slices.
-        return out.at[0].set(0.0).at[-1].set(0.0)
+        return zero_z_ghosts(out)
 
     def fluxes(
         self,
@@ -422,8 +422,8 @@ class Diffusion3D(eqx.Module):
             h, kappa_arr, mu, mv
         )
         # Zero z-ghost slices.
-        fx = fx.at[0].set(0.0).at[-1].set(0.0)
-        fy = fy.at[0].set(0.0).at[-1].set(0.0)
+        fx = zero_z_ghosts(fx)
+        fy = zero_z_ghosts(fy)
         return fx, fy
 
 

@@ -20,6 +20,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.operators._ghost import interior
 
 # ======================================================================
 # Shared primitive implementations (used by both class and functional APIs)
@@ -37,11 +38,11 @@ def _curl_2d(
     zeta[j+1/2, i+1/2] = (v[j+1/2, i+1] - v[j+1/2, i]) / dx
                         - (u[j+1, i+1/2] - u[j, i+1/2]) / dy
     """
-    out = jnp.zeros_like(u)
     # dv_dx[j+1/2, i+1/2] = (v[j+1/2, i+1] - v[j+1/2, i]) / dx
     # du_dy[j+1/2, i+1/2] = (u[j+1, i+1/2] - u[j, i+1/2]) / dy
-    out = out.at[1:-1, 1:-1].set(
-        (v[1:-1, 2:] - v[1:-1, 1:-1]) / dx - (u[2:, 1:-1] - u[1:-1, 1:-1]) / dy
+    out = interior(
+        (v[1:-1, 2:] - v[1:-1, 1:-1]) / dx - (u[2:, 1:-1] - u[1:-1, 1:-1]) / dy,
+        u,
     )
     return out
 
@@ -57,12 +58,12 @@ def _divergence_2d(
     delta[j, i] = (u[j, i+1/2] - u[j, i-1/2]) / dx
                 + (v[j+1/2, i] - v[j-1/2, i]) / dy
     """
-    out = jnp.zeros(u.shape, dtype=jnp.result_type(u, v))
     # du_dx[j, i] = (u[j, i+1/2] - u[j, i-1/2]) / dx  →  (u[1:-1,1:-1] - u[1:-1,:-2]) / dx
     du_dx = (u[1:-1, 1:-1] - u[1:-1, :-2]) / dx
     # dv_dy[j, i] = (v[j+1/2, i] - v[j-1/2, i]) / dy  →  (v[1:-1,1:-1] - v[:-2,1:-1]) / dy
     dv_dy = (v[1:-1, 1:-1] - v[:-2, 1:-1]) / dy
-    return out.at[1:-1, 1:-1].set(du_dx + dv_dy)
+    like = jnp.zeros(u.shape, dtype=jnp.result_type(u, v))
+    return interior(du_dx + dv_dy, like)
 
 
 class Difference1D(eqx.Module):
@@ -91,9 +92,7 @@ class Difference1D(eqx.Module):
         Float[Array, "Nx"]
             Forward x-difference at U-points, same shape as input.
         """
-        out = jnp.zeros_like(h)
-        # dh_dx[i+1/2] = (h[i+1] - h[i]) / dx
-        out = out.at[1:-1].set((h[2:] - h[1:-1]) / self.grid.dx)
+        out = interior((h[2:] - h[1:-1]) / self.grid.dx, h)
         return out
 
     def diff_x_U_to_T(self, u: Float[Array, "Nx"]) -> Float[Array, "Nx"]:
@@ -111,9 +110,7 @@ class Difference1D(eqx.Module):
         Float[Array, "Nx"]
             Backward x-difference at T-points, same shape as input.
         """
-        out = jnp.zeros_like(u)
-        # du_dx[i] = (u[i+1/2] - u[i-1/2]) / dx
-        out = out.at[1:-1].set((u[1:-1] - u[:-2]) / self.grid.dx)
+        out = interior((u[1:-1] - u[:-2]) / self.grid.dx, u)
         return out
 
     def laplacian(self, h: Float[Array, "Nx"]) -> Float[Array, "Nx"]:
@@ -131,9 +128,7 @@ class Difference1D(eqx.Module):
         Float[Array, "Nx"]
             Laplacian at T-points, same shape as input.
         """
-        out = jnp.zeros_like(h)
-        # nabla2_h[i] = (h[i+1] - 2*h[i] + h[i-1]) / dx^2
-        out = out.at[1:-1].set((h[2:] - 2.0 * h[1:-1] + h[:-2]) / self.grid.dx**2)
+        out = interior((h[2:] - 2.0 * h[1:-1] + h[:-2]) / self.grid.dx**2, h)
         return out
 
 
@@ -167,9 +162,8 @@ class Difference2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Forward x-difference at U-points.
         """
-        out = jnp.zeros_like(h)
         # dh_dx[j, i+1/2] = (h[j, i+1] - h[j, i]) / dx
-        out = out.at[1:-1, 1:-1].set((h[1:-1, 2:] - h[1:-1, 1:-1]) / self.grid.dx)
+        out = interior((h[1:-1, 2:] - h[1:-1, 1:-1]) / self.grid.dx, h)
         return out
 
     def diff_y_T_to_V(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -187,9 +181,8 @@ class Difference2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Forward y-difference at V-points.
         """
-        out = jnp.zeros_like(h)
         # dh_dy[j+1/2, i] = (h[j+1, i] - h[j, i]) / dy
-        out = out.at[1:-1, 1:-1].set((h[2:, 1:-1] - h[1:-1, 1:-1]) / self.grid.dy)
+        out = interior((h[2:, 1:-1] - h[1:-1, 1:-1]) / self.grid.dy, h)
         return out
 
     def diff_y_U_to_X(self, u: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -207,9 +200,8 @@ class Difference2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Forward y-difference at X-points.
         """
-        out = jnp.zeros_like(u)
         # du_dy[j+1/2, i+1/2] = (u[j+1, i+1/2] - u[j, i+1/2]) / dy
-        out = out.at[1:-1, 1:-1].set((u[2:, 1:-1] - u[1:-1, 1:-1]) / self.grid.dy)
+        out = interior((u[2:, 1:-1] - u[1:-1, 1:-1]) / self.grid.dy, u)
         return out
 
     def diff_x_V_to_X(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -227,9 +219,8 @@ class Difference2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Forward x-difference at X-points.
         """
-        out = jnp.zeros_like(v)
         # dv_dx[j+1/2, i+1/2] = (v[j+1/2, i+1] - v[j+1/2, i]) / dx
-        out = out.at[1:-1, 1:-1].set((v[1:-1, 2:] - v[1:-1, 1:-1]) / self.grid.dx)
+        out = interior((v[1:-1, 2:] - v[1:-1, 1:-1]) / self.grid.dx, v)
         return out
 
     def diff_y_X_to_U(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -247,9 +238,8 @@ class Difference2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Backward y-difference at U-points.
         """
-        out = jnp.zeros_like(q)
         # dq_dy[j, i+1/2] = (q[j+1/2, i+1/2] - q[j-1/2, i+1/2]) / dy
-        out = out.at[1:-1, 1:-1].set((q[1:-1, 1:-1] - q[:-2, 1:-1]) / self.grid.dy)
+        out = interior((q[1:-1, 1:-1] - q[:-2, 1:-1]) / self.grid.dy, q)
         return out
 
     def diff_x_X_to_V(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -267,9 +257,8 @@ class Difference2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Backward x-difference at V-points.
         """
-        out = jnp.zeros_like(q)
         # dq_dx[j+1/2, i] = (q[j+1/2, i+1/2] - q[j+1/2, i-1/2]) / dx
-        out = out.at[1:-1, 1:-1].set((q[1:-1, 1:-1] - q[1:-1, :-2]) / self.grid.dx)
+        out = interior((q[1:-1, 1:-1] - q[1:-1, :-2]) / self.grid.dx, q)
         return out
 
     # ------------------------------------------------------------------
@@ -291,9 +280,8 @@ class Difference2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Backward x-difference at T-points.
         """
-        out = jnp.zeros_like(u)
         # du_dx[j, i] = (u[j, i+1/2] - u[j, i-1/2]) / dx
-        out = out.at[1:-1, 1:-1].set((u[1:-1, 1:-1] - u[1:-1, :-2]) / self.grid.dx)
+        out = interior((u[1:-1, 1:-1] - u[1:-1, :-2]) / self.grid.dx, u)
         return out
 
     def diff_y_V_to_T(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -311,9 +299,8 @@ class Difference2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Backward y-difference at T-points.
         """
-        out = jnp.zeros_like(v)
         # dv_dy[j, i] = (v[j+1/2, i] - v[j-1/2, i]) / dy
-        out = out.at[1:-1, 1:-1].set((v[1:-1, 1:-1] - v[:-2, 1:-1]) / self.grid.dy)
+        out = interior((v[1:-1, 1:-1] - v[:-2, 1:-1]) / self.grid.dy, v)
         return out
 
     # ------------------------------------------------------------------
@@ -386,11 +373,10 @@ class Difference2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Laplacian at T-points.
         """
-        out = jnp.zeros_like(h)
         # nabla2_h[j, i] = d^2h/dx^2 + d^2h/dy^2
         d2x = (h[1:-1, 2:] - 2.0 * h[1:-1, 1:-1] + h[1:-1, :-2]) / self.grid.dx**2
         d2y = (h[2:, 1:-1] - 2.0 * h[1:-1, 1:-1] + h[:-2, 1:-1]) / self.grid.dy**2
-        out = out.at[1:-1, 1:-1].set(d2x + d2y)
+        out = interior(d2x + d2y, h)
         return out
 
     def grad_perp(
@@ -446,17 +432,17 @@ class Difference2D(eqx.Module):
         >>> u, v = diff.grad_perp(psi)
         """
         # u[j, i+1/2] = -(ψ[j+1,i] + ψ[j+1,i+1] - ψ[j-1,i] - ψ[j-1,i+1]) / (4·dy)
-        u = jnp.zeros_like(psi)
-        u = u.at[1:-1, 1:-1].set(
+        u = interior(
             -(psi[2:, 1:-1] + psi[2:, 2:] - psi[:-2, 1:-1] - psi[:-2, 2:])
-            / (4.0 * self.grid.dy)
+            / (4.0 * self.grid.dy),
+            psi,
         )
 
         # v[j+1/2, i] = (ψ[j,i+1] + ψ[j+1,i+1] - ψ[j,i-1] - ψ[j+1,i-1]) / (4·dx)
-        v = jnp.zeros_like(psi)
-        v = v.at[1:-1, 1:-1].set(
+        v = interior(
             (psi[1:-1, 2:] + psi[2:, 2:] - psi[1:-1, :-2] - psi[2:, :-2])
-            / (4.0 * self.grid.dx)
+            / (4.0 * self.grid.dx),
+            psi,
         )
 
         if mask_u is not None:
@@ -496,11 +482,8 @@ class Difference3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             Forward x-difference at U-points.
         """
-        out = jnp.zeros_like(h)
         # dh_dx[k, j, i+1/2] = (h[k, j, i+1] - h[k, j, i]) / dx
-        out = out.at[1:-1, 1:-1, 1:-1].set(
-            (h[1:-1, 1:-1, 2:] - h[1:-1, 1:-1, 1:-1]) / self.grid.dx
-        )
+        out = interior((h[1:-1, 1:-1, 2:] - h[1:-1, 1:-1, 1:-1]) / self.grid.dx, h)
         return out
 
     def diff_y_T_to_V(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -518,11 +501,8 @@ class Difference3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             Forward y-difference at V-points.
         """
-        out = jnp.zeros_like(h)
         # dh_dy[k, j+1/2, i] = (h[k, j+1, i] - h[k, j, i]) / dy
-        out = out.at[1:-1, 1:-1, 1:-1].set(
-            (h[1:-1, 2:, 1:-1] - h[1:-1, 1:-1, 1:-1]) / self.grid.dy
-        )
+        out = interior((h[1:-1, 2:, 1:-1] - h[1:-1, 1:-1, 1:-1]) / self.grid.dy, h)
         return out
 
     def diff_x_U_to_T(self, u: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -540,11 +520,8 @@ class Difference3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             Backward x-difference at T-points.
         """
-        out = jnp.zeros_like(u)
         # du_dx[k, j, i] = (u[k, j, i+1/2] - u[k, j, i-1/2]) / dx
-        out = out.at[1:-1, 1:-1, 1:-1].set(
-            (u[1:-1, 1:-1, 1:-1] - u[1:-1, 1:-1, :-2]) / self.grid.dx
-        )
+        out = interior((u[1:-1, 1:-1, 1:-1] - u[1:-1, 1:-1, :-2]) / self.grid.dx, u)
         return out
 
     def diff_y_V_to_T(self, v: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -562,11 +539,8 @@ class Difference3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             Backward y-difference at T-points.
         """
-        out = jnp.zeros_like(v)
         # dv_dy[k, j, i] = (v[k, j+1/2, i] - v[k, j-1/2, i]) / dy
-        out = out.at[1:-1, 1:-1, 1:-1].set(
-            (v[1:-1, 1:-1, 1:-1] - v[1:-1, :-2, 1:-1]) / self.grid.dy
-        )
+        out = interior((v[1:-1, 1:-1, 1:-1] - v[1:-1, :-2, 1:-1]) / self.grid.dy, v)
         return out
 
     def divergence(
@@ -608,12 +582,11 @@ class Difference3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             Laplacian at T-points.
         """
-        out = jnp.zeros_like(h)
         d2x = (
             h[1:-1, 1:-1, 2:] - 2.0 * h[1:-1, 1:-1, 1:-1] + h[1:-1, 1:-1, :-2]
         ) / self.grid.dx**2
         d2y = (
             h[1:-1, 2:, 1:-1] - 2.0 * h[1:-1, 1:-1, 1:-1] + h[1:-1, :-2, 1:-1]
         ) / self.grid.dy**2
-        out = out.at[1:-1, 1:-1, 1:-1].set(d2x + d2y)
+        out = interior(d2x + d2y, h)
         return out

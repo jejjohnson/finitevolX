@@ -24,10 +24,10 @@ from __future__ import annotations
 
 import equinox as eqx
 import jax
-import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators.difference import Difference2D
 from finitevolx._src.operators.interpolation import Interpolation2D
 
@@ -92,10 +92,7 @@ class MomentumAdvection2D(eqx.Module):
         """
         u_on_T = self.interp.U_to_T(u)
         v_on_T = self.interp.V_to_T(v)
-        K = jnp.zeros_like(u)
-        K = K.at[1:-1, 1:-1].set(
-            0.5 * (u_on_T[1:-1, 1:-1] ** 2 + v_on_T[1:-1, 1:-1] ** 2)
-        )
+        K = interior(0.5 * (u_on_T[1:-1, 1:-1] ** 2 + v_on_T[1:-1, 1:-1] ** 2), u)
         return self.diff.diff_x_T_to_U(K), self.diff.diff_y_T_to_V(K)
 
     def _vorticity_flux_energy(
@@ -113,10 +110,8 @@ class MomentumAdvection2D(eqx.Module):
         zeta_on_v = self.interp.X_to_V(zeta)
         v_on_u = self.interp.V_to_U(v)
         u_on_v = self.interp.U_to_V(u)
-        zv_u = jnp.zeros_like(u)
-        zu_v = jnp.zeros_like(v)
-        zv_u = zv_u.at[1:-1, 1:-1].set(zeta_on_u[1:-1, 1:-1] * v_on_u[1:-1, 1:-1])
-        zu_v = zu_v.at[1:-1, 1:-1].set(zeta_on_v[1:-1, 1:-1] * u_on_v[1:-1, 1:-1])
+        zv_u = interior(zeta_on_u[1:-1, 1:-1] * v_on_u[1:-1, 1:-1], u)
+        zu_v = interior(zeta_on_v[1:-1, 1:-1] * u_on_v[1:-1, 1:-1], v)
         return zv_u, zu_v
 
     def _vorticity_flux_enstrophy(
@@ -132,10 +127,8 @@ class MomentumAdvection2D(eqx.Module):
         """
         v_on_q = self.interp.V_to_X(v)
         u_on_q = self.interp.U_to_X(u)
-        zv_at_q = jnp.zeros_like(u)
-        zu_at_q = jnp.zeros_like(v)
-        zv_at_q = zv_at_q.at[1:-1, 1:-1].set(zeta[1:-1, 1:-1] * v_on_q[1:-1, 1:-1])
-        zu_at_q = zu_at_q.at[1:-1, 1:-1].set(zeta[1:-1, 1:-1] * u_on_q[1:-1, 1:-1])
+        zv_at_q = interior(zeta[1:-1, 1:-1] * v_on_q[1:-1, 1:-1], u)
+        zu_at_q = interior(zeta[1:-1, 1:-1] * u_on_q[1:-1, 1:-1], v)
         return self.interp.X_to_U(zv_at_q), self.interp.X_to_V(zu_at_q)
 
     def __call__(
@@ -185,25 +178,21 @@ class MomentumAdvection2D(eqx.Module):
             alpha = 1.0 / 3.0
             zv_u_e, zu_v_e = self._vorticity_flux_energy(zeta, u, v)
             zv_u_s, zu_v_s = self._vorticity_flux_enstrophy(zeta, u, v)
-            zv_u = jnp.zeros_like(u)
-            zu_v = jnp.zeros_like(v)
-            zv_u = zv_u.at[1:-1, 1:-1].set(
-                alpha * zv_u_e[1:-1, 1:-1] + (1.0 - alpha) * zv_u_s[1:-1, 1:-1]
+            zv_u = interior(
+                alpha * zv_u_e[1:-1, 1:-1] + (1.0 - alpha) * zv_u_s[1:-1, 1:-1], u
             )
-            zu_v = zu_v.at[1:-1, 1:-1].set(
-                alpha * zu_v_e[1:-1, 1:-1] + (1.0 - alpha) * zu_v_s[1:-1, 1:-1]
+            zu_v = interior(
+                alpha * zu_v_e[1:-1, 1:-1] + (1.0 - alpha) * zu_v_s[1:-1, 1:-1], v
             )
         else:
             raise ValueError(
                 f"Unknown scheme: {scheme!r}.  Choose 'energy', 'enstrophy', or 'al'."
             )
 
-        du_adv = jnp.zeros_like(u)
-        dv_adv = jnp.zeros_like(v)
         # du_adv[j, i+1/2] = +(zeta*v)_u - dK/dx
-        du_adv = du_adv.at[2:-2, 2:-2].set(zv_u[2:-2, 2:-2] - dK_dx[2:-2, 2:-2])
+        du_adv = interior(zv_u[2:-2, 2:-2] - dK_dx[2:-2, 2:-2], u, ghost=2)
         # dv_adv[j+1/2, i] = -(zeta*u)_v - dK/dy
-        dv_adv = dv_adv.at[2:-2, 2:-2].set(-zu_v[2:-2, 2:-2] - dK_dy[2:-2, 2:-2])
+        dv_adv = interior(-zu_v[2:-2, 2:-2] - dK_dy[2:-2, 2:-2], v, ghost=2)
         return du_adv, dv_adv
 
 
@@ -281,6 +270,6 @@ class MomentumAdvection3D(eqx.Module):
             lambda u_k, v_k: self._madv2d(u_k, v_k, scheme=scheme)
         )(u, v)
         # Zero z-ghost slices.
-        du_adv = du_adv.at[0].set(0.0).at[-1].set(0.0)
-        dv_adv = dv_adv.at[0].set(0.0).at[-1].set(0.0)
+        du_adv = zero_z_ghosts(du_adv)
+        dv_adv = zero_z_ghosts(dv_adv)
         return du_adv, dv_adv

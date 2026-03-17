@@ -14,10 +14,10 @@ Half-index notation
 """
 
 import equinox as eqx
-import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.operators._ghost import interior
 
 
 class Interpolation1D(eqx.Module):
@@ -46,9 +46,7 @@ class Interpolation1D(eqx.Module):
         Float[Array, "Nx"]
             Scalar interpolated to U-points.
         """
-        out = jnp.zeros_like(h)
-        # h_on_u[i+1/2] = 1/2 * (h[i] + h[i+1])
-        out = out.at[1:-1].set(0.5 * (h[1:-1] + h[2:]))
+        out = interior(0.5 * (h[1:-1] + h[2:]), h)
         return out
 
     def U_to_T(self, u: Float[Array, "Nx"]) -> Float[Array, "Nx"]:
@@ -66,9 +64,7 @@ class Interpolation1D(eqx.Module):
         Float[Array, "Nx"]
             Velocity interpolated to T-points.
         """
-        out = jnp.zeros_like(u)
-        # u_on_h[i] = 1/2 * (u[i+1/2] + u[i-1/2])
-        out = out.at[1:-1].set(0.5 * (u[1:-1] + u[:-2]))
+        out = interior(0.5 * (u[1:-1] + u[:-2]), u)
         return out
 
 
@@ -102,9 +98,8 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Scalar interpolated to U-points.
         """
-        out = jnp.zeros_like(h)
         # h_on_u[j, i+1/2] = 1/2 * (h[j, i] + h[j, i+1])
-        out = out.at[1:-1, 1:-1].set(0.5 * (h[1:-1, 1:-1] + h[1:-1, 2:]))
+        out = interior(0.5 * (h[1:-1, 1:-1] + h[1:-1, 2:]), h)
         return out
 
     def T_to_V(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -122,9 +117,8 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Scalar interpolated to V-points.
         """
-        out = jnp.zeros_like(h)
         # h_on_v[j+1/2, i] = 1/2 * (h[j, i] + h[j+1, i])
-        out = out.at[1:-1, 1:-1].set(0.5 * (h[1:-1, 1:-1] + h[2:, 1:-1]))
+        out = interior(0.5 * (h[1:-1, 1:-1] + h[2:, 1:-1]), h)
         return out
 
     def T_to_X(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -142,18 +136,16 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Scalar interpolated to X-points (corners).
         """
-        out = jnp.zeros_like(h)
         # h_on_q[j+1/2, i+1/2] = 1/4 * (h[j,i] + h[j,i+1] + h[j+1,i] + h[j+1,i+1])
-        out = out.at[
-            1:-1, 1:-1
-        ].set(
+        out = interior(
             0.25
             * (
                 h[1:-1, 1:-1]  # h[j,   i  ]
                 + h[1:-1, 2:]  # h[j,   i+1]
                 + h[2:, 1:-1]  # h[j+1, i  ]
                 + h[2:, 2:]  # h[j+1, i+1]
-            )
+            ),
+            h,
         )
         return out
 
@@ -176,9 +168,8 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Scalar interpolated to U-points.
         """
-        out = jnp.zeros_like(q)
         # q_on_u[j, i+1/2] = 1/2 * (q[j+1/2, i+1/2] + q[j-1/2, i+1/2])
-        out = out.at[1:-1, 1:-1].set(0.5 * (q[1:-1, 1:-1] + q[:-2, 1:-1]))
+        out = interior(0.5 * (q[1:-1, 1:-1] + q[:-2, 1:-1]), q)
         return out
 
     def X_to_V(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -196,9 +187,8 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Scalar interpolated to V-points.
         """
-        out = jnp.zeros_like(q)
         # q_on_v[j+1/2, i] = 1/2 * (q[j+1/2, i+1/2] + q[j+1/2, i-1/2])
-        out = out.at[1:-1, 1:-1].set(0.5 * (q[1:-1, 1:-1] + q[1:-1, :-2]))
+        out = interior(0.5 * (q[1:-1, 1:-1] + q[1:-1, :-2]), q)
         return out
 
     # ------------------------------------------------------------------
@@ -220,9 +210,8 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Velocity interpolated to T-points.
         """
-        out = jnp.zeros_like(u)
         # u_on_h[j, i] = 1/2 * (u[j, i+1/2] + u[j, i-1/2])
-        out = out.at[1:-1, 1:-1].set(0.5 * (u[1:-1, 1:-1] + u[1:-1, :-2]))
+        out = interior(0.5 * (u[1:-1, 1:-1] + u[1:-1, :-2]), u)
         return out
 
     def V_to_T(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -240,9 +229,8 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Velocity interpolated to T-points.
         """
-        out = jnp.zeros_like(v)
         # v_on_h[j, i] = 1/2 * (v[j+1/2, i] + v[j-1/2, i])
-        out = out.at[1:-1, 1:-1].set(0.5 * (v[1:-1, 1:-1] + v[:-2, 1:-1]))
+        out = interior(0.5 * (v[1:-1, 1:-1] + v[:-2, 1:-1]), v)
         return out
 
     def X_to_T(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -261,19 +249,17 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Scalar interpolated to T-points.
         """
-        out = jnp.zeros_like(q)
         # q_on_h[j, i] = 1/4 * (q[j+1/2,i+1/2] + q[j-1/2,i+1/2]
         #                      + q[j+1/2,i-1/2] + q[j-1/2,i-1/2])
-        out = out.at[
-            1:-1, 1:-1
-        ].set(
+        out = interior(
             0.25
             * (
                 q[1:-1, 1:-1]  # q[j+1/2, i+1/2]
                 + q[:-2, 1:-1]  # q[j-1/2, i+1/2]
                 + q[1:-1, :-2]  # q[j+1/2, i-1/2]
                 + q[:-2, :-2]  # q[j-1/2, i-1/2]
-            )
+            ),
+            q,
         )
         return out
 
@@ -296,9 +282,8 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Velocity interpolated to X-points.
         """
-        out = jnp.zeros_like(u)
         # u_on_q[j+1/2, i+1/2] = 1/2 * (u[j, i+1/2] + u[j+1, i+1/2])
-        out = out.at[1:-1, 1:-1].set(0.5 * (u[1:-1, 1:-1] + u[2:, 1:-1]))
+        out = interior(0.5 * (u[1:-1, 1:-1] + u[2:, 1:-1]), u)
         return out
 
     def V_to_X(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -316,9 +301,8 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Velocity interpolated to X-points.
         """
-        out = jnp.zeros_like(v)
         # v_on_q[j+1/2, i+1/2] = 1/2 * (v[j+1/2, i] + v[j+1/2, i+1])
-        out = out.at[1:-1, 1:-1].set(0.5 * (v[1:-1, 1:-1] + v[1:-1, 2:]))
+        out = interior(0.5 * (v[1:-1, 1:-1] + v[1:-1, 2:]), v)
         return out
 
     # ------------------------------------------------------------------
@@ -341,18 +325,16 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Velocity interpolated to V-points.
         """
-        out = jnp.zeros_like(u)
         # u_on_v[j+1/2, i] = 1/4 * (u[j,i+1/2] + u[j+1,i+1/2] + u[j,i-1/2] + u[j+1,i-1/2])
-        out = out.at[
-            1:-1, 1:-1
-        ].set(
+        out = interior(
             0.25
             * (
                 u[1:-1, 1:-1]  # u[j,   i+1/2]
                 + u[2:, 1:-1]  # u[j+1, i+1/2]
                 + u[1:-1, :-2]  # u[j,   i-1/2]
                 + u[2:, :-2]  # u[j+1, i-1/2]
-            )
+            ),
+            u,
         )
         return out
 
@@ -372,18 +354,16 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Velocity interpolated to U-points.
         """
-        out = jnp.zeros_like(v)
         # v_on_u[j, i+1/2] = 1/4 * (v[j+1/2,i] + v[j-1/2,i] + v[j+1/2,i+1] + v[j-1/2,i+1])
-        out = out.at[
-            1:-1, 1:-1
-        ].set(
+        out = interior(
             0.25
             * (
                 v[1:-1, 1:-1]  # v[j+1/2, i  ]
                 + v[:-2, 1:-1]  # v[j-1/2, i  ]
                 + v[1:-1, 2:]  # v[j+1/2, i+1]
                 + v[:-2, 2:]  # v[j-1/2, i+1]
-            )
+            ),
+            v,
         )
         return out
 
@@ -407,10 +387,7 @@ class Interpolation3D(eqx.Module):
 
         h_on_u[k, j, i+1/2] = 1/2 * (h[k, j, i] + h[k, j, i+1])
         """
-        out = jnp.zeros_like(h)
-        out = out.at[1:-1, 1:-1, 1:-1].set(
-            0.5 * (h[1:-1, 1:-1, 1:-1] + h[1:-1, 1:-1, 2:])
-        )
+        out = interior(0.5 * (h[1:-1, 1:-1, 1:-1] + h[1:-1, 1:-1, 2:]), h)
         return out
 
     def T_to_V(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -418,10 +395,7 @@ class Interpolation3D(eqx.Module):
 
         h_on_v[k, j+1/2, i] = 1/2 * (h[k, j, i] + h[k, j+1, i])
         """
-        out = jnp.zeros_like(h)
-        out = out.at[1:-1, 1:-1, 1:-1].set(
-            0.5 * (h[1:-1, 1:-1, 1:-1] + h[1:-1, 2:, 1:-1])
-        )
+        out = interior(0.5 * (h[1:-1, 1:-1, 1:-1] + h[1:-1, 2:, 1:-1]), h)
         return out
 
     def U_to_T(self, u: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -429,10 +403,7 @@ class Interpolation3D(eqx.Module):
 
         u_on_h[k, j, i] = 1/2 * (u[k, j, i+1/2] + u[k, j, i-1/2])
         """
-        out = jnp.zeros_like(u)
-        out = out.at[1:-1, 1:-1, 1:-1].set(
-            0.5 * (u[1:-1, 1:-1, 1:-1] + u[1:-1, 1:-1, :-2])
-        )
+        out = interior(0.5 * (u[1:-1, 1:-1, 1:-1] + u[1:-1, 1:-1, :-2]), u)
         return out
 
     def V_to_T(self, v: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -440,8 +411,5 @@ class Interpolation3D(eqx.Module):
 
         v_on_h[k, j, i] = 1/2 * (v[k, j+1/2, i] + v[k, j-1/2, i])
         """
-        out = jnp.zeros_like(v)
-        out = out.at[1:-1, 1:-1, 1:-1].set(
-            0.5 * (v[1:-1, 1:-1, 1:-1] + v[1:-1, :-2, 1:-1])
-        )
+        out = interior(0.5 * (v[1:-1, 1:-1, 1:-1] + v[1:-1, :-2, 1:-1]), v)
         return out

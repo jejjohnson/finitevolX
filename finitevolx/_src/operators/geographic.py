@@ -26,6 +26,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.constants import R_EARTH
+from finitevolx._src.operators._ghost import interior
 
 _COS_EPS = 1e-12  # guard against division by cos(lat) ≈ 0 near poles
 
@@ -76,10 +77,9 @@ def diff_lon_T_to_U(
     Float[Array, "Ny Nx"]
         Zonal derivative at U-points.
     """
-    out = jnp.zeros_like(h)
     cos_on_U = 0.5 * (cos_lat_T[1:-1, 1:-1] + cos_lat_T[1:-1, 2:])
     numer = h[1:-1, 2:] - h[1:-1, 1:-1]
-    out = out.at[1:-1, 1:-1].set(_safe_div_cos(numer, cos_on_U, R * dlon))
+    out = interior(_safe_div_cos(numer, cos_on_U, R * dlon), h)
     return out
 
 
@@ -106,8 +106,7 @@ def diff_lat_T_to_V(
     Float[Array, "Ny Nx"]
         Meridional derivative at V-points.
     """
-    out = jnp.zeros_like(h)
-    out = out.at[1:-1, 1:-1].set((h[2:, 1:-1] - h[1:-1, 1:-1]) / (R * dlat))
+    out = interior((h[2:, 1:-1] - h[1:-1, 1:-1]) / (R * dlat), h)
     return out
 
 
@@ -138,10 +137,9 @@ def diff_lon_V_to_X(
     Float[Array, "Ny Nx"]
         Zonal derivative at X-points.
     """
-    out = jnp.zeros_like(v)
     cos_on_X = 0.5 * (cos_lat_V[1:-1, 1:-1] + cos_lat_V[1:-1, 2:])
     numer = v[1:-1, 2:] - v[1:-1, 1:-1]
-    out = out.at[1:-1, 1:-1].set(_safe_div_cos(numer, cos_on_X, R * dlon))
+    out = interior(_safe_div_cos(numer, cos_on_X, R * dlon), v)
     return out
 
 
@@ -168,8 +166,7 @@ def diff_lat_U_to_X(
     Float[Array, "Ny Nx"]
         Meridional derivative at X-points.
     """
-    out = jnp.zeros_like(u)
-    out = out.at[1:-1, 1:-1].set((u[2:, 1:-1] - u[1:-1, 1:-1]) / (R * dlat))
+    out = interior((u[2:, 1:-1] - u[1:-1, 1:-1]) / (R * dlat), u)
     return out
 
 
@@ -204,10 +201,9 @@ def diff_lon_U_to_T(
     Float[Array, "Ny Nx"]
         Zonal derivative at T-points.
     """
-    out = jnp.zeros_like(u)
     cos_T = cos_lat_T[1:-1, 1:-1]
     numer = u[1:-1, 1:-1] - u[1:-1, :-2]
-    out = out.at[1:-1, 1:-1].set(_safe_div_cos(numer, cos_T, R * dlon))
+    out = interior(_safe_div_cos(numer, cos_T, R * dlon), u)
     return out
 
 
@@ -234,8 +230,7 @@ def diff_lat_V_to_T(
     Float[Array, "Ny Nx"]
         Meridional derivative at T-points.
     """
-    out = jnp.zeros_like(v)
-    out = out.at[1:-1, 1:-1].set((v[1:-1, 1:-1] - v[:-2, 1:-1]) / (R * dlat))
+    out = interior((v[1:-1, 1:-1] - v[:-2, 1:-1]) / (R * dlat), v)
     return out
 
 
@@ -270,12 +265,11 @@ def diff2_lon_T(
     Float[Array, "Ny Nx"]
         Second zonal derivative at T-points.  Ghost ring is zero.
     """
-    out = jnp.zeros_like(h)
     cos_T = cos_lat_T[1:-1, 1:-1]
     # (h[j,i+1] - 2*h[j,i] + h[j,i-1]) / dlon^2
     d2h = (h[1:-1, 2:] - 2.0 * h[1:-1, 1:-1] + h[1:-1, :-2]) / dlon**2
     # d²h/dx² = d2h / (R² cos²(lat));  NaN near poles
-    out = out.at[1:-1, 1:-1].set(_safe_div_cos(d2h, cos_T, R**2 * cos_T))
+    out = interior(_safe_div_cos(d2h, cos_T, R**2 * cos_T), h)
     return out
 
 
@@ -311,7 +305,6 @@ def laplacian_merid_T(
         Meridional Laplacian term at T-points.  Ghost ring is zero.
         NaN near the poles where ``|cos(lat)| < eps``.
     """
-    out = jnp.zeros_like(h)
     cos_T = cos_lat_T[1:-1, 1:-1]
     # dh/dlat at half-indices
     dh_N = (h[2:, 1:-1] - h[1:-1, 1:-1]) / dlat
@@ -320,7 +313,7 @@ def laplacian_merid_T(
     cos_N = 0.5 * (cos_T + cos_lat_T[2:, 1:-1])
     cos_S = 0.5 * (cos_T + cos_lat_T[:-2, 1:-1])
     d_cos_dh = (cos_N * dh_N - cos_S * dh_S) / dlat
-    out = out.at[1:-1, 1:-1].set(_safe_div_cos(d_cos_dh, cos_T, R**2))
+    out = interior(_safe_div_cos(d_cos_dh, cos_T, R**2), h)
     return out
 
 
@@ -366,7 +359,6 @@ def divergence_sphere(
     Float[Array, "Ny Nx"]
         Divergence at T-points.
     """
-    out = jnp.zeros_like(u)
     # du/dlon at T: backward diff U -> T
     du_dlon = (u[1:-1, 1:-1] - u[1:-1, :-2]) / dlon
     # d(v*cos)/dlat at T: backward diff V -> T
@@ -374,7 +366,7 @@ def divergence_sphere(
     v_cos_S = v[:-2, 1:-1] * cos_lat_V[:-2, 1:-1]  # south face
     dvc_dlat = (v_cos_N - v_cos_S) / dlat
     cos_T = cos_lat_T[1:-1, 1:-1]
-    out = out.at[1:-1, 1:-1].set(_safe_div_cos(du_dlon + dvc_dlat, cos_T, R))
+    out = interior(_safe_div_cos(du_dlon + dvc_dlat, cos_T, R), u)
     return out
 
 
@@ -415,7 +407,6 @@ def curl_sphere(
     Float[Array, "Ny Nx"]
         Relative vorticity at X-points.
     """
-    out = jnp.zeros_like(u)
     # dv/dlon at X: forward diff V -> X
     dv_dlon = (v[1:-1, 2:] - v[1:-1, 1:-1]) / dlon
     # d(u*cos)/dlat at X: forward diff U -> X
@@ -423,7 +414,7 @@ def curl_sphere(
     u_cos_S = u[1:-1, 1:-1] * cos_lat_U[1:-1, 1:-1]
     duc_dlat = (u_cos_N - u_cos_S) / dlat
     cos_X = cos_lat_X[1:-1, 1:-1]
-    out = out.at[1:-1, 1:-1].set(_safe_div_cos(dv_dlon - duc_dlat, cos_X, R))
+    out = interior(_safe_div_cos(dv_dlon - duc_dlat, cos_X, R), u)
     return out
 
 
@@ -457,7 +448,6 @@ def laplacian_sphere(
     Float[Array, "Ny Nx"]
         Laplacian at T-points.
     """
-    out = jnp.zeros_like(h)
     cos_T = cos_lat_T[1:-1, 1:-1]
 
     # d^2h/dlon^2
@@ -474,7 +464,7 @@ def laplacian_sphere(
 
     lon_term = _safe_div_cos(d2h_dlon2, cos_T, R**2 * cos_T)
     lat_term = _safe_div_cos(d_coslat_dh, cos_T, R**2)
-    out = out.at[1:-1, 1:-1].set(lon_term + lat_term)
+    out = interior(lon_term + lat_term, h)
     return out
 
 
@@ -516,23 +506,19 @@ def geostrophic_velocity_sphere(
     """
     # u_g at U-points: -g/f * dh/dy  →  needs f on U, dh/dlat at U
     # v_g at V-points:  g/f * dh/dx  →  needs f on V, dh/dlon at V
-    u_g = jnp.zeros_like(h)
-    v_g = jnp.zeros_like(h)
 
     # dh/dlat at U-points: average T→U of dh/dlat
     # Use the compact 4-point stencil (like grad_perp)
     # u_g[j, i+1/2] = -g/(f_on_U * R) * (h[j+1,i]+h[j+1,i+1]-h[j-1,i]-h[j-1,i+1])/(4*dlat)
     f_on_U = 0.5 * (f[1:-1, 1:-1] + f[1:-1, 2:])
     dh_dlat_U = (h[2:, 1:-1] + h[2:, 2:] - h[:-2, 1:-1] - h[:-2, 2:]) / (4.0 * dlat)
-    u_g = u_g.at[1:-1, 1:-1].set(-gravity / (f_on_U * R) * dh_dlat_U)
+    u_g = interior(-gravity / (f_on_U * R) * dh_dlat_U, h)
 
     # dh/dlon at V-points: average T→V of dh/dlon
     f_on_V = 0.5 * (f[1:-1, 1:-1] + f[2:, 1:-1])
     cos_on_V = 0.5 * (cos_lat_T[1:-1, 1:-1] + cos_lat_T[2:, 1:-1])
     dh_dlon_V = (h[1:-1, 2:] + h[2:, 2:] - h[1:-1, :-2] - h[2:, :-2]) / (4.0 * dlon)
-    v_g = v_g.at[1:-1, 1:-1].set(
-        _safe_div_cos(gravity * dh_dlon_V, cos_on_V, f_on_V * R)
-    )
+    v_g = interior(_safe_div_cos(gravity * dh_dlon_V, cos_on_V, f_on_V * R), h)
 
     return u_g, v_g
 
@@ -586,7 +572,6 @@ def potential_vorticity_sphere(
     f_on_X = 0.25 * (f[1:-1, 1:-1] + f[1:-1, 2:] + f[2:, 1:-1] + f[2:, 2:])
     h_on_X = 0.25 * (h[1:-1, 1:-1] + h[1:-1, 2:] + h[2:, 1:-1] + h[2:, 2:])
 
-    out = jnp.zeros_like(u)
     num = zeta[1:-1, 1:-1] + f_on_X
-    out = out.at[1:-1, 1:-1].set(jnp.where(h_on_X == 0, jnp.nan, num / h_on_X))
+    out = interior(jnp.where(h_on_X == 0, jnp.nan, num / h_on_X), u)
     return out

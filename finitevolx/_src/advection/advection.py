@@ -25,6 +25,7 @@ from finitevolx._src.advection.reconstruction import (
 )
 from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
 from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.operators._ghost import interior
 
 # TVD limiter names supported by the advection operators.
 _TVD_LIMITERS = frozenset({"minmod", "van_leer", "superbee", "mc"})
@@ -250,7 +251,6 @@ class Advection2D(eqx.Module):
         else:
             raise ValueError(f"Unknown method: {method!r}")
 
-        out = jnp.zeros_like(h)
         # dh[j, i] = -( (fe[j, i+1/2] - fe[j, i-1/2])/dx
         #             + (fn[j+1/2, i] - fn[j-1/2, i])/dy )
         # fe[j,i] is flux at east face of cell [j,i], fn[j,i] is flux at north face
@@ -258,11 +258,13 @@ class Advection2D(eqx.Module):
         #                      and fn[j,i] (north) and fn[j-1,i] (south)
         # Only use face fluxes that are defined by the reconstruction scheme,
         # avoiding ghost-ring flux entries.
-        out = out.at[2:-2, 2:-2].set(
+        out = interior(
             -(
                 (fe[2:-2, 2:-2] - fe[2:-2, 1:-3]) / self.grid.dx
                 + (fn[2:-2, 2:-2] - fn[1:-3, 2:-2]) / self.grid.dy
-            )
+            ),
+            h,
+            ghost=2,
         )
         return out
 

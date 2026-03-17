@@ -24,11 +24,11 @@ from __future__ import annotations
 
 import equinox as eqx
 import jax
-import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
 from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators.interpolation import Interpolation2D
 
 
@@ -110,12 +110,10 @@ class Coriolis2D(eqx.Module):
         # u_on_v[j+1/2, i] = 1/4*(u[j,i+1/2] + u[j+1,i+1/2] + u[j,i-1/2] + u[j+1,i-1/2])
         u_on_v = self.interp.U_to_V(u)
 
-        du_cor = jnp.zeros_like(u)
-        dv_cor = jnp.zeros_like(v)
         # du_cor[j, i+1/2] = +f_on_u * v_on_u
-        du_cor = du_cor.at[1:-1, 1:-1].set(f_on_u[1:-1, 1:-1] * v_on_u[1:-1, 1:-1])
+        du_cor = interior(f_on_u[1:-1, 1:-1] * v_on_u[1:-1, 1:-1], u)
         # dv_cor[j+1/2, i] = -f_on_v * u_on_v
-        dv_cor = dv_cor.at[1:-1, 1:-1].set(-f_on_v[1:-1, 1:-1] * u_on_v[1:-1, 1:-1])
+        dv_cor = interior(-f_on_v[1:-1, 1:-1] * u_on_v[1:-1, 1:-1], v)
 
         if mask is not None:
             du_cor = du_cor * mask.u
@@ -190,8 +188,8 @@ class Coriolis3D(eqx.Module):
         du_cor, dv_cor = jax.vmap(lambda u_k, v_k: self._cor2d(u_k, v_k, f))(u, v)
 
         # Zero the z-ghost slices to match the 3D ghost-ring convention.
-        du_cor = du_cor.at[0].set(0.0).at[-1].set(0.0)
-        dv_cor = dv_cor.at[0].set(0.0).at[-1].set(0.0)
+        du_cor = zero_z_ghosts(du_cor)
+        dv_cor = zero_z_ghosts(dv_cor)
 
         if mask is not None:
             du_cor = du_cor * mask.u
