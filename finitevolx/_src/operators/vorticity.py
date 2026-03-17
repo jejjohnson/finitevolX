@@ -9,9 +9,8 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from finitevolx._src.operators._ghost import interior, zero_z_ghosts
-
 from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators.difference import Difference2D, _curl_2d
 from finitevolx._src.operators.interpolation import Interpolation2D
 

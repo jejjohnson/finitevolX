@@ -236,9 +236,7 @@ def _weno_flux_axis_1d(h: Array, velocity: Array, order: int) -> Array:
 
 
 def _weno_flux_axis_2d_x(h: Array, velocity: Array, order: int) -> Array:
-    out = interior(
-        _weno_last_axis_flux(h[1:-1, :], velocity[1:-1, 1:-1], order), h
-    )
+    out = interior(_weno_last_axis_flux(h[1:-1, :], velocity[1:-1, 1:-1], order), h)
     return out
 
 
@@ -568,9 +566,7 @@ class Reconstruction2D(eqx.Module):
 
         fe[j, i+1/2] = 1/2 * (h[j, i] + h[j, i+1]) * u[j, i+1/2]
         """
-        out = interior(
-            0.5 * (h[1:-1, 1:-1] + h[1:-1, 2:]) * u[1:-1, 1:-1], h
-        )
+        out = interior(0.5 * (h[1:-1, 1:-1] + h[1:-1, 2:]) * u[1:-1, 1:-1], h)
         return out
 
     def naive_y(
@@ -582,9 +578,7 @@ class Reconstruction2D(eqx.Module):
 
         fn[j+1/2, i] = 1/2 * (h[j, i] + h[j+1, i]) * v[j+1/2, i]
         """
-        out = interior(
-            0.5 * (h[1:-1, 1:-1] + h[2:, 1:-1]) * v[1:-1, 1:-1], h
-        )
+        out = interior(0.5 * (h[1:-1, 1:-1] + h[2:, 1:-1]) * v[1:-1, 1:-1], h)
         return out
 
     def upwind1_x(

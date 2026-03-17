@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import equinox as eqx
 import jax
-import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
@@ -93,9 +92,7 @@ class MomentumAdvection2D(eqx.Module):
         """
         u_on_T = self.interp.U_to_T(u)
         v_on_T = self.interp.V_to_T(v)
-        K = interior(
-            0.5 * (u_on_T[1:-1, 1:-1] ** 2 + v_on_T[1:-1, 1:-1] ** 2), u
-        )
+        K = interior(0.5 * (u_on_T[1:-1, 1:-1] ** 2 + v_on_T[1:-1, 1:-1] ** 2), u)
         return self.diff.diff_x_T_to_U(K), self.diff.diff_y_T_to_V(K)
 
     def _vorticity_flux_energy(

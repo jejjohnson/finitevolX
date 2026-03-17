@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import equinox as eqx
 import jax
-import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask

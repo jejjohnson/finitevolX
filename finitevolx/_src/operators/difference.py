@@ -483,9 +483,7 @@ class Difference3D(eqx.Module):
             Forward x-difference at U-points.
         """
         # dh_dx[k, j, i+1/2] = (h[k, j, i+1] - h[k, j, i]) / dx
-        out = interior(
-            (h[1:-1, 1:-1, 2:] - h[1:-1, 1:-1, 1:-1]) / self.grid.dx, h
-        )
+        out = interior((h[1:-1, 1:-1, 2:] - h[1:-1, 1:-1, 1:-1]) / self.grid.dx, h)
         return out
 
     def diff_y_T_to_V(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -504,9 +502,7 @@ class Difference3D(eqx.Module):
             Forward y-difference at V-points.
         """
         # dh_dy[k, j+1/2, i] = (h[k, j+1, i] - h[k, j, i]) / dy
-        out = interior(
-            (h[1:-1, 2:, 1:-1] - h[1:-1, 1:-1, 1:-1]) / self.grid.dy, h
-        )
+        out = interior((h[1:-1, 2:, 1:-1] - h[1:-1, 1:-1, 1:-1]) / self.grid.dy, h)
         return out
 
     def diff_x_U_to_T(self, u: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -525,9 +521,7 @@ class Difference3D(eqx.Module):
             Backward x-difference at T-points.
         """
         # du_dx[k, j, i] = (u[k, j, i+1/2] - u[k, j, i-1/2]) / dx
-        out = interior(
-            (u[1:-1, 1:-1, 1:-1] - u[1:-1, 1:-1, :-2]) / self.grid.dx, u
-        )
+        out = interior((u[1:-1, 1:-1, 1:-1] - u[1:-1, 1:-1, :-2]) / self.grid.dx, u)
         return out
 
     def diff_y_V_to_T(self, v: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -546,9 +540,7 @@ class Difference3D(eqx.Module):
             Backward y-difference at T-points.
         """
         # dv_dy[k, j, i] = (v[k, j+1/2, i] - v[k, j-1/2, i]) / dy
-        out = interior(
-            (v[1:-1, 1:-1, 1:-1] - v[1:-1, :-2, 1:-1]) / self.grid.dy, v
-        )
+        out = interior((v[1:-1, 1:-1, 1:-1] - v[1:-1, :-2, 1:-1]) / self.grid.dy, v)
         return out
 
     def divergence(

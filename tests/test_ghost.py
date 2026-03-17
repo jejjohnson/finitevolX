@@ -2,10 +2,8 @@
 
 import jax
 import jax.numpy as jnp
-import pytest
 
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
-
 
 # ---------------------------------------------------------------------------
 # interior

@@ -518,9 +518,7 @@ def geostrophic_velocity_sphere(
     f_on_V = 0.5 * (f[1:-1, 1:-1] + f[2:, 1:-1])
     cos_on_V = 0.5 * (cos_lat_T[1:-1, 1:-1] + cos_lat_T[2:, 1:-1])
     dh_dlon_V = (h[1:-1, 2:] + h[2:, 2:] - h[1:-1, :-2] - h[2:, :-2]) / (4.0 * dlon)
-    v_g = interior(
-        _safe_div_cos(gravity * dh_dlon_V, cos_on_V, f_on_V * R), h
-    )
+    v_g = interior(_safe_div_cos(gravity * dh_dlon_V, cos_on_V, f_on_V * R), h)
 
     return u_g, v_g
 
