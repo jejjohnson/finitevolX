@@ -1,3 +1,6 @@
+# Local plans (not committed)
+.plans/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
