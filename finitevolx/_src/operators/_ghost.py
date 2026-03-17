@@ -1,5 +1,7 @@
 """Ghost-ring zeroing utilities for Arakawa C-grid operators."""
 
+from __future__ import annotations
+
 import jax.numpy as jnp
 from jaxtyping import Array
 
