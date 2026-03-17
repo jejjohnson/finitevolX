@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.32](https://github.com/jejjohnson/finitevolX/compare/v0.0.31...v0.0.32) (2026-03-17)
+
+
+### Features
+
+* add QG/SWM convenience utilities ([d7cf5bc](https://github.com/jejjohnson/finitevolX/commit/d7cf5bc87f654b25fdc93d584aa5fb1c6499277c))
+* add QG/SWM convenience utilities (closes [#153](https://github.com/jejjohnson/finitevolX/issues/153)) ([4c749ca](https://github.com/jejjohnson/finitevolX/commit/4c749ca822930af012230ccda84ffb1ca3240058))
+* add shallow-water PV from prognostic variables ([db73d3e](https://github.com/jejjohnson/finitevolX/commit/db73d3ea7f2be1342c54611966ed4a7288b52aa7))
+
+
+### Bug Fixes
+
+* address PR review comments on docstrings ([4e619b5](https://github.com/jejjohnson/finitevolX/commit/4e619b51189448abfb6878df6071a08d594b42ca))
+
 ## [0.0.31](https://github.com/jejjohnson/finitevolX/compare/v0.0.30...v0.0.31) (2026-03-13)
 
 
