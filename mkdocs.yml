@@ -45,6 +45,9 @@ nav:
   - C-Grid Discretization: cgrid_discretization.md
   - Multilayer vs. 3D: multilayer_vs_3d.md
   - Masks: masks.md
+  - Raw Stencils:
+      - Theory & Overview: stencils.md
+      - API Reference: api/stencils.md
   - Difference Operators:
       - Theory & Overview: difference.md
       - API Reference: api/difference.md
@@ -82,6 +85,7 @@ nav:
   - Examples: examples.md
   - API Reference:
       - Overview & Grids: api/index.md
+      - Raw Stencils: api/stencils.md
       - Difference: api/difference.md
       - Interpolation: api/interpolation.md
       - Advection: api/advection.md
