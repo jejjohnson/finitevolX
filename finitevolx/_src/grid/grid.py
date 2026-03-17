@@ -202,3 +202,15 @@ class ArakawaCGrid3D(eqx.Module):
         dy = Ly / ny_interior
         dz = Lz / nz_interior
         return cls(Nx=Nx, Ny=Ny, Nz=Nz, Lx=Lx, Ly=Ly, Lz=Lz, dx=dx, dy=dy, dz=dz)
+
+    def horizontal_grid(self) -> "ArakawaCGrid2D":
+        """Extract the horizontal 2-D grid from this 3-D grid.
+
+        Returns
+        -------
+        ArakawaCGrid2D
+            A 2-D grid with the same Nx, Ny, Lx, Ly, dx, dy.
+        """
+        return ArakawaCGrid2D(
+            Nx=self.Nx, Ny=self.Ny, Lx=self.Lx, Ly=self.Ly, dx=self.dx, dy=self.dy
+        )

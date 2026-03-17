@@ -23,6 +23,7 @@ References
 from __future__ import annotations
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
@@ -237,143 +238,11 @@ class MomentumAdvection3D(eqx.Module):
     """
 
     grid: ArakawaCGrid3D
+    _madv2d: MomentumAdvection2D
 
-    def _kinetic_energy_gradients(
-        self,
-        u: Float[Array, "Nz Ny Nx"],
-        v: Float[Array, "Nz Ny Nx"],
-    ) -> tuple[Float[Array, "Nz Ny Nx"], Float[Array, "Nz Ny Nx"]]:
-        """Kinetic energy gradients (dK/dx at U-points, dK/dy at V-points).
-
-        K[k, j, i] = ½ (u_T² + v_T²) at T-points
-        dK/dx[k, j, i+1/2] = (K[k, j, i+1] - K[k, j, i]) / dx
-        dK/dy[k, j+1/2, i] = (K[k, j+1, i] - K[k, j, i]) / dy
-        """
-        dx, dy = self.grid.dx, self.grid.dy
-        # u_on_T[k, j, i] = ½ (u[k, j, i+1/2] + u[k, j, i-1/2])
-        u_on_T = jnp.zeros_like(u)
-        u_on_T = u_on_T.at[1:-1, 1:-1, 1:-1].set(
-            0.5 * (u[1:-1, 1:-1, 1:-1] + u[1:-1, 1:-1, :-2])
-        )
-        # v_on_T[k, j, i] = ½ (v[k, j+1/2, i] + v[k, j-1/2, i])
-        v_on_T = jnp.zeros_like(v)
-        v_on_T = v_on_T.at[1:-1, 1:-1, 1:-1].set(
-            0.5 * (v[1:-1, 1:-1, 1:-1] + v[1:-1, :-2, 1:-1])
-        )
-        K = jnp.zeros_like(u)
-        # K[k, j, i] = ½ (u_T[k,j,i]² + v_T[k,j,i]²)
-        K = K.at[1:-1, 1:-1, 1:-1].set(
-            0.5 * (u_on_T[1:-1, 1:-1, 1:-1] ** 2 + v_on_T[1:-1, 1:-1, 1:-1] ** 2)
-        )
-        # dK/dx[k, j, i+1/2] = (K[k, j, i+1] - K[k, j, i]) / dx
-        dK_dx = jnp.zeros_like(u)
-        dK_dx = dK_dx.at[1:-1, 1:-1, 1:-1].set(
-            (K[1:-1, 1:-1, 2:] - K[1:-1, 1:-1, 1:-1]) / dx
-        )
-        # dK/dy[k, j+1/2, i] = (K[k, j+1, i] - K[k, j, i]) / dy
-        dK_dy = jnp.zeros_like(v)
-        dK_dy = dK_dy.at[1:-1, 1:-1, 1:-1].set(
-            (K[1:-1, 2:, 1:-1] - K[1:-1, 1:-1, 1:-1]) / dy
-        )
-        return dK_dx, dK_dy
-
-    def _vorticity_flux_energy(
-        self,
-        zeta: Float[Array, "Nz Ny Nx"],
-        u: Float[Array, "Nz Ny Nx"],
-        v: Float[Array, "Nz Ny Nx"],
-    ) -> tuple[Float[Array, "Nz Ny Nx"], Float[Array, "Nz Ny Nx"]]:
-        """Sadourny E-scheme vorticity flux at (U-points, V-points).
-
-        zv_u[k, j, i+1/2] = zeta_on_u * v_on_u
-        zu_v[k, j+1/2, i] = zeta_on_v * u_on_v
-        """
-        # zeta_on_u[k, j, i+1/2] = ½ (zeta[k, j+1/2, i+1/2] + zeta[k, j-1/2, i+1/2])
-        zeta_on_u = jnp.zeros_like(u)
-        zeta_on_u = zeta_on_u.at[1:-1, 1:-1, 1:-1].set(
-            0.5 * (zeta[1:-1, 1:-1, 1:-1] + zeta[1:-1, :-2, 1:-1])
-        )
-        # zeta_on_v[k, j+1/2, i] = ½ (zeta[k, j+1/2, i+1/2] + zeta[k, j+1/2, i-1/2])
-        zeta_on_v = jnp.zeros_like(v)
-        zeta_on_v = zeta_on_v.at[1:-1, 1:-1, 1:-1].set(
-            0.5 * (zeta[1:-1, 1:-1, 1:-1] + zeta[1:-1, 1:-1, :-2])
-        )
-        # v_on_u[k,j,i+1/2] = ¼(v[k,j+1/2,i]+v[k,j-1/2,i]+v[k,j+1/2,i+1]+v[k,j-1/2,i+1])
-        v_on_u = jnp.zeros_like(u)
-        v_on_u = v_on_u.at[
-            1:-1, 1:-1, 1:-1
-        ].set(
-            0.25
-            * (
-                v[1:-1, 1:-1, 1:-1]  # v[k, j+1/2, i  ]
-                + v[1:-1, :-2, 1:-1]  # v[k, j-1/2, i  ]
-                + v[1:-1, 1:-1, 2:]  # v[k, j+1/2, i+1]
-                + v[1:-1, :-2, 2:]  # v[k, j-1/2, i+1]
-            )
-        )
-        # u_on_v[k,j+1/2,i] = ¼(u[k,j,i+1/2]+u[k,j+1,i+1/2]+u[k,j,i-1/2]+u[k,j+1,i-1/2])
-        u_on_v = jnp.zeros_like(v)
-        u_on_v = u_on_v.at[
-            1:-1, 1:-1, 1:-1
-        ].set(
-            0.25
-            * (
-                u[1:-1, 1:-1, 1:-1]  # u[k, j,   i+1/2]
-                + u[1:-1, 2:, 1:-1]  # u[k, j+1, i+1/2]
-                + u[1:-1, 1:-1, :-2]  # u[k, j,   i-1/2]
-                + u[1:-1, 2:, :-2]  # u[k, j+1, i-1/2]
-            )
-        )
-        zv_u = jnp.zeros_like(u)
-        zu_v = jnp.zeros_like(v)
-        zv_u = zv_u.at[1:-1, 1:-1, 1:-1].set(
-            zeta_on_u[1:-1, 1:-1, 1:-1] * v_on_u[1:-1, 1:-1, 1:-1]
-        )
-        zu_v = zu_v.at[1:-1, 1:-1, 1:-1].set(
-            zeta_on_v[1:-1, 1:-1, 1:-1] * u_on_v[1:-1, 1:-1, 1:-1]
-        )
-        return zv_u, zu_v
-
-    def _vorticity_flux_enstrophy(
-        self,
-        zeta: Float[Array, "Nz Ny Nx"],
-        u: Float[Array, "Nz Ny Nx"],
-        v: Float[Array, "Nz Ny Nx"],
-    ) -> tuple[Float[Array, "Nz Ny Nx"], Float[Array, "Nz Ny Nx"]]:
-        """Sadourny Z-scheme vorticity flux at (U-points, V-points).
-
-        zv_at_q = zeta * v_on_q at X-points, then y-avg to U-points
-        zu_at_q = zeta * u_on_q at X-points, then x-avg to V-points
-        """
-        # v_on_q[k, j+1/2, i+1/2] = ½ (v[k, j+1/2, i] + v[k, j+1/2, i+1])
-        v_on_q = jnp.zeros_like(v)
-        v_on_q = v_on_q.at[1:-1, 1:-1, 1:-1].set(
-            0.5 * (v[1:-1, 1:-1, 1:-1] + v[1:-1, 1:-1, 2:])
-        )
-        # u_on_q[k, j+1/2, i+1/2] = ½ (u[k, j, i+1/2] + u[k, j+1, i+1/2])
-        u_on_q = jnp.zeros_like(u)
-        u_on_q = u_on_q.at[1:-1, 1:-1, 1:-1].set(
-            0.5 * (u[1:-1, 1:-1, 1:-1] + u[1:-1, 2:, 1:-1])
-        )
-        # (zeta*v) and (zeta*u) at X-points
-        zv_at_q = jnp.zeros_like(u)
-        zv_at_q = zv_at_q.at[1:-1, 1:-1, 1:-1].set(
-            zeta[1:-1, 1:-1, 1:-1] * v_on_q[1:-1, 1:-1, 1:-1]
-        )
-        zu_at_q = jnp.zeros_like(v)
-        zu_at_q = zu_at_q.at[1:-1, 1:-1, 1:-1].set(
-            zeta[1:-1, 1:-1, 1:-1] * u_on_q[1:-1, 1:-1, 1:-1]
-        )
-        # avg (zeta*v) from X to U (y-average), avg (zeta*u) from X to V (x-average)
-        zv_u = jnp.zeros_like(u)
-        zv_u = zv_u.at[1:-1, 1:-1, 1:-1].set(
-            0.5 * (zv_at_q[1:-1, 1:-1, 1:-1] + zv_at_q[1:-1, :-2, 1:-1])
-        )
-        zu_v = jnp.zeros_like(v)
-        zu_v = zu_v.at[1:-1, 1:-1, 1:-1].set(
-            0.5 * (zu_at_q[1:-1, 1:-1, 1:-1] + zu_at_q[1:-1, 1:-1, :-2])
-        )
-        return zv_u, zu_v
+    def __init__(self, grid: ArakawaCGrid3D) -> None:
+        self.grid = grid
+        self._madv2d = MomentumAdvection2D(grid=grid.horizontal_grid())
 
     def __call__(
         self,
@@ -408,50 +277,10 @@ class MomentumAdvection3D(eqx.Module):
             If ``scheme`` is not one of ``'energy'``, ``'enstrophy'``,
             or ``'al'``.
         """
-        dx, dy = self.grid.dx, self.grid.dy
-
-        # zeta[k, j+1/2, i+1/2] = dv/dx - du/dy  at X-points
-        # (v[k, j+1/2, i+1] - v[k, j+1/2, i]) / dx - (u[k, j+1, i+1/2] - u[k, j, i+1/2]) / dy
-        zeta = jnp.zeros_like(u)
-        zeta = zeta.at[1:-1, 1:-1, 1:-1].set(
-            (v[1:-1, 1:-1, 2:] - v[1:-1, 1:-1, 1:-1]) / dx
-            - (u[1:-1, 2:, 1:-1] - u[1:-1, 1:-1, 1:-1]) / dy
-        )
-
-        dK_dx, dK_dy = self._kinetic_energy_gradients(u, v)
-
-        if scheme == "energy":
-            zv_u, zu_v = self._vorticity_flux_energy(zeta, u, v)
-        elif scheme == "enstrophy":
-            zv_u, zu_v = self._vorticity_flux_enstrophy(zeta, u, v)
-        elif scheme == "al":
-            # Arakawa-Lamb: 1/3 energy + 2/3 enstrophy
-            alpha = 1.0 / 3.0
-            zv_u_e, zu_v_e = self._vorticity_flux_energy(zeta, u, v)
-            zv_u_s, zu_v_s = self._vorticity_flux_enstrophy(zeta, u, v)
-            zv_u = jnp.zeros_like(u)
-            zu_v = jnp.zeros_like(v)
-            zv_u = zv_u.at[1:-1, 1:-1, 1:-1].set(
-                alpha * zv_u_e[1:-1, 1:-1, 1:-1]
-                + (1.0 - alpha) * zv_u_s[1:-1, 1:-1, 1:-1]
-            )
-            zu_v = zu_v.at[1:-1, 1:-1, 1:-1].set(
-                alpha * zu_v_e[1:-1, 1:-1, 1:-1]
-                + (1.0 - alpha) * zu_v_s[1:-1, 1:-1, 1:-1]
-            )
-        else:
-            raise ValueError(
-                f"Unknown scheme: {scheme!r}.  Choose 'energy', 'enstrophy', or 'al'."
-            )
-
-        du_adv = jnp.zeros_like(u)
-        dv_adv = jnp.zeros_like(v)
-        # du_adv[k, j, i+1/2] = +(zeta*v)_u - dK/dx
-        du_adv = du_adv.at[1:-1, 2:-2, 2:-2].set(
-            zv_u[1:-1, 2:-2, 2:-2] - dK_dx[1:-1, 2:-2, 2:-2]
-        )
-        # dv_adv[k, j+1/2, i] = -(zeta*u)_v - dK/dy
-        dv_adv = dv_adv.at[1:-1, 2:-2, 2:-2].set(
-            -zu_v[1:-1, 2:-2, 2:-2] - dK_dy[1:-1, 2:-2, 2:-2]
-        )
+        du_adv, dv_adv = jax.vmap(
+            lambda u_k, v_k: self._madv2d(u_k, v_k, scheme=scheme)
+        )(u, v)
+        # Zero z-ghost slices.
+        du_adv = du_adv.at[0].set(0.0).at[-1].set(0.0)
+        dv_adv = dv_adv.at[0].set(0.0).at[-1].set(0.0)
         return du_adv, dv_adv
