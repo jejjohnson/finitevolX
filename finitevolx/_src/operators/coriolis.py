@@ -22,8 +22,8 @@ References
 
 from __future__ import annotations
 
-import jax
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
@@ -187,9 +187,7 @@ class Coriolis3D(eqx.Module):
         """
         # Vmap the 2D Coriolis operator over z-levels.
         # f is 2D (depth-independent) and broadcast to each z-slice.
-        du_cor, dv_cor = jax.vmap(
-            lambda u_k, v_k: self._cor2d(u_k, v_k, f)
-        )(u, v)
+        du_cor, dv_cor = jax.vmap(lambda u_k, v_k: self._cor2d(u_k, v_k, f))(u, v)
 
         # Zero the z-ghost slices to match the 3D ghost-ring convention.
         du_cor = du_cor.at[0].set(0.0).at[-1].set(0.0)

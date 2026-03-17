@@ -52,8 +52,8 @@ If mask arrays are supplied (1 = ocean, 0 = land):
 
 from __future__ import annotations
 
-import jax
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 
@@ -361,7 +361,10 @@ class Diffusion3D(eqx.Module):
 
         def _apply(h_k, kap_k, mh_k, mu_k, mv_k):
             return diffusion_2d(
-                h_k, kap_k, dx, dy,
+                h_k,
+                kap_k,
+                dx,
+                dy,
                 mask_h=mh_k if mask_h is not None else None,
                 mask_u=mu_k if mask_u is not None else None,
                 mask_v=mv_k if mask_v is not None else None,
@@ -409,7 +412,8 @@ class Diffusion3D(eqx.Module):
 
         def _apply(h_k, kap_k, mu_k, mv_k):
             return diff2d.fluxes(
-                h_k, kap_k,
+                h_k,
+                kap_k,
                 mask_u=mu_k if mask_u is not None else None,
                 mask_v=mv_k if mask_v is not None else None,
             )

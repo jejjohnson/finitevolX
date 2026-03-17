@@ -4,8 +4,8 @@ Vorticity and potential-vorticity flux operators on Arakawa C-grids.
 Composes Difference2D and Interpolation2D primitives.
 """
 
-import jax
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 

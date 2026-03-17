@@ -22,8 +22,8 @@ References
 
 from __future__ import annotations
 
-import jax
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 

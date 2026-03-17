@@ -834,7 +834,9 @@ def _interp_T_to_X(field: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
     Uses the same NE-corner stencil as :meth:`Interpolation2D.T_to_X`.
     """
     out = jnp.zeros_like(field)
-    out = out.at[1:-1, 1:-1].set(
+    out = out.at[
+        1:-1, 1:-1
+    ].set(
         0.25
         * (
             field[1:-1, 1:-1]  # T[j,   i  ]
