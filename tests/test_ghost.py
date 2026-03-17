@@ -1,5 +1,7 @@
 """Tests for ghost-ring zeroing utilities."""
 
+from __future__ import annotations
+
 import jax
 import jax.numpy as jnp
 
