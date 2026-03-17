@@ -29,7 +29,7 @@ from jaxtyping import Array, Float
 
 from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
 from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
-from finitevolx._src.operators._ghost import zero_z_ghosts
+from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators.interpolation import Interpolation2D
 
 
@@ -111,12 +111,10 @@ class Coriolis2D(eqx.Module):
         # u_on_v[j+1/2, i] = 1/4*(u[j,i+1/2] + u[j+1,i+1/2] + u[j,i-1/2] + u[j+1,i-1/2])
         u_on_v = self.interp.U_to_V(u)
 
-        du_cor = jnp.zeros_like(u)
-        dv_cor = jnp.zeros_like(v)
         # du_cor[j, i+1/2] = +f_on_u * v_on_u
-        du_cor = du_cor.at[1:-1, 1:-1].set(f_on_u[1:-1, 1:-1] * v_on_u[1:-1, 1:-1])
+        du_cor = interior(f_on_u[1:-1, 1:-1] * v_on_u[1:-1, 1:-1], u)
         # dv_cor[j+1/2, i] = -f_on_v * u_on_v
-        dv_cor = dv_cor.at[1:-1, 1:-1].set(-f_on_v[1:-1, 1:-1] * u_on_v[1:-1, 1:-1])
+        dv_cor = interior(-f_on_v[1:-1, 1:-1] * u_on_v[1:-1, 1:-1], v)
 
         if mask is not None:
             du_cor = du_cor * mask.u
