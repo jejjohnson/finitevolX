@@ -30,6 +30,7 @@ from finitevolx._src.diffusion.diffusion import (
 from finitevolx._src.diffusion.momentum import MomentumAdvection2D, MomentumAdvection3D
 from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask, StencilCapability
 from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.coriolis import Coriolis2D, Coriolis3D
 from finitevolx._src.operators.diagnostics import (
     available_potential_energy,
@@ -264,6 +265,7 @@ __all__ = [
     "divergence_2d",
     # Boundary helpers
     "enforce_periodic",
+    "interior",
     "pad_interior",
     # Interpolation
     "Interpolation1D",

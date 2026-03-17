@@ -26,7 +26,7 @@ from jaxtyping import Array, Float
 # =====================================================================
 
 
-def diff_x_fwd_1d(h: Float[Array, " Nx"]) -> Float[Array, " Nx-2"]:
+def diff_x_fwd_1d(h: Float[Array, "Nx"]) -> Float[Array, "Nx-2"]:
     """Forward difference in x (centre → east face), 1-D.
 
     Δx h[i+½] = h[i+1] − h[i]
@@ -35,12 +35,12 @@ def diff_x_fwd_1d(h: Float[Array, " Nx"]) -> Float[Array, " Nx-2"]:
 
     Parameters
     ----------
-    h : Float[Array, " Nx"]
+    h : Float[Array, "Nx"]
         Field on T-points, including ghost cells.
 
     Returns
     -------
-    Float[Array, " Nx-2"]
+    Float[Array, "Nx-2"]
         Raw difference at interior U-points.
 
     Notes
@@ -51,7 +51,7 @@ def diff_x_fwd_1d(h: Float[Array, " Nx"]) -> Float[Array, " Nx-2"]:
     return h[2:] - h[1:-1]
 
 
-def diff_x_bwd_1d(h: Float[Array, " Nx"]) -> Float[Array, " Nx-2"]:
+def diff_x_bwd_1d(h: Float[Array, "Nx"]) -> Float[Array, "Nx-2"]:
     """Backward difference in x (east face → centre), 1-D.
 
     Δx h[i] = h[i+½] − h[i−½]
@@ -60,12 +60,12 @@ def diff_x_bwd_1d(h: Float[Array, " Nx"]) -> Float[Array, " Nx-2"]:
 
     Parameters
     ----------
-    h : Float[Array, " Nx"]
+    h : Float[Array, "Nx"]
         Field on U-points, including ghost cells.
 
     Returns
     -------
-    Float[Array, " Nx-2"]
+    Float[Array, "Nx-2"]
         Raw difference at interior T-points.
 
     Notes
@@ -299,7 +299,7 @@ def diff_y_bwd_3d(
 # =====================================================================
 
 
-def avg_x_fwd_1d(h: Float[Array, " Nx"]) -> Float[Array, " Nx-2"]:
+def avg_x_fwd_1d(h: Float[Array, "Nx"]) -> Float[Array, "Nx-2"]:
     """Forward average in x (centre → east face), 1-D.
 
     h̄[i+½] = ½ (h[i] + h[i+1])
@@ -308,18 +308,18 @@ def avg_x_fwd_1d(h: Float[Array, " Nx"]) -> Float[Array, " Nx-2"]:
 
     Parameters
     ----------
-    h : Float[Array, " Nx"]
+    h : Float[Array, "Nx"]
         Field on T-points, including ghost cells.
 
     Returns
     -------
-    Float[Array, " Nx-2"]
+    Float[Array, "Nx-2"]
         Averaged values at interior U-points.
     """
     return 0.5 * (h[1:-1] + h[2:])
 
 
-def avg_x_bwd_1d(h: Float[Array, " Nx"]) -> Float[Array, " Nx-2"]:
+def avg_x_bwd_1d(h: Float[Array, "Nx"]) -> Float[Array, "Nx-2"]:
     """Backward average in x (east face → centre), 1-D.
 
     h̄[i] = ½ (h[i−½] + h[i+½])
@@ -328,12 +328,12 @@ def avg_x_bwd_1d(h: Float[Array, " Nx"]) -> Float[Array, " Nx-2"]:
 
     Parameters
     ----------
-    h : Float[Array, " Nx"]
+    h : Float[Array, "Nx"]
         Field on U-points, including ghost cells.
 
     Returns
     -------
-    Float[Array, " Nx-2"]
+    Float[Array, "Nx-2"]
         Averaged values at interior T-points.
     """
     return 0.5 * (h[1:-1] + h[:-2])
