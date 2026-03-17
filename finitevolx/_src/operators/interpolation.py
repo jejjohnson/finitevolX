@@ -18,6 +18,22 @@ from jaxtyping import Array, Float
 
 from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
 from finitevolx._src.operators._ghost import interior
+from finitevolx._src.operators.stencils import (
+    avg_x_bwd,
+    avg_x_bwd_1d,
+    avg_x_bwd_3d,
+    avg_x_fwd,
+    avg_x_fwd_1d,
+    avg_x_fwd_3d,
+    avg_xbwd_yfwd,
+    avg_xfwd_ybwd,
+    avg_xy_bwd,
+    avg_xy_fwd,
+    avg_y_bwd,
+    avg_y_bwd_3d,
+    avg_y_fwd,
+    avg_y_fwd_3d,
+)
 
 
 class Interpolation1D(eqx.Module):
@@ -46,7 +62,7 @@ class Interpolation1D(eqx.Module):
         Float[Array, "Nx"]
             Scalar interpolated to U-points.
         """
-        out = interior(0.5 * (h[1:-1] + h[2:]), h)
+        out = interior(avg_x_fwd_1d(h), h)
         return out
 
     def U_to_T(self, u: Float[Array, "Nx"]) -> Float[Array, "Nx"]:
@@ -64,7 +80,7 @@ class Interpolation1D(eqx.Module):
         Float[Array, "Nx"]
             Velocity interpolated to T-points.
         """
-        out = interior(0.5 * (u[1:-1] + u[:-2]), u)
+        out = interior(avg_x_bwd_1d(u), u)
         return out
 
 
@@ -98,8 +114,7 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Scalar interpolated to U-points.
         """
-        # h_on_u[j, i+1/2] = 1/2 * (h[j, i] + h[j, i+1])
-        out = interior(0.5 * (h[1:-1, 1:-1] + h[1:-1, 2:]), h)
+        out = interior(avg_x_fwd(h), h)
         return out
 
     def T_to_V(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -117,8 +132,7 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Scalar interpolated to V-points.
         """
-        # h_on_v[j+1/2, i] = 1/2 * (h[j, i] + h[j+1, i])
-        out = interior(0.5 * (h[1:-1, 1:-1] + h[2:, 1:-1]), h)
+        out = interior(avg_y_fwd(h), h)
         return out
 
     def T_to_X(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -136,17 +150,7 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Scalar interpolated to X-points (corners).
         """
-        # h_on_q[j+1/2, i+1/2] = 1/4 * (h[j,i] + h[j,i+1] + h[j+1,i] + h[j+1,i+1])
-        out = interior(
-            0.25
-            * (
-                h[1:-1, 1:-1]  # h[j,   i  ]
-                + h[1:-1, 2:]  # h[j,   i+1]
-                + h[2:, 1:-1]  # h[j+1, i  ]
-                + h[2:, 2:]  # h[j+1, i+1]
-            ),
-            h,
-        )
+        out = interior(avg_xy_fwd(h), h)
         return out
 
     # ------------------------------------------------------------------
@@ -168,8 +172,7 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Scalar interpolated to U-points.
         """
-        # q_on_u[j, i+1/2] = 1/2 * (q[j+1/2, i+1/2] + q[j-1/2, i+1/2])
-        out = interior(0.5 * (q[1:-1, 1:-1] + q[:-2, 1:-1]), q)
+        out = interior(avg_y_bwd(q), q)
         return out
 
     def X_to_V(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -187,8 +190,7 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Scalar interpolated to V-points.
         """
-        # q_on_v[j+1/2, i] = 1/2 * (q[j+1/2, i+1/2] + q[j+1/2, i-1/2])
-        out = interior(0.5 * (q[1:-1, 1:-1] + q[1:-1, :-2]), q)
+        out = interior(avg_x_bwd(q), q)
         return out
 
     # ------------------------------------------------------------------
@@ -210,8 +212,7 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Velocity interpolated to T-points.
         """
-        # u_on_h[j, i] = 1/2 * (u[j, i+1/2] + u[j, i-1/2])
-        out = interior(0.5 * (u[1:-1, 1:-1] + u[1:-1, :-2]), u)
+        out = interior(avg_x_bwd(u), u)
         return out
 
     def V_to_T(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -229,8 +230,7 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Velocity interpolated to T-points.
         """
-        # v_on_h[j, i] = 1/2 * (v[j+1/2, i] + v[j-1/2, i])
-        out = interior(0.5 * (v[1:-1, 1:-1] + v[:-2, 1:-1]), v)
+        out = interior(avg_y_bwd(v), v)
         return out
 
     def X_to_T(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -249,18 +249,7 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Scalar interpolated to T-points.
         """
-        # q_on_h[j, i] = 1/4 * (q[j+1/2,i+1/2] + q[j-1/2,i+1/2]
-        #                      + q[j+1/2,i-1/2] + q[j-1/2,i-1/2])
-        out = interior(
-            0.25
-            * (
-                q[1:-1, 1:-1]  # q[j+1/2, i+1/2]
-                + q[:-2, 1:-1]  # q[j-1/2, i+1/2]
-                + q[1:-1, :-2]  # q[j+1/2, i-1/2]
-                + q[:-2, :-2]  # q[j-1/2, i-1/2]
-            ),
-            q,
-        )
+        out = interior(avg_xy_bwd(q), q)
         return out
 
     # ------------------------------------------------------------------
@@ -282,8 +271,7 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Velocity interpolated to X-points.
         """
-        # u_on_q[j+1/2, i+1/2] = 1/2 * (u[j, i+1/2] + u[j+1, i+1/2])
-        out = interior(0.5 * (u[1:-1, 1:-1] + u[2:, 1:-1]), u)
+        out = interior(avg_y_fwd(u), u)
         return out
 
     def V_to_X(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -301,8 +289,7 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Velocity interpolated to X-points.
         """
-        # v_on_q[j+1/2, i+1/2] = 1/2 * (v[j+1/2, i] + v[j+1/2, i+1])
-        out = interior(0.5 * (v[1:-1, 1:-1] + v[1:-1, 2:]), v)
+        out = interior(avg_x_fwd(v), v)
         return out
 
     # ------------------------------------------------------------------
@@ -325,17 +312,7 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Velocity interpolated to V-points.
         """
-        # u_on_v[j+1/2, i] = 1/4 * (u[j,i+1/2] + u[j+1,i+1/2] + u[j,i-1/2] + u[j+1,i-1/2])
-        out = interior(
-            0.25
-            * (
-                u[1:-1, 1:-1]  # u[j,   i+1/2]
-                + u[2:, 1:-1]  # u[j+1, i+1/2]
-                + u[1:-1, :-2]  # u[j,   i-1/2]
-                + u[2:, :-2]  # u[j+1, i-1/2]
-            ),
-            u,
-        )
+        out = interior(avg_xbwd_yfwd(u), u)
         return out
 
     def V_to_U(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -354,17 +331,7 @@ class Interpolation2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Velocity interpolated to U-points.
         """
-        # v_on_u[j, i+1/2] = 1/4 * (v[j+1/2,i] + v[j-1/2,i] + v[j+1/2,i+1] + v[j-1/2,i+1])
-        out = interior(
-            0.25
-            * (
-                v[1:-1, 1:-1]  # v[j+1/2, i  ]
-                + v[:-2, 1:-1]  # v[j-1/2, i  ]
-                + v[1:-1, 2:]  # v[j+1/2, i+1]
-                + v[:-2, 2:]  # v[j-1/2, i+1]
-            ),
-            v,
-        )
+        out = interior(avg_xfwd_ybwd(v), v)
         return out
 
 
@@ -387,7 +354,7 @@ class Interpolation3D(eqx.Module):
 
         h_on_u[k, j, i+1/2] = 1/2 * (h[k, j, i] + h[k, j, i+1])
         """
-        out = interior(0.5 * (h[1:-1, 1:-1, 1:-1] + h[1:-1, 1:-1, 2:]), h)
+        out = interior(avg_x_fwd_3d(h), h)
         return out
 
     def T_to_V(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -395,7 +362,7 @@ class Interpolation3D(eqx.Module):
 
         h_on_v[k, j+1/2, i] = 1/2 * (h[k, j, i] + h[k, j+1, i])
         """
-        out = interior(0.5 * (h[1:-1, 1:-1, 1:-1] + h[1:-1, 2:, 1:-1]), h)
+        out = interior(avg_y_fwd_3d(h), h)
         return out
 
     def U_to_T(self, u: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -403,7 +370,7 @@ class Interpolation3D(eqx.Module):
 
         u_on_h[k, j, i] = 1/2 * (u[k, j, i+1/2] + u[k, j, i-1/2])
         """
-        out = interior(0.5 * (u[1:-1, 1:-1, 1:-1] + u[1:-1, 1:-1, :-2]), u)
+        out = interior(avg_x_bwd_3d(u), u)
         return out
 
     def V_to_T(self, v: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -411,5 +378,5 @@ class Interpolation3D(eqx.Module):
 
         v_on_h[k, j, i] = 1/2 * (v[k, j+1/2, i] + v[k, j-1/2, i])
         """
-        out = interior(0.5 * (v[1:-1, 1:-1, 1:-1] + v[1:-1, :-2, 1:-1]), v)
+        out = interior(avg_y_bwd_3d(v), v)
         return out

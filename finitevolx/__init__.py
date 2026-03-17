@@ -85,6 +85,20 @@ from finitevolx._src.operators.interpolation import (
 )
 from finitevolx._src.operators.jacobian import arakawa_jacobian
 from finitevolx._src.operators.stencils import (
+    avg_x_bwd,
+    avg_x_bwd_1d,
+    avg_x_bwd_3d,
+    avg_x_fwd,
+    avg_x_fwd_1d,
+    avg_x_fwd_3d,
+    avg_xbwd_yfwd,
+    avg_xfwd_ybwd,
+    avg_xy_bwd,
+    avg_xy_fwd,
+    avg_y_bwd,
+    avg_y_bwd_3d,
+    avg_y_fwd,
+    avg_y_fwd_3d,
     diff_x_bwd,
     diff_x_bwd_1d,
     diff_x_bwd_3d,
@@ -212,7 +226,8 @@ __all__ = [
     "Difference1D",
     "Difference2D",
     "Difference3D",
-    # Raw difference stencils (Layer 1 — no metric scaling)
+    # Raw stencils (Layer 1 — no metric scaling)
+    # Difference stencils
     "diff_x_fwd",
     "diff_x_bwd",
     "diff_y_fwd",
@@ -223,6 +238,21 @@ __all__ = [
     "diff_x_bwd_3d",
     "diff_y_fwd_3d",
     "diff_y_bwd_3d",
+    # Averaging stencils
+    "avg_x_fwd",
+    "avg_x_bwd",
+    "avg_y_fwd",
+    "avg_y_bwd",
+    "avg_xy_fwd",
+    "avg_xy_bwd",
+    "avg_xbwd_yfwd",
+    "avg_xfwd_ybwd",
+    "avg_x_fwd_1d",
+    "avg_x_bwd_1d",
+    "avg_x_fwd_3d",
+    "avg_x_bwd_3d",
+    "avg_y_fwd_3d",
+    "avg_y_bwd_3d",
     # Diffusion
     "BiharmonicDiffusion2D",
     "BiharmonicDiffusion3D",
