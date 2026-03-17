@@ -17,6 +17,15 @@ from jaxtyping import (
 from finitevolx._src.grid.constants import GRAVITY, OMEGA, R_EARTH
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.difference import _curl_2d
+from finitevolx._src.operators.stencils import (
+    avg_x_bwd,
+    avg_xy_fwd,
+    avg_y_bwd,
+    diff_x_bwd,
+    diff_x_fwd,
+    diff_y_bwd,
+    diff_y_fwd,
+)
 
 # ======================================================================
 # Kinetic energy & Bernoulli potential  (existing)
@@ -56,8 +65,8 @@ def kinetic_energy(
     v2 = v_float**2
     # u²_on_T[j, i] = 0.5 * (u²[j, i] + u²[j, i-1])  (east + west U-faces)
     # v²_on_T[j, i] = 0.5 * (v²[j, i] + v²[j-1, i])  (north + south V-faces)
-    u2_on_T = 0.5 * (u2[1:-1, 1:-1] + u2[1:-1, :-2])
-    v2_on_T = 0.5 * (v2[1:-1, 1:-1] + v2[:-2, 1:-1])
+    u2_on_T = avg_x_bwd(u2)
+    v2_on_T = avg_y_bwd(v2)
     ke_int = 0.5 * (u2_on_T + v2_on_T)
     if mask is not None:
         ke_int = ke_int * mask[1:-1, 1:-1]
@@ -201,11 +210,7 @@ def shear_strain(
     Float[Array, "Ny Nx"]
         Shear strain at X-points.  Ghost ring is zero.
     """
-    # dv/dx[j+1/2, i+1/2] = (v[j+1/2, i+1] - v[j+1/2, i]) / dx
-    dv_dx = (v[1:-1, 2:] - v[1:-1, 1:-1]) / dx
-    # du/dy[j+1/2, i+1/2] = (u[j+1, i+1/2] - u[j, i+1/2]) / dy
-    du_dy = (u[2:, 1:-1] - u[1:-1, 1:-1]) / dy
-    out = interior(dv_dx + du_dy, u)
+    out = interior(diff_x_fwd(v) / dx + diff_y_fwd(u) / dy, u)
     return out
 
 
@@ -237,11 +242,7 @@ def tensor_strain(
     Float[Array, "Ny Nx"]
         Tensor strain at T-points.  Ghost ring is zero.
     """
-    # du/dx[j, i] = (u[j, i+1/2] - u[j, i-1/2]) / dx
-    du_dx = (u[1:-1, 1:-1] - u[1:-1, :-2]) / dx
-    # dv/dy[j, i] = (v[j+1/2, i] - v[j-1/2, i]) / dy
-    dv_dy = (v[1:-1, 1:-1] - v[:-2, 1:-1]) / dy
-    out = interior(du_dx - dv_dy, u)
+    out = interior(diff_x_bwd(u) / dx - diff_y_bwd(v) / dy, u)
     return out
 
 
@@ -451,10 +452,8 @@ def qg_potential_vorticity(
         Ghost ring is zero; interior is ``[1:-1, 1:-1]``.
     """
     # Laplacian at T-points via centred second differences:
-    # d2psi/dx2[j,i] = (psi[j,i+1] - 2*psi[j,i] + psi[j,i-1]) / dx^2
-    d2x = (psi[1:-1, 2:] - 2.0 * psi[1:-1, 1:-1] + psi[1:-1, :-2]) / dx**2
-    # d2psi/dy2[j,i] = (psi[j+1,i] - 2*psi[j,i] + psi[j-1,i]) / dy^2
-    d2y = (psi[2:, 1:-1] - 2.0 * psi[1:-1, 1:-1] + psi[:-2, 1:-1]) / dy**2
+    d2x = (diff_x_fwd(psi) - diff_x_bwd(psi)) / dx**2
+    d2y = (diff_y_fwd(psi) - diff_y_bwd(psi)) / dy**2
     # q[j,i] = (d2psi/dx2 + d2psi/dy2) / f0 + beta * (y - y0) / f0
     q_int = (d2x + d2y) / f0 + beta * (y[1:-1, 1:-1] - y0) / f0
     out = interior(q_int, psi)
@@ -829,17 +828,7 @@ def _interp_T_to_X(field: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
 
     Uses the same NE-corner stencil as :meth:`Interpolation2D.T_to_X`.
     """
-    out = interior(
-        0.25
-        * (
-            field[1:-1, 1:-1]  # T[j,   i  ]
-            + field[1:-1, 2:]  # T[j,   i+1]
-            + field[2:, 1:-1]  # T[j+1, i  ]
-            + field[2:, 2:]  # T[j+1, i+1]
-        ),
-        field,
-    )
-    return out
+    return interior(avg_xy_fwd(field), field)
 
 
 def sw_potential_vorticity(
