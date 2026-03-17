@@ -820,3 +820,112 @@ def potential_vorticity_multilayer(
     """
     qg_pv_layer = jax.vmap(lambda p: qg_potential_vorticity(p, f0, beta, dx, dy, y, y0))
     return qg_pv_layer(psi) - stretching_term(A, psi)
+
+
+# ======================================================================
+# Shallow-water potential vorticity from prognostic variables  (Issue #153)
+# ======================================================================
+
+
+def _interp_T_to_X(field: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    """Interpolate a T-point field to X-points (corners) via 4-point average.
+
+    X[j+1/2, i+1/2] = 0.25 * (T[j,i] + T[j+1,i] + T[j,i+1] + T[j+1,i+1])
+
+    Interior X-point at index ``[j, i]`` averages T-points
+    ``[j-1, i-1], [j, i-1], [j-1, i], [j, i]``.
+    """
+    out = jnp.zeros_like(field)
+    # For interior indices j=1..Ny-2, i=1..Nx-2:
+    avg = 0.25 * (
+        field[:-2, :-2] + field[1:-1, :-2] + field[:-2, 1:-1] + field[1:-1, 1:-1]
+    )
+    out = out.at[1:-1, 1:-1].set(avg)
+    return out
+
+
+def sw_potential_vorticity(
+    u: Float[Array, "Ny Nx"],
+    v: Float[Array, "Ny Nx"],
+    h: Float[Array, "Ny Nx"],
+    f: Float[Array, "Ny Nx"],
+    dx: float,
+    dy: float,
+) -> Float[Array, "Ny Nx"]:
+    """Shallow-water potential vorticity at X-points on an Arakawa C-grid.
+
+    q[j+1/2, i+1/2] = (omega[j+1/2, i+1/2] + f_X[j+1/2, i+1/2])
+                       / h_X[j+1/2, i+1/2]
+
+    Computes relative vorticity from ``(u, v)`` at X-points, interpolates
+    ``f`` and ``h`` from T-points to X-points, then forms the PV ratio.
+
+    Parameters
+    ----------
+    u : Float[Array, "Ny Nx"]
+        x-velocity at U-points.
+    v : Float[Array, "Ny Nx"]
+        y-velocity at V-points.
+    h : Float[Array, "Ny Nx"]
+        Layer thickness at T-points.
+    f : Float[Array, "Ny Nx"]
+        Coriolis parameter at T-points.
+    dx : float
+        Grid spacing in x.
+    dy : float
+        Grid spacing in y.
+
+    Returns
+    -------
+    Float[Array, "Ny Nx"]
+        Potential vorticity at X-points.  Ghost ring is zero.
+        Where ``h_X == 0`` the result is NaN.
+    """
+    omega = _curl_2d(u, v, dx, dy)
+    f_X = _interp_T_to_X(f)
+    h_X = _interp_T_to_X(h)
+    # Use 0 in ghost ring (where h_X == 0) rather than NaN, matching
+    # the ghost-ring-is-zero convention used by all other operators.
+    return jnp.where(h_X == 0, 0.0, (omega + f_X) / h_X)
+
+
+def sw_potential_vorticity_multilayer(
+    u: Float[Array, "nl Ny Nx"],
+    v: Float[Array, "nl Ny Nx"],
+    h: Float[Array, "nl Ny Nx"],
+    f: Float[Array, "Ny Nx"],
+    dx: float,
+    dy: float,
+) -> Float[Array, "nl Ny Nx"]:
+    """Multi-layer shallow-water potential vorticity at X-points.
+
+    q_k = (omega_k + f) / h_k
+
+    Vmaps :func:`sw_potential_vorticity` over the leading layer axis.
+    Layer coupling in SWM occurs through pressure (interface heights),
+    not through PV, so no coupling matrix is needed.
+
+    Parameters
+    ----------
+    u : Float[Array, "nl Ny Nx"]
+        x-velocity at U-points for all layers.
+    v : Float[Array, "nl Ny Nx"]
+        y-velocity at V-points for all layers.
+    h : Float[Array, "nl Ny Nx"]
+        Layer thickness at T-points for all layers.
+    f : Float[Array, "Ny Nx"]
+        Coriolis parameter at T-points (shared across layers).
+    dx : float
+        Grid spacing in x.
+    dy : float
+        Grid spacing in y.
+
+    Returns
+    -------
+    Float[Array, "nl Ny Nx"]
+        Potential vorticity at X-points for all layers.
+        Ghost ring is zero.
+    """
+    return jax.vmap(
+        lambda u_k, v_k, h_k: sw_potential_vorticity(u_k, v_k, h_k, f, dx, dy)
+    )(u, v, h)

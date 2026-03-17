@@ -50,6 +50,8 @@ from finitevolx._src.operators.diagnostics import (
     strain_magnitude_squared,
     streamfn_to_ssh,
     stretching_term,
+    sw_potential_vorticity,
+    sw_potential_vorticity_multilayer,
     tensor_strain,
     total_energy,
     total_enstrophy,
@@ -243,6 +245,9 @@ __all__ = [
     "total_energy",
     "total_enstrophy",
     "vertical_velocity",
+    # Shallow-water PV
+    "sw_potential_vorticity",
+    "sw_potential_vorticity_multilayer",
     # Coriolis / beta-plane constructors
     "coriolis_fn",
     "coriolis_param",

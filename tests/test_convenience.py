@@ -21,9 +21,12 @@ from finitevolx._src.operators.diagnostics import (
     coriolis_param,
     potential_vorticity_multilayer,
     qg_potential_vorticity,
+    relative_vorticity_cgrid,
     ssh_to_streamfn,
     streamfn_to_ssh,
     stretching_term,
+    sw_potential_vorticity,
+    sw_potential_vorticity_multilayer,
 )
 from finitevolx._src.vertical.multilayer import multilayer
 
@@ -271,6 +274,100 @@ class TestPotentialVorticityMultilayer:
 
 
 # ======================================================================
+# Shallow-water potential vorticity
+# ======================================================================
+
+
+class TestSWPotentialVorticity:
+    def test_output_shape(self, grid2d):
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((grid2d.Ny, grid2d.Nx))
+        h = 10.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        f = 1e-4 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = sw_potential_vorticity(u, v, h, f, grid2d.dx, grid2d.dy)
+        assert result.shape == (grid2d.Ny, grid2d.Nx)
+
+    def test_ghost_ring_zero(self, grid2d):
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((grid2d.Ny, grid2d.Nx))
+        h = 10.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        f = 1e-4 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = sw_potential_vorticity(u, v, h, f, grid2d.dx, grid2d.dy)
+        np.testing.assert_allclose(result[0, :], 0.0, atol=1e-15)
+        np.testing.assert_allclose(result[-1, :], 0.0, atol=1e-15)
+        np.testing.assert_allclose(result[:, 0], 0.0, atol=1e-15)
+        np.testing.assert_allclose(result[:, -1], 0.0, atol=1e-15)
+
+    def test_irrotational_uniform_h(self, grid2d):
+        """Uniform u,v (no vorticity) + uniform f,h => PV = f/h at interior X-points."""
+        u = 3.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = 3.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        h = 10.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        f = 1e-4 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = sw_potential_vorticity(u, v, h, f, grid2d.dx, grid2d.dy)
+        expected = 1e-4 / 10.0
+        np.testing.assert_allclose(result[1:-1, 1:-1], expected, rtol=1e-10)
+
+    def test_matches_manual_composition(self, grid2d):
+        """Must match relative_vorticity + interp + pointwise PV."""
+        c = 1.5
+        x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
+        y = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
+        u = jnp.broadcast_to(-c * y[:, None], (grid2d.Ny, grid2d.Nx))
+        v = jnp.broadcast_to(c * x, (grid2d.Ny, grid2d.Nx))
+        h = 5.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        f = 1e-4 * jnp.ones((grid2d.Ny, grid2d.Nx))
+
+        result = sw_potential_vorticity(u, v, h, f, grid2d.dx, grid2d.dy)
+
+        # Vorticity of solid body rotation = 2c at interior X-points
+        omega = relative_vorticity_cgrid(u, v, grid2d.dx, grid2d.dy)
+        # f and h are uniform so interpolation doesn't change values
+        expected_pv = (omega[1:-1, 1:-1] + 1e-4) / 5.0
+        np.testing.assert_allclose(result[1:-1, 1:-1], expected_pv, rtol=1e-10)
+
+
+class TestSWPotentialVorticityMultilayer:
+    def test_output_shape(self, grid2d):
+        nl = 3
+        u = jnp.ones((nl, grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((nl, grid2d.Ny, grid2d.Nx))
+        h = 10.0 * jnp.ones((nl, grid2d.Ny, grid2d.Nx))
+        f = 1e-4 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = sw_potential_vorticity_multilayer(u, v, h, f, grid2d.dx, grid2d.dy)
+        assert result.shape == (nl, grid2d.Ny, grid2d.Nx)
+
+    def test_matches_single_layer(self, grid2d):
+        """Each layer should match sw_potential_vorticity called independently."""
+        nl = 2
+        key = jax.random.PRNGKey(0)
+        k1, k2, k3 = jax.random.split(key, 3)
+        u = jax.random.normal(k1, (nl, grid2d.Ny, grid2d.Nx))
+        v = jax.random.normal(k2, (nl, grid2d.Ny, grid2d.Nx))
+        h = 5.0 + jax.random.normal(k3, (nl, grid2d.Ny, grid2d.Nx)) * 0.1
+        f = 1e-4 * jnp.ones((grid2d.Ny, grid2d.Nx))
+
+        result = sw_potential_vorticity_multilayer(u, v, h, f, grid2d.dx, grid2d.dy)
+
+        for k in range(nl):
+            expected = sw_potential_vorticity(u[k], v[k], h[k], f, grid2d.dx, grid2d.dy)
+            np.testing.assert_allclose(result[k], expected, atol=1e-12)
+
+    def test_ghost_ring_zero(self, grid2d):
+        nl = 2
+        u = jnp.ones((nl, grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((nl, grid2d.Ny, grid2d.Nx))
+        h = 10.0 * jnp.ones((nl, grid2d.Ny, grid2d.Nx))
+        f = 1e-4 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        result = sw_potential_vorticity_multilayer(u, v, h, f, grid2d.dx, grid2d.dy)
+        for k in range(nl):
+            np.testing.assert_allclose(result[k, 0, :], 0.0, atol=1e-15)
+            np.testing.assert_allclose(result[k, -1, :], 0.0, atol=1e-15)
+            np.testing.assert_allclose(result[k, :, 0], 0.0, atol=1e-15)
+            np.testing.assert_allclose(result[k, :, -1], 0.0, atol=1e-15)
+
+
+# ======================================================================
 # JIT compatibility
 # ======================================================================
 
@@ -303,3 +400,22 @@ class TestJITCompatibility:
         result = fn(psi)
         result_jit = jax.jit(fn)(psi)
         np.testing.assert_allclose(result_jit, result, atol=1e-12)
+
+    def test_sw_potential_vorticity_jit(self, grid2d):
+        u = jnp.ones((grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((grid2d.Ny, grid2d.Nx))
+        h = 10.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        f = 1e-4 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        fn = lambda u, v: sw_potential_vorticity(u, v, h, f, grid2d.dx, grid2d.dy)
+        np.testing.assert_allclose(jax.jit(fn)(u, v), fn(u, v), atol=1e-15)
+
+    def test_sw_potential_vorticity_multilayer_jit(self, grid2d):
+        nl = 2
+        u = jnp.ones((nl, grid2d.Ny, grid2d.Nx))
+        v = jnp.ones((nl, grid2d.Ny, grid2d.Nx))
+        h = 10.0 * jnp.ones((nl, grid2d.Ny, grid2d.Nx))
+        f = 1e-4 * jnp.ones((grid2d.Ny, grid2d.Nx))
+        fn = lambda u, v: sw_potential_vorticity_multilayer(
+            u, v, h, f, grid2d.dx, grid2d.dy
+        )
+        np.testing.assert_allclose(jax.jit(fn)(u, v), fn(u, v), atol=1e-15)
