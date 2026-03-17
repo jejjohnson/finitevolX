@@ -52,6 +52,7 @@ If mask arrays are supplied (1 = ocean, 0 = land):
 
 from __future__ import annotations
 
+import jax
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
@@ -347,47 +348,30 @@ class Diffusion3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             Diffusion tendency at T-points.
         """
-        # Prepare kappa slices for each face direction.
+        dx, dy = self.grid.dx, self.grid.dy
         kappa_arr = jnp.asarray(kappa)
-        if kappa_arr.ndim >= 3:
-            kappa_x = kappa_arr[1:-1, 1:-1, 1:-2]  # source T-cell for east faces
-            kappa_y = kappa_arr[1:-1, 1:-2, 1:-1]  # source T-cell for north faces
-        else:
-            kappa_x = kappa_arr
-            kappa_y = kappa_arr
+        kappa_ax = 0 if kappa_arr.ndim >= 3 else None
+        mh_ax = 0 if mask_h is not None else None
+        mu_ax = 0 if mask_u is not None else None
+        mv_ax = 0 if mask_v is not None else None
+        # Use sentinel zeros for None masks so vmap sees a fixed signature.
+        mh = mask_h if mask_h is not None else jnp.zeros(())
+        mu = mask_u if mask_u is not None else jnp.zeros(())
+        mv = mask_v if mask_v is not None else jnp.zeros(())
 
-        # Step 1: East-face flux at U-points over all z-levels
-        # flux_x[k, j, i+1/2] = κ * (h[k, j, i+1] - h[k, j, i]) / dx
-        # Written for i = 1 ... Nx-3; east boundary face (i=Nx-2) stays 0.
-        flux_x = jnp.zeros_like(h)
-        flux_x = flux_x.at[1:-1, 1:-1, 1:-2].set(
-            kappa_x * (h[1:-1, 1:-1, 2:-1] - h[1:-1, 1:-1, 1:-2]) / self.grid.dx
+        def _apply(h_k, kap_k, mh_k, mu_k, mv_k):
+            return diffusion_2d(
+                h_k, kap_k, dx, dy,
+                mask_h=mh_k if mask_h is not None else None,
+                mask_u=mu_k if mask_u is not None else None,
+                mask_v=mv_k if mask_v is not None else None,
+            )
+
+        out = jax.vmap(_apply, in_axes=(0, kappa_ax, mh_ax, mu_ax, mv_ax))(
+            h, kappa_arr, mh, mu, mv
         )
-        if mask_u is not None:
-            flux_x = flux_x * mask_u
-
-        # Step 2: North-face flux at V-points over all z-levels
-        # flux_y[k, j+1/2, i] = κ * (h[k, j+1, i] - h[k, j, i]) / dy
-        # Written for j = 1 ... Ny-3; north boundary face (j=Ny-2) stays 0.
-        flux_y = jnp.zeros_like(h)
-        flux_y = flux_y.at[1:-1, 1:-2, 1:-1].set(
-            kappa_y * (h[1:-1, 2:-1, 1:-1] - h[1:-1, 1:-2, 1:-1]) / self.grid.dy
-        )
-        if mask_v is not None:
-            flux_y = flux_y * mask_v
-
-        # Step 3: Tendency at T-points over all z-levels
-        # dh[k, j, i] = (flux_x[k, j, i+1/2] - flux_x[k, j, i-1/2]) / dx
-        #             + (flux_y[k, j+1/2, i] - flux_y[k, j-1/2, i]) / dy
-        out = jnp.zeros_like(h)
-        du = (flux_x[1:-1, 1:-1, 1:-1] - flux_x[1:-1, 1:-1, :-2]) / self.grid.dx
-        dv = (flux_y[1:-1, 1:-1, 1:-1] - flux_y[1:-1, :-2, 1:-1]) / self.grid.dy
-        out = out.at[1:-1, 1:-1, 1:-1].set(du + dv)
-
-        if mask_h is not None:
-            out = out * mask_h
-
-        return out
+        # Zero z-ghost slices.
+        return out.at[0].set(0.0).at[-1].set(0.0)
 
     def fluxes(
         self,
@@ -415,34 +399,28 @@ class Diffusion3D(eqx.Module):
             ``(flux_x, flux_y)`` — east-face fluxes at U-points and
             north-face fluxes at V-points.
         """
-        # Prepare kappa slices for each face direction (same logic as __call__).
+        diff2d = Diffusion2D(grid=self.grid.horizontal_grid())
         kappa_arr = jnp.asarray(kappa)
-        if kappa_arr.ndim >= 3:
-            kappa_x = kappa_arr[1:-1, 1:-1, 1:-2]  # source T-cell for east faces
-            kappa_y = kappa_arr[1:-1, 1:-2, 1:-1]  # source T-cell for north faces
-        else:
-            kappa_x = kappa_arr
-            kappa_y = kappa_arr
+        kappa_ax = 0 if kappa_arr.ndim >= 3 else None
+        mu_ax = 0 if mask_u is not None else None
+        mv_ax = 0 if mask_v is not None else None
+        mu = mask_u if mask_u is not None else jnp.zeros(())
+        mv = mask_v if mask_v is not None else jnp.zeros(())
 
-        # flux_x[k, j, i+1/2] = κ * (h[k, j, i+1] - h[k, j, i]) / dx
-        # Written for i = 1 ... Nx-3; east boundary face (i=Nx-2) stays 0.
-        flux_x = jnp.zeros_like(h)
-        flux_x = flux_x.at[1:-1, 1:-1, 1:-2].set(
-            kappa_x * (h[1:-1, 1:-1, 2:-1] - h[1:-1, 1:-1, 1:-2]) / self.grid.dx
+        def _apply(h_k, kap_k, mu_k, mv_k):
+            return diff2d.fluxes(
+                h_k, kap_k,
+                mask_u=mu_k if mask_u is not None else None,
+                mask_v=mv_k if mask_v is not None else None,
+            )
+
+        fx, fy = jax.vmap(_apply, in_axes=(0, kappa_ax, mu_ax, mv_ax))(
+            h, kappa_arr, mu, mv
         )
-        if mask_u is not None:
-            flux_x = flux_x * mask_u
-
-        # flux_y[k, j+1/2, i] = κ * (h[k, j+1, i] - h[k, j, i]) / dy
-        # Written for j = 1 ... Ny-3; north boundary face (j=Ny-2) stays 0.
-        flux_y = jnp.zeros_like(h)
-        flux_y = flux_y.at[1:-1, 1:-2, 1:-1].set(
-            kappa_y * (h[1:-1, 2:-1, 1:-1] - h[1:-1, 1:-2, 1:-1]) / self.grid.dy
-        )
-        if mask_v is not None:
-            flux_y = flux_y * mask_v
-
-        return flux_x, flux_y
+        # Zero z-ghost slices.
+        fx = fx.at[0].set(0.0).at[-1].set(0.0)
+        fy = fy.at[0].set(0.0).at[-1].set(0.0)
+        return fx, fy
 
 
 class BiharmonicDiffusion2D(eqx.Module):
