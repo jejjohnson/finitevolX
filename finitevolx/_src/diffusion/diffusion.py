@@ -58,6 +58,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 
 from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.operators._ghost import zero_z_ghosts
 
 
 def diffusion_2d(
@@ -374,7 +375,7 @@ class Diffusion3D(eqx.Module):
             h, kappa_arr, mh, mu, mv
         )
         # Zero z-ghost slices.
-        return out.at[0].set(0.0).at[-1].set(0.0)
+        return zero_z_ghosts(out)
 
     def fluxes(
         self,
@@ -422,8 +423,8 @@ class Diffusion3D(eqx.Module):
             h, kappa_arr, mu, mv
         )
         # Zero z-ghost slices.
-        fx = fx.at[0].set(0.0).at[-1].set(0.0)
-        fy = fy.at[0].set(0.0).at[-1].set(0.0)
+        fx = zero_z_ghosts(fx)
+        fy = zero_z_ghosts(fy)
         return fx, fy
 
 

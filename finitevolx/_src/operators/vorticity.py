@@ -9,6 +9,8 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
+from finitevolx._src.operators._ghost import zero_z_ghosts
+
 from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
 from finitevolx._src.operators.difference import Difference2D, _curl_2d
 from finitevolx._src.operators.interpolation import Interpolation2D
@@ -243,4 +245,4 @@ class Vorticity3D(eqx.Module):
             u, v
         )
         # Zero z-ghost slices to match 3D ghost-ring convention.
-        return out.at[0].set(0.0).at[-1].set(0.0)
+        return zero_z_ghosts(out)

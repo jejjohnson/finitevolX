@@ -28,6 +28,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.operators._ghost import zero_z_ghosts
 from finitevolx._src.operators.difference import Difference2D
 from finitevolx._src.operators.interpolation import Interpolation2D
 
@@ -281,6 +282,6 @@ class MomentumAdvection3D(eqx.Module):
             lambda u_k, v_k: self._madv2d(u_k, v_k, scheme=scheme)
         )(u, v)
         # Zero z-ghost slices.
-        du_adv = du_adv.at[0].set(0.0).at[-1].set(0.0)
-        dv_adv = dv_adv.at[0].set(0.0).at[-1].set(0.0)
+        du_adv = zero_z_ghosts(du_adv)
+        dv_adv = zero_z_ghosts(dv_adv)
         return du_adv, dv_adv
