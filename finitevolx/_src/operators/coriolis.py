@@ -22,6 +22,7 @@ References
 
 from __future__ import annotations
 
+import jax
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
@@ -148,6 +149,11 @@ class Coriolis3D(eqx.Module):
     """
 
     grid: ArakawaCGrid3D
+    _cor2d: Coriolis2D
+
+    def __init__(self, grid: ArakawaCGrid3D) -> None:
+        self.grid = grid
+        self._cor2d = Coriolis2D(grid=grid.horizontal_grid())
 
     def __call__(
         self,
@@ -179,54 +185,15 @@ class Coriolis3D(eqx.Module):
             ``(du_cor, dv_cor)`` — Coriolis tendencies at U-points and
             V-points, both zero in the ghost ring.
         """
-        # Interpolate f from T-points to velocity points
-        # f_on_u[j, i+1/2] = 1/2 * (f[j, i] + f[j, i+1])
-        f_on_u = jnp.zeros_like(f)
-        f_on_u = f_on_u.at[1:-1, 1:-1].set(0.5 * (f[1:-1, 1:-1] + f[1:-1, 2:]))
-        # f_on_v[j+1/2, i] = 1/2 * (f[j, i] + f[j+1, i])
-        f_on_v = jnp.zeros_like(f)
-        f_on_v = f_on_v.at[1:-1, 1:-1].set(0.5 * (f[1:-1, 1:-1] + f[2:, 1:-1]))
+        # Vmap the 2D Coriolis operator over z-levels.
+        # f is 2D (depth-independent) and broadcast to each z-slice.
+        du_cor, dv_cor = jax.vmap(
+            lambda u_k, v_k: self._cor2d(u_k, v_k, f)
+        )(u, v)
 
-        # Cross-face velocity averages (4-point bilinear) applied per z-level
-        # v_on_u[k,j,i+1/2] = 1/4*(v[k,j+1/2,i] + v[k,j-1/2,i]
-        #                        + v[k,j+1/2,i+1] + v[k,j-1/2,i+1])
-        v_on_u = jnp.zeros_like(u)
-        v_on_u = v_on_u.at[
-            1:-1, 1:-1, 1:-1
-        ].set(
-            0.25
-            * (
-                v[1:-1, 1:-1, 1:-1]  # v[k, j+1/2, i  ]
-                + v[1:-1, :-2, 1:-1]  # v[k, j-1/2, i  ]
-                + v[1:-1, 1:-1, 2:]  # v[k, j+1/2, i+1]
-                + v[1:-1, :-2, 2:]  # v[k, j-1/2, i+1]
-            )
-        )
-        # u_on_v[k,j+1/2,i] = 1/4*(u[k,j,i+1/2] + u[k,j+1,i+1/2]
-        #                        + u[k,j,i-1/2] + u[k,j+1,i-1/2])
-        u_on_v = jnp.zeros_like(v)
-        u_on_v = u_on_v.at[
-            1:-1, 1:-1, 1:-1
-        ].set(
-            0.25
-            * (
-                u[1:-1, 1:-1, 1:-1]  # u[k, j,   i+1/2]
-                + u[1:-1, 2:, 1:-1]  # u[k, j+1, i+1/2]
-                + u[1:-1, 1:-1, :-2]  # u[k, j,   i-1/2]
-                + u[1:-1, 2:, :-2]  # u[k, j+1, i-1/2]
-            )
-        )
-
-        du_cor = jnp.zeros_like(u)
-        dv_cor = jnp.zeros_like(v)
-        # du_cor[k, j, i+1/2] = +f_on_u[j, i+1/2] * v_on_u[k, j, i+1/2]
-        du_cor = du_cor.at[1:-1, 1:-1, 1:-1].set(
-            f_on_u[1:-1, 1:-1] * v_on_u[1:-1, 1:-1, 1:-1]
-        )
-        # dv_cor[k, j+1/2, i] = -f_on_v[j+1/2, i] * u_on_v[k, j+1/2, i]
-        dv_cor = dv_cor.at[1:-1, 1:-1, 1:-1].set(
-            -f_on_v[1:-1, 1:-1] * u_on_v[1:-1, 1:-1, 1:-1]
-        )
+        # Zero the z-ghost slices to match the 3D ghost-ring convention.
+        du_cor = du_cor.at[0].set(0.0).at[-1].set(0.0)
+        dv_cor = dv_cor.at[0].set(0.0).at[-1].set(0.0)
 
         if mask is not None:
             du_cor = du_cor * mask.u
