@@ -4,12 +4,13 @@ Vorticity and potential-vorticity flux operators on Arakawa C-grids.
 Composes Difference2D and Interpolation2D primitives.
 """
 
+import jax
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
-from finitevolx._src.operators.difference import Difference2D
+from finitevolx._src.operators.difference import Difference2D, _curl_2d
 from finitevolx._src.operators.interpolation import Interpolation2D
 
 
@@ -238,12 +239,6 @@ class Vorticity3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             Relative vorticity at X-points.
         """
-        out = jnp.zeros_like(u)
-        # zeta[k, j+1/2, i+1/2] = dv/dx - du/dy
-        out = out.at[
-            1:-1, 1:-1, 1:-1
-        ].set(
-            (v[1:-1, 1:-1, 2:] - v[1:-1, 1:-1, 1:-1]) / self.grid.dx  # dv/dx
-            - (u[1:-1, 2:, 1:-1] - u[1:-1, 1:-1, 1:-1]) / self.grid.dy  # du/dy
-        )
-        return out
+        return jax.vmap(
+            lambda u_k, v_k: _curl_2d(u_k, v_k, self.grid.dx, self.grid.dy)
+        )(u, v)
