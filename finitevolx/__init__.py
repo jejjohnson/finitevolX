@@ -84,6 +84,18 @@ from finitevolx._src.operators.interpolation import (
     Interpolation3D,
 )
 from finitevolx._src.operators.jacobian import arakawa_jacobian
+from finitevolx._src.operators.stencils import (
+    diff_x_bwd,
+    diff_x_bwd_1d,
+    diff_x_bwd_3d,
+    diff_x_fwd,
+    diff_x_fwd_1d,
+    diff_x_fwd_3d,
+    diff_y_bwd,
+    diff_y_bwd_3d,
+    diff_y_fwd,
+    diff_y_fwd_3d,
+)
 from finitevolx._src.operators.vorticity import Vorticity2D, Vorticity3D
 from finitevolx._src.solvers.elliptic import (
     CapacitanceSolver,
@@ -200,6 +212,17 @@ __all__ = [
     "Difference1D",
     "Difference2D",
     "Difference3D",
+    # Raw difference stencils (Layer 1 — no metric scaling)
+    "diff_x_fwd",
+    "diff_x_bwd",
+    "diff_y_fwd",
+    "diff_y_bwd",
+    "diff_x_fwd_1d",
+    "diff_x_bwd_1d",
+    "diff_x_fwd_3d",
+    "diff_x_bwd_3d",
+    "diff_y_fwd_3d",
+    "diff_y_bwd_3d",
     # Diffusion
     "BiharmonicDiffusion2D",
     "BiharmonicDiffusion3D",
