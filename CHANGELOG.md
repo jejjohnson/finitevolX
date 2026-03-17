@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.33](https://github.com/jejjohnson/finitevolX/compare/v0.0.32...v0.0.33) (2026-03-17)
+
+
+### Bug Fixes
+
+* correct _interp_T_to_X stencil to match Interpolation2D.T_to_X ([4852194](https://github.com/jejjohnson/finitevolX/commit/4852194d18e6e6be9874f4a06d10978383270b26))
+* remove unrelated files accidentally committed ([116a640](https://github.com/jejjohnson/finitevolX/commit/116a640eb00fda1ae7949164fbbfe5b37d82042d))
+* zero z-ghost slices in Vorticity3D.relative_vorticity ([f5a3d44](https://github.com/jejjohnson/finitevolX/commit/f5a3d44515f975adbb6efcf72888e496d9d79183))
+
 ## [0.0.32](https://github.com/jejjohnson/finitevolX/compare/v0.0.31...v0.0.32) (2026-03-17)
 
 
