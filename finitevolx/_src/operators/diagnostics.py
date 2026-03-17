@@ -829,17 +829,20 @@ def potential_vorticity_multilayer(
 def _interp_T_to_X(field: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
     """Interpolate a T-point field to X-points (corners) via 4-point average.
 
-    X[j+1/2, i+1/2] = 0.25 * (T[j,i] + T[j+1,i] + T[j,i+1] + T[j+1,i+1])
+    X[j+1/2, i+1/2] = 0.25 * (T[j,i] + T[j,i+1] + T[j+1,i] + T[j+1,i+1])
 
-    Interior X-point at index ``[j, i]`` averages T-points
-    ``[j-1, i-1], [j, i-1], [j-1, i], [j, i]``.
+    Uses the same NE-corner stencil as :meth:`Interpolation2D.T_to_X`.
     """
     out = jnp.zeros_like(field)
-    # For interior indices j=1..Ny-2, i=1..Nx-2:
-    avg = 0.25 * (
-        field[:-2, :-2] + field[1:-1, :-2] + field[:-2, 1:-1] + field[1:-1, 1:-1]
+    out = out.at[1:-1, 1:-1].set(
+        0.25
+        * (
+            field[1:-1, 1:-1]  # T[j,   i  ]
+            + field[1:-1, 2:]  # T[j,   i+1]
+            + field[2:, 1:-1]  # T[j+1, i  ]
+            + field[2:, 2:]  # T[j+1, i+1]
+        )
     )
-    out = out.at[1:-1, 1:-1].set(avg)
     return out
 
 
