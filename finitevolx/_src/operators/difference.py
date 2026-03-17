@@ -92,9 +92,7 @@ class Difference1D(eqx.Module):
         Float[Array, "Nx"]
             Forward x-difference at U-points, same shape as input.
         """
-        out = jnp.zeros_like(h)
-        # dh_dx[i+1/2] = (h[i+1] - h[i]) / dx
-        out = out.at[1:-1].set((h[2:] - h[1:-1]) / self.grid.dx)
+        out = interior((h[2:] - h[1:-1]) / self.grid.dx, h)
         return out
 
     def diff_x_U_to_T(self, u: Float[Array, "Nx"]) -> Float[Array, "Nx"]:
@@ -112,9 +110,7 @@ class Difference1D(eqx.Module):
         Float[Array, "Nx"]
             Backward x-difference at T-points, same shape as input.
         """
-        out = jnp.zeros_like(u)
-        # du_dx[i] = (u[i+1/2] - u[i-1/2]) / dx
-        out = out.at[1:-1].set((u[1:-1] - u[:-2]) / self.grid.dx)
+        out = interior((u[1:-1] - u[:-2]) / self.grid.dx, u)
         return out
 
     def laplacian(self, h: Float[Array, "Nx"]) -> Float[Array, "Nx"]:
@@ -132,9 +128,7 @@ class Difference1D(eqx.Module):
         Float[Array, "Nx"]
             Laplacian at T-points, same shape as input.
         """
-        out = jnp.zeros_like(h)
-        # nabla2_h[i] = (h[i+1] - 2*h[i] + h[i-1]) / dx^2
-        out = out.at[1:-1].set((h[2:] - 2.0 * h[1:-1] + h[:-2]) / self.grid.dx**2)
+        out = interior((h[2:] - 2.0 * h[1:-1] + h[:-2]) / self.grid.dx**2, h)
         return out
 
 
@@ -488,10 +482,9 @@ class Difference3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             Forward x-difference at U-points.
         """
-        out = jnp.zeros_like(h)
         # dh_dx[k, j, i+1/2] = (h[k, j, i+1] - h[k, j, i]) / dx
-        out = out.at[1:-1, 1:-1, 1:-1].set(
-            (h[1:-1, 1:-1, 2:] - h[1:-1, 1:-1, 1:-1]) / self.grid.dx
+        out = interior(
+            (h[1:-1, 1:-1, 2:] - h[1:-1, 1:-1, 1:-1]) / self.grid.dx, h
         )
         return out
 
@@ -510,10 +503,9 @@ class Difference3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             Forward y-difference at V-points.
         """
-        out = jnp.zeros_like(h)
         # dh_dy[k, j+1/2, i] = (h[k, j+1, i] - h[k, j, i]) / dy
-        out = out.at[1:-1, 1:-1, 1:-1].set(
-            (h[1:-1, 2:, 1:-1] - h[1:-1, 1:-1, 1:-1]) / self.grid.dy
+        out = interior(
+            (h[1:-1, 2:, 1:-1] - h[1:-1, 1:-1, 1:-1]) / self.grid.dy, h
         )
         return out
 
@@ -532,10 +524,9 @@ class Difference3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             Backward x-difference at T-points.
         """
-        out = jnp.zeros_like(u)
         # du_dx[k, j, i] = (u[k, j, i+1/2] - u[k, j, i-1/2]) / dx
-        out = out.at[1:-1, 1:-1, 1:-1].set(
-            (u[1:-1, 1:-1, 1:-1] - u[1:-1, 1:-1, :-2]) / self.grid.dx
+        out = interior(
+            (u[1:-1, 1:-1, 1:-1] - u[1:-1, 1:-1, :-2]) / self.grid.dx, u
         )
         return out
 
@@ -554,10 +545,9 @@ class Difference3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             Backward y-difference at T-points.
         """
-        out = jnp.zeros_like(v)
         # dv_dy[k, j, i] = (v[k, j+1/2, i] - v[k, j-1/2, i]) / dy
-        out = out.at[1:-1, 1:-1, 1:-1].set(
-            (v[1:-1, 1:-1, 1:-1] - v[1:-1, :-2, 1:-1]) / self.grid.dy
+        out = interior(
+            (v[1:-1, 1:-1, 1:-1] - v[1:-1, :-2, 1:-1]) / self.grid.dy, v
         )
         return out
 
@@ -600,12 +590,11 @@ class Difference3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             Laplacian at T-points.
         """
-        out = jnp.zeros_like(h)
         d2x = (
             h[1:-1, 1:-1, 2:] - 2.0 * h[1:-1, 1:-1, 1:-1] + h[1:-1, 1:-1, :-2]
         ) / self.grid.dx**2
         d2y = (
             h[1:-1, 2:, 1:-1] - 2.0 * h[1:-1, 1:-1, 1:-1] + h[1:-1, :-2, 1:-1]
         ) / self.grid.dy**2
-        out = out.at[1:-1, 1:-1, 1:-1].set(d2x + d2y)
+        out = interior(d2x + d2y, h)
         return out

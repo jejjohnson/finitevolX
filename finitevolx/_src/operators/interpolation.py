@@ -47,9 +47,7 @@ class Interpolation1D(eqx.Module):
         Float[Array, "Nx"]
             Scalar interpolated to U-points.
         """
-        out = jnp.zeros_like(h)
-        # h_on_u[i+1/2] = 1/2 * (h[i] + h[i+1])
-        out = out.at[1:-1].set(0.5 * (h[1:-1] + h[2:]))
+        out = interior(0.5 * (h[1:-1] + h[2:]), h)
         return out
 
     def U_to_T(self, u: Float[Array, "Nx"]) -> Float[Array, "Nx"]:
@@ -67,9 +65,7 @@ class Interpolation1D(eqx.Module):
         Float[Array, "Nx"]
             Velocity interpolated to T-points.
         """
-        out = jnp.zeros_like(u)
-        # u_on_h[i] = 1/2 * (u[i+1/2] + u[i-1/2])
-        out = out.at[1:-1].set(0.5 * (u[1:-1] + u[:-2]))
+        out = interior(0.5 * (u[1:-1] + u[:-2]), u)
         return out
 
 
@@ -392,10 +388,7 @@ class Interpolation3D(eqx.Module):
 
         h_on_u[k, j, i+1/2] = 1/2 * (h[k, j, i] + h[k, j, i+1])
         """
-        out = jnp.zeros_like(h)
-        out = out.at[1:-1, 1:-1, 1:-1].set(
-            0.5 * (h[1:-1, 1:-1, 1:-1] + h[1:-1, 1:-1, 2:])
-        )
+        out = interior(0.5 * (h[1:-1, 1:-1, 1:-1] + h[1:-1, 1:-1, 2:]), h)
         return out
 
     def T_to_V(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -403,10 +396,7 @@ class Interpolation3D(eqx.Module):
 
         h_on_v[k, j+1/2, i] = 1/2 * (h[k, j, i] + h[k, j+1, i])
         """
-        out = jnp.zeros_like(h)
-        out = out.at[1:-1, 1:-1, 1:-1].set(
-            0.5 * (h[1:-1, 1:-1, 1:-1] + h[1:-1, 2:, 1:-1])
-        )
+        out = interior(0.5 * (h[1:-1, 1:-1, 1:-1] + h[1:-1, 2:, 1:-1]), h)
         return out
 
     def U_to_T(self, u: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -414,10 +404,7 @@ class Interpolation3D(eqx.Module):
 
         u_on_h[k, j, i] = 1/2 * (u[k, j, i+1/2] + u[k, j, i-1/2])
         """
-        out = jnp.zeros_like(u)
-        out = out.at[1:-1, 1:-1, 1:-1].set(
-            0.5 * (u[1:-1, 1:-1, 1:-1] + u[1:-1, 1:-1, :-2])
-        )
+        out = interior(0.5 * (u[1:-1, 1:-1, 1:-1] + u[1:-1, 1:-1, :-2]), u)
         return out
 
     def V_to_T(self, v: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -425,8 +412,5 @@ class Interpolation3D(eqx.Module):
 
         v_on_h[k, j, i] = 1/2 * (v[k, j+1/2, i] + v[k, j-1/2, i])
         """
-        out = jnp.zeros_like(v)
-        out = out.at[1:-1, 1:-1, 1:-1].set(
-            0.5 * (v[1:-1, 1:-1, 1:-1] + v[1:-1, :-2, 1:-1])
-        )
+        out = interior(0.5 * (v[1:-1, 1:-1, 1:-1] + v[1:-1, :-2, 1:-1]), v)
         return out

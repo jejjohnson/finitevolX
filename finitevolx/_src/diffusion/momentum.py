@@ -192,12 +192,10 @@ class MomentumAdvection2D(eqx.Module):
                 f"Unknown scheme: {scheme!r}.  Choose 'energy', 'enstrophy', or 'al'."
             )
 
-        du_adv = jnp.zeros_like(u)
-        dv_adv = jnp.zeros_like(v)
         # du_adv[j, i+1/2] = +(zeta*v)_u - dK/dx
-        du_adv = du_adv.at[2:-2, 2:-2].set(zv_u[2:-2, 2:-2] - dK_dx[2:-2, 2:-2])
+        du_adv = interior(zv_u[2:-2, 2:-2] - dK_dx[2:-2, 2:-2], u, ghost=2)
         # dv_adv[j+1/2, i] = -(zeta*u)_v - dK/dy
-        dv_adv = dv_adv.at[2:-2, 2:-2].set(-zu_v[2:-2, 2:-2] - dK_dy[2:-2, 2:-2])
+        dv_adv = interior(-zu_v[2:-2, 2:-2] - dK_dy[2:-2, 2:-2], v, ghost=2)
         return du_adv, dv_adv
 
 
