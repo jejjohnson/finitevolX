@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.34](https://github.com/jejjohnson/finitevolX/compare/v0.0.33...v0.0.34) (2026-03-17)
+
+
+### Bug Fixes
+
+* export interior() and fix 1D jaxtyping shape strings ([06bdede](https://github.com/jejjohnson/finitevolX/commit/06bdede936346e63eaff93a0a8f9382b65d5036f))
+
 ## [0.0.33](https://github.com/jejjohnson/finitevolX/compare/v0.0.32...v0.0.33) (2026-03-17)
 
 
