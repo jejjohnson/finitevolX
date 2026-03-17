@@ -1,39 +1,139 @@
 # Raw Stencil Primitives
 
 This page explains the theory behind the raw stencil functions in `finitevolx`,
-connecting the continuous finite-volume formulation to the discrete index
-arithmetic that the library implements.
+walking from the continuous equations through the Gauss divergence theorem to
+the discrete stencils that the library implements.
+
+For details on ghost-cell layout, same-size array conventions, and boundary
+interactions, see the [C-Grid Discretization](cgrid_discretization.md) page.
 
 ---
 
-## From Continuous to Discrete
+## 1. The Continuous Equations
 
-### The finite-volume idea
-
-Geophysical fluid dynamics models solve conservation laws of the form
+Geophysical fluid dynamics models solve **conservation laws** — partial
+differential equations that express the conservation of mass, momentum,
+and tracers:
 
 $$
 \frac{\partial q}{\partial t} + \nabla \cdot \mathbf{F}(q) = 0
 $$
 
-where $q$ is a conserved quantity (mass, momentum, tracer) and $\mathbf{F}$
-is its flux.  The **finite-volume method** integrates this equation over each
-grid cell $\Omega_{j,i}$ and applies the **Gauss divergence theorem**:
+where $q$ is a conserved density (layer thickness $h$, momentum
+$hu$, tracer concentration $c$, etc.) and $\mathbf{F}(q)$ is the
+corresponding flux vector.  In two dimensions this expands to:
 
 $$
-\frac{d}{dt}\int_{\Omega_{j,i}} q\, dA
-  = -\oint_{\partial \Omega_{j,i}} \mathbf{F} \cdot \hat{n}\, ds
+\frac{\partial q}{\partial t}
+  + \frac{\partial F^x}{\partial x}
+  + \frac{\partial F^y}{\partial y} = 0
 $$
 
-The volume integral becomes a cell average; the surface integral becomes a
-sum of **face fluxes**.  This is why Arakawa C-grids store scalars at cell
-centres (T-points) and fluxes at cell faces (U- and V-points) — the grid
-layout directly mirrors the mathematical structure of finite-volume
-discretization.
+For example, in the shallow-water mass equation $q = h$ and
+$\mathbf{F} = (hu,\, hv)$, giving the familiar continuity equation:
 
-### Arakawa C-grid staggering
+$$
+\frac{\partial h}{\partial t}
+  + \frac{\partial (hu)}{\partial x}
+  + \frac{\partial (hv)}{\partial y} = 0
+$$
 
-On an Arakawa C-grid, the four variable locations are:
+These are continuous equations defined at every point in space.  To solve
+them numerically, we need to represent them on a finite grid.
+
+---
+
+## 2. The Finite-Volume Approximation
+
+### Integrating over a control volume
+
+Rather than approximating derivatives at a point (as finite-difference
+methods do), the **finite-volume method** works with the *integral* form
+of the conservation law.  We divide the domain into non-overlapping cells
+$\Omega_{j,i}$ and integrate the conservation law over each cell:
+
+$$
+\int_{\Omega_{j,i}} \frac{\partial q}{\partial t}\, dA
+  + \int_{\Omega_{j,i}} \nabla \cdot \mathbf{F}\, dA = 0
+$$
+
+### The Gauss divergence theorem
+
+The key step is applying the **Gauss divergence theorem** (also known as
+the divergence theorem or Green's theorem in 2D) to convert the volume
+integral of the divergence into a surface integral over the cell boundary:
+
+$$
+\int_{\Omega_{j,i}} \nabla \cdot \mathbf{F}\, dA
+  = \oint_{\partial \Omega_{j,i}} \mathbf{F} \cdot \hat{\mathbf{n}}\, ds
+$$
+
+where $\hat{\mathbf{n}}$ is the outward unit normal to the cell boundary
+and $ds$ is the line element along the boundary.  This gives us:
+
+$$
+\frac{d}{dt} \int_{\Omega_{j,i}} q\, dA
+  = -\oint_{\partial \Omega_{j,i}} \mathbf{F} \cdot \hat{\mathbf{n}}\, ds
+$$
+
+The physical meaning is clear: **the rate of change of $q$ inside a cell
+equals the net flux through its faces**.  This is exact — no approximation
+has been made yet.
+
+### Discretizing: cell averages and face fluxes
+
+Now we introduce approximations.  Define the **cell average**:
+
+$$
+\bar{q}_{j,i} = \frac{1}{|\Omega_{j,i}|} \int_{\Omega_{j,i}} q\, dA
+$$
+
+For a rectangular cell with sides $\Delta x$ and $\Delta y$, the boundary
+integral decomposes into four face contributions — east, west, north,
+south.  Approximating the flux as constant along each face:
+
+$$
+\oint_{\partial \Omega} \mathbf{F} \cdot \hat{\mathbf{n}}\, ds
+  \approx
+    \underbrace{F^x_{j,\, i+\frac{1}{2}}}_{\text{east}} \Delta y
+  - \underbrace{F^x_{j,\, i-\frac{1}{2}}}_{\text{west}} \Delta y
+  + \underbrace{F^y_{j+\frac{1}{2},\, i}}_{\text{north}} \Delta x
+  - \underbrace{F^y_{j-\frac{1}{2},\, i}}_{\text{south}} \Delta x
+$$
+
+Dividing by the cell area $\Delta x \Delta y$:
+
+$$
+\frac{d\bar{q}_{j,i}}{dt}
+  = -\frac{F^x_{j,\, i+\frac{1}{2}} - F^x_{j,\, i-\frac{1}{2}}}{\Delta x}
+    -\frac{F^y_{j+\frac{1}{2},\, i} - F^y_{j-\frac{1}{2},\, i}}{\Delta y}
+$$
+
+This is the **semi-discrete finite-volume equation**: continuous in time,
+discrete in space.  Two things are now apparent:
+
+1. **Cell averages** ($\bar{q}_{j,i}$) naturally live at cell centres.
+2. **Face fluxes** ($F^x_{j,i+½}$, $F^y_{j+½,i}$) naturally live at cell faces.
+
+This is *exactly* the Arakawa C-grid staggering — it is not an arbitrary
+choice but a direct consequence of the Gauss divergence theorem.
+
+---
+
+## 3. The Arakawa C-Grid
+
+### Why stagger the grid?
+
+The finite-volume derivation tells us that scalar quantities and fluxes
+live at geometrically different locations: centres vs. faces.  Storing
+them at the same location (a co-located or "A-grid") introduces
+computational modes and requires explicit filtering.  The **Arakawa C-grid**
+respects the natural staggering by assigning:
+
+- **Scalars** (thickness, pressure, tracers) to cell **centres** (T-points)
+- **x-fluxes** and x-velocity to east **faces** (U-points)
+- **y-fluxes** and y-velocity to north **faces** (V-points)
+- **Vorticity** and related quantities to cell **corners** (X-points)
 
 ```
    V[j,i] ──── X[j,i] ──── V[j,i+1]
@@ -48,24 +148,58 @@ On an Arakawa C-grid, the four variable locations are:
 | Point | Position | Physical role |
 |-------|----------|---------------|
 | **T** | $(j,\, i)$ — cell centre | Scalars: thickness $h$, pressure $p$, tracers |
-| **U** | $(j,\, i+\tfrac{1}{2})$ — east face | x-velocity $u$, east-face flux |
-| **V** | $(j+\tfrac{1}{2},\, i)$ — north face | y-velocity $v$, north-face flux |
+| **U** | $(j,\, i+\tfrac{1}{2})$ — east face | x-velocity $u$, east-face flux $F^x$ |
+| **V** | $(j+\tfrac{1}{2},\, i)$ — north face | y-velocity $v$, north-face flux $F^y$ |
 | **X** | $(j+\tfrac{1}{2},\, i+\tfrac{1}{2})$ — NE corner | Vorticity $\zeta$, potential vorticity $q$ |
 
-The discrete approximation to the divergence theorem for cell $(j, i)$ is:
+### The discrete divergence theorem on a C-grid
+
+With this layout, the semi-discrete equation from Section 2 maps directly
+to array operations.  The discrete divergence of the velocity field at
+T-point $(j, i)$ reads the four surrounding face values:
 
 $$
-\frac{\partial \bar{q}_{j,i}}{\partial t}
-  = -\frac{F^x_{j,\, i+\frac{1}{2}} - F^x_{j,\, i-\frac{1}{2}}}{\Delta x}
-    -\frac{F^y_{j+\frac{1}{2},\, i} - F^y_{j-\frac{1}{2},\, i}}{\Delta y}
+(\nabla \cdot \mathbf{u})_{j,i}
+  = \frac{u_{j,\, i+\frac{1}{2}} - u_{j,\, i-\frac{1}{2}}}{\Delta x}
+  + \frac{v_{j+\frac{1}{2},\, i} - v_{j-\frac{1}{2},\, i}}{\Delta y}
 $$
 
-where $F^x$ and $F^y$ are the east-face and north-face fluxes (at U- and
-V-points respectively).
+Each term is a **backward difference** of a face quantity returning to
+the cell centre — this is `diff_x_bwd(u) / dx + diff_y_bwd(v) / dy`.
+
+Similarly, the **curl** (relative vorticity) at X-point $(j+½, i+½)$
+reads the four surrounding face values:
+
+$$
+\zeta_{j+\frac{1}{2},\, i+\frac{1}{2}}
+  = \frac{v_{j+\frac{1}{2},\, i+1} - v_{j+\frac{1}{2},\, i}}{\Delta x}
+  - \frac{u_{j+1,\, i+\frac{1}{2}} - u_{j,\, i+\frac{1}{2}}}{\Delta y}
+$$
+
+Each term is a **forward difference** of a face quantity advancing to
+the corner — this is `diff_x_fwd(v) / dx - diff_y_fwd(u) / dy`.
+
+!!! note "Discrete conservation"
+    Because the east-face flux of cell $(j,i)$ is identically the west-face
+    flux of cell $(j, i+1)$, the finite-volume scheme conserves the
+    total integral of $q$ over the domain to machine precision (up to
+    boundary fluxes).  This **telescoping property** is built into the
+    C-grid layout and is preserved by the raw stencils.
+
+### Ghost cells and the `interior()` helper
+
+In `finitevolx`, every array has the same total shape `[Ny, Nx]` with a
+one-cell ghost ring on each side.  The physical interior occupies
+`[1:-1, 1:-1]`.  Raw stencils return arrays of shape `(Ny-2, Nx-2)` —
+the interior only.  The `interior(values, like)` helper pads the result
+back to full grid shape with zeros in the ghost ring.
+
+For full details on ghost-cell layout and boundary interactions, see the
+[C-Grid Discretization](cgrid_discretization.md) page.
 
 ---
 
-## The 3-Layer Architecture
+## 4. The 3-Layer Architecture
 
 `finitevolx` organises its spatial operators into three layers:
 
@@ -84,7 +218,7 @@ and curvilinear coordinate systems.
 
 ---
 
-## Difference Stencils
+## 5. Difference Stencils
 
 ### Forward differences
 
@@ -159,7 +293,7 @@ This is exactly how `Difference2D.laplacian` is implemented internally.
 
 ---
 
-## Averaging Stencils
+## 6. Averaging Stencils
 
 Interpolation between grid locations uses arithmetic averages of
 nearest neighbours.  Like the difference stencils, these return
@@ -223,7 +357,7 @@ $$
 
 ---
 
-## Complete Reference
+## 7. Complete Reference
 
 ### Difference stencils
 
@@ -261,7 +395,7 @@ $$
 
 ---
 
-## Usage: Building Custom Operators
+## 8. Usage: Building Custom Operators
 
 The raw stencils are designed as building blocks for custom operators,
 especially when working with non-Cartesian coordinate systems where the
