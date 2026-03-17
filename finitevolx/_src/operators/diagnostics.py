@@ -702,7 +702,7 @@ def coriolis_fn(
     beta : float
         Meridional Coriolis gradient (1/(m·s)).
     y0 : float, scalar Array, or None
-        Reference latitude (m).  If ``None``, uses ``mean(Y)``.
+        Reference meridional coordinate (m).  If ``None``, uses ``mean(Y)``.
 
     Returns
     -------
@@ -789,9 +789,8 @@ def potential_vorticity_multilayer(
 
     q_k = nabla^2(psi_k) / f0 + beta*(y - y0)/f0 - (A . psi)_k
 
-    Combines :func:`qg_potential_vorticity` (vmapped over layers via
-    :func:`~finitevolx.multilayer`) and :func:`stretching_term` into a
-    single call.
+    Vmaps :func:`qg_potential_vorticity` over the layer axis and
+    subtracts :func:`stretching_term` in a single call.
 
     Parameters
     ----------
@@ -810,7 +809,7 @@ def potential_vorticity_multilayer(
     y : Float[Array, "Ny Nx"]
         Meridional coordinate at T-points.
     y0 : float
-        Reference latitude.
+        Reference meridional coordinate (m).
 
     Returns
     -------
