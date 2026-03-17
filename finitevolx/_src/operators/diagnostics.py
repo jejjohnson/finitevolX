@@ -7,13 +7,14 @@ and domain-integrated conservation diagnostics.
 
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 from jaxtyping import (
     Array,
     Float,
 )
 
-from finitevolx._src.grid.constants import GRAVITY
+from finitevolx._src.grid.constants import GRAVITY, OMEGA, R_EARTH
 from finitevolx._src.operators.difference import _curl_2d
 
 # ======================================================================
@@ -627,3 +628,195 @@ def vertical_velocity(
     cumsum = jnp.cumsum(div_h, axis=0)  # [Nz, Ny, Nx]
     w = w.at[1:, :, :].set(-cumsum * dz)
     return w
+
+
+# ======================================================================
+# Coriolis / beta-plane field constructors  (Issue #153)
+# ======================================================================
+
+
+def coriolis_param(
+    lat: float | Float[Array, "..."], omega: float = OMEGA
+) -> float | Float[Array, ""]:
+    """Reference Coriolis parameter from latitude.
+
+    f0 = 2 * Omega * sin(lat0)
+
+    Parameters
+    ----------
+    lat : float or array
+        Latitude(s) in degrees.  If an array, the mean is used.
+    omega : float
+        Earth's angular velocity (rad/s).  Default ``OMEGA``.
+
+    Returns
+    -------
+    float or scalar Array
+        Reference Coriolis parameter f0 (1/s).
+    """
+    lat_rad = jnp.deg2rad(jnp.mean(jnp.asarray(lat)))
+    return 2.0 * omega * jnp.sin(lat_rad)
+
+
+def beta_param(
+    lat: float | Float[Array, "..."], omega: float = OMEGA, radius: float = R_EARTH
+) -> float | Float[Array, ""]:
+    """Meridional gradient of the Coriolis parameter from latitude.
+
+    beta = (2 * Omega / R) * cos(lat0)
+
+    Parameters
+    ----------
+    lat : float or array
+        Latitude(s) in degrees.  If an array, the mean is used.
+    omega : float
+        Earth's angular velocity (rad/s).  Default ``OMEGA``.
+    radius : float
+        Earth's radius (m).  Default ``R_EARTH``.
+
+    Returns
+    -------
+    float or scalar Array
+        Meridional Coriolis gradient beta (1/(m·s)).
+    """
+    lat_rad = jnp.deg2rad(jnp.mean(jnp.asarray(lat)))
+    return (2.0 * omega / radius) * jnp.cos(lat_rad)
+
+
+def coriolis_fn(
+    Y: Float[Array, "..."],
+    f0: float = 9.375e-5,
+    beta: float = 1.754e-11,
+    y0: float | Float[Array, ""] | None = None,
+) -> Float[Array, "..."]:
+    """Beta-plane Coriolis field.
+
+    f(y) = f0 + beta * (y - y0)
+
+    Parameters
+    ----------
+    Y : Float[Array, "..."]
+        Meridional coordinate array (m).
+    f0 : float
+        Reference Coriolis parameter (1/s).
+    beta : float
+        Meridional Coriolis gradient (1/(m·s)).
+    y0 : float, scalar Array, or None
+        Reference latitude (m).  If ``None``, uses ``mean(Y)``.
+
+    Returns
+    -------
+    Float[Array, "..."]
+        Coriolis parameter field, same shape as *Y*.
+    """
+    y0_val: float | Float[Array, ""] = jnp.mean(Y) if y0 is None else y0
+    return f0 + beta * (Y - y0_val)
+
+
+# ======================================================================
+# Streamfunction ↔ SSH conversion  (Issue #153)
+# ======================================================================
+
+
+def streamfn_to_ssh(
+    psi: Float[Array, "..."],
+    f0: float,
+    g: float = GRAVITY,
+) -> Float[Array, "..."]:
+    """Convert streamfunction to sea surface height.
+
+    eta = (f0 / g) * psi
+
+    Parameters
+    ----------
+    psi : Float[Array, "..."]
+        Streamfunction.
+    f0 : float
+        Reference Coriolis parameter (1/s).
+    g : float
+        Gravitational acceleration (m/s²).  Default ``GRAVITY``.
+
+    Returns
+    -------
+    Float[Array, "..."]
+        Sea surface height, same shape as *psi*.
+    """
+    return (f0 / g) * psi
+
+
+def ssh_to_streamfn(
+    ssh: Float[Array, "..."],
+    f0: float,
+    g: float = GRAVITY,
+) -> Float[Array, "..."]:
+    """Convert sea surface height to streamfunction.
+
+    psi = (g / f0) * eta
+
+    Parameters
+    ----------
+    ssh : Float[Array, "..."]
+        Sea surface height.
+    f0 : float
+        Reference Coriolis parameter (1/s).
+    g : float
+        Gravitational acceleration (m/s²).  Default ``GRAVITY``.
+
+    Returns
+    -------
+    Float[Array, "..."]
+        Streamfunction, same shape as *ssh*.
+    """
+    return (g / f0) * ssh
+
+
+# ======================================================================
+# Multilayer QG potential vorticity  (Issue #153)
+# ======================================================================
+
+
+def potential_vorticity_multilayer(
+    psi: Float[Array, "nl Ny Nx"],
+    A: Float[Array, "nl nl"],
+    f0: float,
+    beta: float,
+    dx: float,
+    dy: float,
+    y: Float[Array, "Ny Nx"],
+    y0: float,
+) -> Float[Array, "nl Ny Nx"]:
+    """Multi-layer QG potential vorticity.
+
+    q_k = nabla^2(psi_k) / f0 + beta*(y - y0)/f0 - (A . psi)_k
+
+    Combines :func:`qg_potential_vorticity` (vmapped over layers via
+    :func:`~finitevolx.multilayer`) and :func:`stretching_term` into a
+    single call.
+
+    Parameters
+    ----------
+    psi : Float[Array, "nl Ny Nx"]
+        Streamfunction at T-points for all layers.
+    A : Float[Array, "nl nl"]
+        Layer coupling (stretching) matrix.
+    f0 : float
+        Reference Coriolis parameter.
+    beta : float
+        Meridional gradient of the Coriolis parameter.
+    dx : float
+        Grid spacing in x.
+    dy : float
+        Grid spacing in y.
+    y : Float[Array, "Ny Nx"]
+        Meridional coordinate at T-points.
+    y0 : float
+        Reference latitude.
+
+    Returns
+    -------
+    Float[Array, "nl Ny Nx"]
+        QG potential vorticity for all layers.
+        Ghost ring is zero; interior is ``[:, 1:-1, 1:-1]``.
+    """
+    qg_pv_layer = jax.vmap(lambda p: qg_potential_vorticity(p, f0, beta, dx, dy, y, y0))
+    return qg_pv_layer(psi) - stretching_term(A, psi)
