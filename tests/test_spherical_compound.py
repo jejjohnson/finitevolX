@@ -61,6 +61,13 @@ class TestSphericalDivergence2D:
         result = div_op(u, v)
         np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
 
+    def test_zero_u_uniform_v(self, div_op, grid):
+        """Uniform v, zero u => divergence is non-zero due to spherical metric."""
+        u = jnp.zeros((grid.Ny, grid.Nx))
+        v = 1.0 * jnp.ones((grid.Ny, grid.Nx))
+        result = div_op(u, v)
+        assert not jnp.allclose(result[2:-2, 2:-2], 0.0, atol=1e-10)
+
 
 # ======================================================================
 # SphericalVorticity2D
