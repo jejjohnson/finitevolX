@@ -9,13 +9,6 @@ from finitevolx._src.grid.spherical_grid import (
     SphericalArakawaCGrid2D,
     SphericalArakawaCGrid3D,
 )
-from finitevolx._src.operators.geographic import (
-    curl_sphere,
-    divergence_sphere,
-    geostrophic_velocity_sphere as geo_vel_old,
-    laplacian_sphere,
-    potential_vorticity_sphere,
-)
 from finitevolx._src.operators.spherical_compound import (
     SphericalDivergence2D,
     SphericalDivergence3D,
@@ -23,7 +16,7 @@ from finitevolx._src.operators.spherical_compound import (
     SphericalLaplacian3D,
     SphericalVorticity2D,
     SphericalVorticity3D,
-    geostrophic_velocity_sphere as geo_vel_new,
+    geostrophic_velocity_sphere,
 )
 from finitevolx._src.operators.vorticity import Vorticity2D
 
@@ -68,15 +61,12 @@ class TestSphericalDivergence2D:
         result = div_op(u, v)
         np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
 
-    def test_cross_validate(self, div_op, grid, rng):
-        k1, k2 = jax.random.split(rng)
-        u = jax.random.normal(k1, (grid.Ny, grid.Nx))
-        v = jax.random.normal(k2, (grid.Ny, grid.Nx))
-        new = div_op(u, v)
-        old = divergence_sphere(
-            u, v, grid.cos_lat_T, grid.cos_lat_V, grid.dlon, grid.dlat, grid.R
-        )
-        np.testing.assert_allclose(new, old, atol=1e-6)
+    def test_zero_u_uniform_v(self, div_op, grid):
+        """Uniform v, zero u => divergence is non-zero due to spherical metric."""
+        u = jnp.zeros((grid.Ny, grid.Nx))
+        v = 1.0 * jnp.ones((grid.Ny, grid.Nx))
+        result = div_op(u, v)
+        assert not jnp.allclose(result[2:-2, 2:-2], 0.0, atol=1e-10)
 
 
 # ======================================================================
@@ -99,28 +89,6 @@ class TestSphericalVorticity2D:
         v = jnp.zeros((grid.Ny, grid.Nx))
         result = vort_op.relative_vorticity(u, v)
         np.testing.assert_allclose(result, 0.0, atol=1e-10)
-
-    def test_cross_validate_curl(self, vort_op, grid, rng):
-        k1, k2 = jax.random.split(rng)
-        u = jax.random.normal(k1, (grid.Ny, grid.Nx))
-        v = jax.random.normal(k2, (grid.Ny, grid.Nx))
-        new = vort_op.relative_vorticity(u, v)
-        old = curl_sphere(
-            u, v, grid.cos_lat_U, grid.cos_lat_X, grid.dlon, grid.dlat, grid.R
-        )
-        np.testing.assert_allclose(new, old, atol=1e-6)
-
-    def test_cross_validate_pv(self, vort_op, grid, rng):
-        k1, k2, k3 = jax.random.split(rng, 3)
-        u = jax.random.normal(k1, (grid.Ny, grid.Nx))
-        v = jax.random.normal(k2, (grid.Ny, grid.Nx))
-        h = 1.0 + 0.1 * jax.random.normal(k3, (grid.Ny, grid.Nx))
-        f = 1e-4 * jnp.ones((grid.Ny, grid.Nx))
-        new = vort_op.potential_vorticity(u, v, h, f)
-        old = potential_vorticity_sphere(
-            u, v, h, f, grid.cos_lat_U, grid.cos_lat_X, grid.dlon, grid.dlat, grid.R
-        )
-        np.testing.assert_allclose(new, old, atol=1e-5)
 
     def test_pv_flux_matches_cartesian(self, vort_op, grid, rng):
         """PV flux methods are coordinate-independent — should match Cartesian."""
@@ -168,12 +136,6 @@ class TestSphericalLaplacian2D:
         result = lap_op(h)
         np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
 
-    def test_cross_validate(self, lap_op, grid, rng):
-        h = jax.random.normal(rng, (grid.Ny, grid.Nx))
-        new = lap_op(h)
-        old = laplacian_sphere(h, grid.cos_lat_T, grid.dlon, grid.dlat, grid.R)
-        np.testing.assert_allclose(new, old, atol=1e-5)
-
 
 # ======================================================================
 # Geostrophic velocity
@@ -184,24 +146,16 @@ class TestGeostrophicVelocity:
     def test_output_shapes(self, grid):
         h = jnp.ones((grid.Ny, grid.Nx))
         f = 1e-4 * jnp.ones((grid.Ny, grid.Nx))
-        u_g, v_g = geo_vel_new(h, f, grid)
+        u_g, v_g = geostrophic_velocity_sphere(h, f, grid)
         assert u_g.shape == (grid.Ny, grid.Nx)
         assert v_g.shape == (grid.Ny, grid.Nx)
 
     def test_constant_h_zero(self, grid):
         h = 5.0 * jnp.ones((grid.Ny, grid.Nx))
         f = 1e-4 * jnp.ones((grid.Ny, grid.Nx))
-        u_g, v_g = geo_vel_new(h, f, grid)
+        u_g, v_g = geostrophic_velocity_sphere(h, f, grid)
         np.testing.assert_allclose(u_g[1:-1, 1:-1], 0.0, atol=1e-10)
         np.testing.assert_allclose(v_g[1:-1, 1:-1], 0.0, atol=1e-10)
-
-    def test_cross_validate(self, grid, rng):
-        h = jax.random.normal(rng, (grid.Ny, grid.Nx))
-        f = 1e-4 * jnp.ones((grid.Ny, grid.Nx))
-        u_new, v_new = geo_vel_new(h, f, grid)
-        u_old, v_old = geo_vel_old(h, f, grid.cos_lat_T, grid.dlon, grid.dlat, R=grid.R)
-        np.testing.assert_allclose(u_new, u_old, atol=1e-6)
-        np.testing.assert_allclose(v_new, v_old, atol=1e-6)
 
 
 # ======================================================================

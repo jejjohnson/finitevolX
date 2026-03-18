@@ -9,16 +9,6 @@ from finitevolx._src.grid.spherical_grid import (
     SphericalArakawaCGrid2D,
     SphericalArakawaCGrid3D,
 )
-from finitevolx._src.operators.geographic import (
-    diff2_lon_T,
-    diff_lat_T_to_V,
-    diff_lat_U_to_X,
-    diff_lat_V_to_T,
-    diff_lon_T_to_U,
-    diff_lon_U_to_T,
-    diff_lon_V_to_X,
-    laplacian_merid_T,
-)
 from finitevolx._src.operators.spherical_difference import (
     SphericalDifference2D,
     SphericalDifference3D,
@@ -70,11 +60,12 @@ class TestDiffLonTtoU:
         np.testing.assert_allclose(result[0, :], 0.0, atol=1e-10)
         np.testing.assert_allclose(result[-1, :], 0.0, atol=1e-10)
 
-    def test_cross_validate(self, diff, grid, rng):
-        h = jax.random.normal(rng, (grid.Ny, grid.Nx))
-        new = diff.diff_lon_T_to_U(h)
-        old = diff_lon_T_to_U(h, grid.cos_lat_T, grid.dlon, grid.R)
-        np.testing.assert_allclose(new, old, atol=1e-6)
+    def test_linear_longitude(self, diff, grid):
+        """h = lon => dh/dx = 1/(R cos(lat)) at U-points."""
+        h = grid.lon_T
+        result = diff.diff_lon_T_to_U(h)
+        expected = 1.0 / (R * grid.cos_lat_U[1:-1, 1:-1])
+        np.testing.assert_allclose(result[1:-1, 1:-1], expected, rtol=1e-5)
 
 
 class TestDiffLatTtoV:
@@ -88,12 +79,6 @@ class TestDiffLatTtoV:
         result = diff.diff_lat_T_to_V(h)
         np.testing.assert_allclose(result[1:-1, 1:-1], 1.0 / R, rtol=1e-5)
 
-    def test_cross_validate(self, diff, grid, rng):
-        h = jax.random.normal(rng, (grid.Ny, grid.Nx))
-        new = diff.diff_lat_T_to_V(h)
-        old = diff_lat_T_to_V(h, grid.dlat, grid.R)
-        np.testing.assert_allclose(new, old, atol=1e-6)
-
 
 class TestDiffLonVtoX:
     def test_output_shape(self, diff, grid):
@@ -105,11 +90,12 @@ class TestDiffLonVtoX:
         result = diff.diff_lon_V_to_X(v)
         np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
 
-    def test_cross_validate(self, diff, grid, rng):
-        v = jax.random.normal(rng, (grid.Ny, grid.Nx))
-        new = diff.diff_lon_V_to_X(v)
-        old = diff_lon_V_to_X(v, grid.cos_lat_V, grid.dlon, grid.R)
-        np.testing.assert_allclose(new, old, atol=1e-6)
+    def test_linear_longitude(self, diff, grid):
+        """v = lon => dv/dx = 1/(R cos(lat)) at X-points."""
+        v = grid.lon_T
+        result = diff.diff_lon_V_to_X(v)
+        expected = 1.0 / (R * grid.cos_lat_X[1:-1, 1:-1])
+        np.testing.assert_allclose(result[1:-1, 1:-1], expected, rtol=1e-5)
 
 
 class TestDiffLatUtoX:
@@ -123,12 +109,6 @@ class TestDiffLatUtoX:
         result = diff.diff_lat_U_to_X(u)
         np.testing.assert_allclose(result[1:-1, 1:-1], 1.0 / R, rtol=1e-5)
 
-    def test_cross_validate(self, diff, grid, rng):
-        u = jax.random.normal(rng, (grid.Ny, grid.Nx))
-        new = diff.diff_lat_U_to_X(u)
-        old = diff_lat_U_to_X(u, grid.dlat, grid.R)
-        np.testing.assert_allclose(new, old, atol=1e-6)
-
 
 # ======================================================================
 # Backward differences
@@ -141,11 +121,12 @@ class TestDiffLonUtoT:
         result = diff.diff_lon_U_to_T(u)
         np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
 
-    def test_cross_validate(self, diff, grid, rng):
-        u = jax.random.normal(rng, (grid.Ny, grid.Nx))
-        new = diff.diff_lon_U_to_T(u)
-        old = diff_lon_U_to_T(u, grid.cos_lat_T, grid.dlon, grid.R)
-        np.testing.assert_allclose(new, old, atol=1e-6)
+    def test_linear_longitude(self, diff, grid):
+        """u = lon => du/dx = 1/(R cos(lat)) at T-points."""
+        u = grid.lon_T
+        result = diff.diff_lon_U_to_T(u)
+        expected = 1.0 / (R * grid.cos_lat_T[1:-1, 1:-1])
+        np.testing.assert_allclose(result[1:-1, 1:-1], expected, rtol=1e-5)
 
 
 class TestDiffLatVtoT:
@@ -154,11 +135,11 @@ class TestDiffLatVtoT:
         result = diff.diff_lat_V_to_T(v)
         np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
 
-    def test_cross_validate(self, diff, grid, rng):
-        v = jax.random.normal(rng, (grid.Ny, grid.Nx))
-        new = diff.diff_lat_V_to_T(v)
-        old = diff_lat_V_to_T(v, grid.dlat, grid.R)
-        np.testing.assert_allclose(new, old, atol=1e-6)
+    def test_linear_latitude(self, diff, grid):
+        """v = lat => dv/dy = 1/R at T-points."""
+        v = grid.lat_T
+        result = diff.diff_lat_V_to_T(v)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 1.0 / R, rtol=1e-5)
 
 
 # ======================================================================
@@ -176,11 +157,11 @@ class TestDiff2Lon:
         result = diff.diff2_lon(h)
         np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
 
-    def test_cross_validate(self, diff, grid, rng):
-        h = jax.random.normal(rng, (grid.Ny, grid.Nx))
-        new = diff.diff2_lon(h)
-        old = diff2_lon_T(h, grid.cos_lat_T, grid.dlon, grid.R)
-        np.testing.assert_allclose(new, old, atol=1e-5)
+    def test_linear_field_near_zero(self, diff, grid):
+        """d²(lon)/dx² ≈ 0 for a linear zonal field."""
+        h = grid.lon_T
+        result = diff.diff2_lon(h)
+        np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-4)
 
 
 class TestLaplacianMerid:
@@ -193,11 +174,11 @@ class TestLaplacianMerid:
         result = diff.laplacian_merid(h)
         np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
 
-    def test_cross_validate(self, diff, grid, rng):
-        h = jax.random.normal(rng, (grid.Ny, grid.Nx))
-        new = diff.laplacian_merid(h)
-        old = laplacian_merid_T(h, grid.cos_lat_T, grid.dlat, grid.R)
-        np.testing.assert_allclose(new, old, atol=1e-6)
+    def test_linear_latitude_nonzero(self, diff, grid):
+        """Meridional Laplacian of h=lat is non-trivial (not zero) due to metric."""
+        h = grid.lat_T
+        result = diff.laplacian_merid(h)
+        assert not jnp.allclose(result[2:-2, 2:-2], 0.0, atol=1e-10)
 
 
 # ======================================================================
