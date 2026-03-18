@@ -245,12 +245,20 @@ class TestSphericalDifference3D:
         result = diff3d.diff_lon_T_to_U(h)
         assert result.shape == (grid3d.Nz, grid3d.Ny, grid3d.Nx)
 
+    def test_z_ghost_slices_zero(self, diff3d, grid3d):
+        key = jax.random.PRNGKey(7)
+        h = jax.random.normal(key, (grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = diff3d.diff_lon_T_to_U(h)
+        np.testing.assert_allclose(result[0, :, :], 0.0, atol=1e-10)
+        np.testing.assert_allclose(result[-1, :, :], 0.0, atol=1e-10)
+
     def test_matches_per_level(self, diff3d, grid3d):
         key = jax.random.PRNGKey(0)
         h = jax.random.normal(key, (grid3d.Nz, grid3d.Ny, grid3d.Nx))
         result_3d = diff3d.diff_lon_T_to_U(h)
         diff2d = diff3d._diff2d
-        for k in range(grid3d.Nz):
+        # Interior z-levels should match 2D; ghost slices (k=0, k=-1) are zeroed.
+        for k in range(1, grid3d.Nz - 1):
             result_2d = diff2d.diff_lon_T_to_U(h[k])
             np.testing.assert_allclose(result_3d[k], result_2d, atol=1e-10)
 

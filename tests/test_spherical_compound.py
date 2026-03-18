@@ -249,6 +249,23 @@ class TestSpherical3DCompound:
         result = lap3d(h)
         np.testing.assert_allclose(result[:, 1:-1, 1:-1], 0.0, atol=1e-10)
 
+    def test_div3d_z_ghost_slices_zero(self, grid3d):
+        div3d = SphericalDivergence3D(grid=grid3d)
+        key = jax.random.PRNGKey(7)
+        k1, k2 = jax.random.split(key)
+        u = jax.random.normal(k1, (grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        v = jax.random.normal(k2, (grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = div3d(u, v)
+        np.testing.assert_allclose(result[0, :, :], 0.0, atol=1e-10)
+        np.testing.assert_allclose(result[-1, :, :], 0.0, atol=1e-10)
+
+    def test_lap3d_z_ghost_slices_zero(self, grid3d):
+        lap3d = SphericalLaplacian3D(grid=grid3d)
+        h = jax.random.normal(jax.random.PRNGKey(7), (grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        result = lap3d(h)
+        np.testing.assert_allclose(result[0, :, :], 0.0, atol=1e-10)
+        np.testing.assert_allclose(result[-1, :, :], 0.0, atol=1e-10)
+
 
 # ======================================================================
 # JIT + grad
