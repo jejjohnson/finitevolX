@@ -91,11 +91,7 @@ class TestSphericalArakawaCGrid2D:
         assert isinstance(grid2d, ArakawaCGrid2D)
 
     def test_jit_compatible(self, grid2d):
-        @jax.jit
-        def get_dx(g):
-            return g.dx
-
-        result = get_dx(grid2d)
+        result = jax.jit(lambda g: g.dx)(grid2d)
         np.testing.assert_allclose(result, grid2d.dx, atol=0)
 
 
