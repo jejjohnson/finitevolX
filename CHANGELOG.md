@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.0.35](https://github.com/jejjohnson/finitevolX/compare/v0.0.34...v0.0.35) (2026-03-18)
+
+
+### Features
+
+* add spherical compound operators (divergence, vorticity, laplacian) ([d96505f](https://github.com/jejjohnson/finitevolX/commit/d96505f7b2d0a3d7b2984a4ec2d8168c96cdb5bc))
+* add SphericalArakawaCGrid2D and SphericalArakawaCGrid3D ([d66186c](https://github.com/jejjohnson/finitevolX/commit/d66186ceac4f65345db3e40d43cec80eda6a7ec7))
+* add SphericalDifference2D/3D and extract _safe_div_cos utility ([0cb35a6](https://github.com/jejjohnson/finitevolX/commit/0cb35a69bc66d5bd0227e7d58b2e530c176204e4))
+* export spherical operators and fix CI issues ([820f3e0](https://github.com/jejjohnson/finitevolX/commit/820f3e013923d37f5ef5c22938f95a1b880c5388))
+* introduce spherical Arakawa C-grid operators ([d277ead](https://github.com/jejjohnson/finitevolX/commit/d277ead0f163eaf84a2b1fd72d8ca4a22b2939f4))
+
+
+### Bug Fixes
+
+* zero z-ghost slices in 3D spherical operators ([bff01e9](https://github.com/jejjohnson/finitevolX/commit/bff01e96a3f37b5cadb1f979040905a62345d844))
+
 ## [0.0.34](https://github.com/jejjohnson/finitevolX/compare/v0.0.33...v0.0.34) (2026-03-17)
 
 
