@@ -13,7 +13,7 @@ Primary use cases:
 - Implicit vertical mixing (TKE closure)
 - The implicit part of IMEX time integrators
 
-The solver supports batched systems via :func:`jax.vmap`, making it
+The solver supports batched systems via :func:`eqx.filter_vmap`, making it
 efficient for solving one tridiagonal system per horizontal column.
 
 Usage example
