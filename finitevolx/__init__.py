@@ -68,21 +68,6 @@ from finitevolx._src.operators.difference import (
     Difference3D,
 )
 from finitevolx._src.operators.divergence import Divergence2D, divergence_2d
-from finitevolx._src.operators.geographic import (
-    curl_sphere,
-    diff2_lon_T,
-    diff_lat_T_to_V,
-    diff_lat_U_to_X,
-    diff_lat_V_to_T,
-    diff_lon_T_to_U,
-    diff_lon_U_to_T,
-    diff_lon_V_to_X,
-    divergence_sphere,
-    geostrophic_velocity_sphere,
-    laplacian_merid_T,
-    laplacian_sphere,
-    potential_vorticity_sphere,
-)
 from finitevolx._src.operators.interpolation import (
     Interpolation1D,
     Interpolation2D,
@@ -331,20 +316,6 @@ __all__ = [
     # Streamfunction / SSH conversion
     "streamfn_to_ssh",
     "ssh_to_streamfn",
-    # Geographic (spherical) operators
-    "curl_sphere",
-    "laplacian_merid_T",
-    "diff2_lon_T",
-    "diff_lat_T_to_V",
-    "diff_lat_U_to_X",
-    "diff_lat_V_to_T",
-    "diff_lon_T_to_U",
-    "diff_lon_U_to_T",
-    "diff_lon_V_to_X",
-    "divergence_sphere",
-    "geostrophic_velocity_sphere",
-    "laplacian_sphere",
-    "potential_vorticity_sphere",
     # Spherical compound operators
     "SphericalDivergence2D",
     "SphericalDivergence3D",
