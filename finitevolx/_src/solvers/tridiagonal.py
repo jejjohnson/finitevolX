@@ -13,7 +13,7 @@ Primary use cases:
 - Implicit vertical mixing (TKE closure)
 - The implicit part of IMEX time integrators
 
-The solver supports batched systems via :func:`jax.vmap`, making it
+The solver supports batched systems via :func:`eqx.filter_vmap`, making it
 efficient for solving one tridiagonal system per horizontal column.
 
 Usage example
@@ -32,7 +32,7 @@ Usage example
 
 from __future__ import annotations
 
-import jax
+import equinox as eqx
 from jaxtyping import Array, Float
 import lineax as lx
 
@@ -90,7 +90,7 @@ def solve_tridiagonal_batched(
 ) -> Float[Array, "*batch n"]:
     """Solve independent tridiagonal systems over leading batch dimensions.
 
-    This is a convenience wrapper that applies :func:`jax.vmap` over all
+    This is a convenience wrapper that applies :func:`eqx.filter_vmap` over all
     leading dimensions of the input arrays.  Typical use: solve one vertical
     column per (j, i) horizontal grid point.
 
@@ -128,5 +128,5 @@ def solve_tridiagonal_batched(
     n_batch = diag.ndim - 1
     fn = solve_tridiagonal
     for _ in range(n_batch):
-        fn = jax.vmap(fn)
+        fn = eqx.filter_vmap(fn)
     return fn(lower, diag, upper, rhs)

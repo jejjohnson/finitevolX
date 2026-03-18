@@ -5,7 +5,6 @@ Composes Difference2D and Interpolation2D primitives.
 """
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
@@ -235,8 +234,8 @@ class Vorticity3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             Relative vorticity at X-points.
         """
-        out = jax.vmap(lambda u_k, v_k: _curl_2d(u_k, v_k, self.grid.dx, self.grid.dy))(
-            u, v
-        )
+        out = eqx.filter_vmap(
+            lambda u_k, v_k: _curl_2d(u_k, v_k, self.grid.dx, self.grid.dy)
+        )(u, v)
         # Zero z-ghost slices to match 3D ghost-ring convention.
         return zero_z_ghosts(out)

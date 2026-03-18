@@ -7,7 +7,7 @@ and domain-integrated conservation diagnostics.
 
 from __future__ import annotations
 
-import jax
+import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import (
     Array,
@@ -812,7 +812,9 @@ def potential_vorticity_multilayer(
         QG potential vorticity for all layers.
         Ghost ring is zero; interior is ``[:, 1:-1, 1:-1]``.
     """
-    qg_pv_layer = jax.vmap(lambda p: qg_potential_vorticity(p, f0, beta, dx, dy, y, y0))
+    qg_pv_layer = eqx.filter_vmap(
+        lambda p: qg_potential_vorticity(p, f0, beta, dx, dy, y, y0)
+    )
     return qg_pv_layer(psi) - stretching_term(A, psi)
 
 
@@ -913,6 +915,6 @@ def sw_potential_vorticity_multilayer(
         Potential vorticity at X-points for all layers.
         Ghost ring is zero.
     """
-    return jax.vmap(
+    return eqx.filter_vmap(
         lambda u_k, v_k, h_k: sw_potential_vorticity(u_k, v_k, h_k, f, dx, dy)
     )(u, v, h)

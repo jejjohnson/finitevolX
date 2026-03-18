@@ -28,17 +28,17 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-import jax
+import equinox as eqx
 
 
 def multilayer(fn: Callable[..., Any]) -> Callable[..., Any]:
     """Lift a 2D horizontal operator to multilayer/multimode fields.
 
-    Wraps ``fn`` with :func:`jax.vmap` so that it is applied independently
-    to every layer (or mode) along the leading batch axis.  The result is
-    mathematically and numerically identical to calling ``fn`` on each
-    ``[Ny, Nx]`` slice in sequence, but is executed in a single vectorised
-    pass via JAX.
+    Wraps ``fn`` with :func:`eqx.filter_vmap` so that it is applied
+    independently to every layer (or mode) along the leading batch axis.
+    The result is mathematically and numerically identical to calling ``fn``
+    on each ``[Ny, Nx]`` slice in sequence, but is executed in a single
+    vectorised pass via JAX.
 
     Parameters
     ----------
@@ -87,8 +87,8 @@ def multilayer(fn: Callable[..., Any]) -> Callable[..., Any]:
     (3, 10, 10)
 
     For operators that take multiple arguments (e.g., divergence), pass the
-    bound method directly — :func:`jax.vmap` batches each positional argument
-    over the leading axis independently:
+    bound method directly — :func:`eqx.filter_vmap` batches each positional
+    argument over the leading axis independently:
 
     >>> u = jnp.ones((3, grid.Ny, grid.Nx))
     >>> v = jnp.ones((3, grid.Ny, grid.Nx))
@@ -96,4 +96,4 @@ def multilayer(fn: Callable[..., Any]) -> Callable[..., Any]:
     >>> div.shape
     (3, 10, 10)
     """
-    return jax.vmap(fn)
+    return eqx.filter_vmap(fn)

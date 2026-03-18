@@ -522,8 +522,6 @@ def pv_inversion(
     Float[Array, "... Ny Nx"]
         Streamfunction ψ, same shape as *pv*.
     """
-    import jax
-
     lam = jnp.asarray(lambda_)
 
     if lam.ndim == 0:
@@ -557,7 +555,7 @@ def pv_inversion(
                 preconditioner,
             )
 
-        out = jax.vmap(_solve_one)(flat)
+        out = eqx.filter_vmap(_solve_one)(flat)
         return out.reshape(shape)
 
     # Array lambda: leading dim must match lam.shape[0]
@@ -625,8 +623,8 @@ def pv_inversion(
     pv_4d = pv.reshape(-1, nl, ny, nx)
 
     # vmap over layer axis (pairing each layer with its lambda)
-    _solve_layers = jax.vmap(_solve_layer, in_axes=(0, 0))
+    _solve_layers = eqx.filter_vmap(_solve_layer, in_axes=(0, 0))
 
     # vmap over the (flattened) batch axis
-    out_4d = jax.vmap(lambda batch: _solve_layers(batch, lam))(pv_4d)
+    out_4d = eqx.filter_vmap(lambda batch: _solve_layers(batch, lam))(pv_4d)
     return out_4d.reshape(shape)

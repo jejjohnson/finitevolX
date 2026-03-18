@@ -20,7 +20,6 @@ Operators that divide by ``cos(lat)`` return NaN where
 from __future__ import annotations
 
 import equinox as eqx
-import jax
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.spherical_grid import (
@@ -228,7 +227,7 @@ class SphericalDifference2D(eqx.Module):
 class SphericalDifference3D(eqx.Module):
     """Spherical finite-difference operators on a 3-D Arakawa C-grid.
 
-    Applies 2-D spherical differences to each z-level via ``jax.vmap``.
+    Applies 2-D spherical differences to each z-level via ``eqx.filter_vmap``.
 
     Parameters
     ----------
@@ -245,32 +244,32 @@ class SphericalDifference3D(eqx.Module):
 
     def diff_lon_T_to_U(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Zonal derivative T → U over all z-levels."""
-        return zero_z_ghosts(jax.vmap(self._diff2d.diff_lon_T_to_U)(h))
+        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lon_T_to_U)(h))
 
     def diff_lat_T_to_V(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Meridional derivative T → V over all z-levels."""
-        return zero_z_ghosts(jax.vmap(self._diff2d.diff_lat_T_to_V)(h))
+        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lat_T_to_V)(h))
 
     def diff_lon_V_to_X(self, v: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Zonal derivative V → X over all z-levels."""
-        return zero_z_ghosts(jax.vmap(self._diff2d.diff_lon_V_to_X)(v))
+        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lon_V_to_X)(v))
 
     def diff_lat_U_to_X(self, u: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Meridional derivative U → X over all z-levels."""
-        return zero_z_ghosts(jax.vmap(self._diff2d.diff_lat_U_to_X)(u))
+        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lat_U_to_X)(u))
 
     def diff_lon_U_to_T(self, u: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Backward zonal derivative U → T over all z-levels."""
-        return zero_z_ghosts(jax.vmap(self._diff2d.diff_lon_U_to_T)(u))
+        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lon_U_to_T)(u))
 
     def diff_lat_V_to_T(self, v: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Backward meridional derivative V → T over all z-levels."""
-        return zero_z_ghosts(jax.vmap(self._diff2d.diff_lat_V_to_T)(v))
+        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lat_V_to_T)(v))
 
     def diff2_lon(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Second zonal derivative at T-points over all z-levels."""
-        return zero_z_ghosts(jax.vmap(self._diff2d.diff2_lon)(h))
+        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff2_lon)(h))
 
     def laplacian_merid(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Meridional Laplacian term at T-points over all z-levels."""
-        return zero_z_ghosts(jax.vmap(self._diff2d.laplacian_merid)(h))
+        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.laplacian_merid)(h))
