@@ -12,7 +12,6 @@ Coriolis is coordinate-independent (purely algebraic). Use
 from __future__ import annotations
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
@@ -389,7 +388,7 @@ class SphericalDivergence3D(eqx.Module):
         v: Float[Array, "Nz Ny Nx"],
     ) -> Float[Array, "Nz Ny Nx"]:
         """Horizontal divergence at T-points over all z-levels."""
-        return zero_z_ghosts(jax.vmap(self._div2d)(u, v))
+        return zero_z_ghosts(eqx.filter_vmap(self._div2d)(u, v))
 
 
 class SphericalVorticity3D(eqx.Module):
@@ -413,7 +412,7 @@ class SphericalVorticity3D(eqx.Module):
         v: Float[Array, "Nz Ny Nx"],
     ) -> Float[Array, "Nz Ny Nx"]:
         """Relative vorticity at X-points over all z-levels."""
-        return zero_z_ghosts(jax.vmap(self._vort2d.relative_vorticity)(u, v))
+        return zero_z_ghosts(eqx.filter_vmap(self._vort2d.relative_vorticity)(u, v))
 
 
 class SphericalLaplacian3D(eqx.Module):
@@ -433,4 +432,4 @@ class SphericalLaplacian3D(eqx.Module):
 
     def __call__(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Laplacian at T-points over all z-levels."""
-        return zero_z_ghosts(jax.vmap(self._lap2d)(h))
+        return zero_z_ghosts(eqx.filter_vmap(self._lap2d)(h))

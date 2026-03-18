@@ -23,7 +23,6 @@ References
 from __future__ import annotations
 
 import equinox as eqx
-import jax
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
@@ -185,7 +184,9 @@ class Coriolis3D(eqx.Module):
         """
         # Vmap the 2D Coriolis operator over z-levels.
         # f is 2D (depth-independent) and broadcast to each z-slice.
-        du_cor, dv_cor = jax.vmap(lambda u_k, v_k: self._cor2d(u_k, v_k, f))(u, v)
+        du_cor, dv_cor = eqx.filter_vmap(lambda u_k, v_k: self._cor2d(u_k, v_k, f))(
+            u, v
+        )
 
         # Zero the z-ghost slices to match the 3D ghost-ring convention.
         du_cor = zero_z_ghosts(du_cor)

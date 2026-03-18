@@ -28,6 +28,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
@@ -151,7 +152,7 @@ def make_nystrom_preconditioner(
     def _apply_col(col: Float[Array, " n"]) -> Float[Array, " n"]:
         return matvec(col.reshape(Ny, Nx)).ravel()
 
-    Y = jax.vmap(_apply_col, in_axes=1, out_axes=1)(Q)  # [n, k]
+    Y = eqx.filter_vmap(_apply_col, in_axes=1, out_axes=1)(Q)  # [n, k]
 
     # Step 3: Small matrix B = Q^T Y = Q^T A Q in R^{k x k}
     B = Q.T @ Y  # [k, k]

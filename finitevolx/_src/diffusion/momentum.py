@@ -23,7 +23,6 @@ References
 from __future__ import annotations
 
 import equinox as eqx
-import jax
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
@@ -266,7 +265,7 @@ class MomentumAdvection3D(eqx.Module):
             If ``scheme`` is not one of ``'energy'``, ``'enstrophy'``,
             or ``'al'``.
         """
-        du_adv, dv_adv = jax.vmap(
+        du_adv, dv_adv = eqx.filter_vmap(
             lambda u_k, v_k: self._madv2d(u_k, v_k, scheme=scheme)
         )(u, v)
         # Zero z-ghost slices.

@@ -53,7 +53,6 @@ If mask arrays are supplied (1 = ocean, 0 = land):
 from __future__ import annotations
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 
@@ -370,7 +369,7 @@ class Diffusion3D(eqx.Module):
                 mask_v=mv_k if mask_v is not None else None,
             )
 
-        out = jax.vmap(_apply, in_axes=(0, kappa_ax, mh_ax, mu_ax, mv_ax))(
+        out = eqx.filter_vmap(_apply, in_axes=(0, kappa_ax, mh_ax, mu_ax, mv_ax))(
             h, kappa_arr, mh, mu, mv
         )
         # Zero z-ghost slices.
@@ -418,7 +417,7 @@ class Diffusion3D(eqx.Module):
                 mask_v=mv_k if mask_v is not None else None,
             )
 
-        fx, fy = jax.vmap(_apply, in_axes=(0, kappa_ax, mu_ax, mv_ax))(
+        fx, fy = eqx.filter_vmap(_apply, in_axes=(0, kappa_ax, mu_ax, mv_ax))(
             h, kappa_arr, mu, mv
         )
         # Zero z-ghost slices.
