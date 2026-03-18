@@ -27,24 +27,7 @@ from jaxtyping import Array, Float
 
 from finitevolx._src.grid.constants import R_EARTH
 from finitevolx._src.operators._ghost import interior
-
-_COS_EPS = 1e-12  # guard against division by cos(lat) ≈ 0 near poles
-
-
-def _safe_div_cos(
-    numerator: Float[Array, "..."],
-    cos_val: Float[Array, "..."],
-    scale: float | Float[Array, "..."],
-) -> Float[Array, "..."]:
-    """Compute ``numerator / (scale * cos_val)`` with pole guard.
-
-    Returns NaN where ``|cos_val| < eps`` instead of Inf.
-    """
-    denom = scale * cos_val
-    safe_denom = jnp.where(jnp.abs(cos_val) < _COS_EPS, 1.0, denom)
-    result = numerator / safe_denom
-    return jnp.where(jnp.abs(cos_val) < _COS_EPS, jnp.nan, result)
-
+from finitevolx._src.operators._utils import _safe_div_cos
 
 # ======================================================================
 # Spherical differences  (Issue #7)

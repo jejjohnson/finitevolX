@@ -30,6 +30,10 @@ from finitevolx._src.diffusion.diffusion import (
 from finitevolx._src.diffusion.momentum import MomentumAdvection2D, MomentumAdvection3D
 from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask, StencilCapability
 from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.grid.spherical_grid import (
+    SphericalArakawaCGrid2D,
+    SphericalArakawaCGrid3D,
+)
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.coriolis import Coriolis2D, Coriolis3D
 from finitevolx._src.operators.diagnostics import (
@@ -85,6 +89,18 @@ from finitevolx._src.operators.interpolation import (
     Interpolation3D,
 )
 from finitevolx._src.operators.jacobian import arakawa_jacobian
+from finitevolx._src.operators.spherical_compound import (
+    SphericalDivergence2D,
+    SphericalDivergence3D,
+    SphericalLaplacian2D,
+    SphericalLaplacian3D,
+    SphericalVorticity2D,
+    SphericalVorticity3D,
+)
+from finitevolx._src.operators.spherical_difference import (
+    SphericalDifference2D,
+    SphericalDifference3D,
+)
 from finitevolx._src.operators.stencils import (
     avg_x_bwd,
     avg_x_bwd_1d,
@@ -211,6 +227,8 @@ __all__ = [
     "ArakawaCGrid2D",
     "ArakawaCGrid3D",
     "ArakawaCGridMask",
+    "SphericalArakawaCGrid2D",
+    "SphericalArakawaCGrid3D",
     # Boundary condition sets and 1D BCs
     "BoundaryConditionSet",
     "Dirichlet1D",
@@ -227,6 +245,9 @@ __all__ = [
     "Difference1D",
     "Difference2D",
     "Difference3D",
+    # Spherical finite difference
+    "SphericalDifference2D",
+    "SphericalDifference3D",
     # Raw stencils (Layer 1 — no metric scaling)
     # Difference stencils
     "diff_x_fwd",
@@ -324,6 +345,13 @@ __all__ = [
     "geostrophic_velocity_sphere",
     "laplacian_sphere",
     "potential_vorticity_sphere",
+    # Spherical compound operators
+    "SphericalDivergence2D",
+    "SphericalDivergence3D",
+    "SphericalLaplacian2D",
+    "SphericalLaplacian3D",
+    "SphericalVorticity2D",
+    "SphericalVorticity3D",
     # Vorticity
     "Vorticity2D",
     "Vorticity3D",
