@@ -199,9 +199,7 @@ class TestGeostrophicVelocity:
         h = jax.random.normal(rng, (grid.Ny, grid.Nx))
         f = 1e-4 * jnp.ones((grid.Ny, grid.Nx))
         u_new, v_new = geo_vel_new(h, f, grid)
-        u_old, v_old = geo_vel_old(
-            h, f, grid.cos_lat_T, grid.dlon, grid.dlat, R=grid.R
-        )
+        u_old, v_old = geo_vel_old(h, f, grid.cos_lat_T, grid.dlon, grid.dlat, R=grid.R)
         np.testing.assert_allclose(u_new, u_old, atol=1e-6)
         np.testing.assert_allclose(v_new, v_old, atol=1e-6)
 
@@ -263,7 +261,7 @@ class TestJitGradCompound:
         k1, k2 = jax.random.split(rng)
         u = jax.random.normal(k1, (grid.Ny, grid.Nx))
         v = jax.random.normal(k2, (grid.Ny, grid.Nx))
-        result = jax.jit(lambda a, b: div_op(a, b))(u, v)
+        result = jax.jit(lambda a, b: div_op(a, b))(u, v)  # noqa: PLW0108
         assert result.shape == (grid.Ny, grid.Nx)
 
     def test_grad_laplacian(self, grid, rng):

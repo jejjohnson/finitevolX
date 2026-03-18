@@ -55,9 +55,7 @@ class TestSphericalArakawaCGrid2D:
         assert grid2d.cos_lat_T.shape == (grid2d.Ny, grid2d.Nx)
 
     def test_cos_lat_T_values(self, grid2d):
-        np.testing.assert_allclose(
-            grid2d.cos_lat_T, jnp.cos(grid2d.lat_T), atol=1e-12
-        )
+        np.testing.assert_allclose(grid2d.cos_lat_T, jnp.cos(grid2d.lat_T), atol=1e-12)
 
     def test_cos_lat_U_equals_T(self, grid2d):
         np.testing.assert_allclose(grid2d.cos_lat_U, grid2d.cos_lat_T, atol=0)

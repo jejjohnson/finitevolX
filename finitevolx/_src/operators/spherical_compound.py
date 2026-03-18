@@ -24,11 +24,8 @@ from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators._utils import _safe_div_cos
 from finitevolx._src.operators.interpolation import Interpolation2D
 from finitevolx._src.operators.stencils import (
-    avg_xy_fwd,
     diff_x_bwd,
     diff_x_fwd,
-    diff_y_bwd,
-    diff_y_fwd,
 )
 
 
@@ -354,20 +351,14 @@ def geostrophic_velocity_sphere(
 
     # u_g at U-points: compact 4-point stencil
     f_on_U = 0.5 * (f[1:-1, 1:-1] + f[1:-1, 2:])
-    dh_dlat_U = (
-        h[2:, 1:-1] + h[2:, 2:] - h[:-2, 1:-1] - h[:-2, 2:]
-    ) / (4.0 * dlat)
+    dh_dlat_U = (h[2:, 1:-1] + h[2:, 2:] - h[:-2, 1:-1] - h[:-2, 2:]) / (4.0 * dlat)
     u_g = interior(-gravity / (f_on_U * R) * dh_dlat_U, h)
 
     # v_g at V-points: compact 4-point stencil
     f_on_V = 0.5 * (f[1:-1, 1:-1] + f[2:, 1:-1])
     cos_on_V = 0.5 * (grid.cos_lat_T[1:-1, 1:-1] + grid.cos_lat_T[2:, 1:-1])
-    dh_dlon_V = (
-        h[1:-1, 2:] + h[2:, 2:] - h[1:-1, :-2] - h[2:, :-2]
-    ) / (4.0 * dlon)
-    v_g = interior(
-        _safe_div_cos(gravity * dh_dlon_V, cos_on_V, f_on_V * R), h
-    )
+    dh_dlon_V = (h[1:-1, 2:] + h[2:, 2:] - h[1:-1, :-2] - h[2:, :-2]) / (4.0 * dlon)
+    v_g = interior(_safe_div_cos(gravity * dh_dlon_V, cos_on_V, f_on_V * R), h)
 
     return u_g, v_g
 
@@ -440,8 +431,6 @@ class SphericalLaplacian3D(eqx.Module):
         self.grid = grid
         self._lap2d = SphericalLaplacian2D(grid=grid.horizontal_grid())
 
-    def __call__(
-        self, h: Float[Array, "Nz Ny Nx"]
-    ) -> Float[Array, "Nz Ny Nx"]:
+    def __call__(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Laplacian at T-points over all z-levels."""
         return jax.vmap(self._lap2d)(h)

@@ -194,9 +194,7 @@ class SphericalDifference2D(eqx.Module):
         """
         cos_T = self.grid.cos_lat_T[1:-1, 1:-1]
         d2h = (diff_x_fwd(h) - diff_x_bwd(h)) / self.grid.dlon**2
-        out = interior(
-            _safe_div_cos(d2h, cos_T, self.grid.R**2 * cos_T), h
-        )
+        out = interior(_safe_div_cos(d2h, cos_T, self.grid.R**2 * cos_T), h)
         return out
 
     def laplacian_merid(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -245,50 +243,34 @@ class SphericalDifference3D(eqx.Module):
         self.grid = grid
         self._diff2d = SphericalDifference2D(grid=grid.horizontal_grid())
 
-    def diff_lon_T_to_U(
-        self, h: Float[Array, "Nz Ny Nx"]
-    ) -> Float[Array, "Nz Ny Nx"]:
+    def diff_lon_T_to_U(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Zonal derivative T → U over all z-levels."""
         return jax.vmap(self._diff2d.diff_lon_T_to_U)(h)
 
-    def diff_lat_T_to_V(
-        self, h: Float[Array, "Nz Ny Nx"]
-    ) -> Float[Array, "Nz Ny Nx"]:
+    def diff_lat_T_to_V(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Meridional derivative T → V over all z-levels."""
         return jax.vmap(self._diff2d.diff_lat_T_to_V)(h)
 
-    def diff_lon_V_to_X(
-        self, v: Float[Array, "Nz Ny Nx"]
-    ) -> Float[Array, "Nz Ny Nx"]:
+    def diff_lon_V_to_X(self, v: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Zonal derivative V → X over all z-levels."""
         return jax.vmap(self._diff2d.diff_lon_V_to_X)(v)
 
-    def diff_lat_U_to_X(
-        self, u: Float[Array, "Nz Ny Nx"]
-    ) -> Float[Array, "Nz Ny Nx"]:
+    def diff_lat_U_to_X(self, u: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Meridional derivative U → X over all z-levels."""
         return jax.vmap(self._diff2d.diff_lat_U_to_X)(u)
 
-    def diff_lon_U_to_T(
-        self, u: Float[Array, "Nz Ny Nx"]
-    ) -> Float[Array, "Nz Ny Nx"]:
+    def diff_lon_U_to_T(self, u: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Backward zonal derivative U → T over all z-levels."""
         return jax.vmap(self._diff2d.diff_lon_U_to_T)(u)
 
-    def diff_lat_V_to_T(
-        self, v: Float[Array, "Nz Ny Nx"]
-    ) -> Float[Array, "Nz Ny Nx"]:
+    def diff_lat_V_to_T(self, v: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Backward meridional derivative V → T over all z-levels."""
         return jax.vmap(self._diff2d.diff_lat_V_to_T)(v)
 
-    def diff2_lon(
-        self, h: Float[Array, "Nz Ny Nx"]
-    ) -> Float[Array, "Nz Ny Nx"]:
+    def diff2_lon(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Second zonal derivative at T-points over all z-levels."""
         return jax.vmap(self._diff2d.diff2_lon)(h)
 
-    def laplacian_merid(
-        self, h: Float[Array, "Nz Ny Nx"]
-    ) -> Float[Array, "Nz Ny Nx"]:
+    def laplacian_merid(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Meridional Laplacian term at T-points over all z-levels."""
         return jax.vmap(self._diff2d.laplacian_merid)(h)

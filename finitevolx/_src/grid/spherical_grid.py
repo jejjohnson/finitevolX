@@ -63,7 +63,7 @@ class SphericalArakawaCGrid2D(ArakawaCGrid2D):
     lon_T: Float[Array, "Ny Nx"]
 
     @classmethod
-    def from_interior(
+    def from_interior(  # type: ignore[override]  # intentionally different signature
         cls,
         nx_interior: int,
         ny_interior: int,
@@ -183,7 +183,7 @@ class SphericalArakawaCGrid3D(ArakawaCGrid3D):
     lon_T: Float[Array, "Ny Nx"]
 
     @classmethod
-    def from_interior(
+    def from_interior(  # type: ignore[override]  # intentionally different signature
         cls,
         nx_interior: int,
         ny_interior: int,

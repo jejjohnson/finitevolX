@@ -208,7 +208,7 @@ class TestLaplacianMerid:
 class TestJitGrad:
     def test_jit(self, diff, grid, rng):
         h = jax.random.normal(rng, (grid.Ny, grid.Nx))
-        result = jax.jit(lambda x: diff.diff_lon_T_to_U(x))(h)
+        result = jax.jit(lambda x: diff.diff_lon_T_to_U(x))(h)  # noqa: PLW0108
         assert result.shape == (grid.Ny, grid.Nx)
 
     def test_grad(self, diff, grid, rng):

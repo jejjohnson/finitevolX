@@ -29,7 +29,6 @@ from finitevolx._src.grid.constants import R_EARTH
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators._utils import _safe_div_cos
 
-
 # ======================================================================
 # Spherical differences  (Issue #7)
 # ======================================================================
