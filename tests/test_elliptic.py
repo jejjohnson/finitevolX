@@ -321,6 +321,20 @@ def _build_rect_mask(Ny: int, Nx: int, border: int = 1) -> np.ndarray:
     return mask
 
 
+def _inner_boundary_indices(mask: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Compute inner-boundary (j, i) indices from a boolean mask.
+
+    Inner-boundary points are True (interior) cells that are 4-connected
+    to at least one False (exterior) cell.
+    """
+    from scipy.ndimage import binary_dilation
+
+    struct = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], dtype=bool)
+    dilated = binary_dilation(~mask, structure=struct)
+    inner_boundary = mask & dilated
+    return np.where(inner_boundary)
+
+
 class TestCapacitanceSolver:
     def test_returns_capacitance_solver(self):
         mask = _build_rect_mask(8, 10)
@@ -348,7 +362,8 @@ class TestCapacitanceSolver:
         rhs = jnp.sin(jnp.pi * j / Ny) * jnp.cos(jnp.pi * i / Nx)
         psi = solver(rhs)
 
-        bc_vals = psi[solver._j_b, solver._i_b]
+        j_b, i_b = _inner_boundary_indices(mask)
+        bc_vals = psi[j_b, i_b]
         np.testing.assert_allclose(np.array(bc_vals), 0.0, atol=1e-10)
 
     def test_no_boundary_raises(self):
@@ -540,8 +555,9 @@ class TestVmapCapacitanceSolver:
         dy = 1.0 / (Ny - 1)
         solver = build_capacitance_solver(mask, dx, dy, lambda_=-1.0, base_bc="fft")
 
+        j_b, i_b = _inner_boundary_indices(mask)
         rhs = jnp.ones((4, Ny, Nx))
         psi = jax.vmap(solver)(rhs)
         for l in range(4):
-            bc_vals = psi[l][solver._j_b, solver._i_b]
+            bc_vals = psi[l][j_b, i_b]
             np.testing.assert_allclose(np.array(bc_vals), 0.0, atol=1e-10)

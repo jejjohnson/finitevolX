@@ -4,6 +4,8 @@ All transforms follow the unnormalized scipy convention (norm=None).
 See spectraldiffx documentation for details on each transform type.
 """
 
+from __future__ import annotations
+
 from spectraldiffx import (
     dct,
     dctn,

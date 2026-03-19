@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from jaxtyping import Array, Float
 from spectraldiffx import (
     dct2_eigenvalues,
     dst1_eigenvalues,
@@ -35,12 +36,12 @@ _HELMHOLTZ_DISPATCH: dict[str, Callable] = {
 
 
 def _spectral_solve(
-    rhs,
+    rhs: Float[Array, "Ny Nx"],
     dx: float,
     dy: float,
     lambda_: float,
     bc: str,
-):
+) -> Float[Array, "Ny Nx"]:
     """Dispatch to the appropriate rectangular spectral solver.
 
     Uses the Helmholtz solvers unconditionally (they handle lambda=0
