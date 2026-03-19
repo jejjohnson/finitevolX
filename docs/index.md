@@ -75,7 +75,7 @@ artifacts written by each script.
 
 ## Documentation
 
-For detailed API documentation, see the [API Reference](api/reference.md).
+For detailed API documentation, see the [API Reference](api/index.md).
 
 ## Citation
 
