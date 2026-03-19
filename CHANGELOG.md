@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.36](https://github.com/jejjohnson/finitevolX/compare/v0.0.35...v0.0.36) (2026-03-19)
+
+
+### Bug Fixes
+
+* address PR review feedback ([a7484b0](https://github.com/jejjohnson/finitevolX/commit/a7484b07178bf8e3347615ce88e0f6af67ad614b))
+* resolve docs build failure and reorganize API reference ([0a01584](https://github.com/jejjohnson/finitevolX/commit/0a015849855590c07f976ac51a4ec805cd3ffae5))
+* resolve docs build failure from spectraldiffx re-exports ([30969d4](https://github.com/jejjohnson/finitevolX/commit/30969d4f1c858ef26f51c9e0c8dc3af7f2d235f4))
+
 ## [0.0.35](https://github.com/jejjohnson/finitevolX/compare/v0.0.34...v0.0.35) (2026-03-18)
 
 
