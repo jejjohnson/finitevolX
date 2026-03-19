@@ -31,7 +31,11 @@ dependencies = [
     "scipy>=1.14.0",
     "lineax>=0.1.0",
     "diffrax>=0.6.0",
+    "spectraldiffx",
 ]
+
+[tool.uv.sources]
+spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git" }
 
 [project.urls]
 Repository = "https://github.com/jejjohnson/finitevolX"
