@@ -36,15 +36,23 @@ plugins:
             docstring_style: numpy
             show_source: true
             show_root_heading: true
+            preload_modules:
+              - spectraldiffx
   - mkdocs-jupyter:
       execute: false
       ignore_h1_titles: true
 
 nav:
   - Home: index.md
-  - C-Grid Discretization: cgrid_discretization.md
-  - Multilayer vs. 3D: multilayer_vs_3d.md
-  - Masks: masks.md
+  - C-Grid Discretization:
+      - Theory & Overview: cgrid_discretization.md
+      - API Reference: api/grids.md
+  - Masks:
+      - Theory & Overview: masks.md
+      - API Reference: api/masks.md
+  - Vertical Structure:
+      - Theory & Overview: multilayer_vs_3d.md
+      - API Reference: api/vertical_modes.md
   - Raw Stencils:
       - Theory & Overview: stencils.md
       - API Reference: api/stencils.md
@@ -76,27 +84,17 @@ nav:
   - Elliptic Solvers:
       - Theory & Overview: elliptic_solvers.md
       - Usage Guide: elliptic_solvers_usage.md
-      - API Reference: api/elliptic.md
+      - Convenience Wrappers: api/elliptic.md
+      - Spectral Solvers: api/spectral_solvers.md
+      - Spectral Transforms: api/spectral_transforms.md
+      - Capacitance Method: api/capacitance.md
+      - Iterative Solvers: api/iterative.md
   - Multigrid Solver:
       - Theory & Overview: multigrid_solver.md
       - Usage Guide: multigrid_solver_usage.md
       - API Reference: api/multigrid.md
   - Solver Comparison: solver_comparison.md
   - Examples: examples.md
-  - API Reference:
-      - Overview & Grids: api/index.md
-      - Raw Stencils: api/stencils.md
-      - Difference: api/difference.md
-      - Interpolation: api/interpolation.md
-      - Advection: api/advection.md
-      - Reconstruction: api/reconstruction.md
-      - Vorticity: api/vorticity.md
-      - Diffusion: api/diffusion.md
-      - Divergence: api/divergence.md
-      - Coriolis: api/coriolis.md
-      - Momentum Advection: api/momentum.md
-      - Boundary Conditions: api/boundary_conditions.md
-      - Diagnostics: api/diagnostics.md
   - Changelog: CHANGELOG.md
 
 markdown_extensions:
