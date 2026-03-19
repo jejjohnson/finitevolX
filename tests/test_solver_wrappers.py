@@ -44,6 +44,16 @@ def neumann_grid():
     return Ny, Nx, dx, dy
 
 
+def _inner_boundary_indices(mask: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Compute inner-boundary (j, i) indices from a boolean mask."""
+    from scipy.ndimage import binary_dilation
+
+    struct = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], dtype=bool)
+    dilated = binary_dilation(~np.asarray(mask, dtype=bool), structure=struct)
+    inner_boundary = np.asarray(mask, dtype=bool) & dilated
+    return np.where(inner_boundary)
+
+
 @pytest.fixture
 def rect_mask():
     """Rectangular mask with 1-cell land border for capacitance / CG tests."""
@@ -200,7 +210,8 @@ class TestStreamfunctionCapacitance:
             rhs, dx, dy, method="capacitance", lambda_=-1.0, capacitance_solver=solver
         )
         # BC enforcement: zero at boundary indices
-        bc_vals = psi[solver._j_b, solver._i_b]
+        j_b, i_b = _inner_boundary_indices(rect_mask)
+        bc_vals = psi[j_b, i_b]
         np.testing.assert_allclose(np.array(bc_vals), 0.0, atol=1e-10)
 
     def test_with_cgrid_mask_solver(self, cgrid_mask):
@@ -217,7 +228,8 @@ class TestStreamfunctionCapacitance:
         psi = streamfunction_from_vorticity(
             rhs, dx, dy, method="capacitance", lambda_=-1.0, capacitance_solver=solver
         )
-        bc_vals = psi[solver._j_b, solver._i_b]
+        j_b, i_b = _inner_boundary_indices(np.asarray(cgrid_mask.psi))
+        bc_vals = psi[j_b, i_b]
         np.testing.assert_allclose(np.array(bc_vals), 0.0, atol=1e-10)
 
     def test_capacitance_requires_solver(self, dirichlet_grid):
@@ -490,5 +502,6 @@ class TestCapacitanceSolverWithCGridMask:
         i = jnp.arange(Nx)[None, :]
         rhs = jnp.sin(jnp.pi * j / Ny) * jnp.cos(jnp.pi * i / Nx)
         psi = solver(rhs)
-        bc_vals = psi[solver._j_b, solver._i_b]
+        j_b, i_b = _inner_boundary_indices(np.asarray(cgrid_mask.psi))
+        bc_vals = psi[j_b, i_b]
         np.testing.assert_allclose(np.array(bc_vals), 0.0, atol=1e-10)

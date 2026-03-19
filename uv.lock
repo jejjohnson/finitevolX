@@ -488,8 +488,21 @@ wheels = [
 ]
 
 [[package]]
+name = "finitediffx"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jax" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/59/7d/24398c0b011bc473a763c830e757d270f14327e64cf8ac27313a57e84f0a/finitediffx-0.1.0.tar.gz", hash = "sha256:52d9e67e551f5cad2b555ddf0ef84ab3f61011172b30b738a07c4776e6f3afbc", size = 20007, upload-time = "2023-07-27T14:07:10.346Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0d/d3/818f9d6ca330f4aa78e618f24dac8a79c5d0825b00e9927c461a23539bb4/finitediffx-0.1.0-py3-none-any.whl", hash = "sha256:0b4a900453d8c7317f5e6668e47371cfe27020f075dd9890182561ab19e11572", size = 17714, upload-time = "2023-07-27T14:07:08.806Z" },
+]
+
+[[package]]
 name = "finitevolx"
-version = "0.0.30"
+version = "0.0.35"
 source = { editable = "." }
 dependencies = [
     { name = "beartype" },
@@ -500,6 +513,7 @@ dependencies = [
     { name = "jaxtyping" },
     { name = "lineax" },
     { name = "scipy" },
+    { name = "spectraldiffx" },
 ]
 
 [package.optional-dependencies]
@@ -573,6 +587,7 @@ requires-dist = [
     { name = "pytest-xdist", marker = "extra == 'test'", specifier = ">=3.5.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.0" },
     { name = "scipy", specifier = ">=1.14.0" },
+    { name = "spectraldiffx", git = "https://github.com/jejjohnson/spectraldiffx.git" },
     { name = "tqdm", marker = "extra == 'examples'", specifier = ">=4.66.0" },
     { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.23" },
     { name = "xarray", marker = "extra == 'examples'", specifier = ">=2025.1.0" },
@@ -886,6 +901,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/13/a5/80c02f307c8ce863cb33e27daf049315e9d96979e14eead700923b5ec9cc/jupytext-1.19.1.tar.gz", hash = "sha256:82587c07e299173c70ed5e8ec7e75183edf1be289ed518bab49ad0d4e3d5f433", size = 4307829, upload-time = "2026-01-25T21:35:13.276Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/16/5a/736dd2f4535dbf3bf26523f9158c011389ef88dd06ec2eef67fd744f1c7b/jupytext-1.19.1-py3-none-any.whl", hash = "sha256:d8975035155d034bdfde5c0c37891425314b7ea8d3a6c4b5d18c294348714cd9", size = 170478, upload-time = "2026-01-25T21:35:11.17Z" },
+]
+
+[[package]]
+name = "kernex"
+version = "0.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jax" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a0/de/8a338586754fe77efef4d45d2adeee1a8389b433a8b03fee8ba6bf3a04e6/kernex-0.2.1.tar.gz", hash = "sha256:102814a1f35879b1b6f57f2c113768266c566e2e2eed9dc96d4c25a90d5fbed7", size = 26955, upload-time = "2025-11-15T12:08:20.43Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/47/ff/108214af06b6b1259bdd66a7ccb49e370395c648cd2fbfe7872f705d9e40/kernex-0.2.1-py3-none-any.whl", hash = "sha256:5f02f70209765f4c6c01ef9ee80f5d739ee6cc0dda31a5f3a603a53c8081a53d", size = 30819, upload-time = "2025-11-15T12:08:19.187Z" },
 ]
 
 [[package]]
@@ -2074,6 +2101,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/7b/ae/2d9c981590ed9999a0d91755b47fc74f74de286b0f5cee14c9269041e6c4/soupsieve-2.8.3.tar.gz", hash = "sha256:3267f1eeea4251fb42728b6dfb746edc9acaffc4a45b27e19450b676586e8349", size = 118627, upload-time = "2026-01-20T04:27:02.457Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/46/2c/1462b1d0a634697ae9e55b3cecdcb64788e8b7d63f54d923fcd0bb140aed/soupsieve-2.8.3-py3-none-any.whl", hash = "sha256:ed64f2ba4eebeab06cc4962affce381647455978ffc1e36bb79a545b91f45a95", size = 37016, upload-time = "2026-01-20T04:27:01.012Z" },
+]
+
+[[package]]
+name = "spectraldiffx"
+version = "0.0.5"
+source = { git = "https://github.com/jejjohnson/spectraldiffx.git#7261a58d33f9efb0d5c3bfbf54bcf1dfffe27d7a" }
+dependencies = [
+    { name = "beartype" },
+    { name = "equinox" },
+    { name = "finitediffx" },
+    { name = "jax" },
+    { name = "jaxlib" },
+    { name = "jaxtyping" },
+    { name = "kernex" },
 ]
 
 [[package]]

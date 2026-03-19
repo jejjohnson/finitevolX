@@ -29,6 +29,10 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 import numpy as np
+from spectraldiffx import (
+    CapacitanceSolver,
+    build_capacitance_solver as _build_capacitance_solver_base,
+)
 
 from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
 
@@ -63,89 +67,8 @@ from finitevolx._src.solvers.spectral import (  # noqa: F401
 )
 
 # ---------------------------------------------------------------------------
-# Capacitance matrix solver (irregular / masked domains)
+# Capacitance matrix solver — thin wrapper for ArakawaCGridMask support
 # ---------------------------------------------------------------------------
-
-
-class CapacitanceSolver(eqx.Module):
-    """Spectral Poisson/Helmholtz solver for masked irregular domains.
-
-    Uses the **capacitance matrix method** (Buzbee, Golub & Nielson 1970) to
-    extend a fast rectangular spectral solver to a domain defined by a binary
-    mask.
-
-    The algorithm relies on two observations:
-
-    1. The irregular-domain solution ``ψ`` equals the rectangular spectral
-       solution ``u`` minus a correction ``Σ_k α_k g_k``, where ``g_k`` are
-       Green's functions (response to unit sources at each inner-boundary
-       point ``b_k``).
-
-    2. Requiring ``ψ(b_k) = 0`` at every inner-boundary point yields the
-       linear system ``C α = u[B]``, where ``C[k,l] = g_l(b_k)`` is the
-       **capacitance matrix**.
-
-    Construct with :func:`build_capacitance_solver` (offline, runs *N_b*
-    spectral solves where *N_b* = number of inner-boundary points).
-
-    Attributes
-    ----------
-    _C_inv : Float[Array, "Nb Nb"]
-        Pre-inverted capacitance matrix.
-    _green_flat : Float[Array, "Nb NyNx"]
-        Green's functions (one row per boundary point), stored flat.
-    _j_b : Int[Array, "Nb"]
-        Row indices of inner-boundary points.
-    _i_b : Int[Array, "Nb"]
-        Column indices of inner-boundary points.
-    dx : float
-        Grid spacing in x.
-    dy : float
-        Grid spacing in y.
-    lambda_ : float
-        Helmholtz parameter.
-    base_bc : str
-        Spectral solver used as the rectangular base (``"fft"``, ``"dst"``,
-        or ``"dct"``).
-    """
-
-    _C_inv: Float[Array, "Nb Nb"]
-    _green_flat: Float[Array, "Nb NyNx"]
-    _j_b: Array
-    _i_b: Array
-    dx: float
-    dy: float
-    lambda_: float = eqx.field(static=True)
-    base_bc: str = eqx.field(static=True)
-
-    def __call__(
-        self,
-        rhs: Float[Array, "Ny Nx"],
-    ) -> Float[Array, "Ny Nx"]:
-        """Solve (∇² − λ)ψ = rhs on the masked domain.
-
-        Parameters
-        ----------
-        rhs : Float[Array, "Ny Nx"]
-            Right-hand side, defined on the full rectangular grid.
-            Values outside the mask are ignored.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Solution ψ, satisfying ψ = 0 at all inner-boundary points
-            and (approximately) (∇² − λ)ψ = rhs at interior points.
-        """
-        Ny, Nx = rhs.shape
-        # Step 1: rectangular spectral solve
-        u = _spectral_solve(rhs, self.dx, self.dy, self.lambda_, self.base_bc)
-        # Step 2: values of u at inner-boundary points
-        u_b = u[self._j_b, self._i_b]  # [Nb]
-        # Step 3: correction coefficients  alpha = C^{-1} u_b
-        alpha = self._C_inv @ u_b  # [Nb]
-        # Step 4: correction field  sum_k alpha_k g_k
-        correction = (self._green_flat.T @ alpha).reshape(Ny, Nx)  # [Ny, Nx]
-        return u - correction
 
 
 def build_capacitance_solver(
@@ -161,28 +84,14 @@ def build_capacitance_solver(
     solves (``N_b`` = number of inner-boundary points).  The result is a
     :class:`CapacitanceSolver` whose ``__call__`` method is JIT-compilable.
 
-    Algorithm (Buzbee, Golub & Nielson 1970):
-
-    1. Find inner-boundary points ``B`` = mask points adjacent to exterior.
-    2. For each ``b_k ∈ B``, solve ``L_rect g_k = e_{b_k}`` (Green's function).
-    3. Build ``C[k, l] = g_l(b_k)``  and invert to ``C⁻¹``.
-
     Parameters
     ----------
     mask : np.ndarray of bool shape (Ny, Nx), or ArakawaCGridMask
         Physical domain mask.  ``True`` = interior (ocean/fluid),
         ``False`` = exterior (land/walls).
 
-        When a plain array is passed, inner-boundary points are computed
-        as wet (``True``) cells that are 4-connected to at least one dry
-        (``False``) cell.
-
         When an :class:`ArakawaCGridMask` is passed, the ``psi``
-        staggering mask is used and the precomputed
-        ``psi_irrbound_xids`` / ``psi_irrbound_yids`` supply the
-        inner-boundary indices directly.  These are **wet** points on
-        the psi grid that border at least one dry cell — the same
-        convention as the plain-array path.
+        staggering mask is extracted automatically.
     dx : float
         Grid spacing in x.
     dy : float
@@ -190,85 +99,16 @@ def build_capacitance_solver(
     lambda_ : float
         Helmholtz parameter λ.  Use ``0.0`` for pure Poisson.
     base_bc : {"fft", "dst", "dct"}
-        Rectangular spectral solver used as the base.  ``"fft"`` (periodic)
-        is a good default; ``"dst"`` (Dirichlet) handles rectangle-boundary
-        conditions directly.
+        Rectangular spectral solver used as the base.
 
     Returns
     -------
     CapacitanceSolver
         A callable equinox Module with all precomputed arrays baked in.
-
-    Notes
-    -----
-    Memory cost: ``O(N_b × Ny × Nx)`` for the Green's function matrix.
-    Time cost (offline): ``O(N_b × Ny × Nx × log(Ny × Nx))``.
-    Time cost (online): ``O(N_b² + Ny × Nx × log(Ny × Nx))``.
-
-    Raises
-    ------
-    ValueError
-        If the mask has no inner-boundary points (e.g. all-ones mask).
     """
-    # Extract mask array and boundary indices from ArakawaCGridMask
     if isinstance(mask, ArakawaCGridMask):
-        mask_bool = np.asarray(mask.psi, dtype=bool)
-        # psi_irrbound_yids stores row (j) indices,
-        # psi_irrbound_xids stores column (i) indices.
-        j_b = np.asarray(mask.psi_irrbound_yids, dtype=np.intp)
-        i_b = np.asarray(mask.psi_irrbound_xids, dtype=np.intp)
-        Ny, Nx = mask_bool.shape
-        N_b = len(j_b)
-    else:
-        from scipy.ndimage import binary_dilation  # local import (offline only)
-
-        mask_bool = np.asarray(mask, dtype=bool)
-        Ny, Nx = mask_bool.shape
-
-        # Inner-boundary: mask-interior cells adjacent to at least one exterior cell
-        exterior = ~mask_bool
-        struct = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], dtype=bool)
-        dilated = binary_dilation(exterior, structure=struct)
-        inner_boundary = mask_bool & dilated  # [Ny, Nx] bool
-
-        j_b, i_b = np.where(inner_boundary)  # row/col indices of boundary points
-        N_b = len(j_b)
-    if N_b == 0:
-        raise ValueError(
-            "No inner-boundary points found.  Check that the mask has a "
-            "non-trivial interior/exterior structure."
-        )
-
-    # Helper: one rectangular spectral solve (numpy interface)
-    def _base_solve_np(f_2d: np.ndarray) -> np.ndarray:
-        f_jax = jnp.array(f_2d, dtype=float)
-        result = _spectral_solve(f_jax, dx, dy, lambda_, base_bc)
-        return np.array(result)
-
-    # Green's functions: G[k] = solution to L_rect g_k = e_{b_k}
-    # Shape: [N_b, Ny, Nx]
-    green = np.zeros((N_b, Ny, Nx), dtype=float)
-    for k in range(N_b):
-        e_k = np.zeros((Ny, Nx), dtype=float)
-        e_k[j_b[k], i_b[k]] = 1.0
-        green[k] = _base_solve_np(e_k)
-
-    # Capacitance matrix C[k, l] = green[l] evaluated at boundary point b_k
-    # green[:, j_b, i_b] has shape [N_b, N_b] with element [l, k] = green[l, b_k]
-    # We need C[k, l], so transpose.
-    C = green[:, j_b, i_b].T  # [N_b, N_b]
-    C_inv = np.linalg.inv(C)
-
-    return CapacitanceSolver(
-        _C_inv=jnp.array(C_inv),
-        _green_flat=jnp.array(green.reshape(N_b, Ny * Nx)),
-        _j_b=jnp.array(j_b),
-        _i_b=jnp.array(i_b),
-        dx=float(dx),
-        dy=float(dy),
-        lambda_=float(lambda_),
-        base_bc=base_bc,
-    )
+        mask = np.asarray(mask.psi, dtype=bool)
+    return _build_capacitance_solver_base(mask, dx, dy, lambda_, base_bc)
 
 
 # ---------------------------------------------------------------------------
