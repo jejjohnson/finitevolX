@@ -1,57 +1,122 @@
-# Finite Volume Tools in JAX (In Progress)
-[![CI Tests](https://github.com/jejjohnson/finitevolX/actions/workflows/ci.yml/badge.svg)](https://github.com/jejjohnson/finitevolX/actions/workflows/ci.yml)
-[![Lint & Format](https://github.com/jejjohnson/finitevolX/actions/workflows/lint.yml/badge.svg)](https://github.com/jejjohnson/finitevolX/actions/workflows/lint.yml)
-[![Type Check](https://github.com/jejjohnson/finitevolX/actions/workflows/typecheck.yml/badge.svg)](https://github.com/jejjohnson/finitevolX/actions/workflows/typecheck.yml)
-[![CodeFactor](https://www.codefactor.io/repository/github/jejjohnson/finitevolx/badge)](https://www.codefactor.io/repository/github/jejjohnson/finitevolx)
-[![codecov](https://codecov.io/gh/jejjohnson/finitevolX/branch/main/graph/badge.svg?token=YGPQQEAK91)](https://codecov.io/gh/jejjohnson/finitevolX)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<p align="center">
+  <h1 align="center">finitevolX</h1>
+  <p align="center">
+    <em>Finite-volume operators for JAX on Arakawa C-grids</em>
+  </p>
+</p>
 
-> This package provides finite-volume building blocks for staggered Arakawa grids in JAX.
-> The current API is class-based and focuses on differences, interpolations, reconstructions,
-> vorticity operators, elliptic solvers, and boundary-condition helpers.
+<p align="center">
+  <a href="https://github.com/jejjohnson/finitevolX/actions/workflows/ci.yml"><img src="https://github.com/jejjohnson/finitevolX/actions/workflows/ci.yml/badge.svg" alt="CI Tests"></a>
+  <a href="https://github.com/jejjohnson/finitevolX/actions/workflows/lint.yml"><img src="https://github.com/jejjohnson/finitevolX/actions/workflows/lint.yml/badge.svg" alt="Lint & Format"></a>
+  <a href="https://github.com/jejjohnson/finitevolX/actions/workflows/typecheck.yml"><img src="https://github.com/jejjohnson/finitevolX/actions/workflows/typecheck.yml/badge.svg" alt="Type Check"></a>
+  <a href="https://www.codefactor.io/repository/github/jejjohnson/finitevolx"><img src="https://www.codefactor.io/repository/github/jejjohnson/finitevolx/badge" alt="CodeFactor"></a>
+  <a href="https://codecov.io/gh/jejjohnson/finitevolX"><img src="https://codecov.io/gh/jejjohnson/finitevolX/branch/main/graph/badge.svg?token=YGPQQEAK91" alt="codecov"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.12%2B-blue.svg" alt="Python 3.12+"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+</p>
 
----
-## Key Features
-
-**Grid & Masks**.
-Arakawa C-grid classes (`ArakawaCGrid1D/2D/3D`) with stencil-aware mask utilities for land/ocean boundaries.
-
-**Operators**.
-Finite-difference, interpolation, divergence, vorticity, Coriolis, and Jacobian operators on staggered grids. Diagnostic quantities like kinetic energy and Bernoulli potential.
-
-**Advection & Reconstruction**.
-Advection operators with pluggable reconstruction methods including upwind, TVD (minmod, van Leer, superbee, MC), and WENO (3rd, 5th, 7th, 9th order) schemes. Mask-aware stencil dispatch for irregular domains.
-
-**Diffusion**.
-Harmonic and biharmonic diffusion operators, plus energy/enstrophy-conserving momentum advection in vector-invariant form.
-
-**Boundary Conditions**.
-Composable per-face boundary conditions (Dirichlet, Neumann, periodic, sponge, slip, Robin, etc.) with ghost-cell enforcement.
-
-**Time Integration**.
-Pure functional time steppers (Euler, Heun/RK2, SSP-RK3, RK4, AB2/AB3, Leapfrog+RAF, IMEX-SSP2, split-explicit) and [diffrax](https://docs.kidger.site/diffrax/)-based Butcher tableau solvers for adaptive stepping, checkpointing, and `SaveAt`. Semi-Lagrangian advection for large-CFL transport.
-
-**Elliptic Solvers**.
-Spectral Poisson/Helmholtz solvers (DST, DCT, FFT), capacitance matrix method for masked domains, and preconditioned conjugate gradient.
-
-**Vertical Modes**.
-Vertical mode decomposition and multilayer vmap helper for 3D simulations.
+<p align="center">
+  <a href="https://jejjohnson.github.io/finitevolX/"><strong>Documentation</strong></a> &bull;
+  <a href="#installation"><strong>Installation</strong></a> &bull;
+  <a href="#quick-start"><strong>Quick Start</strong></a> &bull;
+  <a href="#examples"><strong>Examples</strong></a>
+</p>
 
 ---
-## 🛠️ Installation<a id="installation"></a>
 
-### `pip`
+**finitevolX** provides staggered finite-volume building blocks for ocean and atmosphere modelling in [JAX](https://github.com/jax-ml/jax).  Every operator is a pure function or stateless [equinox](https://docs.kidger.site/equinox/) Module — fully compatible with `jax.jit`, `jax.vmap`, and `jax.grad`.
 
-Install the package directly from GitHub:
+```python
+import finitevolx as fvx
+
+# Build an Arakawa C-grid (64x64 interior + 2-cell ghost ring)
+grid = fvx.ArakawaCGrid2D.from_interior(64, 64, Lx=5.12e6, Ly=5.12e6)
+
+# Operators are stateless modules
+diff  = fvx.Difference2D(grid)
+div   = fvx.Divergence2D(grid)
+vort  = fvx.Vorticity2D(grid)
+
+# Compute divergence at T-points from staggered velocities
+div_uv = div(u, v)
+
+# Solve the Helmholtz equation (∇² − λ)ψ = q  for streamfunction
+psi = fvx.solve_helmholtz_dst(q, grid.dx, grid.dy, lambda_=1/Ld**2)
+
+# Time-step with Heun's method (RK2)
+state_next = fvx.heun_step(tendency_fn, state, dt)
+```
+
+---
+
+## Features
+
+### Grids & Masks
+
+| Component | Description |
+|-----------|-------------|
+| `ArakawaCGrid1D/2D/3D` | Staggered C-grid containers with T, U, V, X point locations |
+| `ArakawaCGridMask` | Land/ocean masks with automatic staggered derivation (h, u, v, psi) |
+| Boundary classification | 4-level land/coast/near-coast/ocean + vorticity boundary categories |
+| Stencil capability | Adaptive WENO stencil dispatch at irregular coastlines |
+| `SphericalArakawaCGrid2D/3D` | Spherical coordinate grids |
+
+### Operators
+
+| Operator | Class | Description |
+|----------|-------|-------------|
+| Difference | `Difference1D/2D/3D` | Forward/backward differences, Laplacian, curl, gradient |
+| Interpolation | `Interpolation1D/2D/3D` | Staggered averaging (T↔U, T↔V, X↔T, etc.) |
+| Divergence | `Divergence2D/3D` | Backward-difference divergence at T-points |
+| Vorticity | `Vorticity2D/3D` | Relative vorticity, potential vorticity, PV flux |
+| Coriolis | `Coriolis2D/3D` | Beta-plane Coriolis tendencies |
+| Diffusion | `Diffusion2D/3D` | Harmonic and biharmonic diffusion |
+| Advection | `Advection1D/2D/3D` | Flux-form with upwind, TVD (minmod/van Leer/superbee/MC), WENO3/5/7/9 |
+| Jacobian | `arakawa_jacobian` | Energy-conserving Arakawa Jacobian |
+| Diagnostics | `kinetic_energy`, `enstrophy`, `okubo_weiss`, ... | Scalar diagnostics |
+| Spherical | `SphericalDivergence2D`, `SphericalLaplacian2D`, ... | Operators on the sphere |
+
+### Boundary Conditions
+
+Per-face composable BCs with ghost-cell enforcement:
+
+`Periodic` &bull; `Dirichlet` &bull; `Neumann` &bull; `Robin` &bull; `Slip` &bull; `Sponge` &bull; `Reflective` &bull; `Extrapolation` &bull; `Outflow`
+
+### Elliptic Solvers
+
+| Solver | Use case | Accuracy |
+|--------|----------|----------|
+| **Spectral** (DST/DCT/FFT) | Rectangular, constant coefficient | Machine precision |
+| **Capacitance matrix** | Masked domains, simple coastlines | Machine precision |
+| **Preconditioned CG** | Arbitrary masks, tight tolerance | Controllable |
+| **Multigrid** | Variable coefficients, any mask | O(N) per V-cycle |
+| **MG + CG** | Variable coefficients, tight tolerance | Controllable |
+
+Convenience wrappers: `streamfunction_from_vorticity`, `pressure_from_divergence`, `pv_inversion`
+
+### Time Integration
+
+**Functional steppers** (pure functions, no hidden state):
+
+`euler_step` &bull; `heun_step` &bull; `rk4_step` &bull; `rk3_ssp_step` &bull; `ab2_step` &bull; `ab3_step` &bull; `leapfrog_raf_step` &bull; `imex_ssp2_step` &bull; `split_explicit_step` &bull; `semi_lagrangian_step`
+
+**[diffrax](https://docs.kidger.site/diffrax/) integration**: `ForwardEulerDfx`, `RK2Heun`, `RK3SSP`, `RK4Classic`, `SSP_RK104`, `IMEX_SSP2`, and more — with adaptive stepping, checkpointing, and `SaveAt`.
+
+### Vertical Structure
+
+`multilayer` vmap helper &bull; `decompose_vertical_modes` &bull; `layer_to_mode` / `mode_to_layer` transforms &bull; `build_coupling_matrix`
+
+---
+
+## Installation
+
+### pip
 
 ```bash
 pip install git+https://github.com/jejjohnson/finitevolX
 ```
 
-### `uv` (recommended)
-
-Install the development, test, documentation, and example dependencies:
+### uv (recommended)
 
 ```bash
 git clone https://github.com/jejjohnson/finitevolX.git
@@ -60,83 +125,119 @@ uv sync --all-extras
 ```
 
 ---
-## ⏩ Examples<a id="examples"></a>
 
-The repository ships three double-gyre examples that use the `finitevolx` API
-for spatial operators and `finitevolx.heun_step` for time integration.  Each
-script uses `xarray` for preprocessing and postprocessing, writes sampled model
-fields to Zarr, and saves an **animated GIF** showing the field evolution over
-time.  Each script accepts an optional `--spinup-steps` argument to run a silent
-spin-up phase before recording frames, which helps produce a recognisable
-double-gyre structure in the animation.
+## Quick Start
 
-### Linear shallow-water model
+Build a grid, compute vorticity, and invert for the streamfunction:
 
-Script: [`scripts/swm_linear.py`](./scripts/swm_linear.py)
+```python
+import jax
+import jax.numpy as jnp
+import finitevolx as fvx
 
-```bash
-uv run python scripts/swm_linear.py
+jax.config.update("jax_enable_x64", True)
+
+# 1. Grid
+grid = fvx.ArakawaCGrid2D.from_interior(64, 64, Lx=1e6, Ly=1e6)
+
+# 2. Operators
+diff = fvx.Difference2D(grid)
+vort = fvx.Vorticity2D(grid)
+
+# 3. Velocity field (full grid with ghost ring)
+Ny, Nx = grid.Ny, grid.Nx
+j, i = jnp.mgrid[:Ny, :Nx]
+u = -jnp.sin(jnp.pi * j / Ny) * jnp.cos(jnp.pi * i / Nx)
+v =  jnp.cos(jnp.pi * j / Ny) * jnp.sin(jnp.pi * i / Nx)
+
+# 4. Relative vorticity at X-points (corners)
+zeta = vort.relative_vorticity(u, v)
+
+# 5. Invert for streamfunction: ∇²ψ = ζ
+psi = fvx.streamfunction_from_vorticity(
+    zeta[1:-1, 1:-1], grid.dx, grid.dy
+)
 ```
 
-Artifacts written by default:
-
-- `outputs/linear_shallow_water_double_gyre.zarr`
-- `outputs/linear_shallow_water_double_gyre.gif`
-
-![Linear shallow-water double gyre](docs/images/linear_shallow_water_double_gyre.gif)
-
-### Nonlinear shallow-water model
-
-Script: [`scripts/shallow_water.py`](./scripts/shallow_water.py)
-
-```bash
-uv run python scripts/shallow_water.py
-```
-
-Artifacts written by default:
-
-- `outputs/shallow_water_double_gyre.zarr`
-- `outputs/shallow_water_double_gyre.gif`
-
-![Nonlinear shallow-water double gyre](docs/images/shallow_water_double_gyre.gif)
-
-### 1.5-layer quasi-geostrophic model
-
-Script: [`scripts/qg_1p5_layer.py`](./scripts/qg_1p5_layer.py)
-
-```bash
-uv run python scripts/qg_1p5_layer.py
-```
-
-Artifacts written by default:
-
-- `outputs/qg_1p5_layer_double_gyre.zarr`
-- `outputs/qg_1p5_layer_double_gyre.gif`
-
-![1.5-layer QG double gyre](docs/images/qg_1p5_layer_double_gyre.gif)
-
-The QG example uses basin-scale default parameters that are closer to the
-MQGeometry double-gyre benchmark and saves a **relative-vorticity** animation
-instead of a streamfunction plot, which produces a more recognizable eddy field.
-Run with `--spinup-steps 8000` to start recording after the double-gyre
-circulation is well established (~370 days into the simulation).
-
-For a different artifact location during development, pass `--output-dir` to any
-of the scripts.
+See the [documentation](https://jejjohnson.github.io/finitevolX/) for the full API reference.
 
 ---
+
+## Examples
+
+The `notebooks/` directory contains pedagogical Jupytext notebooks that build models step by step with equations, ASCII diagrams, and inline figures. The `scripts/` directory has production simulation scripts that generate Zarr output and animated GIFs.
+
+### Tutorials
+
+| Notebook | Description | Key APIs |
+|----------|-------------|----------|
+| [Masks](notebooks/demo_masks.py) | C-grid mask construction, staggered derivation, boundary classification | `ArakawaCGridMask` |
+| [Elliptic Solvers](notebooks/demo_solvers.py) | Spectral, capacitance, CG, multigrid on 4 geometries + inhomogeneous BCs | `solve_helmholtz_dst`, `build_capacitance_solver`, `solve_cg`, `build_multigrid_solver` |
+| [Pressure Poisson](notebooks/pressure_poisson.py) | Divergence-free projection on the C-grid, DST-I vs DST-II | `Divergence2D`, `Difference2D`, `solve_poisson_dst` |
+| [Streamfunction Inversion](notebooks/streamfunction_inversion.py) | X-point vs T-point placement, velocity recovery, convergence | `streamfunction_from_vorticity`, `solve_poisson_dst2` |
+| [Helmholtz Screening](notebooks/helmholtz_screening.py) | QG PV inversion with screening, JIT/vmap/grad | `StaggeredDirichletHelmholtzSolver2D`, `pv_inversion` |
+
+### Time-Dependent Models
+
+| Notebook | Model | Key APIs |
+|----------|-------|----------|
+| [Linear Shallow Water](notebooks/swm_linear.py) | Wind-driven double gyre on beta-plane | `Difference2D`, `Interpolation2D`, `Vorticity2D`, `heun_step` |
+| [Nonlinear Shallow Water](notebooks/shallow_water.py) | Full depth continuity + momentum advection | `Advection2D`, `Difference2D`, `heun_step` |
+| [1.5-Layer QG](notebooks/qg_1p5_layer.py) | PV advection + Helmholtz inversion | `Advection2D`, `solve_helmholtz_dst`, `heun_step` |
+
+### Double-Gyre Simulations (production scripts)
+
+Run the full-resolution simulations with spin-up and Zarr/GIF output:
+
+```bash
+uv run python scripts/swm_linear.py        # Linear shallow-water
+uv run python scripts/shallow_water.py      # Nonlinear shallow-water
+uv run python scripts/qg_1p5_layer.py       # 1.5-layer QG
+```
+
+| Linear SWM | Nonlinear SWM | 1.5-Layer QG |
+|:---:|:---:|:---:|
+| ![Linear](docs/images/swm_linear/linear_shallow_water_double_gyre.gif) | ![Nonlinear](docs/images/shallow_water/shallow_water_double_gyre.gif) | ![QG](docs/images/qg_1p5_layer/qg_1p5_layer_double_gyre.gif) |
+
+---
+
+## Documentation
+
+Full documentation with theory, usage guides, and API reference:
+
+**[jejjohnson.github.io/finitevolX](https://jejjohnson.github.io/finitevolX/)**
+
+| Section | Content |
+|---------|---------|
+| [C-Grid Discretization](https://jejjohnson.github.io/finitevolX/cgrid_discretization/) | Theory of Arakawa C-grid staggering |
+| [Operators](https://jejjohnson.github.io/finitevolX/spatial_operators/) | Divergence, vorticity, Coriolis, diffusion |
+| [Advection](https://jejjohnson.github.io/finitevolX/advection/) | TVD and WENO reconstruction theory |
+| [Boundary Conditions](https://jejjohnson.github.io/finitevolX/boundary_conditions/) | Per-face BC composition |
+| [Elliptic Solvers](https://jejjohnson.github.io/finitevolX/elliptic_solvers/) | Spectral, capacitance, CG, multigrid theory |
+| [Time Integration](https://jejjohnson.github.io/finitevolX/time_integration/) | Explicit, IMEX, and diffrax-based steppers |
+| [Solver Comparison](https://jejjohnson.github.io/finitevolX/solver_comparison/) | Visual benchmark across geometries |
+| [API Reference](https://jejjohnson.github.io/finitevolX/api/grids/) | Auto-generated from docstrings |
+
+---
+
 ## References
 
 **Software**
 
-* [PyFVTool](https://github.com/simulkade/PyFVTool) - Finite Volume Tool in Python
-* [jaxinterp2d](https://github.com/adam-coogan/jaxinterp2d) - CartesianGrid interpolator for JAX
-* [ndimsplinejax](https://github.com/nmoteki/ndimsplinejax) - SplineGrid interpolator for JAX
-* [diffrax](https://docs.kidger.site/diffrax/) - JAX-native ODE/SDE solvers (used by finitevolX's time integration module)
+- [spectraldiffx](https://github.com/jejjohnson/spectraldiffx) &mdash; Pseudospectral solvers in JAX (the spectral backend for finitevolX's elliptic solvers)
+- [diffrax](https://docs.kidger.site/diffrax/) &mdash; JAX-native ODE/SDE solvers (time integration backend)
+- [equinox](https://docs.kidger.site/equinox/) &mdash; JAX neural network library (Module system used by all operators)
+- [PyFVTool](https://github.com/simulkade/PyFVTool) &mdash; Finite Volume Tool in Python
 
 **Algorithms**
 
-* [Thiry et al, 2023](https://egusphere.copernicus.org/preprints/2023/egusphere-2023-1715/) | [MQGeometry 1.0](https://github.com/louity/MQGeometry) - the WENO reconstructions applied to the multilayer Quasi-Geostrophic equations, Arakawa Grid masks
-* [Roullet & Gaillard, 2021](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2021MS002663) | [pyRSW](https://github.com/pvthinker/pyRSW#pyrsw) - the WENO reconstructions applied to the shallow water equations
-* [Gottlieb, Shu & Tadmor, 2001](https://doi.org/10.1137/S003614450036757X) - Strong Stability-Preserving High-Order Time Discretization Methods (SSP-RK schemes)
-* [Ketcheson, 2008](https://doi.org/10.1137/07070485X) - Highly efficient SSP methods: SSP-RK(10,4) with 10 stages and effective CFL coefficient of 6
+- [Thiry et al, 2023](https://egusphere.copernicus.org/preprints/2023/egusphere-2023-1715/) | [MQGeometry](https://github.com/louity/MQGeometry) &mdash; WENO reconstructions for multilayer QG, Arakawa grid masks
+- [Roullet & Gaillard, 2021](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2021MS002663) | [pyRSW](https://github.com/pvthinker/pyRSW) &mdash; WENO reconstructions for shallow-water equations
+- [Gottlieb, Shu & Tadmor, 2001](https://doi.org/10.1137/S003614450036757X) &mdash; Strong Stability-Preserving High-Order Time Discretization Methods
+- [Ketcheson, 2008](https://doi.org/10.1137/07070485X) &mdash; Highly efficient SSP methods: SSP-RK(10,4)
+
+---
+
+## License
+
+MIT &copy; [J. Emmanuel Johnson](https://github.com/jejjohnson)

@@ -37,7 +37,7 @@ Script: `scripts/swm_linear.py`
 - `xarray` coordinates for the initial height anomaly, Coriolis field, and wind forcing
 - Zarr output fields: `eta`, `u`, `v`, `speed`, `relative_vorticity`, `kinetic_energy`, `mass_anomaly`
 
-![Linear shallow-water double gyre](images/linear_shallow_water_double_gyre.gif)
+![Linear shallow-water double gyre](images/swm_linear/linear_shallow_water_double_gyre.gif)
 
 ## Nonlinear shallow-water model
 
@@ -48,7 +48,7 @@ Script: `scripts/shallow_water.py`
 - Compact Bernoulli and advective closure in the momentum equation
 - Zarr output fields: `eta`, `u`, `v`, `speed`, `relative_vorticity`, `kinetic_energy`, `minimum_depth`
 
-![Nonlinear shallow-water double gyre](images/shallow_water_double_gyre.gif)
+![Nonlinear shallow-water double gyre](images/shallow_water/shallow_water_double_gyre.gif)
 
 ## 1.5-layer QG model
 
@@ -61,7 +61,7 @@ Script: `scripts/qg_1p5_layer.py`
 - Saved figure shows **relative vorticity** rather than streamfunction so the eddy field matches the expected diagnostic
 - Zarr output fields: `q`, `psi`, `u`, `v`, `speed`, `relative_vorticity`, `pv_enstrophy`
 
-![1.5-layer QG double gyre](images/qg_1p5_layer_double_gyre.gif)
+![1.5-layer QG double gyre](images/qg_1p5_layer/qg_1p5_layer_double_gyre.gif)
 
 ## Stability checks
 

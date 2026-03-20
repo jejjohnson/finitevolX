@@ -64,19 +64,19 @@ domain topologies:
 
 ### Rectangular basin
 
-![Rectangular basin](images/demo_masks_staggered_basin.png)
+![Rectangular basin](images/demo_masks/staggered_basin.png)
 
 ### Basin with island
 
-![Basin with island](images/demo_masks_staggered_island.png)
+![Basin with island](images/demo_masks/staggered_island.png)
 
 ### Zonal channel
 
-![Zonal channel](images/demo_masks_staggered_channel.png)
+![Zonal channel](images/demo_masks/staggered_channel.png)
 
 ### Irregular coastline
 
-![Irregular coastline](images/demo_masks_staggered_irregular.png)
+![Irregular coastline](images/demo_masks/staggered_irregular.png)
 
 ## Land / coast classification
 
@@ -85,19 +85,19 @@ The mask includes a 4-level classification (0 = land, 1 = coast,
 
 ### Rectangular basin
 
-![Classification: basin](images/demo_masks_classification_basin.png)
+![Classification: basin](images/demo_masks/classification_basin.png)
 
 ### Basin with island
 
-![Classification: island](images/demo_masks_classification_island.png)
+![Classification: island](images/demo_masks/classification_island.png)
 
 ### Zonal channel
 
-![Classification: channel](images/demo_masks_classification_channel.png)
+![Classification: channel](images/demo_masks/classification_channel.png)
 
 ### Irregular coastline
 
-![Classification: irregular](images/demo_masks_classification_irregular.png)
+![Classification: irregular](images/demo_masks/classification_irregular.png)
 
 ## Vorticity boundary classification
 
