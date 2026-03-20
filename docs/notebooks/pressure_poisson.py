@@ -132,6 +132,9 @@ fig.savefig(IMG_DIR / "grid_points.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
+# ![C-grid point locations](../images/pressure_poisson/grid_points.png)
+
+# %% [markdown]
 # ## 2. Divergence-Free Projection
 #
 # The pressure-projection method (Chorin splitting) removes divergence from
@@ -249,6 +252,9 @@ fig.savefig(IMG_DIR / "projection.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
+# ![Pressure Poisson: divergence, pressure, and projection](../images/pressure_poisson/projection.png)
+
+# %% [markdown]
 # The projection removes divergence to **machine precision** because the
 # spectral DST-I solver exactly inverts the same discrete Laplacian stencil
 # that the C-grid divergence and gradient operators compose to.
@@ -320,6 +326,9 @@ fig.suptitle("Regular vs staggered Dirichlet solver comparison", fontsize=14, y=
 fig.tight_layout()
 fig.savefig(IMG_DIR / "dst1_vs_dst2.png", dpi=150, bbox_inches="tight")
 plt.show()
+
+# %% [markdown]
+# ![DST-I vs DST-II comparison](../images/pressure_poisson/dst1_vs_dst2.png)
 
 # %% [markdown]
 # The DST-I solver produces a solution whose discrete Laplacian matches

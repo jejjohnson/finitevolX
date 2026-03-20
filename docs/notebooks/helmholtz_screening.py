@@ -128,6 +128,9 @@ fig.savefig(IMG_DIR / "screening_effect.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
+# ![Screening effect across deformation radii](../images/helmholtz_screening/screening_effect.png)
+
+# %% [markdown]
 # As $L_d$ decreases (screening increases), the streamfunction response
 # becomes more localised around the PV anomaly.  At $L_d = 50$ km, the
 # response barely extends beyond the Gaussian core.
@@ -159,6 +162,9 @@ ax.grid(True, alpha=0.3)
 ax.axvline(x0 / 1e3, color="0.5", ls=":", lw=1)
 fig.savefig(IMG_DIR / "cross_sections.png", dpi=150, bbox_inches="tight")
 plt.show()
+
+# %% [markdown]
+# ![Cross-section profiles](../images/helmholtz_screening/cross_sections.png)
 
 # %% [markdown]
 # ## 4. Dirichlet vs Neumann Boundary Conditions
@@ -213,6 +219,9 @@ fig.suptitle(f"BC comparison at Ld = {Ld_compare/1e3:.0f} km", fontsize=14, y=1.
 fig.tight_layout()
 fig.savefig(IMG_DIR / "dirichlet_vs_neumann.png", dpi=150, bbox_inches="tight")
 plt.show()
+
+# %% [markdown]
+# ![Dirichlet vs Neumann BCs](../images/helmholtz_screening/dirichlet_vs_neumann.png)
 
 # %% [markdown]
 # The difference is concentrated near the domain boundaries, where the BCs
@@ -305,6 +314,9 @@ fig.suptitle("JAX transforms: JIT solve and autodiff", fontsize=14, y=1.02)
 fig.tight_layout()
 fig.savefig(IMG_DIR / "jax_transforms.png", dpi=150, bbox_inches="tight")
 plt.show()
+
+# %% [markdown]
+# ![JAX transforms: JIT and autodiff](../images/helmholtz_screening/jax_transforms.png)
 
 # %% [markdown]
 # ## 7. Timing Comparison

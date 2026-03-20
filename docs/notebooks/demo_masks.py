@@ -224,6 +224,23 @@ for topo_name, topo_masks in all_masks.items():
     plot_classification(topo_masks, topo_name, IMG_DIR)
 
 # %% [markdown]
+# ![Staggered masks: basin](../images/demo_masks/staggered_basin.png)
+#
+# ![Classification: basin](../images/demo_masks/classification_basin.png)
+#
+# ![Staggered masks: island](../images/demo_masks/staggered_island.png)
+#
+# ![Classification: island](../images/demo_masks/classification_island.png)
+#
+# ![Staggered masks: channel](../images/demo_masks/staggered_channel.png)
+#
+# ![Classification: channel](../images/demo_masks/classification_channel.png)
+#
+# ![Staggered masks: irregular](../images/demo_masks/staggered_irregular.png)
+#
+# ![Classification: irregular](../images/demo_masks/classification_irregular.png)
+
+# %% [markdown]
 # ## 3. Stencil capability and adaptive WENO masks
 #
 # Each cell stores how many contiguous wet neighbours it has in each
@@ -286,6 +303,9 @@ fig.suptitle("Vorticity boundary classification (island domain)", fontsize=13)
 plt.tight_layout()
 fig.savefig(IMG_DIR / "vorticity_boundary.png", dpi=150, bbox_inches="tight")
 plt.show()
+
+# %% [markdown]
+# ![Vorticity boundary classification](../images/demo_masks/vorticity_boundary.png)
 
 # %% [markdown]
 # ## 5. All-ocean domain shortcut
