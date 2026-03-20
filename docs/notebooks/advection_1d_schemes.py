@@ -329,7 +329,7 @@ ax.plot(x_np, exact, "k--", lw=2, label="Exact", zorder=5)
 colours = {"upwind1": "#d62728", "upwind3": "#1f77b4", "superbee": "#2ca02c", "weno5": "#ff7f0e"}
 
 for method in methods:
-    ax.plot(x_np, results[method], colour := colours[method], lw=1.5, label=method)
+    ax.plot(x_np, results[method], color=colours[method], lw=1.5, label=method)
 
 ax.set_xlabel("x")
 ax.set_ylabel("q")

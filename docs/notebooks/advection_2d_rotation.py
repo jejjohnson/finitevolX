@@ -441,7 +441,13 @@ ax.plot(x_np, exact_2d[j_centre, :], "k--", lw=2, label="Exact")
 
 colours_2d = {"upwind1": "#d62728", "superbee": "#2ca02c", "weno5": "#ff7f0e"}
 for method in methods_2d:
-    ax.plot(x_np, results_2d[method][j_centre, :], colour := colours_2d[method], lw=1.5, label=method)
+    ax.plot(
+        x_np,
+        results_2d[method][j_centre, :],
+        color=colours_2d[method],
+        lw=1.5,
+        label=method,
+    )
 
 ax.set_xlabel("x")
 ax.set_ylabel("q")
