@@ -353,8 +353,10 @@ p_convenience = fvx.pressure_from_divergence(rhs, dx, dy, bc="dst")
 print(f"max |convenience - DST-I| = {float(jnp.abs(p_convenience - p_dst1).max()):.2e}")
 
 # %% [markdown]
-# `pressure_from_divergence(bc="dst")` dispatches to DST-I, matching
-# finitevolX's ghost-cell convention.  This is the recommended interface.
+# Here we pass `bc="dst"` (Dirichlet) to match the manufactured test where
+# $\phi = 0$ on the boundary.  Note that the library default is `bc="dct"`
+# (Neumann, $\partial p / \partial n = 0$), which is the standard choice for
+# pressure with solid walls in most ocean models.
 
 # %% [markdown]
 # ## Summary
@@ -367,4 +369,4 @@ print(f"max |convenience - DST-I| = {float(jnp.abs(p_convenience - p_dst1).max()
 # | **Projection** | $\mathbf{u}^* = \mathbf{u} - \nabla p$ removes divergence to machine precision |
 # | **C-grid advantage** | $\partial p/\partial x$ at U-points, $\partial p/\partial y$ at V-points — no interpolation |
 # | **Module class** | `StaggeredDirichletHelmholtzSolver2D` wraps DST-II for equinox workflows |
-# | **Convenience** | `fvx.pressure_from_divergence(rhs, dx, dy, bc="dst")` — one-line API |
+# | **Convenience** | `fvx.pressure_from_divergence(rhs, dx, dy)` — defaults to DCT (Neumann) |
