@@ -274,7 +274,7 @@ plt.show()
 print("Saved geometries.png")
 
 # %% [markdown]
-# ![Domain geometries](../images/demo_solvers/geometries.png)
+# ![Domain geometries](../../images/demo_solvers/geometries.png)
 
 # %% [markdown]
 # ## 3. Rectangle — Spectral DST, CG, Multigrid
@@ -333,7 +333,7 @@ plot_triplet(
 )
 
 # %% [markdown]
-# ![Rectangle: Spectral solver](../images/demo_solvers/solver_rect_spectral.png)
+# ![Rectangle: Spectral solver](../../images/demo_solvers/solver_rect_spectral.png)
 
 # %%
 # ── CG + spectral preconditioner ──
@@ -359,7 +359,7 @@ plot_triplet(
 )
 
 # %% [markdown]
-# ![Rectangle: CG solver](../images/demo_solvers/solver_rect_cg.png)
+# ![Rectangle: CG solver](../../images/demo_solvers/solver_rect_cg.png)
 
 # %%
 # ── Multigrid (8 V-cycles) ──
@@ -381,7 +381,7 @@ plot_triplet(
 )
 
 # %% [markdown]
-# ![Rectangle: Multigrid solver](../images/demo_solvers/solver_rect_mg.png)
+# ![Rectangle: Multigrid solver](../../images/demo_solvers/solver_rect_mg.png)
 
 # %%
 results["Rectangle"] = {
@@ -457,7 +457,7 @@ plot_triplet(
 print(f"  Capacitance: {t_cap * 1000:.2f} ms, boundary pts = {len(cap._j_b)}")
 
 # %% [markdown]
-# ![Basin: Capacitance solver](../images/demo_solvers/solver_basin_cap.png)
+# ![Basin: Capacitance solver](../../images/demo_solvers/solver_basin_cap.png)
 
 # %%
 # ── CG + spectral preconditioner ──
@@ -490,7 +490,7 @@ plot_triplet(
 )
 
 # %% [markdown]
-# ![Basin: CG solver](../images/demo_solvers/solver_basin_cg.png)
+# ![Basin: CG solver](../../images/demo_solvers/solver_basin_cg.png)
 
 # %%
 # ── Multigrid (8 V-cycles) ──
@@ -514,7 +514,7 @@ plot_triplet(
 )
 
 # %% [markdown]
-# ![Basin: Multigrid solver](../images/demo_solvers/solver_basin_mg.png)
+# ![Basin: Multigrid solver](../../images/demo_solvers/solver_basin_mg.png)
 
 # %%
 results["Basin"] = {
@@ -591,7 +591,7 @@ plot_triplet(
 )
 
 # %% [markdown]
-# ![Circle: CG solver](../images/demo_solvers/solver_circle_cg.png)
+# ![Circle: CG solver](../../images/demo_solvers/solver_circle_cg.png)
 
 # %%
 # ── Multigrid (8 V-cycles) ──
@@ -615,7 +615,7 @@ plot_triplet(
 )
 
 # %% [markdown]
-# ![Circle: Multigrid solver](../images/demo_solvers/solver_circle_mg.png)
+# ![Circle: Multigrid solver](../../images/demo_solvers/solver_circle_mg.png)
 
 # %%
 results["Circle"] = {
@@ -709,7 +709,7 @@ plot_triplet(
 )
 
 # %% [markdown]
-# ![Notch: Multigrid solver](../images/demo_solvers/solver_notch_mg.png)
+# ![Notch: Multigrid solver](../../images/demo_solvers/solver_notch_mg.png)
 
 # %%
 # ── MG-preconditioned CG ──
@@ -742,7 +742,7 @@ plot_triplet(
 )
 
 # %% [markdown]
-# ![Notch: MG+CG solver](../images/demo_solvers/solver_notch_mgcg.png)
+# ![Notch: MG+CG solver](../../images/demo_solvers/solver_notch_mgcg.png)
 
 # %%
 results["Notch\n(variable coeff)"] = {
@@ -866,7 +866,7 @@ plt.show()
 print("Saved accuracy_timing.png")
 
 # %% [markdown]
-# ![Accuracy and timing comparison](../images/demo_solvers/accuracy_timing.png)
+# ![Accuracy and timing comparison](../../images/demo_solvers/accuracy_timing.png)
 
 # %% [markdown]
 # ## 8. Inhomogeneous Boundary Conditions (Known Boundary Values)
@@ -995,7 +995,7 @@ plt.show()
 print("Saved inhomogeneous_bc.png")
 
 # %% [markdown]
-# ![Inhomogeneous Dirichlet BCs via lifting](../images/demo_solvers/inhomogeneous_bc.png)
+# ![Inhomogeneous Dirichlet BCs via lifting](../../images/demo_solvers/inhomogeneous_bc.png)
 
 # %% [markdown]
 # The lifting trick works with **any** solver (spectral, CG, capacitance,

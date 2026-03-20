@@ -221,7 +221,7 @@ plt.show()
 print(f"Saved: {IMG_DIR / 'wind_forcing.png'}")
 
 # %% [markdown]
-# ![Double-gyre wind forcing](../images/swm_linear/wind_forcing.png)
+# ![Double-gyre wind forcing](../../images/swm_linear/wind_forcing.png)
 
 # %% [markdown]
 # ## 5. Operator Construction
@@ -476,7 +476,7 @@ plt.show()
 print(f"Saved: {IMG_DIR / 'demo_results.png'}")
 
 # %% [markdown]
-# ![Linear SWM results](../images/swm_linear/demo_results.png)
+# ![Linear SWM results](../../images/swm_linear/demo_results.png)
 
 # %% [markdown]
 # At this early stage the solution is dominated by gravity-wave adjustment
@@ -515,7 +515,7 @@ print(f"Saved: {IMG_DIR / 'demo_results.png'}")
 #
 # The pre-rendered animation shows the spun-up double-gyre circulation:
 #
-# ![Linear shallow-water double gyre](../images/swm_linear/linear_shallow_water_double_gyre.gif)
+# ![Linear shallow-water double gyre](../../images/swm_linear/linear_shallow_water_double_gyre.gif)
 
 # %% [markdown]
 # ## 10. Summary

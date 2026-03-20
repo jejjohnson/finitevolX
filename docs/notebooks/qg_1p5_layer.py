@@ -238,7 +238,7 @@ fig.savefig(IMG_DIR / "wind_curl_forcing.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
-# ![Double-gyre wind-curl forcing](../images/qg_1p5_layer/wind_curl_forcing.png)
+# ![Double-gyre wind-curl forcing](../../images/qg_1p5_layer/wind_curl_forcing.png)
 
 # %% [markdown]
 # The forcing is antisymmetric about the basin midline.  The southern
@@ -322,7 +322,7 @@ fig.savefig(IMG_DIR / "helmholtz_inversion_demo.png", dpi=150, bbox_inches="tigh
 plt.show()
 
 # %% [markdown]
-# ![Helmholtz inversion demonstration](../images/qg_1p5_layer/helmholtz_inversion_demo.png)
+# ![Helmholtz inversion demonstration](../../images/qg_1p5_layer/helmholtz_inversion_demo.png)
 
 # %% [markdown]
 # The Helmholtz inversion smears the PV anomaly pattern slightly due to
@@ -590,7 +590,7 @@ fig.savefig(IMG_DIR / "qg_1p5_layer_results.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
-# ![QG model results](../images/qg_1p5_layer/qg_1p5_layer_results.png)
+# ![QG model results](../../images/qg_1p5_layer/qg_1p5_layer_results.png)
 
 # %% [markdown]
 # Even in this short run the double-gyre pattern is visible: the wind
@@ -611,7 +611,7 @@ plt.show()
 # separation develops inertial overshoot, and mesoscale eddies populate
 # the inter-gyre region.
 #
-# ![1.5-layer QG double gyre](../images/qg_1p5_layer/qg_1p5_layer_double_gyre.gif)
+# ![1.5-layer QG double gyre](../../images/qg_1p5_layer/qg_1p5_layer_double_gyre.gif)
 
 # %% [markdown]
 # ## 11. Summary

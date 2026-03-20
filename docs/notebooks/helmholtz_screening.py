@@ -128,7 +128,7 @@ fig.savefig(IMG_DIR / "screening_effect.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
-# ![Screening effect across deformation radii](../images/helmholtz_screening/screening_effect.png)
+# ![Screening effect across deformation radii](../../images/helmholtz_screening/screening_effect.png)
 
 # %% [markdown]
 # As $L_d$ decreases (screening increases), the streamfunction response
@@ -164,7 +164,7 @@ fig.savefig(IMG_DIR / "cross_sections.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
-# ![Cross-section profiles](../images/helmholtz_screening/cross_sections.png)
+# ![Cross-section profiles](../../images/helmholtz_screening/cross_sections.png)
 
 # %% [markdown]
 # ## 4. Dirichlet vs Neumann Boundary Conditions
@@ -221,7 +221,7 @@ fig.savefig(IMG_DIR / "dirichlet_vs_neumann.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
-# ![Dirichlet vs Neumann BCs](../images/helmholtz_screening/dirichlet_vs_neumann.png)
+# ![Dirichlet vs Neumann BCs](../../images/helmholtz_screening/dirichlet_vs_neumann.png)
 
 # %% [markdown]
 # The difference is concentrated near the domain boundaries, where the BCs
@@ -316,7 +316,7 @@ fig.savefig(IMG_DIR / "jax_transforms.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
-# ![JAX transforms: JIT and autodiff](../images/helmholtz_screening/jax_transforms.png)
+# ![JAX transforms: JIT and autodiff](../../images/helmholtz_screening/jax_transforms.png)
 
 # %% [markdown]
 # ## 7. Timing Comparison

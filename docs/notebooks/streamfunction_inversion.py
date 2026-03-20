@@ -136,7 +136,7 @@ fig.savefig(IMG_DIR / "vorticity.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
-# ![Lamb-Oseen vorticity field](../images/streamfunction_inversion/vorticity.png)
+# ![Lamb-Oseen vorticity field](../../images/streamfunction_inversion/vorticity.png)
 
 # %% [markdown]
 # ## 2. X-point Inversion (DST-I)
@@ -190,7 +190,7 @@ fig.savefig(IMG_DIR / "streamfunction_comparison.png", dpi=150, bbox_inches="tig
 plt.show()
 
 # %% [markdown]
-# ![Streamfunction: X-point vs T-point](../images/streamfunction_inversion/streamfunction_comparison.png)
+# ![Streamfunction: X-point vs T-point](../../images/streamfunction_inversion/streamfunction_comparison.png)
 
 # %% [markdown]
 # ## 4. Velocity Recovery
@@ -251,7 +251,7 @@ fig.savefig(IMG_DIR / "velocity_recovery.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
-# ![Velocity recovery comparison](../images/streamfunction_inversion/velocity_recovery.png)
+# ![Velocity recovery comparison](../../images/streamfunction_inversion/velocity_recovery.png)
 
 # %% [markdown]
 # ## 5. Error Analysis
@@ -322,7 +322,7 @@ fig.savefig(IMG_DIR / "convergence.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
-# ![Convergence: DST-I vs DST-II](../images/streamfunction_inversion/convergence.png)
+# ![Convergence: DST-I vs DST-II](../../images/streamfunction_inversion/convergence.png)
 
 # %% [markdown]
 # Both solvers converge at **second order** ($O(dx^2)$).  This is expected:
