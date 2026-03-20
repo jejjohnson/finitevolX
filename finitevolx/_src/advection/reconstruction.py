@@ -20,8 +20,12 @@ from finitevolx._src.advection.limiters import mc, minmod, superbee, van_leer
 from finitevolx._src.advection.weno import (
     weno_3pts as _weno3,
     weno_3pts_improved as _wenoz3,
+    weno_3pts_improved_right as _wenoz3_right,
+    weno_3pts_right as _weno3_right,
     weno_5pts as _weno5,
     weno_5pts_improved as _wenoz5,
+    weno_5pts_improved_right as _wenoz5_right,
+    weno_5pts_right as _weno5_right,
     weno_7pts as _weno7,
     weno_9pts as _weno9,
 )
@@ -361,13 +365,13 @@ class Reconstruction1D(eqx.Module):
         """3-point WENO east-face flux with boundary fallback.
 
         Positive flow:  h_face[i+1/2] = WENO3(h[i-1], h[i],   h[i+1])
-        Negative flow:  h_face[i+1/2] = WENO3(h[i+2], h[i+1], h[i])
+        Negative flow:  h_face[i+1/2] = WENO3_right(h[i], h[i+1], h[i+2])
         Falls back to 1st-order upwind on east boundary where i+2 unavailable.
         """
         # WENO-3 positive: left-biased stencil, valid for all interior faces
         h_pos = _weno3(h[:-2], h[1:-1], h[2:])
         # WENO-3 negative: right-biased stencil, valid for i+2 < Nx
-        h_neg_interior = _weno3(h[3:], h[2:-1], h[1:-2])
+        h_neg_interior = _weno3_right(h[1:-2], h[2:-1], h[3:])
         # 1st-order upwind fallback at east boundary
         h_neg_boundary = h[-1:]
         h_neg = jnp.concatenate([h_neg_interior, h_neg_boundary])
@@ -383,13 +387,13 @@ class Reconstruction1D(eqx.Module):
         """3-point WENO-Z east-face flux with boundary fallback.
 
         Positive flow:  h_face[i+1/2] = WENOZ3(h[i-1], h[i],   h[i+1])
-        Negative flow:  h_face[i+1/2] = WENOZ3(h[i+2], h[i+1], h[i])
+        Negative flow:  h_face[i+1/2] = WENOZ3_right(h[i], h[i+1], h[i+2])
         Falls back to 1st-order upwind on east boundary where i+2 unavailable.
         """
         # WENO-Z-3 positive: left-biased stencil, valid for all interior faces
         h_pos = _wenoz3(h[:-2], h[1:-1], h[2:])
         # WENO-Z-3 negative: right-biased stencil, valid for i+2 < Nx
-        h_neg_interior = _wenoz3(h[3:], h[2:-1], h[1:-2])
+        h_neg_interior = _wenoz3_right(h[1:-2], h[2:-1], h[3:])
         # 1st-order upwind fallback at east boundary
         h_neg_boundary = h[-1:]
         h_neg = jnp.concatenate([h_neg_interior, h_neg_boundary])
@@ -406,8 +410,8 @@ class Reconstruction1D(eqx.Module):
 
         Positive flow:  h_face[i+1/2] = WENO5(h[i-2], h[i-1], h[i], h[i+1], h[i+2])
             for i = 2..Nx-3; WENO3 fallback at i = 1 and i = Nx-2.
-        Negative flow:  h_face[i+1/2] = WENO5(h[i+3], h[i+2], h[i+1], h[i], h[i-1])
-            for i = 2..Nx-3; WENO3 fallback at i = 1; 1st-order upwind at i = Nx-2.
+        Negative flow:  h_face[i+1/2] = WENO5_right(h[i-1], h[i], h[i+1], h[i+2], h[i+3])
+            for i = 1..Nx-4; WENO3_right fallback at i = Nx-3; 1st-order upwind at i = Nx-2.
         """
         # WENO-5 positive: valid for interior faces i=2..Nx-3 (needs h[i-2..i+2])
         h5_pos_interior = _weno5(h[:-4], h[1:-3], h[2:-2], h[3:-1], h[4:])
@@ -416,13 +420,13 @@ class Reconstruction1D(eqx.Module):
         # WENO-3 fallback at last interior face (i=Nx-2, h[i+2] = h[Nx] out of bounds)
         h3_pos_last = _weno3(h[-3:-2], h[-2:-1], h[-1:])
         h_pos = jnp.concatenate([h3_pos_first, h5_pos_interior, h3_pos_last])
-        # WENO-5 negative: valid for interior faces i=2..Nx-3
-        h5_neg_interior = _weno5(h[4:], h[3:-1], h[2:-2], h[1:-3], h[:-4])
-        # WENO-3 fallback at first interior face (i=1)
-        h3_neg_first = _weno3(h[3:4], h[2:3], h[1:2])
+        # WENO-5 right-biased: valid for faces i=1..Nx-4
+        h5_neg_interior = _weno5_right(h[:-4], h[1:-3], h[2:-2], h[3:-1], h[4:])
+        # WENO-3 right-biased fallback at face i=Nx-3
+        h3_neg_penultimate = _weno3_right(h[-3:-2], h[-2:-1], h[-1:])
         # 1st-order upwind fallback at east boundary (i=Nx-2)
         h1_neg_last = h[-1:]
-        h_neg = jnp.concatenate([h3_neg_first, h5_neg_interior, h1_neg_last])
+        h_neg = jnp.concatenate([h5_neg_interior, h3_neg_penultimate, h1_neg_last])
         h_face = jnp.where(u[1:-1] >= 0.0, h_pos, h_neg)
         out = interior(h_face * u[1:-1], h)
         return out
@@ -436,8 +440,8 @@ class Reconstruction1D(eqx.Module):
 
         Positive flow:  h_face[i+1/2] = WENOZ5(h[i-2], h[i-1], h[i], h[i+1], h[i+2])
             for i = 2..Nx-3; WENO-Z-3 fallback at i = 1 and i = Nx-2.
-        Negative flow:  h_face[i+1/2] = WENOZ5(h[i+3], h[i+2], h[i+1], h[i], h[i-1])
-            for i = 2..Nx-3; WENO-Z-3 fallback at i = 1; 1st-order upwind at i = Nx-2.
+        Negative flow:  h_face[i+1/2] = WENOZ5_right(h[i-1], h[i], h[i+1], h[i+2], h[i+3])
+            for i = 1..Nx-4; WENO-Z-3_right fallback at i = Nx-3; 1st-order upwind at i = Nx-2.
         """
         # WENO-Z-5 positive: valid for interior faces i=2..Nx-3
         h5_pos_interior = _wenoz5(h[:-4], h[1:-3], h[2:-2], h[3:-1], h[4:])
@@ -446,13 +450,13 @@ class Reconstruction1D(eqx.Module):
         # WENO-Z-3 fallback at last interior face (i=Nx-2)
         h3_pos_last = _wenoz3(h[-3:-2], h[-2:-1], h[-1:])
         h_pos = jnp.concatenate([h3_pos_first, h5_pos_interior, h3_pos_last])
-        # WENO-Z-5 negative: valid for interior faces i=2..Nx-3
-        h5_neg_interior = _wenoz5(h[4:], h[3:-1], h[2:-2], h[1:-3], h[:-4])
-        # WENO-Z-3 fallback at first interior face (i=1)
-        h3_neg_first = _wenoz3(h[3:4], h[2:3], h[1:2])
+        # WENO-Z-5 right-biased: valid for faces i=1..Nx-4
+        h5_neg_interior = _wenoz5_right(h[:-4], h[1:-3], h[2:-2], h[3:-1], h[4:])
+        # WENO-Z-3 right-biased fallback at face i=Nx-3
+        h3_neg_penultimate = _wenoz3_right(h[-3:-2], h[-2:-1], h[-1:])
         # 1st-order upwind fallback at east boundary (i=Nx-2)
         h1_neg_last = h[-1:]
-        h_neg = jnp.concatenate([h3_neg_first, h5_neg_interior, h1_neg_last])
+        h_neg = jnp.concatenate([h5_neg_interior, h3_neg_penultimate, h1_neg_last])
         h_face = jnp.where(u[1:-1] >= 0.0, h_pos, h_neg)
         out = interior(h_face * u[1:-1], h)
         return out
@@ -727,13 +731,13 @@ class Reconstruction2D(eqx.Module):
         """3-point WENO east-face flux with boundary fallback.
 
         Positive flow:  fe[j,i+1/2] = WENO3(h[j,i-1], h[j,i],   h[j,i+1]) * u
-        Negative flow:  fe[j,i+1/2] = WENO3(h[j,i+2], h[j,i+1], h[j,i])   * u
+        Negative flow:  fe[j,i+1/2] = WENO3_right(h[j,i], h[j,i+1], h[j,i+2]) * u
         Falls back to 1st-order upwind on east boundary where i+2 unavailable.
         """
         # WENO-3 positive: left-biased, valid for all interior faces
         h_pos = _weno3(h[1:-1, :-2], h[1:-1, 1:-1], h[1:-1, 2:])
         # WENO-3 negative: right-biased, valid for i+2 < Nx
-        h_neg_interior = _weno3(h[1:-1, 3:], h[1:-1, 2:-1], h[1:-1, 1:-2])
+        h_neg_interior = _weno3_right(h[1:-1, 1:-2], h[1:-1, 2:-1], h[1:-1, 3:])
         # 1st-order upwind fallback at east boundary column
         h_neg_boundary = h[1:-1, -1:]
         h_neg = jnp.concatenate([h_neg_interior, h_neg_boundary], axis=1)
@@ -749,13 +753,13 @@ class Reconstruction2D(eqx.Module):
         """3-point WENO north-face flux with boundary fallback.
 
         Positive flow:  fn[j+1/2,i] = WENO3(h[j-1,i], h[j,i],   h[j+1,i]) * v
-        Negative flow:  fn[j+1/2,i] = WENO3(h[j+2,i], h[j+1,i], h[j,i])   * v
+        Negative flow:  fn[j+1/2,i] = WENO3_right(h[j,i], h[j+1,i], h[j+2,i]) * v
         Falls back to 1st-order upwind on north boundary where j+2 unavailable.
         """
         # WENO-3 positive: left-biased, valid for all interior faces
         h_pos = _weno3(h[:-2, 1:-1], h[1:-1, 1:-1], h[2:, 1:-1])
         # WENO-3 negative: right-biased, valid for j+2 < Ny
-        h_neg_interior = _weno3(h[3:, 1:-1], h[2:-1, 1:-1], h[1:-2, 1:-1])
+        h_neg_interior = _weno3_right(h[1:-2, 1:-1], h[2:-1, 1:-1], h[3:, 1:-1])
         # 1st-order upwind fallback at north boundary row
         h_neg_boundary = h[-1:, 1:-1]
         h_neg = jnp.concatenate([h_neg_interior, h_neg_boundary], axis=0)
@@ -771,13 +775,13 @@ class Reconstruction2D(eqx.Module):
         """3-point WENO-Z east-face flux with boundary fallback.
 
         Positive flow:  fe[j,i+1/2] = WENOZ3(h[j,i-1], h[j,i],   h[j,i+1]) * u
-        Negative flow:  fe[j,i+1/2] = WENOZ3(h[j,i+2], h[j,i+1], h[j,i])   * u
+        Negative flow:  fe[j,i+1/2] = WENOZ3_right(h[j,i], h[j,i+1], h[j,i+2]) * u
         Falls back to 1st-order upwind on east boundary where i+2 unavailable.
         """
         # WENO-Z-3 positive: left-biased, valid for all interior faces
         h_pos = _wenoz3(h[1:-1, :-2], h[1:-1, 1:-1], h[1:-1, 2:])
         # WENO-Z-3 negative: right-biased, valid for i+2 < Nx
-        h_neg_interior = _wenoz3(h[1:-1, 3:], h[1:-1, 2:-1], h[1:-1, 1:-2])
+        h_neg_interior = _wenoz3_right(h[1:-1, 1:-2], h[1:-1, 2:-1], h[1:-1, 3:])
         # 1st-order upwind fallback at east boundary column
         h_neg_boundary = h[1:-1, -1:]
         h_neg = jnp.concatenate([h_neg_interior, h_neg_boundary], axis=1)
@@ -793,13 +797,13 @@ class Reconstruction2D(eqx.Module):
         """3-point WENO-Z north-face flux with boundary fallback.
 
         Positive flow:  fn[j+1/2,i] = WENOZ3(h[j-1,i], h[j,i],   h[j+1,i]) * v
-        Negative flow:  fn[j+1/2,i] = WENOZ3(h[j+2,i], h[j+1,i], h[j,i])   * v
+        Negative flow:  fn[j+1/2,i] = WENOZ3_right(h[j,i], h[j+1,i], h[j+2,i]) * v
         Falls back to 1st-order upwind on north boundary where j+2 unavailable.
         """
         # WENO-Z-3 positive: left-biased, valid for all interior faces
         h_pos = _wenoz3(h[:-2, 1:-1], h[1:-1, 1:-1], h[2:, 1:-1])
         # WENO-Z-3 negative: right-biased, valid for j+2 < Ny
-        h_neg_interior = _wenoz3(h[3:, 1:-1], h[2:-1, 1:-1], h[1:-2, 1:-1])
+        h_neg_interior = _wenoz3_right(h[1:-2, 1:-1], h[2:-1, 1:-1], h[3:, 1:-1])
         # 1st-order upwind fallback at north boundary row
         h_neg_boundary = h[-1:, 1:-1]
         h_neg = jnp.concatenate([h_neg_interior, h_neg_boundary], axis=0)
@@ -816,8 +820,8 @@ class Reconstruction2D(eqx.Module):
 
         Positive flow:  fe[j,i+1/2] = WENO5(h[j,i-2..i+2]) * u
             for i = 2..Nx-3; WENO3 fallback at i = 1 and i = Nx-2.
-        Negative flow:  fe[j,i+1/2] = WENO5(h[j,i+3..i-1]) * u
-            for i = 2..Nx-3; WENO3 fallback at i = 1; 1st-order upwind at i = Nx-2.
+        Negative flow:  fe[j,i+1/2] = WENO5_right(h[j,i-1], h[j,i], h[j,i+1], h[j,i+2], h[j,i+3]) * u
+            for i = 1..Nx-4; WENO3_right fallback at i = Nx-3; 1st-order upwind at i = Nx-2.
         """
         # WENO-5 positive: valid for i=2..Nx-3
         h5_pos_int = _weno5(
@@ -828,15 +832,15 @@ class Reconstruction2D(eqx.Module):
         # WENO-3 fallback at last interior column (i=Nx-2)
         h3_pos_last = _weno3(h[1:-1, -3:-2], h[1:-1, -2:-1], h[1:-1, -1:])
         h_pos = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=1)
-        # WENO-5 negative: valid for i=2..Nx-3
-        h5_neg_int = _weno5(
-            h[1:-1, 4:], h[1:-1, 3:-1], h[1:-1, 2:-2], h[1:-1, 1:-3], h[1:-1, :-4]
+        # WENO-5 right-biased: valid for i=1..Nx-4
+        h5_neg_int = _weno5_right(
+            h[1:-1, :-4], h[1:-1, 1:-3], h[1:-1, 2:-2], h[1:-1, 3:-1], h[1:-1, 4:]
         )
-        # WENO-3 fallback at first interior column (i=1)
-        h3_neg_first = _weno3(h[1:-1, 3:4], h[1:-1, 2:3], h[1:-1, 1:2])
+        # WENO-3 right-biased fallback at column i=Nx-3
+        h3_neg_penultimate = _weno3_right(h[1:-1, -3:-2], h[1:-1, -2:-1], h[1:-1, -1:])
         # 1st-order upwind fallback at east boundary column (i=Nx-2)
         h1_neg_last = h[1:-1, -1:]
-        h_neg = jnp.concatenate([h3_neg_first, h5_neg_int, h1_neg_last], axis=1)
+        h_neg = jnp.concatenate([h5_neg_int, h3_neg_penultimate, h1_neg_last], axis=1)
         h_face = jnp.where(u[1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = interior(h_face * u[1:-1, 1:-1], h)
         return out
@@ -850,8 +854,8 @@ class Reconstruction2D(eqx.Module):
 
         Positive flow:  fn[j+1/2,i] = WENO5(h[j-2..j+2,i]) * v
             for j = 2..Ny-3; WENO3 fallback at j = 1 and j = Ny-2.
-        Negative flow:  fn[j+1/2,i] = WENO5(h[j+3..j-1,i]) * v
-            for j = 2..Ny-3; WENO3 fallback at j = 1; 1st-order upwind at j = Ny-2.
+        Negative flow:  fn[j+1/2,i] = WENO5_right(h[j-1,i], h[j,i], h[j+1,i], h[j+2,i], h[j+3,i]) * v
+            for j = 1..Ny-4; WENO3_right fallback at j = Ny-3; 1st-order upwind at j = Ny-2.
         """
         # WENO-5 positive: valid for j=2..Ny-3
         h5_pos_int = _weno5(
@@ -862,15 +866,15 @@ class Reconstruction2D(eqx.Module):
         # WENO-3 fallback at last interior row (j=Ny-2)
         h3_pos_last = _weno3(h[-3:-2, 1:-1], h[-2:-1, 1:-1], h[-1:, 1:-1])
         h_pos = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=0)
-        # WENO-5 negative: valid for j=2..Ny-3
-        h5_neg_int = _weno5(
-            h[4:, 1:-1], h[3:-1, 1:-1], h[2:-2, 1:-1], h[1:-3, 1:-1], h[:-4, 1:-1]
+        # WENO-5 right-biased: valid for j=1..Ny-4
+        h5_neg_int = _weno5_right(
+            h[:-4, 1:-1], h[1:-3, 1:-1], h[2:-2, 1:-1], h[3:-1, 1:-1], h[4:, 1:-1]
         )
-        # WENO-3 fallback at first interior row (j=1)
-        h3_neg_first = _weno3(h[3:4, 1:-1], h[2:3, 1:-1], h[1:2, 1:-1])
+        # WENO-3 right-biased fallback at row j=Ny-3
+        h3_neg_penultimate = _weno3_right(h[-3:-2, 1:-1], h[-2:-1, 1:-1], h[-1:, 1:-1])
         # 1st-order upwind fallback at north boundary row (j=Ny-2)
         h1_neg_last = h[-1:, 1:-1]
-        h_neg = jnp.concatenate([h3_neg_first, h5_neg_int, h1_neg_last], axis=0)
+        h_neg = jnp.concatenate([h5_neg_int, h3_neg_penultimate, h1_neg_last], axis=0)
         h_face = jnp.where(v[1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = interior(h_face * v[1:-1, 1:-1], h)
         return out
@@ -884,8 +888,8 @@ class Reconstruction2D(eqx.Module):
 
         Positive flow:  fe[j,i+1/2] = WENOZ5(h[j,i-2..i+2]) * u
             for i = 2..Nx-3; WENO-Z-3 fallback at i = 1 and i = Nx-2.
-        Negative flow:  fe[j,i+1/2] = WENOZ5(h[j,i+3..i-1]) * u
-            for i = 2..Nx-3; WENO-Z-3 fallback at i = 1; 1st-order upwind at i = Nx-2.
+        Negative flow:  fe[j,i+1/2] = WENOZ5_right(h[j,i-1], h[j,i], h[j,i+1], h[j,i+2], h[j,i+3]) * u
+            for i = 1..Nx-4; WENO-Z-3_right fallback at i = Nx-3; 1st-order upwind at i = Nx-2.
         """
         # WENO-Z-5 positive: valid for i=2..Nx-3
         h5_pos_int = _wenoz5(
@@ -896,15 +900,15 @@ class Reconstruction2D(eqx.Module):
         # WENO-Z-3 fallback at last interior column (i=Nx-2)
         h3_pos_last = _wenoz3(h[1:-1, -3:-2], h[1:-1, -2:-1], h[1:-1, -1:])
         h_pos = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=1)
-        # WENO-Z-5 negative: valid for i=2..Nx-3
-        h5_neg_int = _wenoz5(
-            h[1:-1, 4:], h[1:-1, 3:-1], h[1:-1, 2:-2], h[1:-1, 1:-3], h[1:-1, :-4]
+        # WENO-Z-5 right-biased: valid for i=1..Nx-4
+        h5_neg_int = _wenoz5_right(
+            h[1:-1, :-4], h[1:-1, 1:-3], h[1:-1, 2:-2], h[1:-1, 3:-1], h[1:-1, 4:]
         )
-        # WENO-Z-3 fallback at first interior column (i=1)
-        h3_neg_first = _wenoz3(h[1:-1, 3:4], h[1:-1, 2:3], h[1:-1, 1:2])
+        # WENO-Z-3 right-biased fallback at column i=Nx-3
+        h3_neg_penultimate = _wenoz3_right(h[1:-1, -3:-2], h[1:-1, -2:-1], h[1:-1, -1:])
         # 1st-order upwind fallback at east boundary column (i=Nx-2)
         h1_neg_last = h[1:-1, -1:]
-        h_neg = jnp.concatenate([h3_neg_first, h5_neg_int, h1_neg_last], axis=1)
+        h_neg = jnp.concatenate([h5_neg_int, h3_neg_penultimate, h1_neg_last], axis=1)
         h_face = jnp.where(u[1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = interior(h_face * u[1:-1, 1:-1], h)
         return out
@@ -918,8 +922,8 @@ class Reconstruction2D(eqx.Module):
 
         Positive flow:  fn[j+1/2,i] = WENOZ5(h[j-2..j+2,i]) * v
             for j = 2..Ny-3; WENO-Z-3 fallback at j = 1 and j = Ny-2.
-        Negative flow:  fn[j+1/2,i] = WENOZ5(h[j+3..j-1,i]) * v
-            for j = 2..Ny-3; WENO-Z-3 fallback at j = 1; 1st-order upwind at j = Ny-2.
+        Negative flow:  fn[j+1/2,i] = WENOZ5_right(h[j-1,i], h[j,i], h[j+1,i], h[j+2,i], h[j+3,i]) * v
+            for j = 1..Ny-4; WENO-Z-3_right fallback at j = Ny-3; 1st-order upwind at j = Ny-2.
         """
         # WENO-Z-5 positive: valid for j=2..Ny-3
         h5_pos_int = _wenoz5(
@@ -930,15 +934,15 @@ class Reconstruction2D(eqx.Module):
         # WENO-Z-3 fallback at last interior row (j=Ny-2)
         h3_pos_last = _wenoz3(h[-3:-2, 1:-1], h[-2:-1, 1:-1], h[-1:, 1:-1])
         h_pos = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=0)
-        # WENO-Z-5 negative: valid for j=2..Ny-3
-        h5_neg_int = _wenoz5(
-            h[4:, 1:-1], h[3:-1, 1:-1], h[2:-2, 1:-1], h[1:-3, 1:-1], h[:-4, 1:-1]
+        # WENO-Z-5 right-biased: valid for j=1..Ny-4
+        h5_neg_int = _wenoz5_right(
+            h[:-4, 1:-1], h[1:-3, 1:-1], h[2:-2, 1:-1], h[3:-1, 1:-1], h[4:, 1:-1]
         )
-        # WENO-Z-3 fallback at first interior row (j=1)
-        h3_neg_first = _wenoz3(h[3:4, 1:-1], h[2:3, 1:-1], h[1:2, 1:-1])
+        # WENO-Z-3 right-biased fallback at row j=Ny-3
+        h3_neg_penultimate = _wenoz3_right(h[-3:-2, 1:-1], h[-2:-1, 1:-1], h[-1:, 1:-1])
         # 1st-order upwind fallback at north boundary row (j=Ny-2)
         h1_neg_last = h[-1:, 1:-1]
-        h_neg = jnp.concatenate([h3_neg_first, h5_neg_int, h1_neg_last], axis=0)
+        h_neg = jnp.concatenate([h5_neg_int, h3_neg_penultimate, h1_neg_last], axis=0)
         h_face = jnp.where(v[1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = interior(h_face * v[1:-1, 1:-1], h)
         return out
@@ -1360,14 +1364,14 @@ class Reconstruction3D(eqx.Module):
         """3-point WENO east-face flux over all z-levels with boundary fallback.
 
         Positive flow:  fe[k,j,i+1/2] = WENO3(h[k,j,i-1], h[k,j,i],   h[k,j,i+1]) * u
-        Negative flow:  fe[k,j,i+1/2] = WENO3(h[k,j,i+2], h[k,j,i+1], h[k,j,i])   * u
+        Negative flow:  fe[k,j,i+1/2] = WENO3_right(h[k,j,i], h[k,j,i+1], h[k,j,i+2]) * u
         Falls back to 1st-order upwind on east boundary where i+2 unavailable.
         """
         # WENO-3 positive: left-biased, valid for all interior faces
         h_pos = _weno3(h[1:-1, 1:-1, :-2], h[1:-1, 1:-1, 1:-1], h[1:-1, 1:-1, 2:])
         # WENO-3 negative: right-biased, valid for i+2 < Nx
-        h_neg_interior = _weno3(
-            h[1:-1, 1:-1, 3:], h[1:-1, 1:-1, 2:-1], h[1:-1, 1:-1, 1:-2]
+        h_neg_interior = _weno3_right(
+            h[1:-1, 1:-1, 1:-2], h[1:-1, 1:-1, 2:-1], h[1:-1, 1:-1, 3:]
         )
         # 1st-order upwind fallback at east boundary
         h_neg_boundary = h[1:-1, 1:-1, -1:]
@@ -1384,14 +1388,14 @@ class Reconstruction3D(eqx.Module):
         """3-point WENO north-face flux over all z-levels with boundary fallback.
 
         Positive flow:  fn[k,j+1/2,i] = WENO3(h[k,j-1,i], h[k,j,i],   h[k,j+1,i]) * v
-        Negative flow:  fn[k,j+1/2,i] = WENO3(h[k,j+2,i], h[k,j+1,i], h[k,j,i])   * v
+        Negative flow:  fn[k,j+1/2,i] = WENO3_right(h[k,j,i], h[k,j+1,i], h[k,j+2,i]) * v
         Falls back to 1st-order upwind on north boundary where j+2 unavailable.
         """
         # WENO-3 positive: left-biased, valid for all interior faces
         h_pos = _weno3(h[1:-1, :-2, 1:-1], h[1:-1, 1:-1, 1:-1], h[1:-1, 2:, 1:-1])
         # WENO-3 negative: right-biased, valid for j+2 < Ny
-        h_neg_interior = _weno3(
-            h[1:-1, 3:, 1:-1], h[1:-1, 2:-1, 1:-1], h[1:-1, 1:-2, 1:-1]
+        h_neg_interior = _weno3_right(
+            h[1:-1, 1:-2, 1:-1], h[1:-1, 2:-1, 1:-1], h[1:-1, 3:, 1:-1]
         )
         # 1st-order upwind fallback at north boundary
         h_neg_boundary = h[1:-1, -1:, 1:-1]
@@ -1408,14 +1412,14 @@ class Reconstruction3D(eqx.Module):
         """3-point WENO-Z east-face flux over all z-levels with boundary fallback.
 
         Positive flow:  fe[k,j,i+1/2] = WENOZ3(h[k,j,i-1], h[k,j,i],   h[k,j,i+1]) * u
-        Negative flow:  fe[k,j,i+1/2] = WENOZ3(h[k,j,i+2], h[k,j,i+1], h[k,j,i])   * u
+        Negative flow:  fe[k,j,i+1/2] = WENOZ3_right(h[k,j,i], h[k,j,i+1], h[k,j,i+2]) * u
         Falls back to 1st-order upwind on east boundary where i+2 unavailable.
         """
         # WENO-Z-3 positive: left-biased, valid for all interior faces
         h_pos = _wenoz3(h[1:-1, 1:-1, :-2], h[1:-1, 1:-1, 1:-1], h[1:-1, 1:-1, 2:])
         # WENO-Z-3 negative: right-biased, valid for i+2 < Nx
-        h_neg_interior = _wenoz3(
-            h[1:-1, 1:-1, 3:], h[1:-1, 1:-1, 2:-1], h[1:-1, 1:-1, 1:-2]
+        h_neg_interior = _wenoz3_right(
+            h[1:-1, 1:-1, 1:-2], h[1:-1, 1:-1, 2:-1], h[1:-1, 1:-1, 3:]
         )
         # 1st-order upwind fallback at east boundary
         h_neg_boundary = h[1:-1, 1:-1, -1:]
@@ -1432,14 +1436,14 @@ class Reconstruction3D(eqx.Module):
         """3-point WENO-Z north-face flux over all z-levels with boundary fallback.
 
         Positive flow:  fn[k,j+1/2,i] = WENOZ3(h[k,j-1,i], h[k,j,i],   h[k,j+1,i]) * v
-        Negative flow:  fn[k,j+1/2,i] = WENOZ3(h[k,j+2,i], h[k,j+1,i], h[k,j,i])   * v
+        Negative flow:  fn[k,j+1/2,i] = WENOZ3_right(h[k,j,i], h[k,j+1,i], h[k,j+2,i]) * v
         Falls back to 1st-order upwind on north boundary where j+2 unavailable.
         """
         # WENO-Z-3 positive: left-biased, valid for all interior faces
         h_pos = _wenoz3(h[1:-1, :-2, 1:-1], h[1:-1, 1:-1, 1:-1], h[1:-1, 2:, 1:-1])
         # WENO-Z-3 negative: right-biased, valid for j+2 < Ny
-        h_neg_interior = _wenoz3(
-            h[1:-1, 3:, 1:-1], h[1:-1, 2:-1, 1:-1], h[1:-1, 1:-2, 1:-1]
+        h_neg_interior = _wenoz3_right(
+            h[1:-1, 1:-2, 1:-1], h[1:-1, 2:-1, 1:-1], h[1:-1, 3:, 1:-1]
         )
         # 1st-order upwind fallback at north boundary
         h_neg_boundary = h[1:-1, -1:, 1:-1]
@@ -1457,8 +1461,8 @@ class Reconstruction3D(eqx.Module):
 
         Positive flow:  fe[k,j,i+1/2] = WENO5(h[k,j,i-2..i+2]) * u
             for i = 2..Nx-3; WENO3 fallback at i = 1 and i = Nx-2.
-        Negative flow:  fe[k,j,i+1/2] = WENO5(h[k,j,i+3..i-1]) * u
-            for i = 2..Nx-3; WENO3 fallback at i = 1; 1st-order upwind at i = Nx-2.
+        Negative flow:  fe[k,j,i+1/2] = WENO5_right(h[k,j,i-1], h[k,j,i], h[k,j,i+1], h[k,j,i+2], h[k,j,i+3]) * u
+            for i = 1..Nx-4; WENO3_right fallback at i = Nx-3; 1st-order upwind at i = Nx-2.
         """
         h5_pos_int = _weno5(
             h[1:-1, 1:-1, :-4],
@@ -1474,17 +1478,19 @@ class Reconstruction3D(eqx.Module):
             h[1:-1, 1:-1, -3:-2], h[1:-1, 1:-1, -2:-1], h[1:-1, 1:-1, -1:]
         )
         h_pos = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=2)
-        h5_neg_int = _weno5(
-            h[1:-1, 1:-1, 4:],
-            h[1:-1, 1:-1, 3:-1],
-            h[1:-1, 1:-1, 2:-2],
-            h[1:-1, 1:-1, 1:-3],
+        h5_neg_int = _weno5_right(
             h[1:-1, 1:-1, :-4],
+            h[1:-1, 1:-1, 1:-3],
+            h[1:-1, 1:-1, 2:-2],
+            h[1:-1, 1:-1, 3:-1],
+            h[1:-1, 1:-1, 4:],
         )
-        h3_neg_first = _weno3(
-            h[1:-1, 1:-1, 3:4], h[1:-1, 1:-1, 2:3], h[1:-1, 1:-1, 1:2]
+        h3_neg_penultimate = _weno3_right(
+            h[1:-1, 1:-1, -3:-2], h[1:-1, 1:-1, -2:-1], h[1:-1, 1:-1, -1:]
         )
-        h_neg = jnp.concatenate([h3_neg_first, h5_neg_int, h[1:-1, 1:-1, -1:]], axis=2)
+        h_neg = jnp.concatenate(
+            [h5_neg_int, h3_neg_penultimate, h[1:-1, 1:-1, -1:]], axis=2
+        )
         h_face = jnp.where(u[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = interior(h_face * u[1:-1, 1:-1, 1:-1], h)
         return out
@@ -1498,8 +1504,8 @@ class Reconstruction3D(eqx.Module):
 
         Positive flow:  fn[k,j+1/2,i] = WENO5(h[k,j-2..j+2,i]) * v
             for j = 2..Ny-3; WENO3 fallback at j = 1 and j = Ny-2.
-        Negative flow:  fn[k,j+1/2,i] = WENO5(h[k,j+3..j-1,i]) * v
-            for j = 2..Ny-3; WENO3 fallback at j = 1; 1st-order upwind at j = Ny-2.
+        Negative flow:  fn[k,j+1/2,i] = WENO5_right(h[k,j-1,i], h[k,j,i], h[k,j+1,i], h[k,j+2,i], h[k,j+3,i]) * v
+            for j = 1..Ny-4; WENO3_right fallback at j = Ny-3; 1st-order upwind at j = Ny-2.
         """
         h5_pos_int = _weno5(
             h[1:-1, :-4, 1:-1],
@@ -1515,17 +1521,19 @@ class Reconstruction3D(eqx.Module):
             h[1:-1, -3:-2, 1:-1], h[1:-1, -2:-1, 1:-1], h[1:-1, -1:, 1:-1]
         )
         h_pos = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=1)
-        h5_neg_int = _weno5(
-            h[1:-1, 4:, 1:-1],
-            h[1:-1, 3:-1, 1:-1],
-            h[1:-1, 2:-2, 1:-1],
-            h[1:-1, 1:-3, 1:-1],
+        h5_neg_int = _weno5_right(
             h[1:-1, :-4, 1:-1],
+            h[1:-1, 1:-3, 1:-1],
+            h[1:-1, 2:-2, 1:-1],
+            h[1:-1, 3:-1, 1:-1],
+            h[1:-1, 4:, 1:-1],
         )
-        h3_neg_first = _weno3(
-            h[1:-1, 3:4, 1:-1], h[1:-1, 2:3, 1:-1], h[1:-1, 1:2, 1:-1]
+        h3_neg_penultimate = _weno3_right(
+            h[1:-1, -3:-2, 1:-1], h[1:-1, -2:-1, 1:-1], h[1:-1, -1:, 1:-1]
         )
-        h_neg = jnp.concatenate([h3_neg_first, h5_neg_int, h[1:-1, -1:, 1:-1]], axis=1)
+        h_neg = jnp.concatenate(
+            [h5_neg_int, h3_neg_penultimate, h[1:-1, -1:, 1:-1]], axis=1
+        )
         h_face = jnp.where(v[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = interior(h_face * v[1:-1, 1:-1, 1:-1], h)
         return out
@@ -1539,8 +1547,8 @@ class Reconstruction3D(eqx.Module):
 
         Positive flow:  fe[k,j,i+1/2] = WENOZ5(h[k,j,i-2..i+2]) * u
             for i = 2..Nx-3; WENO-Z-3 fallback at i = 1 and i = Nx-2.
-        Negative flow:  fe[k,j,i+1/2] = WENOZ5(h[k,j,i+3..i-1]) * u
-            for i = 2..Nx-3; WENO-Z-3 fallback at i = 1; 1st-order upwind at i = Nx-2.
+        Negative flow:  fe[k,j,i+1/2] = WENOZ5_right(h[k,j,i-1], h[k,j,i], h[k,j,i+1], h[k,j,i+2], h[k,j,i+3]) * u
+            for i = 1..Nx-4; WENO-Z-3_right fallback at i = Nx-3; 1st-order upwind at i = Nx-2.
         """
         h5_pos_int = _wenoz5(
             h[1:-1, 1:-1, :-4],
@@ -1556,17 +1564,19 @@ class Reconstruction3D(eqx.Module):
             h[1:-1, 1:-1, -3:-2], h[1:-1, 1:-1, -2:-1], h[1:-1, 1:-1, -1:]
         )
         h_pos = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=2)
-        h5_neg_int = _wenoz5(
-            h[1:-1, 1:-1, 4:],
-            h[1:-1, 1:-1, 3:-1],
-            h[1:-1, 1:-1, 2:-2],
-            h[1:-1, 1:-1, 1:-3],
+        h5_neg_int = _wenoz5_right(
             h[1:-1, 1:-1, :-4],
+            h[1:-1, 1:-1, 1:-3],
+            h[1:-1, 1:-1, 2:-2],
+            h[1:-1, 1:-1, 3:-1],
+            h[1:-1, 1:-1, 4:],
         )
-        h3_neg_first = _wenoz3(
-            h[1:-1, 1:-1, 3:4], h[1:-1, 1:-1, 2:3], h[1:-1, 1:-1, 1:2]
+        h3_neg_penultimate = _wenoz3_right(
+            h[1:-1, 1:-1, -3:-2], h[1:-1, 1:-1, -2:-1], h[1:-1, 1:-1, -1:]
         )
-        h_neg = jnp.concatenate([h3_neg_first, h5_neg_int, h[1:-1, 1:-1, -1:]], axis=2)
+        h_neg = jnp.concatenate(
+            [h5_neg_int, h3_neg_penultimate, h[1:-1, 1:-1, -1:]], axis=2
+        )
         h_face = jnp.where(u[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = interior(h_face * u[1:-1, 1:-1, 1:-1], h)
         return out
@@ -1580,8 +1590,8 @@ class Reconstruction3D(eqx.Module):
 
         Positive flow:  fn[k,j+1/2,i] = WENOZ5(h[k,j-2..j+2,i]) * v
             for j = 2..Ny-3; WENO-Z-3 fallback at j = 1 and j = Ny-2.
-        Negative flow:  fn[k,j+1/2,i] = WENOZ5(h[k,j+3..j-1,i]) * v
-            for j = 2..Ny-3; WENO-Z-3 fallback at j = 1; 1st-order upwind at j = Ny-2.
+        Negative flow:  fn[k,j+1/2,i] = WENOZ5_right(h[k,j-1,i], h[k,j,i], h[k,j+1,i], h[k,j+2,i], h[k,j+3,i]) * v
+            for j = 1..Ny-4; WENO-Z-3_right fallback at j = Ny-3; 1st-order upwind at j = Ny-2.
         """
         h5_pos_int = _wenoz5(
             h[1:-1, :-4, 1:-1],
@@ -1597,17 +1607,19 @@ class Reconstruction3D(eqx.Module):
             h[1:-1, -3:-2, 1:-1], h[1:-1, -2:-1, 1:-1], h[1:-1, -1:, 1:-1]
         )
         h_pos = jnp.concatenate([h3_pos_first, h5_pos_int, h3_pos_last], axis=1)
-        h5_neg_int = _wenoz5(
-            h[1:-1, 4:, 1:-1],
-            h[1:-1, 3:-1, 1:-1],
-            h[1:-1, 2:-2, 1:-1],
-            h[1:-1, 1:-3, 1:-1],
+        h5_neg_int = _wenoz5_right(
             h[1:-1, :-4, 1:-1],
+            h[1:-1, 1:-3, 1:-1],
+            h[1:-1, 2:-2, 1:-1],
+            h[1:-1, 3:-1, 1:-1],
+            h[1:-1, 4:, 1:-1],
         )
-        h3_neg_first = _wenoz3(
-            h[1:-1, 3:4, 1:-1], h[1:-1, 2:3, 1:-1], h[1:-1, 1:2, 1:-1]
+        h3_neg_penultimate = _wenoz3_right(
+            h[1:-1, -3:-2, 1:-1], h[1:-1, -2:-1, 1:-1], h[1:-1, -1:, 1:-1]
         )
-        h_neg = jnp.concatenate([h3_neg_first, h5_neg_int, h[1:-1, -1:, 1:-1]], axis=1)
+        h_neg = jnp.concatenate(
+            [h5_neg_int, h3_neg_penultimate, h[1:-1, -1:, 1:-1]], axis=1
+        )
         h_face = jnp.where(v[1:-1, 1:-1, 1:-1] >= 0.0, h_pos, h_neg)
         out = interior(h_face * v[1:-1, 1:-1, 1:-1], h)
         return out
