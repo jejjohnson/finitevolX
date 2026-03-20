@@ -74,7 +74,7 @@ import finitevolx as fvx
 # differs from fvx.masked_laplacian.  There is no public equivalent yet.
 from finitevolx._src.solvers.multigrid import _apply_operator
 
-IMG_DIR = Path(__file__).resolve().parent.parent / "docs" / "images" / "demo_solvers"
+IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "demo_solvers"
 IMG_DIR.mkdir(parents=True, exist_ok=True)
 
 # %% [markdown]
@@ -274,6 +274,9 @@ plt.show()
 print("Saved geometries.png")
 
 # %% [markdown]
+# ![Domain geometries](../images/demo_solvers/geometries.png)
+
+# %% [markdown]
 # ## 3. Rectangle — Spectral DST, CG, Multigrid
 #
 # The simplest geometry: no land mask, pure Dirichlet boundary conditions.
@@ -329,6 +332,10 @@ plot_triplet(
     "solver_rect_spectral.png",
 )
 
+# %% [markdown]
+# ![Rectangle: Spectral solver](../images/demo_solvers/solver_rect_spectral.png)
+
+# %%
 # ── CG + spectral preconditioner ──
 A_rect = lambda x: fvx.masked_laplacian(x, mask_rect_jnp, dx, dy, lambda_=lambda_)
 pc_rect = fvx.make_spectral_preconditioner(dx, dy, lambda_=lambda_, bc="dst")
@@ -351,6 +358,10 @@ plot_triplet(
     "solver_rect_cg.png",
 )
 
+# %% [markdown]
+# ![Rectangle: CG solver](../images/demo_solvers/solver_rect_cg.png)
+
+# %%
 # ── Multigrid (8 V-cycles) ──
 mg_rect = fvx.build_multigrid_solver(mask_rect, dx, dy, lambda_=lambda_, n_cycles=8)
 sol_mg_rect = mg_rect(rhs)
@@ -369,6 +380,10 @@ plot_triplet(
     "solver_rect_mg.png",
 )
 
+# %% [markdown]
+# ![Rectangle: Multigrid solver](../images/demo_solvers/solver_rect_mg.png)
+
+# %%
 results["Rectangle"] = {
     "Spectral": {"time_ms": t_sp_rect * 1000, "rel_residual": 0.0, "label": "exact"},
     "CG": {
@@ -441,6 +456,10 @@ plot_triplet(
 )
 print(f"  Capacitance: {t_cap * 1000:.2f} ms, boundary pts = {len(cap._j_b)}")
 
+# %% [markdown]
+# ![Basin: Capacitance solver](../images/demo_solvers/solver_basin_cap.png)
+
+# %%
 # ── CG + spectral preconditioner ──
 pc_basin = fvx.make_spectral_preconditioner(dx, dy, lambda_=lambda_, bc="dst")
 sol_cg_basin, info_cg_basin = fvx.solve_cg(
@@ -470,6 +489,10 @@ plot_triplet(
     "solver_basin_cg.png",
 )
 
+# %% [markdown]
+# ![Basin: CG solver](../images/demo_solvers/solver_basin_cg.png)
+
+# %%
 # ── Multigrid (8 V-cycles) ──
 mg_basin = fvx.build_multigrid_solver(mask_basin, dx, dy, lambda_=lambda_, n_cycles=8)
 sol_mg_basin = mg_basin(rhs_basin)
@@ -490,6 +513,10 @@ plot_triplet(
     "solver_basin_mg.png",
 )
 
+# %% [markdown]
+# ![Basin: Multigrid solver](../images/demo_solvers/solver_basin_mg.png)
+
+# %%
 results["Basin"] = {
     "Capacitance": {"time_ms": t_cap * 1000, "rel_residual": 0.0, "label": "direct"},
     "CG": {
@@ -563,6 +590,10 @@ plot_triplet(
     "solver_circle_cg.png",
 )
 
+# %% [markdown]
+# ![Circle: CG solver](../images/demo_solvers/solver_circle_cg.png)
+
+# %%
 # ── Multigrid (8 V-cycles) ──
 mg_circle = fvx.build_multigrid_solver(mask_circle, dx, dy, lambda_=lambda_, n_cycles=8)
 sol_mg_circle = mg_circle(rhs_circle)
@@ -583,6 +614,10 @@ plot_triplet(
     "solver_circle_mg.png",
 )
 
+# %% [markdown]
+# ![Circle: Multigrid solver](../images/demo_solvers/solver_circle_mg.png)
+
+# %%
 results["Circle"] = {
     "CG": {
         "time_ms": t_cg_circle * 1000,
@@ -673,6 +708,10 @@ plot_triplet(
     "solver_notch_mg.png",
 )
 
+# %% [markdown]
+# ![Notch: Multigrid solver](../images/demo_solvers/solver_notch_mg.png)
+
+# %%
 # ── MG-preconditioned CG ──
 pc_mg_notch = fvx.make_multigrid_preconditioner(mg_notch)
 sol_mgcg_notch, info_mgcg_notch = fvx.solve_cg(
@@ -702,6 +741,10 @@ plot_triplet(
     "solver_notch_mgcg.png",
 )
 
+# %% [markdown]
+# ![Notch: MG+CG solver](../images/demo_solvers/solver_notch_mgcg.png)
+
+# %%
 results["Notch\n(variable coeff)"] = {
     "Multigrid": {
         "time_ms": t_mg_notch * 1000,
@@ -821,6 +864,9 @@ plt.tight_layout()
 fig.savefig(IMG_DIR / "accuracy_timing.png", dpi=150, bbox_inches="tight")
 plt.show()
 print("Saved accuracy_timing.png")
+
+# %% [markdown]
+# ![Accuracy and timing comparison](../images/demo_solvers/accuracy_timing.png)
 
 # %% [markdown]
 # ## 8. Inhomogeneous Boundary Conditions (Known Boundary Values)
@@ -947,6 +993,9 @@ plt.tight_layout()
 fig.savefig(IMG_DIR / "inhomogeneous_bc.png", dpi=150, bbox_inches="tight")
 plt.show()
 print("Saved inhomogeneous_bc.png")
+
+# %% [markdown]
+# ![Inhomogeneous Dirichlet BCs via lifting](../images/demo_solvers/inhomogeneous_bc.png)
 
 # %% [markdown]
 # The lifting trick works with **any** solver (spectral, CG, capacitance,

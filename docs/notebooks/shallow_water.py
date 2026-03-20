@@ -73,7 +73,7 @@ jax.config.update("jax_enable_x64", True)
 
 import finitevolx as fvx
 
-IMG_DIR = Path(__file__).resolve().parent.parent / "docs" / "images" / "shallow_water"
+IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "shallow_water"
 IMG_DIR.mkdir(parents=True, exist_ok=True)
 
 # %% [markdown]
@@ -560,6 +560,9 @@ fig.savefig(IMG_DIR / "shallow_water_results.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
+# ![Nonlinear shallow water results](../images/shallow_water/shallow_water_results.png)
+
+# %% [markdown]
 # ## 10. Full Simulation
 #
 # The production script at `scripts/shallow_water.py` runs a longer
@@ -575,7 +578,7 @@ plt.show()
 # #   New: Advection2D for continuity, centered advection for momentum
 # ```
 #
-# ![Nonlinear shallow-water double gyre](../docs/images/shallow_water/shallow_water_double_gyre.gif)
+# ![Nonlinear shallow-water double gyre](../images/shallow_water/shallow_water_double_gyre.gif)
 
 # %% [markdown]
 # ## Summary

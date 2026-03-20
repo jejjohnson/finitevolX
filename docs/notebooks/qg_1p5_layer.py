@@ -75,7 +75,7 @@ jax.config.update("jax_enable_x64", True)
 
 import finitevolx as fvx
 
-IMG_DIR = Path(__file__).resolve().parent.parent / "docs" / "images" / "qg_1p5_layer"
+IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "qg_1p5_layer"
 IMG_DIR.mkdir(parents=True, exist_ok=True)
 
 # %% [markdown]
@@ -238,6 +238,9 @@ fig.savefig(IMG_DIR / "wind_curl_forcing.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
+# ![Double-gyre wind-curl forcing](../images/qg_1p5_layer/wind_curl_forcing.png)
+
+# %% [markdown]
 # The forcing is antisymmetric about the basin midline.  The southern
 # (blue) half receives negative PV input (anticyclonic), and the northern
 # (red) half receives positive PV input (cyclonic).
@@ -317,6 +320,9 @@ for ax in axes:
 fig.tight_layout()
 fig.savefig(IMG_DIR / "helmholtz_inversion_demo.png", dpi=150, bbox_inches="tight")
 plt.show()
+
+# %% [markdown]
+# ![Helmholtz inversion demonstration](../images/qg_1p5_layer/helmholtz_inversion_demo.png)
 
 # %% [markdown]
 # The Helmholtz inversion smears the PV anomaly pattern slightly due to
@@ -584,6 +590,9 @@ fig.savefig(IMG_DIR / "qg_1p5_layer_results.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
+# ![QG model results](../images/qg_1p5_layer/qg_1p5_layer_results.png)
+
+# %% [markdown]
 # Even in this short run the double-gyre pattern is visible: the wind
 # forcing has begun to spin up anticyclonic (negative $\psi$) circulation
 # in the south and cyclonic (positive $\psi$) circulation in the north.
@@ -602,7 +611,7 @@ plt.show()
 # separation develops inertial overshoot, and mesoscale eddies populate
 # the inter-gyre region.
 #
-# ![1.5-layer QG double gyre](../docs/images/qg_1p5_layer/qg_1p5_layer_double_gyre.gif)
+# ![1.5-layer QG double gyre](../images/qg_1p5_layer/qg_1p5_layer_double_gyre.gif)
 
 # %% [markdown]
 # ## 11. Summary
