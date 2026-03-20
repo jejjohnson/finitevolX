@@ -94,7 +94,13 @@ nav:
       - Usage Guide: multigrid_solver_usage.md
       - API Reference: api/multigrid.md
   - Solver Comparison: solver_comparison.md
-  - Examples: examples.md
+  - Examples:
+      - Overview: examples.md
+      - Elliptic Solvers: notebooks/demo_solvers.py
+      - Masks: notebooks/demo_masks.py
+      - Pressure Poisson: notebooks/pressure_poisson.py
+      - Streamfunction Inversion: notebooks/streamfunction_inversion.py
+      - Helmholtz Screening: notebooks/helmholtz_screening.py
   - Changelog: CHANGELOG.md
 
 markdown_extensions:
