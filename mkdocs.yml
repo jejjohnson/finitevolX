@@ -101,6 +101,9 @@ nav:
       - Pressure Poisson: notebooks/pressure_poisson.py
       - Streamfunction Inversion: notebooks/streamfunction_inversion.py
       - Helmholtz Screening: notebooks/helmholtz_screening.py
+      - 1-D Advection Schemes: notebooks/advection_1d_schemes.py
+      - 2-D Rotating Advection: notebooks/advection_2d_rotation.py
+      - 2-D Masked Advection: notebooks/advection_2d_masked.py
       - Linear Shallow Water: notebooks/swm_linear.py
       - Nonlinear Shallow Water: notebooks/shallow_water.py
       - 1.5-Layer QG: notebooks/qg_1p5_layer.py
