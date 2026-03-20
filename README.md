@@ -165,25 +165,25 @@ See the [documentation](https://jejjohnson.github.io/finitevolX/) for the full A
 
 ## Examples
 
-The `notebooks/` directory contains pedagogical Jupytext notebooks that build models step by step with equations, ASCII diagrams, and inline figures. The `scripts/` directory has production simulation scripts that generate Zarr output and animated GIFs.
+The `docs/notebooks/` directory contains pedagogical Jupytext notebooks that build models step by step with equations, ASCII diagrams, and inline figures. The `scripts/` directory has production simulation scripts that generate Zarr output and animated GIFs.
 
 ### Tutorials
 
 | Notebook | Description | Key APIs |
 |----------|-------------|----------|
-| [Masks](notebooks/demo_masks.py) | C-grid mask construction, staggered derivation, boundary classification | `ArakawaCGridMask` |
-| [Elliptic Solvers](notebooks/demo_solvers.py) | Spectral, capacitance, CG, multigrid on 4 geometries + inhomogeneous BCs | `solve_helmholtz_dst`, `build_capacitance_solver`, `solve_cg`, `build_multigrid_solver` |
-| [Pressure Poisson](notebooks/pressure_poisson.py) | Divergence-free projection on the C-grid, DST-I vs DST-II | `Divergence2D`, `Difference2D`, `solve_poisson_dst` |
-| [Streamfunction Inversion](notebooks/streamfunction_inversion.py) | X-point vs T-point placement, velocity recovery, convergence | `streamfunction_from_vorticity`, `solve_poisson_dst2` |
-| [Helmholtz Screening](notebooks/helmholtz_screening.py) | QG PV inversion with screening, JIT/vmap/grad | `StaggeredDirichletHelmholtzSolver2D`, `pv_inversion` |
+| [Masks](docs/notebooks/demo_masks.py) | C-grid mask construction, staggered derivation, boundary classification | `ArakawaCGridMask` |
+| [Elliptic Solvers](docs/notebooks/demo_solvers.py) | Spectral, capacitance, CG, multigrid on 4 geometries + inhomogeneous BCs | `solve_helmholtz_dst`, `build_capacitance_solver`, `solve_cg`, `build_multigrid_solver` |
+| [Pressure Poisson](docs/notebooks/pressure_poisson.py) | Divergence-free projection on the C-grid, DST-I vs DST-II | `Divergence2D`, `Difference2D`, `solve_poisson_dst` |
+| [Streamfunction Inversion](docs/notebooks/streamfunction_inversion.py) | X-point vs T-point placement, velocity recovery, convergence | `streamfunction_from_vorticity`, `solve_poisson_dst2` |
+| [Helmholtz Screening](docs/notebooks/helmholtz_screening.py) | QG PV inversion with screening, JIT/vmap/grad | `StaggeredDirichletHelmholtzSolver2D`, `pv_inversion` |
 
 ### Time-Dependent Models
 
 | Notebook | Model | Key APIs |
 |----------|-------|----------|
-| [Linear Shallow Water](notebooks/swm_linear.py) | Wind-driven double gyre on beta-plane | `Difference2D`, `Interpolation2D`, `Vorticity2D`, `heun_step` |
-| [Nonlinear Shallow Water](notebooks/shallow_water.py) | Full depth continuity + momentum advection | `Advection2D`, `Difference2D`, `heun_step` |
-| [1.5-Layer QG](notebooks/qg_1p5_layer.py) | PV advection + Helmholtz inversion | `Advection2D`, `solve_helmholtz_dst`, `heun_step` |
+| [Linear Shallow Water](docs/notebooks/swm_linear.py) | Wind-driven double gyre on beta-plane | `Difference2D`, `Interpolation2D`, `Vorticity2D`, `heun_step` |
+| [Nonlinear Shallow Water](docs/notebooks/shallow_water.py) | Full depth continuity + momentum advection | `Advection2D`, `Difference2D`, `heun_step` |
+| [1.5-Layer QG](docs/notebooks/qg_1p5_layer.py) | PV advection + Helmholtz inversion | `Advection2D`, `solve_helmholtz_dst`, `heun_step` |
 
 ### Double-Gyre Simulations (production scripts)
 
