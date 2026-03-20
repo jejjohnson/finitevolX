@@ -96,11 +96,14 @@ nav:
   - Solver Comparison: solver_comparison.md
   - Examples:
       - Overview: examples.md
-      - Elliptic Solvers: notebooks/demo_solvers.py
       - Masks: notebooks/demo_masks.py
+      - Elliptic Solvers: notebooks/demo_solvers.py
       - Pressure Poisson: notebooks/pressure_poisson.py
       - Streamfunction Inversion: notebooks/streamfunction_inversion.py
       - Helmholtz Screening: notebooks/helmholtz_screening.py
+      - Linear Shallow Water: notebooks/swm_linear.py
+      - Nonlinear Shallow Water: notebooks/shallow_water.py
+      - 1.5-Layer QG: notebooks/qg_1p5_layer.py
   - Changelog: CHANGELOG.md
 
 markdown_extensions:
