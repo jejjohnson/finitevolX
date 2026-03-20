@@ -53,10 +53,11 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-matplotlib.use("Agg")
 jax.config.update("jax_enable_x64", True)
 
 import finitevolx as fvx
@@ -89,21 +90,42 @@ Gamma = 1e5       # circulation (m²/s)
 r0 = 300e3        # vortex radius (300 km)
 x0, y0 = Lx / 2, Ly / 2  # centre of domain
 
-# T-point coordinates (cell centres, interior only)
-i_idx = jnp.arange(nx)[None, :] + 0.5
-j_idx = jnp.arange(ny)[:, None] + 0.5
-x_T = i_idx * dx
-y_T = j_idx * dy
+# We construct ζ on TWO grids to match each solver's convention:
+#
+# - DST-I (X-point/vertex): grid points at i*dx/(N+1) for i=1..N
+#   (vertices, excluding the zero-boundary endpoints)
+# - DST-II (T-point/cell-centre): grid points at (i+0.5)*dx/N for i=0..N-1
+#   (cell centres, with boundary half a spacing outside)
+#
+# The Gaussian vortex is smooth enough that the difference is negligible,
+# but using the correct grid for each solver avoids a systematic O(dx) shift.
 
-r2 = (x_T - x0) ** 2 + (y_T - y0) ** 2
-zeta = (Gamma / (jnp.pi * r0**2)) * jnp.exp(-r2 / r0**2)
+# DST-I grid: vertex-centred (X-point convention)
+i_X = jnp.arange(1, nx + 1)[None, :]
+j_X = jnp.arange(1, ny + 1)[:, None]
+x_X = i_X * dx * nx / (nx + 1)  # points at i/(N+1) * Lx
+y_X = j_X * dy * ny / (ny + 1)
 
-print(f"max |ζ| = {float(jnp.abs(zeta).max()):.4e} s⁻¹")
+# DST-II grid: cell-centred (T-point convention)
+i_T = jnp.arange(nx)[None, :] + 0.5
+j_T = jnp.arange(ny)[:, None] + 0.5
+x_T = i_T * dx
+y_T = j_T * dy
+
+# Vorticity on each grid
+r2_X = (x_X - x0) ** 2 + (y_X - y0) ** 2
+zeta_X = (Gamma / (jnp.pi * r0**2)) * jnp.exp(-r2_X / r0**2)
+
+r2_T = (x_T - x0) ** 2 + (y_T - y0) ** 2
+zeta_T = (Gamma / (jnp.pi * r0**2)) * jnp.exp(-r2_T / r0**2)
+
+print(f"max |ζ_X| = {float(jnp.abs(zeta_X).max()):.4e} s⁻¹ (vertex grid)")
+print(f"max |ζ_T| = {float(jnp.abs(zeta_T).max()):.4e} s⁻¹ (cell-centre grid)")
 
 # %%
 fig, ax = plt.subplots(figsize=(6, 5.5))
 im = ax.imshow(
-    np.asarray(zeta), origin="lower", cmap="RdBu_r",
+    np.asarray(zeta_T), origin="lower", cmap="RdBu_r",
     extent=[0, Lx / 1e6, 0, Ly / 1e6],
 )
 ax.set_xlabel("x (×10³ km)")
@@ -118,10 +140,10 @@ plt.show()
 #
 # The finitevolX convenience wrapper `streamfunction_from_vorticity`
 # uses DST-I by default, which assumes $\psi$ lives at grid vertices
-# (X-points/corners).
+# (X-points/corners).  We pass `zeta_X` (vertex-centred grid).
 
 # %%
-psi_X = fvx.streamfunction_from_vorticity(zeta, dx, dy, bc="dst")
+psi_X = fvx.streamfunction_from_vorticity(zeta_X, dx, dy, bc="dst")
 
 print(f"ψ_X range: [{float(psi_X.min()):.2e}, {float(psi_X.max()):.2e}]")
 
@@ -132,7 +154,7 @@ print(f"ψ_X range: [{float(psi_X.min()):.2e}, {float(psi_X.max()):.2e}]")
 # the staggered Dirichlet solver directly.
 
 # %%
-psi_T = solve_poisson_dst2(zeta, dx, dy)
+psi_T = solve_poisson_dst2(zeta_T, dx, dy)
 
 print(f"ψ_T range: [{float(psi_T.min()):.2e}, {float(psi_T.max()):.2e}]")
 
@@ -169,18 +191,16 @@ plt.show()
 #
 # From each $\psi$ placement, we recover $(u, v)$ using C-grid differences.
 #
-# **From $\psi$ at X-points:**
-# - $u = -\partial\psi/\partial y$ at U-points (X→U: backward y-difference)
-# - $v = +\partial\psi/\partial x$ at V-points (X→V: backward x-difference)
+# **From $\psi$ at X-points (corners):**
+# - $u = -\partial\psi/\partial y$ at U-points via `diff_y_X_to_U` (natural X→U map)
+# - $v = +\partial\psi/\partial x$ at V-points via `diff_x_X_to_V` (natural X→V map)
 #
-# **From $\psi$ at T-points:**
-# - $u = -\partial\psi/\partial y$ at U-points (T→U needs y-interpolation + difference)
-# - $v = +\partial\psi/\partial x$ at V-points (T→V needs x-interpolation + difference)
-#
-# For simplicity, we use the full-grid Difference2D operator for both.
+# **From $\psi$ at T-points (cell centres):**
+# - `Difference2D.grad_perp(psi)` returns $(u, v)$ at (U, V) points directly,
+#   combining interpolation and differentiation in the correct staggered sense.
 
 # %%
-# Pad psi_X into full grid (with ghost ring)
+# Pad into full grid (with ghost ring)
 psi_X_full = jnp.zeros((ny + 2, nx + 2))
 psi_X_full = psi_X_full.at[1:-1, 1:-1].set(psi_X)
 
@@ -189,15 +209,12 @@ psi_T_full = psi_T_full.at[1:-1, 1:-1].set(psi_T)
 
 diff_op = fvx.Difference2D(grid)
 
-# From ψ at X-points: u = -dψ/dy, v = +dψ/dx
-# For X-point ψ, the natural differences are X→U and X→V
-# but Difference2D operates T→U and T→V, so this is approximate
-u_from_X = -diff_op.diff_y_T_to_V(psi_X_full)
-v_from_X = diff_op.diff_x_T_to_U(psi_X_full)
+# From ψ at X-points: use dedicated X→U and X→V operators
+u_from_X = -diff_op.diff_y_X_to_U(psi_X_full)
+v_from_X = diff_op.diff_x_X_to_V(psi_X_full)
 
-# From ψ at T-points: same T→U, T→V differences
-u_from_T = -diff_op.diff_y_T_to_V(psi_T_full)
-v_from_T = diff_op.diff_x_T_to_U(psi_T_full)
+# From ψ at T-points: use perpendicular gradient (u at U, v at V)
+u_from_T, v_from_T = diff_op.grad_perp(psi_T_full)
 
 # %%
 fig, axes = plt.subplots(2, 2, figsize=(12, 10))

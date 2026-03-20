@@ -59,11 +59,12 @@ import time
 import jax
 import jax.numpy as jnp
 import matplotlib
+
+matplotlib.use("Agg")
 from matplotlib.patches import Patch
 import matplotlib.pyplot as plt
 import numpy as np
 
-matplotlib.use("Agg")
 jax.config.update("jax_enable_x64", True)
 
 import finitevolx as fvx

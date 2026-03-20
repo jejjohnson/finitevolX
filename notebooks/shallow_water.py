@@ -64,10 +64,11 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-matplotlib.use("Agg")
 jax.config.update("jax_enable_x64", True)
 
 import finitevolx as fvx
