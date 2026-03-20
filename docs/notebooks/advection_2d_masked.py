@@ -237,7 +237,7 @@ def combine_adaptive(adaptive):
     return out
 
 
-fig, axes = plt.subplots(1, 2, figsize=(13, 5.5))
+fig, axes = plt.subplots(1, 2, figsize=(13, 5.5), constrained_layout=True)
 cmap = matplotlib.colors.ListedColormap(["#2d2d2d", "#d62728", "#ff7f0e", "#1f77b4"])
 bounds = [-0.5, 1, 3, 5, 7]
 norm = matplotlib.colors.BoundaryNorm(bounds, cmap.N)
@@ -255,7 +255,6 @@ for ax, adaptive, title in [
 
 cbar = fig.colorbar(im, ax=axes, shrink=0.75, ticks=[0, 2, 4, 6])
 cbar.ax.set_yticklabels(["land", "upwind1", "WENO3", "WENO5"])
-fig.tight_layout()
 fig.savefig(IMG_DIR / "adaptive_stencils.png", dpi=150, bbox_inches="tight")
 
 # %% [markdown]
@@ -362,7 +361,7 @@ for name, cfg in experiments.items():
 # ### Side-by-side comparison
 
 # %%
-fig, axes = plt.subplots(1, 3, figsize=(15, 4.5), sharey=True)
+fig, axes = plt.subplots(1, 3, figsize=(15, 4.5), sharey=True, constrained_layout=True)
 
 for ax, (name, data) in zip(axes, results.items(), strict=False):
     im = ax.imshow(
@@ -379,7 +378,6 @@ for ax, (name, data) in zip(axes, results.items(), strict=False):
 
 axes[0].set_ylabel("j")
 fig.colorbar(im, ax=axes, shrink=0.85, label="q")
-fig.tight_layout()
 fig.savefig(IMG_DIR / "comparison.png", dpi=150, bbox_inches="tight")
 
 # %% [markdown]
@@ -470,7 +468,7 @@ fig.savefig(IMG_DIR / "comparison.png", dpi=150, bbox_inches="tight")
 # Let's zoom in on the C-island channel to see the cascade close up.
 
 # %%
-fig, axes = plt.subplots(1, 3, figsize=(14, 4))
+fig, axes = plt.subplots(1, 3, figsize=(14, 4), constrained_layout=True)
 
 # Zoom region around the C-island channel
 r_slice = slice(18, 46)
@@ -506,8 +504,7 @@ fig.colorbar(im, ax=axes[2], shrink=0.85)
 for ax in axes:
     ax.set_xlabel("i (zoomed)")
 axes[0].set_ylabel("j (zoomed)")
-fig.suptitle("Zoom: C-Island Channel", fontsize=13, y=1.02)
-fig.tight_layout()
+fig.suptitle("Zoom: C-Island Channel", fontsize=13)
 fig.savefig(IMG_DIR / "channel_zoom.png", dpi=150, bbox_inches="tight")
 
 # %% [markdown]
