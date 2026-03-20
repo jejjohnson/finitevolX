@@ -1,5 +1,6 @@
 """Tests for Advection1D, Advection2D, Advection3D."""
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -417,3 +418,74 @@ class TestAdvection3DMask:
         v = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
         result = adv(h, u, v, method="weno5", mask=coastal)
         assert jnp.all(jnp.isfinite(result)).item()
+
+
+class TestAdvection2DRotationStability:
+    """Regression test: WENO5/WENOZ5 must remain stable under solid-body rotation.
+
+    Before the right-biased reconstruction fix, WENO5 would blow up
+    within ~165 steps for any spatially varying velocity field with
+    sign changes (e.g., rotation).
+    """
+
+    @pytest.fixture
+    def rotation_setup(self):
+        """Set up a small solid-body rotation test case."""
+        nx = ny = 32
+        ng = 4
+        Lx = Ly = 1.0
+        omega = 2 * jnp.pi
+        dx = Lx / nx
+        dy = Ly / ny
+        grid = ArakawaCGrid2D(
+            Nx=nx + 2 * ng, Ny=ny + 2 * ng, Lx=Lx, Ly=Ly, dx=dx, dy=dy
+        )
+        # Staggered coordinates
+        x_t = (jnp.arange(grid.Nx) - ng + 0.5) * dx
+        y_t = (jnp.arange(grid.Ny) - ng + 0.5) * dy
+        _Xu, Yu = jnp.meshgrid(x_t + 0.5 * dx, y_t)
+        Xv, _Yv = jnp.meshgrid(x_t, y_t + 0.5 * dy)
+        u = -omega * (Yu - 0.5)
+        v = omega * (Xv - 0.5)
+        # Cosine bell IC
+        Xt, Yt = jnp.meshgrid(x_t, y_t)
+        r = jnp.sqrt((Xt - 0.25) ** 2 + (Yt - 0.5) ** 2)
+        q0 = jnp.where(r < 0.15, 0.5 * (1 + jnp.cos(jnp.pi * r / 0.15)), 0.0)
+
+        def pbc(h):
+            h = h.at[:ng, :].set(h[-2 * ng : -ng, :])
+            h = h.at[-ng:, :].set(h[ng : 2 * ng, :])
+            h = h.at[:, :ng].set(h[:, -2 * ng : -ng])
+            h = h.at[:, -ng:].set(h[:, ng : 2 * ng])
+            return h
+
+        q0 = pbc(q0)
+        u_max = float(jnp.max(jnp.abs(u)))
+        v_max = float(jnp.max(jnp.abs(v)))
+        dt = 0.3 / (u_max / dx + v_max / dy)
+        T = 0.5  # half revolution
+        nsteps = int(T / dt)
+        dt = T / nsteps
+        return grid, q0, u, v, pbc, dt, nsteps, ng
+
+    @pytest.mark.parametrize("method", ["weno5", "wenoz5"])
+    def test_rotation_stays_finite(self, rotation_setup, method):
+        grid, q0, u, v, pbc, dt, nsteps, ng = rotation_setup
+        from finitevolx import Advection2D, rk3_ssp_step
+
+        advect = Advection2D(grid)
+
+        def rhs(q):
+            q = pbc(q)
+            return advect(q, u, v, method=method)
+
+        rhs_jit = jax.jit(rhs)
+        q = q0.copy()
+        for _ in range(nsteps):
+            q = rk3_ssp_step(q, rhs_jit, dt)
+            q = pbc(q)
+
+        assert jnp.all(jnp.isfinite(q)).item(), f"{method} produced NaN/Inf"
+        peak = float(jnp.max(q[ng:-ng, ng:-ng]))
+        assert peak > 0.5, f"{method} peak eroded to {peak}, expected > 0.5"
+        assert peak < 1.2, f"{method} peak grew to {peak}, expected < 1.2"

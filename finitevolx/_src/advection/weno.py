@@ -410,6 +410,118 @@ def weno_5pts_improved(
     return qi_weno5
 
 
+def weno_3pts_right(q0: Array, qp: Array, qpp: Array) -> Array:
+    """
+    3-points non-linear right-biased stencil reconstruction at face q0+1/2:
+
+    q0--x--qp-----qpp
+
+    Uses sub-stencils {q0, qp} and {qp, qpp} with reversed optimal weights.
+
+    Jiang and Shu, J. Comput. Phys. 126, 202–228 (1996), Section 2.3.
+    """
+    eps = 1e-8
+
+    qi1 = 0.5 * (q0 + qp)
+    qi2 = 1.5 * qp - 0.5 * qpp
+
+    beta1 = (qp - q0) ** 2
+    beta2 = (qpp - qp) ** 2
+
+    g1, g2 = 2.0 / 3.0, 1.0 / 3.0
+    w1 = g1 / (beta1 + eps) ** 2
+    w2 = g2 / (beta2 + eps) ** 2
+
+    return (w1 * qi1 + w2 * qi2) / (w1 + w2)
+
+
+def weno_3pts_improved_right(q0: Array, qp: Array, qpp: Array) -> Array:
+    """
+    3-points non-linear right-biased WENO-Z stencil reconstruction at face q0+1/2:
+
+    q0--x--qp-----qpp
+
+    Borges et al, J. Comput. Phys. 227 (2008).
+    """
+    eps = 1e-14
+
+    qi1 = 0.5 * (q0 + qp)
+    qi2 = 1.5 * qp - 0.5 * qpp
+
+    beta1 = (qp - q0) ** 2
+    beta2 = (qpp - qp) ** 2
+    tau = jnp.abs(beta2 - beta1)
+
+    g1, g2 = 2.0 / 3.0, 1.0 / 3.0
+    w1 = g1 * (1.0 + tau / (beta1 + eps))
+    w2 = g2 * (1.0 + tau / (beta2 + eps))
+
+    return (w1 * qi1 + w2 * qi2) / (w1 + w2)
+
+
+def weno_5pts_right(qm: Array, q0: Array, qp: Array, qpp: Array, qppp: Array) -> Array:
+    """
+    5-points non-linear right-biased stencil reconstruction at face q0+1/2:
+
+    qm-----q0--x--qp----qpp---qppp
+
+    Uses cells {qm, q0, qp, qpp, qppp} to reconstruct the face value from
+    the right (upwind for negative velocity).
+
+    Jiang and Shu, J. Comput. Phys. 126, 202–228 (1996), Section 2.3.
+    """
+    eps = 1e-8
+
+    # Candidate reconstructions at face q0+1/2
+    qi1 = 1.0 / 3.0 * qppp - 7.0 / 6.0 * qpp + 11.0 / 6.0 * qp
+    qi2 = -1.0 / 6.0 * qpp + 5.0 / 6.0 * qp + 1.0 / 3.0 * q0
+    qi3 = 1.0 / 3.0 * qp + 5.0 / 6.0 * q0 - 1.0 / 6.0 * qm
+
+    # Smoothness indicators
+    k1, k2 = 13.0 / 12.0, 0.25
+    beta1 = k1 * (qp - 2 * qpp + qppp) ** 2 + k2 * (3 * qp - 4 * qpp + qppp) ** 2
+    beta2 = k1 * (q0 - 2 * qp + qpp) ** 2 + k2 * (q0 - qpp) ** 2
+    beta3 = k1 * (qm - 2 * q0 + qp) ** 2 + k2 * (qm - 4 * q0 + 3 * qp) ** 2
+
+    g1, g2, g3 = 0.1, 0.6, 0.3
+    w1 = g1 / (beta1 + eps) ** 2
+    w2 = g2 / (beta2 + eps) ** 2
+    w3 = g3 / (beta3 + eps) ** 2
+
+    return (w1 * qi1 + w2 * qi2 + w3 * qi3) / (w1 + w2 + w3)
+
+
+def weno_5pts_improved_right(
+    qm: Array, q0: Array, qp: Array, qpp: Array, qppp: Array
+) -> Array:
+    """
+    5-points non-linear right-biased WENO-Z stencil reconstruction at face q0+1/2:
+
+    qm-----q0--x--qp----qpp---qppp
+
+    Borges et al, J. Comput. Phys. 227 (2008).
+    """
+    eps = 1e-16
+
+    qi1 = 1.0 / 3.0 * qppp - 7.0 / 6.0 * qpp + 11.0 / 6.0 * qp
+    qi2 = -1.0 / 6.0 * qpp + 5.0 / 6.0 * qp + 1.0 / 3.0 * q0
+    qi3 = 1.0 / 3.0 * qp + 5.0 / 6.0 * q0 - 1.0 / 6.0 * qm
+
+    k1, k2 = 13.0 / 12.0, 0.25
+    beta1 = k1 * (qp - 2 * qpp + qppp) ** 2 + k2 * (3 * qp - 4 * qpp + qppp) ** 2
+    beta2 = k1 * (q0 - 2 * qp + qpp) ** 2 + k2 * (q0 - qpp) ** 2
+    beta3 = k1 * (qm - 2 * q0 + qp) ** 2 + k2 * (qm - 4 * q0 + 3 * qp) ** 2
+
+    tau5 = jnp.abs(beta1 - beta3)
+
+    g1, g2, g3 = 0.1, 0.6, 0.3
+    w1 = g1 * (1 + tau5 / (beta1 + eps))
+    w2 = g2 * (1 + tau5 / (beta2 + eps))
+    w3 = g3 * (1 + tau5 / (beta3 + eps))
+
+    return (w1 * qi1 + w2 * qi2 + w3 * qi3) / (w1 + w2 + w3)
+
+
 def weno_7pts(
     qmmm: Array,
     qmm: Array,

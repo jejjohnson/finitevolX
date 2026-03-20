@@ -19,8 +19,12 @@ import pytest
 from finitevolx._src.advection.weno import (
     weno_3pts,
     weno_3pts_improved,
+    weno_3pts_improved_right,
+    weno_3pts_right,
     weno_5pts,
     weno_5pts_improved,
+    weno_5pts_improved_right,
+    weno_5pts_right,
 )
 
 jax.config.update("jax_enable_x64", True)
@@ -412,3 +416,111 @@ class TestWenoJaxCompat:
         eager = weno_5pts_improved(q[:-4], q[1:-3], q[2:-2], q[3:-1], q[4:])
         jitted = jax.jit(weno_5pts_improved)(q[:-4], q[1:-3], q[2:-2], q[3:-1], q[4:])
         np.testing.assert_allclose(jitted, eager, rtol=1e-10)
+
+
+# ---------------------------------------------------------------------------
+# Right-biased kernels: constant-field, linear-exactness, and upwind tests
+# ---------------------------------------------------------------------------
+
+
+class TestWeno3Right:
+    """Right-biased WENO-3 at face i+1/2 using {q_i, q_{i+1}, q_{i+2}}."""
+
+    def test_constant(self):
+        c = 3.0
+        result = weno_3pts_right(_scalar(c), _scalar(c), _scalar(c))
+        np.testing.assert_allclose(float(result), c, rtol=1e-10)
+
+    def test_constant_array(self):
+        c = 2.5
+        q = c * jnp.ones(20)
+        result = weno_3pts_right(q[:-2], q[1:-1], q[2:])
+        np.testing.assert_allclose(result, c, rtol=1e-10)
+
+    def test_linear_exact(self):
+        """Right-biased WENO3 should be exact for linear data."""
+        dx = 0.1
+        q = jnp.arange(10, dtype=float) * dx
+        # face at i+1/2: exact value = (i + 0.5)*dx
+        result = weno_3pts_right(q[:-2], q[1:-1], q[2:])
+        expected = (jnp.arange(len(result)) + 0.5) * dx
+        np.testing.assert_allclose(result, expected, atol=1e-12)
+
+    def test_step_upwind_from_right(self):
+        """At a step, right-biased should select the upwind (right) value."""
+        # Step: 0 0 0 | 1 1 1, face between 0-region and 1-region
+        q0 = _scalar(0.0)  # cell i (left of face)
+        qp = _scalar(1.0)  # cell i+1 (right of face, upwind for u<0)
+        qpp = _scalar(1.0)  # cell i+2
+        result = float(weno_3pts_right(q0, qp, qpp))
+        assert result > 0.9, f"Right-biased should select ~1.0, got {result}"
+
+    def test_wenoz3_right_constant(self):
+        c = 4.2
+        result = weno_3pts_improved_right(_scalar(c), _scalar(c), _scalar(c))
+        np.testing.assert_allclose(float(result), c, rtol=1e-10)
+
+    def test_wenoz3_right_linear(self):
+        dx = 0.1
+        q = jnp.arange(10, dtype=float) * dx
+        result = weno_3pts_improved_right(q[:-2], q[1:-1], q[2:])
+        expected = (jnp.arange(len(result)) + 0.5) * dx
+        np.testing.assert_allclose(result, expected, atol=1e-12)
+
+
+class TestWeno5Right:
+    """Right-biased WENO-5 at face i+1/2 using {q_{i-1}..q_{i+3}}."""
+
+    def test_constant(self):
+        c = 5.0
+        s = _scalar(c)
+        result = weno_5pts_right(s, s, s, s, s)
+        np.testing.assert_allclose(float(result), c, rtol=1e-10)
+
+    def test_constant_array(self):
+        c = 1.7
+        q = c * jnp.ones(20)
+        result = weno_5pts_right(q[:-4], q[1:-3], q[2:-2], q[3:-1], q[4:])
+        np.testing.assert_allclose(result, c, rtol=1e-10)
+
+    def test_linear_exact(self):
+        """Right-biased WENO5 should be exact for linear data."""
+        dx = 0.05
+        q = jnp.arange(20, dtype=float) * dx
+        # face at (k+1)+1/2 for k-th element
+        result = weno_5pts_right(q[:-4], q[1:-3], q[2:-2], q[3:-1], q[4:])
+        expected = (jnp.arange(len(result)) + 1.5) * dx
+        np.testing.assert_allclose(result, expected, atol=1e-12)
+
+    def test_quadratic_accurate(self):
+        """On smooth quadratic data, right-biased should be 5th-order accurate."""
+        dx = 0.05
+        q = (jnp.arange(20, dtype=float) * dx) ** 2
+        result = weno_5pts_right(q[:-4], q[1:-3], q[2:-2], q[3:-1], q[4:])
+        # face at (k+1)+1/2, exact = ((k+1)+0.5)^2 * dx^2
+        expected = ((jnp.arange(len(result)) + 1.5) * dx) ** 2
+        # 5th-order accuracy: error ~ O(dx^5) ≈ 3e-7 for dx=0.05
+        np.testing.assert_allclose(result, expected, atol=1e-3)
+
+    def test_step_upwind_from_right(self):
+        """At a step, right-biased should select the upwind (right) value."""
+        qm = _scalar(0.0)
+        q0 = _scalar(0.0)
+        qp = _scalar(1.0)  # cell i+1 (upwind for u<0)
+        qpp = _scalar(1.0)
+        qppp = _scalar(1.0)
+        result = float(weno_5pts_right(qm, q0, qp, qpp, qppp))
+        assert result > 0.9, f"Right-biased should select ~1.0, got {result}"
+
+    def test_wenoz5_right_constant(self):
+        c = 3.3
+        s = _scalar(c)
+        result = weno_5pts_improved_right(s, s, s, s, s)
+        np.testing.assert_allclose(float(result), c, rtol=1e-10)
+
+    def test_wenoz5_right_linear(self):
+        dx = 0.05
+        q = jnp.arange(20, dtype=float) * dx
+        result = weno_5pts_improved_right(q[:-4], q[1:-3], q[2:-2], q[3:-1], q[4:])
+        expected = (jnp.arange(len(result)) + 1.5) * dx
+        np.testing.assert_allclose(result, expected, atol=1e-12)
