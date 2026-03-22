@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.0.37](https://github.com/jejjohnson/finitevolX/compare/v0.0.36...v0.0.37) (2026-03-20)
+
+
+### Features
+
+* **docs:** add three advection tutorial notebooks ([1e12210](https://github.com/jejjohnson/finitevolX/commit/1e122105361f1f3fd9fef39d62f73dd2e67bdfce))
+
+
+### Bug Fixes
+
+* address PR [#184](https://github.com/jejjohnson/finitevolX/issues/184) review comments ([afe7428](https://github.com/jejjohnson/finitevolX/commit/afe7428a03c6dda23ee79723703baf5fa9a2d5b5))
+* address PR [#184](https://github.com/jejjohnson/finitevolX/issues/184) review comments (round 2) ([8eaa904](https://github.com/jejjohnson/finitevolX/commit/8eaa9045f7375022c08dfb3c108aa3341b2bbe2c))
+* **advection:** correct right-biased WENO reconstruction for negative flow ([db5b079](https://github.com/jejjohnson/finitevolX/commit/db5b0792d97fc19ee379ebadc6b8f45ebbfb86eb))
+* **docs:** add notebook symlinks so mkdocs-jupyter can find them ([5d9fecf](https://github.com/jejjohnson/finitevolX/commit/5d9fecf3cfce2690a5451894a70372348bef671c))
+* **docs:** correct image paths — use ../../images/ for mkdocs-jupyter ([ef0f18b](https://github.com/jejjohnson/finitevolX/commit/ef0f18ba5cbe79c271c3fb6d2eab48d1f40ac590))
+* **docs:** embed all figures as markdown images for non-executed rendering ([98c776b](https://github.com/jejjohnson/finitevolX/commit/98c776b7535358bd6b7ff03594d5b558531687cb))
+* **docs:** enable MathJax rendering in mkdocs-jupyter notebooks ([42cf22d](https://github.com/jejjohnson/finitevolX/commit/42cf22d0a145bb8524bee0b9d81d868dabd57864))
+* **docs:** move notebooks to docs/ and embed figures for mkdocs rendering ([81be84d](https://github.com/jejjohnson/finitevolX/commit/81be84db436d91e0cb789cbcf208820a270baa72))
+* **docs:** remove restrictive MathJax class filter breaking notebook math ([1549298](https://github.com/jejjohnson/finitevolX/commit/15492984edab8af18c990ab32379fb521b8f7fba))
+* **docs:** use constrained_layout for masked advection plots ([b91a05b](https://github.com/jejjohnson/finitevolX/commit/b91a05b549ece54a3442cee76cd4fec502656cfb))
+
 ## [0.0.36](https://github.com/jejjohnson/finitevolX/compare/v0.0.35...v0.0.36) (2026-03-19)
 
 
