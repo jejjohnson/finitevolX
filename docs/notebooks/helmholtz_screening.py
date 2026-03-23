@@ -32,8 +32,8 @@
 # | Mesoscale | 200–500 km | moderate | Moderate screening |
 # | Submesoscale | 10–50 km | large | Strong screening — very local response |
 #
-# This notebook demonstrates the screening effect using the module-class
-# solvers from spectraldiffx, integrated with finitevolX's C-grid operators.
+# This notebook demonstrates the screening effect using the spectral
+# solver classes (re-exported from spectraldiffx) via finitevolX's public API.
 
 # %%
 from pathlib import Path
@@ -51,7 +51,7 @@ jax.config.update("jax_enable_x64", True)
 import equinox as eqx
 
 import finitevolx as fvx
-from spectraldiffx import (
+from finitevolx import (
     StaggeredDirichletHelmholtzSolver2D,
     RegularNeumannHelmholtzSolver2D,
 )
