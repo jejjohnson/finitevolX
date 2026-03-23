@@ -47,7 +47,6 @@
 # | **Spectral DST** | Eigenvalue division in frequency space | No | No | $O(N \log N)$ |
 # | **Capacitance matrix** | Sherman-Morrison-Woodbury correction | Yes (few bdry pts) | No | $O(N \log N + B^2)$ |
 # | **CG + spectral PC** | Krylov iteration, spectral preconditioner | Yes | No | $O(k \cdot N \log N)$ |
-# | **CG + Nyström PC** | Krylov iteration, low-rank approximate inverse | Yes | No | $O(k \cdot N)$ |
 # | **Multigrid** | Recursive V-cycle coarsening / smoothing | Yes | Yes | $O(N)$ |
 # | **MG + CG** | MG V-cycle as CG preconditioner | Yes | Yes | $O(k \cdot N)$ |
 
@@ -594,56 +593,6 @@ plot_triplet(
 # %% [markdown]
 # ![Circle: CG solver](../../images/demo_solvers/solver_circle_cg.png)
 
-# %% [markdown]
-# ### CG with Nyström preconditioner (operator-only)
-#
-# The **Nyström preconditioner** builds a low-rank approximate inverse by
-# probing the operator with random vectors.  Unlike the spectral
-# preconditioner (which requires knowledge of the grid spacing and BC type),
-# Nyström only needs `matvec` access — useful when the operator is a black
-# box.  The `rank` parameter controls the quality of the approximation;
-# higher ranks give better preconditioning at the cost of a more expensive
-# setup.
-
-# %%
-# ── CG + Nyström preconditioner ──
-pc_nystrom_circle = fvx.make_nystrom_preconditioner(
-    A_circle, shape=(Ny, Nx), rank=100, key=jax.random.PRNGKey(0)
-)
-sol_nystrom_circle, info_nystrom_circle = fvx.solve_cg(
-    A_circle, rhs_circle, preconditioner=pc_nystrom_circle, rtol=1e-10, atol=1e-10
-)
-sol_nystrom_circle = sol_nystrom_circle * mask_circle_jnp
-t_nystrom_circle = time_fn(
-    lambda: (
-        fvx.solve_cg(
-            A_circle,
-            rhs_circle,
-            preconditioner=pc_nystrom_circle,
-            rtol=1e-10,
-            atol=1e-10,
-        )[0]
-        * mask_circle_jnp
-    )
-)
-rr_nystrom_circle = rel_residual(
-    sol_nystrom_circle, rhs_circle, A_circle, interior_mask=mask_circle_jnp
-)
-err_nystrom_circle = (rhs_circle - A_circle(sol_nystrom_circle)) * mask_circle_jnp
-
-plot_triplet(
-    rhs_circle,
-    sol_nystrom_circle,
-    err_nystrom_circle,
-    mask_circle,
-    f"Circle — CG + Nyström PC ({info_nystrom_circle.iterations} iters, rank 100)",
-    f"CG+Nyström, {info_nystrom_circle.iterations} iters",
-    "solver_circle_nystrom.png",
-)
-
-# %% [markdown]
-# ![Circle: CG + Nyström](../../images/demo_solvers/solver_circle_nystrom.png)
-
 # %%
 # ── Multigrid (8 V-cycles) ──
 mg_circle = fvx.build_multigrid_solver(mask_circle, dx, dy, lambda_=lambda_, n_cycles=8)
@@ -675,11 +624,6 @@ results["Circle"] = {
         "rel_residual": rr_cg_circle,
         "label": f"{info_cg_circle.iterations} iters",
     },
-    "Nyström": {
-        "time_ms": t_nystrom_circle * 1000,
-        "rel_residual": rr_nystrom_circle,
-        "label": f"{info_nystrom_circle.iterations} iters",
-    },
     "Multigrid": {
         "time_ms": t_mg_circle * 1000,
         "rel_residual": rr_mg_circle,
@@ -687,12 +631,8 @@ results["Circle"] = {
     },
 }
 
-print(f"  CG:      {t_cg_circle * 1000:.2f} ms, {info_cg_circle.iterations} iters")
-print(
-    f"  Nyström: {t_nystrom_circle * 1000:.2f} ms, "
-    f"{info_nystrom_circle.iterations} iters"
-)
-print(f"  MG:      {t_mg_circle * 1000:.2f} ms, rel residual = {rr_mg_circle:.2e}")
+print(f"  CG: {t_cg_circle * 1000:.2f} ms, {info_cg_circle.iterations} iters")
+print(f"  MG: {t_mg_circle * 1000:.2f} ms, rel residual = {rr_mg_circle:.2e}")
 
 # %% [markdown]
 # ## 6. Notch Domain with Variable Coefficient — Multigrid, MG+CG
@@ -846,7 +786,6 @@ colors = {
     "Spectral": "#2196F3",
     "Capacitance": "#4CAF50",
     "CG": "#FF9800",
-    "Nyström": "#795548",
     "Multigrid": "#9C27B0",
     "MG+CG": "#E91E63",
 }
@@ -1082,7 +1021,6 @@ print("Saved inhomogeneous_bc.png")
 # | **Rectangle** | Spectral (DST) | Full grid, constant coeff | $O(N \log N)$, exact |
 # | **Near-rectangular mask** | Capacitance matrix | Few boundary points, constant coeff | $O(N \log N + B^2)$ |
 # | **Complex mask** | CG + spectral PC | Arbitrary mask, constant coeff | $O(k \cdot N \log N)$ |
-# | **Complex mask** | CG + Nyström PC | Operator-only access, no grid info | $O(k \cdot N)$ |
 # | **Any mask** | Multigrid | Variable coeff, moderate accuracy | $O(N)$ per V-cycle |
 # | **Any mask, high accuracy** | MG + CG | Variable coeff, tight tolerance | $O(k \cdot N)$ |
 #

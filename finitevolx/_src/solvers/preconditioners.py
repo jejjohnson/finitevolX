@@ -174,18 +174,20 @@ def make_nystrom_preconditioner(
     W = Q @ U  # [n, k], orthonormal columns
 
     # Full-rank correction: for directions orthogonal to the captured subspace,
-    # apply a conservative scalar scaling instead of mapping to zero.  Without
-    # this, CG falsely "converges" in the preconditioned norm while the true
-    # residual remains ~1.0 (see #187).
+    # apply a scalar scaling instead of mapping to zero.  Without this, CG
+    # falsely "converges" in the preconditioned norm while the true residual
+    # remains ~1.0 (see #187).
     #
-    # We use the inverse of the largest-magnitude captured eigenvalue
-    # (smallest |s_inv| entry) as a conservative fallback.  Since eigvals are
-    # sorted ascending (most negative first for NSD), s_inv[0] has the
-    # smallest magnitude.
+    # Random probing preferentially captures the largest-magnitude eigenvalues
+    # of A; the uncaptured directions tend to have smaller-magnitude eigenvalues
+    # and therefore *larger*-magnitude inverses.  Using s_inv[-1] (the largest-
+    # magnitude captured inverse, from the smallest captured |eigenvalue|) as
+    # the fallback keeps the preconditioned spectrum of uncaptured directions
+    # close to 1, which is what CG needs for fast convergence.
     #
     # Rewrite:  M^{-1} x = a*x + W*((s_inv - a)*(W^T x))
     # which avoids explicit projection and is efficient.
-    alpha_shift = s_inv[0]  # most conservative (smallest magnitude) entry
+    alpha_shift = s_inv[-1]  # best estimate for uncaptured (small |eig|) directions
     s_eff = s_inv - alpha_shift  # extra scaling for the captured subspace
 
     def _preconditioner(r: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:

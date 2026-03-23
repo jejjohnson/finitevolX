@@ -275,13 +275,17 @@ print(f"Residual norm: {info.residual_norm:.2e}")
     ```
 
     Builds a low-rank approximate inverse by probing the operator with
-    random vectors.  Useful when you only have `matvec` access to the
-    operator (e.g., a black-box PDE operator), or when the spectral
-    preconditioner is not effective enough.
+    random vectors.  Only needs `matvec` access — useful when you have a
+    black-box operator with no analytic structure to exploit.
 
-    The `rank` parameter controls quality vs. setup cost: higher ranks
-    give better preconditioning.  A rank of 50–200 is typical for 2-D
-    problems.
+    !!! warning "Nyström is a niche preconditioner"
+        For standard Helmholtz/Poisson problems on known grids, the spectral
+        or multigrid preconditioners are significantly more effective.
+        Nyström captures only `rank` directions of the inverse; the remaining
+        directions receive a scalar fallback, so the iteration count may not
+        improve much over unpreconditioned CG.  Consider Nyström only when
+        no other preconditioner is available (e.g., a non-standard operator
+        known only through `matvec`).
 
 === "Multigrid (most powerful)"
 
