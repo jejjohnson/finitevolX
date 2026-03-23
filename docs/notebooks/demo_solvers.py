@@ -336,8 +336,17 @@ plot_triplet(
 # ![Rectangle: Spectral solver](../../images/demo_solvers/solver_rect_spectral.png)
 
 # %%
-# ── CG + spectral preconditioner ──
+# ── CG (no preconditioner) ──
 A_rect = lambda x: fvx.masked_laplacian(x, mask_rect_jnp, dx, dy, lambda_=lambda_)
+sol_cg0_rect, info_cg0_rect = fvx.solve_cg(
+    A_rect, rhs, rtol=1e-10, atol=1e-10
+)
+t_cg0_rect = time_fn(
+    lambda: fvx.solve_cg(A_rect, rhs, rtol=1e-10, atol=1e-10)[0]
+)
+rr_cg0_rect = rel_residual(sol_cg0_rect, rhs, A_rect, interior_mask=interior_rect)
+
+# ── CG + spectral preconditioner ──
 pc_rect = fvx.make_spectral_preconditioner(dx, dy, lambda_=lambda_, bc="dst")
 sol_cg_rect, info_cg_rect = fvx.solve_cg(
     A_rect, rhs, preconditioner=pc_rect, rtol=1e-10, atol=1e-10
@@ -386,6 +395,11 @@ plot_triplet(
 # %%
 results["Rectangle"] = {
     "Spectral": {"time_ms": t_sp_rect * 1000, "rel_residual": 0.0, "label": "exact"},
+    "CG (bare)": {
+        "time_ms": t_cg0_rect * 1000,
+        "rel_residual": rr_cg0_rect,
+        "label": f"{info_cg0_rect.iterations} iters",
+    },
     "CG": {
         "time_ms": t_cg_rect * 1000,
         "rel_residual": rr_cg_rect,
@@ -399,7 +413,8 @@ results["Rectangle"] = {
 }
 
 print(f"  Spectral: {t_sp_rect * 1000:.2f} ms")
-print(f"  CG:       {t_cg_rect * 1000:.2f} ms, {info_cg_rect.iterations} iters")
+print(f"  CG bare:  {t_cg0_rect * 1000:.2f} ms, {info_cg0_rect.iterations} iters")
+print(f"  CG + PC:  {t_cg_rect * 1000:.2f} ms, {info_cg_rect.iterations} iters")
 print(f"  MG:       {t_mg_rect * 1000:.2f} ms, rel residual = {rr_mg_rect:.2e}")
 
 # %% [markdown]
@@ -460,6 +475,18 @@ print(f"  Capacitance: {t_cap * 1000:.2f} ms, boundary pts = {len(cap._j_b)}")
 # ![Basin: Capacitance solver](../../images/demo_solvers/solver_basin_cap.png)
 
 # %%
+# ── CG (no preconditioner) ──
+sol_cg0_basin, info_cg0_basin = fvx.solve_cg(
+    A_basin, rhs_basin, rtol=1e-10, atol=1e-10
+)
+sol_cg0_basin = sol_cg0_basin * mask_basin_jnp
+t_cg0_basin = time_fn(
+    lambda: fvx.solve_cg(A_basin, rhs_basin, rtol=1e-10, atol=1e-10)[0] * mask_basin_jnp
+)
+rr_cg0_basin = rel_residual(
+    sol_cg0_basin, rhs_basin, A_basin, interior_mask=mask_basin_jnp
+)
+
 # ── CG + spectral preconditioner ──
 pc_basin = fvx.make_spectral_preconditioner(dx, dy, lambda_=lambda_, bc="dst")
 sol_cg_basin, info_cg_basin = fvx.solve_cg(
@@ -519,6 +546,11 @@ plot_triplet(
 # %%
 results["Basin"] = {
     "Capacitance": {"time_ms": t_cap * 1000, "rel_residual": 0.0, "label": "direct"},
+    "CG (bare)": {
+        "time_ms": t_cg0_basin * 1000,
+        "rel_residual": rr_cg0_basin,
+        "label": f"{info_cg0_basin.iterations} iters",
+    },
     "CG": {
         "time_ms": t_cg_basin * 1000,
         "rel_residual": rr_cg_basin,
@@ -531,7 +563,8 @@ results["Basin"] = {
     },
 }
 
-print(f"  CG:       {t_cg_basin * 1000:.2f} ms, {info_cg_basin.iterations} iters")
+print(f"  CG bare:  {t_cg0_basin * 1000:.2f} ms, {info_cg0_basin.iterations} iters")
+print(f"  CG + PC:  {t_cg_basin * 1000:.2f} ms, {info_cg_basin.iterations} iters")
 print(f"  MG:       {t_mg_basin * 1000:.2f} ms, rel residual = {rr_mg_basin:.2e}")
 
 # %% [markdown]
@@ -560,6 +593,19 @@ print("\nCircle:")
 mask_circle_jnp = jnp.array(mask_circle)
 rhs_circle = rhs * mask_circle_jnp
 A_circle = lambda x: fvx.masked_laplacian(x, mask_circle_jnp, dx, dy, lambda_=lambda_)
+
+# ── CG (no preconditioner) ──
+sol_cg0_circle, info_cg0_circle = fvx.solve_cg(
+    A_circle, rhs_circle, rtol=1e-10, atol=1e-10
+)
+sol_cg0_circle = sol_cg0_circle * mask_circle_jnp
+t_cg0_circle = time_fn(
+    lambda: fvx.solve_cg(A_circle, rhs_circle, rtol=1e-10, atol=1e-10)[0]
+    * mask_circle_jnp
+)
+rr_cg0_circle = rel_residual(
+    sol_cg0_circle, rhs_circle, A_circle, interior_mask=mask_circle_jnp
+)
 
 # ── CG + spectral preconditioner ──
 pc_circle = fvx.make_spectral_preconditioner(dx, dy, lambda_=lambda_, bc="dst")
@@ -619,6 +665,11 @@ plot_triplet(
 
 # %%
 results["Circle"] = {
+    "CG (bare)": {
+        "time_ms": t_cg0_circle * 1000,
+        "rel_residual": rr_cg0_circle,
+        "label": f"{info_cg0_circle.iterations} iters",
+    },
     "CG": {
         "time_ms": t_cg_circle * 1000,
         "rel_residual": rr_cg_circle,
@@ -631,8 +682,9 @@ results["Circle"] = {
     },
 }
 
-print(f"  CG: {t_cg_circle * 1000:.2f} ms, {info_cg_circle.iterations} iters")
-print(f"  MG: {t_mg_circle * 1000:.2f} ms, rel residual = {rr_mg_circle:.2e}")
+print(f"  CG bare: {t_cg0_circle * 1000:.2f} ms, {info_cg0_circle.iterations} iters")
+print(f"  CG + PC: {t_cg_circle * 1000:.2f} ms, {info_cg_circle.iterations} iters")
+print(f"  MG:      {t_mg_circle * 1000:.2f} ms, rel residual = {rr_mg_circle:.2e}")
 
 # %% [markdown]
 # ## 6. Notch Domain with Variable Coefficient — Multigrid, MG+CG
@@ -690,6 +742,19 @@ mg_notch = fvx.build_multigrid_solver(
 )
 A_notch = lambda x: _apply_operator(x, mg_notch.levels[0])
 
+# ── CG (no preconditioner) ──
+sol_cg0_notch, info_cg0_notch = fvx.solve_cg(
+    A_notch, rhs_notch, rtol=1e-10, atol=1e-10
+)
+sol_cg0_notch = sol_cg0_notch * mask_notch_jnp
+t_cg0_notch = time_fn(
+    lambda: fvx.solve_cg(A_notch, rhs_notch, rtol=1e-10, atol=1e-10)[0]
+    * mask_notch_jnp
+)
+rr_cg0_notch = rel_residual(
+    sol_cg0_notch, rhs_notch, A_notch, interior_mask=mask_notch_jnp
+)
+
 # ── Multigrid standalone (10 V-cycles) ──
 sol_mg_notch = mg_notch(rhs_notch)
 t_mg_notch = time_fn(lambda: mg_notch(rhs_notch))
@@ -746,6 +811,11 @@ plot_triplet(
 
 # %%
 results["Notch\n(variable coeff)"] = {
+    "CG (bare)": {
+        "time_ms": t_cg0_notch * 1000,
+        "rel_residual": rr_cg0_notch,
+        "label": f"{info_cg0_notch.iterations} iters",
+    },
     "Multigrid": {
         "time_ms": t_mg_notch * 1000,
         "rel_residual": rr_mg_notch,
@@ -761,9 +831,10 @@ results["Notch\n(variable coeff)"] = {
 diff_mg_mgcg = float(
     jnp.linalg.norm(sol_mgcg_notch - sol_mg_notch) / jnp.linalg.norm(sol_mgcg_notch)
 )
-print(f"  MG:    {t_mg_notch * 1000:.2f} ms, rel residual = {rr_mg_notch:.2e}")
+print(f"  CG bare: {t_cg0_notch * 1000:.2f} ms, {info_cg0_notch.iterations} iters")
+print(f"  MG:      {t_mg_notch * 1000:.2f} ms, rel residual = {rr_mg_notch:.2e}")
 print(
-    f"  MG+CG: {t_mgcg_notch * 1000:.2f} ms, {info_mgcg_notch.iterations} iters, "
+    f"  MG+CG:   {t_mgcg_notch * 1000:.2f} ms, {info_mgcg_notch.iterations} iters, "
     f"rel residual = {rr_mgcg_notch:.2e}"
 )
 print(f"  Relative difference MG vs MG+CG: {diff_mg_mgcg:.2e}")
@@ -785,6 +856,7 @@ geom_shorts = [g.split("\n")[0] for g in geom_order]
 colors = {
     "Spectral": "#2196F3",
     "Capacitance": "#4CAF50",
+    "CG (bare)": "#BDBDBD",
     "CG": "#FF9800",
     "Multigrid": "#9C27B0",
     "MG+CG": "#E91E63",
