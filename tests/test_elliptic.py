@@ -419,15 +419,19 @@ class TestNystromPreconditioner:
         Ny, Nx = 32, 32
         dx, dy = 1.0 / Nx, 1.0 / Ny
         lam = 4.0
-        mask = jnp.ones((Ny, Nx))
+        # Non-trivial mask: 4-cell land border (rectangular basin)
+        mask = jnp.zeros((Ny, Nx))
+        mask = mask.at[4:-4, 4:-4].set(1.0)
 
         def A(x):
             return masked_laplacian(x, mask, dx, dy, lambda_=lam)
 
         j = jnp.arange(Ny)[:, None]
         i = jnp.arange(Nx)[None, :]
-        rhs = jnp.sin(jnp.pi * (j + 1) / (Ny + 1)) * jnp.sin(
-            jnp.pi * (i + 1) / (Nx + 1)
+        rhs = (
+            jnp.sin(jnp.pi * (j + 1) / (Ny + 1))
+            * jnp.sin(jnp.pi * (i + 1) / (Nx + 1))
+            * mask
         )
 
         M_inv = make_nystrom_preconditioner(A, (Ny, Nx), rank=50)
