@@ -27,7 +27,9 @@ from finitevolx._src.advection.weno import (
     weno_5pts_improved_right as _wenoz5_right,
     weno_5pts_right as _weno5_right,
     weno_7pts as _weno7,
+    weno_7pts_right as _weno7_right,
     weno_9pts as _weno9,
+    weno_9pts_right as _weno9_right,
 )
 from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
 from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
@@ -91,26 +93,32 @@ def _weno7_positive_last_axis(h: Array) -> Array:
 
 
 def _weno7_negative_last_axis(h: Array) -> Array:
-    h3_first = _weno3(h[..., 3:4], h[..., 2:3], h[..., 1:2])
-    h5_second = _weno5(h[..., 4:5], h[..., 3:4], h[..., 2:3], h[..., 1:2], h[..., 0:1])
-    h7_interior = _weno7(
-        h[..., 6:],
-        h[..., 5:-1],
-        h[..., 4:-2],
-        h[..., 3:-3],
-        h[..., 2:-4],
-        h[..., 1:-5],
+    # Right-biased face reconstruction for negative flow.
+    # Faces at positions 1.5, 2.5, ..., N-1.5 (N-2 total).
+    # Boundary fallbacks are on the RIGHT side (the upwind boundary for u<0).
+    h5_first = _weno5_right(
+        h[..., 0:1], h[..., 1:2], h[..., 2:3], h[..., 3:4], h[..., 4:5]
+    )
+    h7_interior = _weno7_right(
         h[..., :-6],
+        h[..., 1:-5],
+        h[..., 2:-4],
+        h[..., 3:-3],
+        h[..., 4:-2],
+        h[..., 5:-1],
+        h[..., 6:],
     )
-    h5_penultimate = _weno5(
-        h[..., -1:],
-        h[..., -2:-1],
-        h[..., -3:-2],
-        h[..., -4:-3],
+    h5_penultimate = _weno5_right(
         h[..., -5:-4],
+        h[..., -4:-3],
+        h[..., -3:-2],
+        h[..., -2:-1],
+        h[..., -1:],
     )
+    h3_second_last = _weno3_right(h[..., -3:-2], h[..., -2:-1], h[..., -1:])
+    h1_last = h[..., -1:]
     return jnp.concatenate(
-        [h3_first, h5_second, h7_interior, h5_penultimate, h[..., -1:]],
+        [h5_first, h7_interior, h5_penultimate, h3_second_last, h1_last],
         axis=-1,
     )
 
@@ -170,53 +178,59 @@ def _weno9_positive_last_axis(h: Array) -> Array:
 
 
 def _weno9_negative_last_axis(h: Array) -> Array:
-    h3_first = _weno3(h[..., 3:4], h[..., 2:3], h[..., 1:2])
-    h5_second = _weno5(h[..., 4:5], h[..., 3:4], h[..., 2:3], h[..., 1:2], h[..., 0:1])
-    h7_third = _weno7(
-        h[..., 6:7],
-        h[..., 5:6],
-        h[..., 4:5],
-        h[..., 3:4],
-        h[..., 2:3],
-        h[..., 1:2],
+    # Right-biased face reconstruction for negative flow.
+    # Faces at positions 1.5, 2.5, ..., N-1.5 (N-2 total).
+    # Boundary fallbacks are on the RIGHT side (the upwind boundary for u<0).
+    h5_first = _weno5_right(
+        h[..., 0:1], h[..., 1:2], h[..., 2:3], h[..., 3:4], h[..., 4:5]
+    )
+    h7_second = _weno7_right(
         h[..., 0:1],
+        h[..., 1:2],
+        h[..., 2:3],
+        h[..., 3:4],
+        h[..., 4:5],
+        h[..., 5:6],
+        h[..., 6:7],
     )
-    h9_interior = _weno9(
-        h[..., 8:],
-        h[..., 7:-1],
-        h[..., 6:-2],
-        h[..., 5:-3],
-        h[..., 4:-4],
-        h[..., 3:-5],
-        h[..., 2:-6],
-        h[..., 1:-7],
+    h9_interior = _weno9_right(
         h[..., :-8],
+        h[..., 1:-7],
+        h[..., 2:-6],
+        h[..., 3:-5],
+        h[..., 4:-4],
+        h[..., 5:-3],
+        h[..., 6:-2],
+        h[..., 7:-1],
+        h[..., 8:],
     )
-    h7_third_last = _weno7(
-        h[..., -1:],
-        h[..., -2:-1],
-        h[..., -3:-2],
-        h[..., -4:-3],
-        h[..., -5:-4],
-        h[..., -6:-5],
+    h7_third_last = _weno7_right(
         h[..., -7:-6],
-    )
-    h5_second_last = _weno5(
-        h[..., -1:],
-        h[..., -2:-1],
-        h[..., -3:-2],
-        h[..., -4:-3],
+        h[..., -6:-5],
         h[..., -5:-4],
+        h[..., -4:-3],
+        h[..., -3:-2],
+        h[..., -2:-1],
+        h[..., -1:],
     )
+    h5_second_last = _weno5_right(
+        h[..., -5:-4],
+        h[..., -4:-3],
+        h[..., -3:-2],
+        h[..., -2:-1],
+        h[..., -1:],
+    )
+    h3_third_last = _weno3_right(h[..., -3:-2], h[..., -2:-1], h[..., -1:])
+    h1_last = h[..., -1:]
     return jnp.concatenate(
         [
-            h3_first,
-            h5_second,
-            h7_third,
+            h5_first,
+            h7_second,
             h9_interior,
             h7_third_last,
             h5_second_last,
-            h[..., -1:],
+            h3_third_last,
+            h1_last,
         ],
         axis=-1,
     )

@@ -25,6 +25,10 @@ from finitevolx._src.advection.weno import (
     weno_5pts_improved,
     weno_5pts_improved_right,
     weno_5pts_right,
+    weno_7pts,
+    weno_7pts_right,
+    weno_9pts,
+    weno_9pts_right,
 )
 
 jax.config.update("jax_enable_x64", True)
@@ -524,3 +528,273 @@ class TestWeno5Right:
         result = weno_5pts_improved_right(q[:-4], q[1:-3], q[2:-2], q[3:-1], q[4:])
         expected = (jnp.arange(len(result)) + 1.5) * dx
         np.testing.assert_allclose(result, expected, atol=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# WENO-7 stencil tests (left-biased)
+# ---------------------------------------------------------------------------
+
+
+class TestWeno7:
+    """WENO-7 left-biased stencil: constant, linear, stability."""
+
+    def test_constant(self):
+        c = 2.7
+        s = _scalar(c)
+        result = weno_7pts(s, s, s, s, s, s, s)
+        np.testing.assert_allclose(float(result), c, rtol=1e-10)
+
+    def test_constant_array(self):
+        c = 4.1
+        q = c * jnp.ones(20)
+        result = weno_7pts(q[:-6], q[1:-5], q[2:-4], q[3:-3], q[4:-2], q[5:-1], q[6:])
+        np.testing.assert_allclose(result, c, rtol=1e-10)
+
+    def test_linear_exact(self):
+        """Left-biased WENO7 should be exact for linear data."""
+        dx = 0.1
+        q = jnp.arange(20, dtype=float) * dx
+        result = weno_7pts(q[:-6], q[1:-5], q[2:-4], q[3:-3], q[4:-2], q[5:-1], q[6:])
+        # face at (k+3)+1/2 for k-th element
+        expected = (jnp.arange(len(result)) + 3.5) * dx
+        np.testing.assert_allclose(result, expected, atol=1e-10)
+
+    def test_finite_on_random_data(self):
+        rng = np.random.default_rng(70)
+        data = rng.uniform(-10.0, 10.0, (100,))
+        q = jnp.asarray(data)
+        result = weno_7pts(q[:-6], q[1:-5], q[2:-4], q[3:-3], q[4:-2], q[5:-1], q[6:])
+        assert jnp.all(jnp.isfinite(result)), "weno7 produced NaN/Inf"
+
+    @pytest.mark.parametrize("lo,hi", [(0.0, 1.0), (1.0, 5.0)])
+    def test_bounded_near_step(self, lo, hi):
+        s = _scalar
+        result = float(weno_7pts(s(lo), s(lo), s(lo), s(lo), s(hi), s(hi), s(hi)))
+        tol = 1e-10 * max(abs(lo), abs(hi), 1.0)
+        assert lo - tol <= result <= hi + tol
+
+
+# ---------------------------------------------------------------------------
+# WENO-9 stencil tests (left-biased)
+# ---------------------------------------------------------------------------
+
+
+class TestWeno9:
+    """WENO-9 left-biased stencil: constant, linear, stability."""
+
+    def test_constant(self):
+        c = 6.3
+        s = _scalar(c)
+        result = weno_9pts(s, s, s, s, s, s, s, s, s)
+        np.testing.assert_allclose(float(result), c, rtol=1e-10)
+
+    def test_constant_array(self):
+        c = 1.9
+        q = c * jnp.ones(20)
+        result = weno_9pts(
+            q[:-8],
+            q[1:-7],
+            q[2:-6],
+            q[3:-5],
+            q[4:-4],
+            q[5:-3],
+            q[6:-2],
+            q[7:-1],
+            q[8:],
+        )
+        np.testing.assert_allclose(result, c, rtol=1e-10)
+
+    def test_linear_exact(self):
+        dx = 0.1
+        q = jnp.arange(20, dtype=float) * dx
+        result = weno_9pts(
+            q[:-8],
+            q[1:-7],
+            q[2:-6],
+            q[3:-5],
+            q[4:-4],
+            q[5:-3],
+            q[6:-2],
+            q[7:-1],
+            q[8:],
+        )
+        expected = (jnp.arange(len(result)) + 4.5) * dx
+        np.testing.assert_allclose(result, expected, atol=1e-10)
+
+    def test_finite_on_random_data(self):
+        rng = np.random.default_rng(90)
+        data = rng.uniform(-10.0, 10.0, (100,))
+        q = jnp.asarray(data)
+        result = weno_9pts(
+            q[:-8],
+            q[1:-7],
+            q[2:-6],
+            q[3:-5],
+            q[4:-4],
+            q[5:-3],
+            q[6:-2],
+            q[7:-1],
+            q[8:],
+        )
+        assert jnp.all(jnp.isfinite(result)), "weno9 produced NaN/Inf"
+
+
+# ---------------------------------------------------------------------------
+# WENO-7 right-biased stencil tests
+# ---------------------------------------------------------------------------
+
+
+class TestWeno7Right:
+    """Right-biased WENO-7 at face i+1/2 using {q_{i-2}..q_{i+4}}."""
+
+    def test_constant(self):
+        c = 3.5
+        s = _scalar(c)
+        result = weno_7pts_right(s, s, s, s, s, s, s)
+        np.testing.assert_allclose(float(result), c, rtol=1e-10)
+
+    def test_constant_array(self):
+        c = 7.2
+        q = c * jnp.ones(20)
+        result = weno_7pts_right(
+            q[:-6], q[1:-5], q[2:-4], q[3:-3], q[4:-2], q[5:-1], q[6:]
+        )
+        np.testing.assert_allclose(result, c, rtol=1e-10)
+
+    def test_linear_exact(self):
+        """Right-biased WENO7 should be exact for linear data."""
+        dx = 0.1
+        q = jnp.arange(20, dtype=float) * dx
+        result = weno_7pts_right(
+            q[:-6], q[1:-5], q[2:-4], q[3:-3], q[4:-2], q[5:-1], q[6:]
+        )
+        # face at (k+2)+1/2 for k-th element (q0 = q[k+2])
+        expected = (jnp.arange(len(result)) + 2.5) * dx
+        np.testing.assert_allclose(result, expected, atol=1e-10)
+
+    def test_step_upwind_from_right(self):
+        """At a step, right-biased should select the upwind (right) value."""
+        s = _scalar
+        result = float(
+            weno_7pts_right(s(0.0), s(0.0), s(0.0), s(1.0), s(1.0), s(1.0), s(1.0))
+        )
+        assert result > 0.9, f"Right-biased should select ~1.0, got {result}"
+
+    def test_finite_on_random_data(self):
+        rng = np.random.default_rng(71)
+        data = rng.uniform(-10.0, 10.0, (100,))
+        q = jnp.asarray(data)
+        result = weno_7pts_right(
+            q[:-6], q[1:-5], q[2:-4], q[3:-3], q[4:-2], q[5:-1], q[6:]
+        )
+        assert jnp.all(jnp.isfinite(result)), "weno7_right produced NaN/Inf"
+
+    @pytest.mark.parametrize("lo,hi", [(0.0, 1.0), (1.0, 5.0)])
+    def test_bounded_near_step(self, lo, hi):
+        s = _scalar
+        result = float(weno_7pts_right(s(lo), s(lo), s(lo), s(hi), s(hi), s(hi), s(hi)))
+        tol = 1e-10 * max(abs(lo), abs(hi), 1.0)
+        assert lo - tol <= result <= hi + tol
+
+
+# ---------------------------------------------------------------------------
+# WENO-9 right-biased stencil tests
+# ---------------------------------------------------------------------------
+
+
+class TestWeno9Right:
+    """Right-biased WENO-9 at face i+1/2 using {q_{i-3}..q_{i+5}}."""
+
+    def test_constant(self):
+        c = 8.1
+        s = _scalar(c)
+        result = weno_9pts_right(s, s, s, s, s, s, s, s, s)
+        np.testing.assert_allclose(float(result), c, rtol=1e-10)
+
+    def test_constant_array(self):
+        c = 2.4
+        q = c * jnp.ones(20)
+        result = weno_9pts_right(
+            q[:-8],
+            q[1:-7],
+            q[2:-6],
+            q[3:-5],
+            q[4:-4],
+            q[5:-3],
+            q[6:-2],
+            q[7:-1],
+            q[8:],
+        )
+        np.testing.assert_allclose(result, c, rtol=1e-10)
+
+    def test_linear_exact(self):
+        """Right-biased WENO9 should be exact for linear data."""
+        dx = 0.1
+        q = jnp.arange(20, dtype=float) * dx
+        result = weno_9pts_right(
+            q[:-8],
+            q[1:-7],
+            q[2:-6],
+            q[3:-5],
+            q[4:-4],
+            q[5:-3],
+            q[6:-2],
+            q[7:-1],
+            q[8:],
+        )
+        # face at (k+3)+1/2 for k-th element (q0 = q[k+3])
+        expected = (jnp.arange(len(result)) + 3.5) * dx
+        np.testing.assert_allclose(result, expected, atol=1e-10)
+
+    def test_step_upwind_from_right(self):
+        s = _scalar
+        result = float(
+            weno_9pts_right(
+                s(0.0),
+                s(0.0),
+                s(0.0),
+                s(0.0),
+                s(1.0),
+                s(1.0),
+                s(1.0),
+                s(1.0),
+                s(1.0),
+            )
+        )
+        assert result > 0.9, f"Right-biased should select ~1.0, got {result}"
+
+    def test_finite_on_random_data(self):
+        rng = np.random.default_rng(91)
+        data = rng.uniform(-10.0, 10.0, (100,))
+        q = jnp.asarray(data)
+        result = weno_9pts_right(
+            q[:-8],
+            q[1:-7],
+            q[2:-6],
+            q[3:-5],
+            q[4:-4],
+            q[5:-3],
+            q[6:-2],
+            q[7:-1],
+            q[8:],
+        )
+        assert jnp.all(jnp.isfinite(result)), "weno9_right produced NaN/Inf"
+
+    @pytest.mark.parametrize("lo,hi", [(0.0, 1.0), (1.0, 5.0)])
+    def test_bounded_near_step(self, lo, hi):
+        s = _scalar
+        result = float(
+            weno_9pts_right(
+                s(lo),
+                s(lo),
+                s(lo),
+                s(lo),
+                s(hi),
+                s(hi),
+                s(hi),
+                s(hi),
+                s(hi),
+            )
+        )
+        tol = 1e-10 * max(abs(lo), abs(hi), 1.0)
+        assert lo - tol <= result <= hi + tol
