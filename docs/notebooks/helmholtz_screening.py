@@ -51,7 +51,7 @@ jax.config.update("jax_enable_x64", True)
 import equinox as eqx
 
 import finitevolx as fvx
-from spectraldiffx import (
+from finitevolx import (
     StaggeredDirichletHelmholtzSolver2D,
     RegularNeumannHelmholtzSolver2D,
 )

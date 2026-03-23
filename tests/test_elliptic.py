@@ -102,6 +102,91 @@ class TestSpectralReexports:
             ]
         )
 
+    def test_new_solvers_importable(self):
+        from finitevolx import (
+            # RHS modification
+            modify_rhs_1d,
+            modify_rhs_2d,
+            modify_rhs_3d,
+            # Generic per-axis BC solvers
+            solve_helmholtz_2d,
+            solve_helmholtz_3d,
+            solve_helmholtz_dct1,
+            solve_helmholtz_dct1_1d,
+            solve_helmholtz_dct1_3d,
+            solve_helmholtz_dct2,
+            solve_helmholtz_dct2_1d,
+            solve_helmholtz_dct2_3d,
+            # 2D explicit-transform variants
+            solve_helmholtz_dst1,
+            solve_helmholtz_dst1_1d,
+            solve_helmholtz_dst1_3d,
+            solve_helmholtz_dst2,
+            solve_helmholtz_dst2_1d,
+            solve_helmholtz_dst2_3d,
+            # 1D solvers
+            solve_helmholtz_fft_1d,
+            # 3D solvers
+            solve_helmholtz_fft_3d,
+            solve_poisson_2d,
+            solve_poisson_3d,
+            solve_poisson_dct1,
+            solve_poisson_dct1_1d,
+            solve_poisson_dct1_3d,
+            solve_poisson_dct2,
+            solve_poisson_dct2_1d,
+            solve_poisson_dct2_3d,
+            solve_poisson_dst1,
+            solve_poisson_dst1_1d,
+            solve_poisson_dst1_3d,
+            solve_poisson_dst2,
+            solve_poisson_dst2_1d,
+            solve_poisson_dst2_3d,
+            solve_poisson_fft_1d,
+            solve_poisson_fft_3d,
+        )
+
+        assert all(
+            callable(f)
+            for f in [
+                solve_helmholtz_dst1,
+                solve_helmholtz_dst2,
+                solve_helmholtz_dct1,
+                solve_helmholtz_dct2,
+                solve_poisson_dst1,
+                solve_poisson_dst2,
+                solve_poisson_dct1,
+                solve_poisson_dct2,
+                solve_helmholtz_fft_1d,
+                solve_helmholtz_dst1_1d,
+                solve_helmholtz_dst2_1d,
+                solve_helmholtz_dct1_1d,
+                solve_helmholtz_dct2_1d,
+                solve_poisson_fft_1d,
+                solve_poisson_dst1_1d,
+                solve_poisson_dst2_1d,
+                solve_poisson_dct1_1d,
+                solve_poisson_dct2_1d,
+                solve_helmholtz_fft_3d,
+                solve_helmholtz_dst1_3d,
+                solve_helmholtz_dst2_3d,
+                solve_helmholtz_dct1_3d,
+                solve_helmholtz_dct2_3d,
+                solve_poisson_fft_3d,
+                solve_poisson_dst1_3d,
+                solve_poisson_dst2_3d,
+                solve_poisson_dct1_3d,
+                solve_poisson_dct2_3d,
+                solve_helmholtz_2d,
+                solve_helmholtz_3d,
+                solve_poisson_2d,
+                solve_poisson_3d,
+                modify_rhs_1d,
+                modify_rhs_2d,
+                modify_rhs_3d,
+            ]
+        )
+
     def test_eigenvalues_importable(self):
         import finitevolx
 
@@ -111,6 +196,67 @@ class TestSpectralReexports:
                 finitevolx.dst1_eigenvalues,
                 finitevolx.dct2_eigenvalues,
                 finitevolx.fft_eigenvalues,
+            ]
+        )
+
+    def test_new_eigenvalues_importable(self):
+        import finitevolx
+
+        # FD2 eigenvalues
+        for name in [
+            "dct1_eigenvalues",
+            "dct2_eigenvalues",
+            "dct3_eigenvalues",
+            "dct4_eigenvalues",
+            "dst1_eigenvalues",
+            "dst2_eigenvalues",
+            "dst3_eigenvalues",
+            "dst4_eigenvalues",
+            "fft_eigenvalues",
+        ]:
+            assert callable(getattr(finitevolx, name)), f"{name} not callable"
+
+        # Pseudo-spectral eigenvalues
+        for name in [
+            "dct1_eigenvalues_ps",
+            "dct2_eigenvalues_ps",
+            "dct3_eigenvalues_ps",
+            "dct4_eigenvalues_ps",
+            "dst1_eigenvalues_ps",
+            "dst2_eigenvalues_ps",
+            "dst3_eigenvalues_ps",
+            "dst4_eigenvalues_ps",
+            "fft_eigenvalues_ps",
+        ]:
+            assert callable(getattr(finitevolx, name)), f"{name} not callable"
+
+    def test_solver_classes_importable(self):
+        from finitevolx import (
+            BoundaryCondition,
+            DirichletHelmholtzSolver2D,
+            MixedBCHelmholtzSolver2D,
+            MixedBCHelmholtzSolver3D,
+            NeumannHelmholtzSolver2D,
+            RegularNeumannHelmholtzSolver2D,
+            SpectralHelmholtzSolver1D,
+            SpectralHelmholtzSolver2D,
+            SpectralHelmholtzSolver3D,
+            StaggeredDirichletHelmholtzSolver2D,
+        )
+
+        assert all(
+            c is not None
+            for c in [
+                BoundaryCondition,
+                DirichletHelmholtzSolver2D,
+                MixedBCHelmholtzSolver2D,
+                MixedBCHelmholtzSolver3D,
+                NeumannHelmholtzSolver2D,
+                RegularNeumannHelmholtzSolver2D,
+                SpectralHelmholtzSolver1D,
+                SpectralHelmholtzSolver2D,
+                SpectralHelmholtzSolver3D,
+                StaggeredDirichletHelmholtzSolver2D,
             ]
         )
 

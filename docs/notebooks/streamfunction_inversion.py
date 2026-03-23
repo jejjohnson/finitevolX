@@ -61,7 +61,7 @@ import numpy as np
 jax.config.update("jax_enable_x64", True)
 
 import finitevolx as fvx
-from spectraldiffx import solve_poisson_dst, solve_poisson_dst2
+from finitevolx import solve_poisson_dst, solve_poisson_dst2
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "streamfunction_inversion"
 IMG_DIR.mkdir(parents=True, exist_ok=True)
