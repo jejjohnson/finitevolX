@@ -35,7 +35,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git" }
+spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "v0.0.10" }
 
 [project.urls]
 Repository = "https://github.com/jejjohnson/finitevolX"

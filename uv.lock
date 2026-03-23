@@ -587,7 +587,7 @@ requires-dist = [
     { name = "pytest-xdist", marker = "extra == 'test'", specifier = ">=3.5.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.0" },
     { name = "scipy", specifier = ">=1.14.0" },
-    { name = "spectraldiffx", git = "https://github.com/jejjohnson/spectraldiffx.git" },
+    { name = "spectraldiffx", git = "https://github.com/jejjohnson/spectraldiffx.git?tag=v0.0.10" },
     { name = "tqdm", marker = "extra == 'examples'", specifier = ">=4.66.0" },
     { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.23" },
     { name = "xarray", marker = "extra == 'examples'", specifier = ">=2025.1.0" },
@@ -2106,7 +2106,7 @@ wheels = [
 [[package]]
 name = "spectraldiffx"
 version = "0.0.10"
-source = { git = "https://github.com/jejjohnson/spectraldiffx.git#3eb41382642c7a90f2c1590c144387af677f284e" }
+source = { git = "https://github.com/jejjohnson/spectraldiffx.git?tag=v0.0.10#eac31a578ae31da61fa855cccc594459722e1517" }
 dependencies = [
     { name = "beartype" },
     { name = "equinox" },

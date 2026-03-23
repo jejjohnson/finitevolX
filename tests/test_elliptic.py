@@ -102,90 +102,57 @@ class TestSpectralReexports:
             ]
         )
 
-    def test_new_solvers_importable(self):
-        from finitevolx import (
-            # RHS modification
-            modify_rhs_1d,
-            modify_rhs_2d,
-            modify_rhs_3d,
-            # Generic per-axis BC solvers
-            solve_helmholtz_2d,
-            solve_helmholtz_3d,
-            solve_helmholtz_dct1,
-            solve_helmholtz_dct1_1d,
-            solve_helmholtz_dct1_3d,
-            solve_helmholtz_dct2,
-            solve_helmholtz_dct2_1d,
-            solve_helmholtz_dct2_3d,
+    @pytest.mark.parametrize(
+        "name",
+        [
             # 2D explicit-transform variants
-            solve_helmholtz_dst1,
-            solve_helmholtz_dst1_1d,
-            solve_helmholtz_dst1_3d,
-            solve_helmholtz_dst2,
-            solve_helmholtz_dst2_1d,
-            solve_helmholtz_dst2_3d,
+            "solve_helmholtz_dst1",
+            "solve_helmholtz_dst2",
+            "solve_helmholtz_dct1",
+            "solve_helmholtz_dct2",
+            "solve_poisson_dst1",
+            "solve_poisson_dst2",
+            "solve_poisson_dct1",
+            "solve_poisson_dct2",
             # 1D solvers
-            solve_helmholtz_fft_1d,
+            "solve_helmholtz_fft_1d",
+            "solve_helmholtz_dst1_1d",
+            "solve_helmholtz_dst2_1d",
+            "solve_helmholtz_dct1_1d",
+            "solve_helmholtz_dct2_1d",
+            "solve_poisson_fft_1d",
+            "solve_poisson_dst1_1d",
+            "solve_poisson_dst2_1d",
+            "solve_poisson_dct1_1d",
+            "solve_poisson_dct2_1d",
             # 3D solvers
-            solve_helmholtz_fft_3d,
-            solve_poisson_2d,
-            solve_poisson_3d,
-            solve_poisson_dct1,
-            solve_poisson_dct1_1d,
-            solve_poisson_dct1_3d,
-            solve_poisson_dct2,
-            solve_poisson_dct2_1d,
-            solve_poisson_dct2_3d,
-            solve_poisson_dst1,
-            solve_poisson_dst1_1d,
-            solve_poisson_dst1_3d,
-            solve_poisson_dst2,
-            solve_poisson_dst2_1d,
-            solve_poisson_dst2_3d,
-            solve_poisson_fft_1d,
-            solve_poisson_fft_3d,
-        )
+            "solve_helmholtz_fft_3d",
+            "solve_helmholtz_dst1_3d",
+            "solve_helmholtz_dst2_3d",
+            "solve_helmholtz_dct1_3d",
+            "solve_helmholtz_dct2_3d",
+            "solve_poisson_fft_3d",
+            "solve_poisson_dst1_3d",
+            "solve_poisson_dst2_3d",
+            "solve_poisson_dct1_3d",
+            "solve_poisson_dct2_3d",
+            # Generic per-axis BC solvers
+            "solve_helmholtz_2d",
+            "solve_helmholtz_3d",
+            "solve_poisson_2d",
+            "solve_poisson_3d",
+            # RHS modification
+            "modify_rhs_1d",
+            "modify_rhs_2d",
+            "modify_rhs_3d",
+        ],
+    )
+    def test_new_solvers_importable(self, name):
+        import finitevolx
 
-        assert all(
-            callable(f)
-            for f in [
-                solve_helmholtz_dst1,
-                solve_helmholtz_dst2,
-                solve_helmholtz_dct1,
-                solve_helmholtz_dct2,
-                solve_poisson_dst1,
-                solve_poisson_dst2,
-                solve_poisson_dct1,
-                solve_poisson_dct2,
-                solve_helmholtz_fft_1d,
-                solve_helmholtz_dst1_1d,
-                solve_helmholtz_dst2_1d,
-                solve_helmholtz_dct1_1d,
-                solve_helmholtz_dct2_1d,
-                solve_poisson_fft_1d,
-                solve_poisson_dst1_1d,
-                solve_poisson_dst2_1d,
-                solve_poisson_dct1_1d,
-                solve_poisson_dct2_1d,
-                solve_helmholtz_fft_3d,
-                solve_helmholtz_dst1_3d,
-                solve_helmholtz_dst2_3d,
-                solve_helmholtz_dct1_3d,
-                solve_helmholtz_dct2_3d,
-                solve_poisson_fft_3d,
-                solve_poisson_dst1_3d,
-                solve_poisson_dst2_3d,
-                solve_poisson_dct1_3d,
-                solve_poisson_dct2_3d,
-                solve_helmholtz_2d,
-                solve_helmholtz_3d,
-                solve_poisson_2d,
-                solve_poisson_3d,
-                modify_rhs_1d,
-                modify_rhs_2d,
-                modify_rhs_3d,
-            ]
-        )
+        fn = getattr(finitevolx, name, None)
+        assert fn is not None, f"finitevolx.{name} not found"
+        assert callable(fn), f"finitevolx.{name} is not callable"
 
     def test_eigenvalues_importable(self):
         import finitevolx
@@ -230,35 +197,34 @@ class TestSpectralReexports:
         ]:
             assert callable(getattr(finitevolx, name)), f"{name} not callable"
 
-    def test_solver_classes_importable(self):
-        from finitevolx import (
-            BoundaryCondition,
-            DirichletHelmholtzSolver2D,
-            MixedBCHelmholtzSolver2D,
-            MixedBCHelmholtzSolver3D,
-            NeumannHelmholtzSolver2D,
-            RegularNeumannHelmholtzSolver2D,
-            SpectralHelmholtzSolver1D,
-            SpectralHelmholtzSolver2D,
-            SpectralHelmholtzSolver3D,
-            StaggeredDirichletHelmholtzSolver2D,
-        )
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "DirichletHelmholtzSolver2D",
+            "MixedBCHelmholtzSolver2D",
+            "MixedBCHelmholtzSolver3D",
+            "NeumannHelmholtzSolver2D",
+            "RegularNeumannHelmholtzSolver2D",
+            "SpectralHelmholtzSolver1D",
+            "SpectralHelmholtzSolver2D",
+            "SpectralHelmholtzSolver3D",
+            "StaggeredDirichletHelmholtzSolver2D",
+        ],
+    )
+    def test_solver_classes_importable(self, name):
+        import inspect
 
-        assert all(
-            c is not None
-            for c in [
-                BoundaryCondition,
-                DirichletHelmholtzSolver2D,
-                MixedBCHelmholtzSolver2D,
-                MixedBCHelmholtzSolver3D,
-                NeumannHelmholtzSolver2D,
-                RegularNeumannHelmholtzSolver2D,
-                SpectralHelmholtzSolver1D,
-                SpectralHelmholtzSolver2D,
-                SpectralHelmholtzSolver3D,
-                StaggeredDirichletHelmholtzSolver2D,
-            ]
-        )
+        import finitevolx
+
+        cls = getattr(finitevolx, name, None)
+        assert cls is not None, f"finitevolx.{name} not found"
+        assert inspect.isclass(cls), f"finitevolx.{name} is not a class"
+
+    def test_boundary_condition_type_importable(self):
+        from finitevolx import BoundaryCondition
+
+        # BoundaryCondition is a type alias, not a class — just verify it exists
+        assert BoundaryCondition is not None
 
     def test_capacitance_importable(self):
         import finitevolx
