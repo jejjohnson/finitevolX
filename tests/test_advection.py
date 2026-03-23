@@ -468,8 +468,17 @@ class TestAdvection2DRotationStability:
         dt = T / nsteps
         return grid, q0, u, v, pbc, dt, nsteps, ng
 
-    @pytest.mark.parametrize("method", ["weno5", "wenoz5"])
-    def test_rotation_stays_finite(self, rotation_setup, method):
+    @pytest.mark.parametrize(
+        "method,min_peak",
+        [
+            ("weno3", 0.3),
+            ("weno5", 0.5),
+            ("wenoz5", 0.5),
+            ("weno7", 0.5),
+            ("weno9", 0.5),
+        ],
+    )
+    def test_rotation_stays_finite(self, rotation_setup, method, min_peak):
         grid, q0, u, v, pbc, dt, nsteps, ng = rotation_setup
         from finitevolx import Advection2D, rk3_ssp_step
 
@@ -487,5 +496,164 @@ class TestAdvection2DRotationStability:
 
         assert jnp.all(jnp.isfinite(q)).item(), f"{method} produced NaN/Inf"
         peak = float(jnp.max(q[ng:-ng, ng:-ng]))
-        assert peak > 0.5, f"{method} peak eroded to {peak}, expected > 0.5"
+        assert peak > min_peak, f"{method} peak eroded to {peak}, expected > {min_peak}"
         assert peak < 1.2, f"{method} peak grew to {peak}, expected < 1.2"
+
+
+# ── Negative-flow polynomial exactness ──────────────────────────────────────
+
+
+class TestNegativeFlowExactness:
+    """Each scheme must give zero tendency for constant fields under negative flow.
+
+    These tests use u = -1 (negative velocity) and verify that, in both 1-D and
+    2-D, the discrete advection tendency vanishes in the interior region when
+    the advected field h is spatially constant.
+    """
+
+    @pytest.mark.parametrize(
+        "method",
+        ["upwind1", "weno3", "weno5", "weno7", "weno9", "minmod", "van_leer"],
+    )
+    def test_constant_negative_flow_zero_tendency(self, method):
+        grid = ArakawaCGrid1D.from_interior(24, 1.0)
+        adv = Advection1D(grid=grid)
+        h = jnp.ones(grid.Nx)
+        u = -jnp.ones(grid.Nx)
+        result = adv(h, u, method=method)
+        # Wide stencils (weno9) accumulate ~1e-6 error in float32
+        np.testing.assert_allclose(result[4:-4], 0.0, atol=1e-5)
+
+    @pytest.mark.parametrize(
+        "method",
+        ["upwind1", "weno3", "weno5", "weno7", "weno9", "minmod", "van_leer"],
+    )
+    def test_constant_negative_flow_2d(self, method):
+        grid = ArakawaCGrid2D.from_interior(16, 16, 1.0, 1.0)
+        adv = Advection2D(grid=grid)
+        h = jnp.ones((grid.Ny, grid.Nx))
+        u = -jnp.ones((grid.Ny, grid.Nx))
+        v = -jnp.ones((grid.Ny, grid.Nx))
+        result = adv(h, u, v, method=method)
+        np.testing.assert_allclose(result[4:-4, 4:-4], 0.0, atol=1e-5)
+
+
+# ── 1-D convergence rate under negative flow ───────────────────────────────
+
+
+class TestNegativeFlowConvergence:
+    """Verify convergence order under negative flow for each WENO scheme.
+
+    A smooth sinusoidal profile advected with u = -1 for one period must
+    converge at the expected order as the grid is refined.
+    """
+
+    @staticmethod
+    def _run_1d_advection(n_interior, method, n_periods=1):
+        """Advect sin(2π x) with u=-1 for *n_periods* on a periodic domain."""
+        from finitevolx import Advection1D, rk3_ssp_step
+
+        ng = 4
+        Lx = 1.0
+        dx = Lx / n_interior
+        grid = ArakawaCGrid1D(Nx=n_interior + 2 * ng, Lx=Lx, dx=dx)
+
+        x = (jnp.arange(grid.Nx) - ng + 0.5) * dx
+        q0 = jnp.sin(2 * jnp.pi * x)
+
+        u = -jnp.ones(grid.Nx)
+
+        def pbc(h):
+            h = h.at[:ng].set(h[-2 * ng : -ng])
+            h = h.at[-ng:].set(h[ng : 2 * ng])
+            return h
+
+        q0 = pbc(q0)
+        u_max = 1.0
+        dt = 0.3 * dx / u_max
+        T = n_periods * Lx
+        nsteps = int(T / dt)
+        dt = T / nsteps
+
+        advect = Advection1D(grid)
+
+        def rhs(q):
+            q = pbc(q)
+            return advect(q, u, method=method)
+
+        rhs_jit = jax.jit(rhs)
+        q = q0.copy()
+        for _ in range(nsteps):
+            q = rk3_ssp_step(q, rhs_jit, dt)
+            q = pbc(q)
+
+        error = float(jnp.max(jnp.abs(q[ng:-ng] - q0[ng:-ng])))
+        return error
+
+    @pytest.mark.parametrize(
+        "method,min_order",
+        [
+            ("upwind1", 0.8),
+            ("weno3", 1.2),
+            ("weno5", 2.0),
+            ("weno7", 2.5),
+            ("weno9", 2.5),
+        ],
+    )
+    def test_convergence_rate_negative_flow(self, method, min_order):
+        n1, n2 = 32, 128
+        e1 = self._run_1d_advection(n1, method)
+        e2 = self._run_1d_advection(n2, method)
+        ratio = n2 / n1
+        order = jnp.log(e1 / e2) / jnp.log(ratio)
+        assert float(order) > min_order, (
+            f"{method}: convergence order {float(order):.2f} < {min_order}"
+        )
+
+
+# ── Conservation ────────────────────────────────────────────────────────────
+
+
+class TestAdvectionConservation:
+    """Total mass (sum * dx) must be conserved to float32 accumulation tolerance."""
+
+    @pytest.mark.parametrize(
+        "method",
+        ["upwind1", "weno3", "weno5", "weno7", "weno9", "minmod", "van_leer"],
+    )
+    def test_1d_conservation(self, method):
+        from finitevolx import Advection1D, rk3_ssp_step
+
+        ng = 4
+        n = 64
+        Lx = 1.0
+        dx = Lx / n
+        grid = ArakawaCGrid1D(Nx=n + 2 * ng, Lx=Lx, dx=dx)
+
+        x = (jnp.arange(grid.Nx) - ng + 0.5) * dx
+        r = jnp.abs(x - 0.5)
+        q0 = jnp.where(r < 0.15, 0.5 * (1 + jnp.cos(jnp.pi * r / 0.15)), 0.0)
+        u = jnp.ones(grid.Nx)
+
+        def pbc(h):
+            h = h.at[:ng].set(h[-2 * ng : -ng])
+            h = h.at[-ng:].set(h[ng : 2 * ng])
+            return h
+
+        q0 = pbc(q0)
+        dt = 0.3 * dx
+        advect = Advection1D(grid)
+
+        def rhs(q):
+            q = pbc(q)
+            return advect(q, u, method=method)
+
+        rhs_jit = jax.jit(rhs)
+        q = q0.copy()
+        mass0 = float(jnp.sum(q[ng:-ng]) * dx)
+        for _ in range(50):
+            q = rk3_ssp_step(q, rhs_jit, dt)
+            q = pbc(q)
+
+        mass = float(jnp.sum(q[ng:-ng]) * dx)
+        np.testing.assert_allclose(mass, mass0, rtol=1e-5)

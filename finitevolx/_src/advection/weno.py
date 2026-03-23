@@ -522,6 +522,19 @@ def weno_5pts_improved_right(
     return (w1 * qi1 + w2 * qi2 + w3 * qi3) / (w1 + w2 + w3)
 
 
+_WENO7_COEFFS_RIGHT = tuple(tuple(reversed(c)) for c in reversed(_WENO7_COEFFS))
+_WENO7_WEIGHTS_RIGHT = tuple(reversed(_WENO7_WEIGHTS))
+_WENO7_BETA_MATRICES_RIGHT = tuple(
+    m[::-1, ::-1] for m in reversed(_WENO7_BETA_MATRICES)
+)
+
+_WENO9_COEFFS_RIGHT = tuple(tuple(reversed(c)) for c in reversed(_WENO9_COEFFS))
+_WENO9_WEIGHTS_RIGHT = tuple(reversed(_WENO9_WEIGHTS))
+_WENO9_BETA_MATRICES_RIGHT = tuple(
+    m[::-1, ::-1] for m in reversed(_WENO9_BETA_MATRICES)
+)
+
+
 def weno_7pts(
     qmmm: Array,
     qmm: Array,
@@ -578,4 +591,75 @@ def weno_9pts(
     )
     return _weno_reconstruct(
         stencils, _WENO9_COEFFS, _WENO9_BETA_MATRICES, _WENO9_WEIGHTS
+    )
+
+
+def weno_7pts_right(
+    qmm: Array,
+    qm: Array,
+    q0: Array,
+    qp: Array,
+    qpp: Array,
+    qppp: Array,
+    qpppp: Array,
+) -> Array:
+    """
+    7-points non-linear right-biased stencil reconstruction at face q0+1/2:
+
+    qmm----qm-----q0--x--qp----qpp---qppp--qpppp
+
+    Uses cells {q_{i-2}..q_{i+4}} for right-biased (negative-flow) WENO-7
+    reconstruction.  Sub-stencil coefficients, optimal weights, and smoothness
+    indicators are the mirror of the left-biased formulas.
+
+    Jiang and Shu, J. Comput. Phys. 126, 202–228 (1996), Section 2.3.
+    """
+    stencils = (
+        (qmm, qm, q0, qp),
+        (qm, q0, qp, qpp),
+        (q0, qp, qpp, qppp),
+        (qp, qpp, qppp, qpppp),
+    )
+    return _weno_reconstruct(
+        stencils,
+        _WENO7_COEFFS_RIGHT,
+        _WENO7_BETA_MATRICES_RIGHT,
+        _WENO7_WEIGHTS_RIGHT,
+    )
+
+
+def weno_9pts_right(
+    qmmm: Array,
+    qmm: Array,
+    qm: Array,
+    q0: Array,
+    qp: Array,
+    qpp: Array,
+    qppp: Array,
+    qpppp: Array,
+    qppppp: Array,
+) -> Array:
+    """
+    9-points non-linear right-biased stencil reconstruction at face q0+1/2:
+
+    qmmm---qmm----qm-----q0--x--qp----qpp---qppp--qpppp-qppppp
+
+    Uses cells {q_{i-3}..q_{i+5}} for right-biased (negative-flow) WENO-9
+    reconstruction.  Sub-stencil coefficients, optimal weights, and smoothness
+    indicators are the mirror of the left-biased formulas.
+
+    Jiang and Shu, J. Comput. Phys. 126, 202–228 (1996), Section 2.3.
+    """
+    stencils = (
+        (qmmm, qmm, qm, q0, qp),
+        (qmm, qm, q0, qp, qpp),
+        (qm, q0, qp, qpp, qppp),
+        (q0, qp, qpp, qppp, qpppp),
+        (qp, qpp, qppp, qpppp, qppppp),
+    )
+    return _weno_reconstruct(
+        stencils,
+        _WENO9_COEFFS_RIGHT,
+        _WENO9_BETA_MATRICES_RIGHT,
+        _WENO9_WEIGHTS_RIGHT,
     )

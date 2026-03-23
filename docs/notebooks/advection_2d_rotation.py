@@ -114,7 +114,7 @@ IMG_DIR.mkdir(parents=True, exist_ok=True)
 #
 # We build a 2-D Arakawa C-grid on the doubly-periodic domain
 # $[0, 1] \times [0, 1]$.  As in the 1-D tutorial, we add extra ghost
-# cells (`ng = 4` per side) so that the advection operator's write region
+# cells (`ng = 5` per side) so that the advection operator's write region
 # `[2:-2, 2:-2]` covers all physical cells.
 #
 # ### C-grid staggering
@@ -140,7 +140,7 @@ Lx = Ly = 1.0
 omega = 2 * jnp.pi  # angular velocity → period T = 1.0
 
 # --- ghost ring ---
-ng = 4  # ghost cells per side
+ng = 5  # ghost cells per side (≥ 5 for WENO9)
 
 # --- grid ---
 dx = Lx / nx
@@ -303,11 +303,11 @@ print(f"|u|_max = {u_max:.2f}, |v|_max = {v_max:.2f}, CFL ≈ {cfl:.2f}")
 # %% [markdown]
 # ## Running the Simulation
 #
-# We compare three schemes: `upwind1`, `superbee`, and `weno5`.
+# We compare six schemes spanning upwind, TVD, and WENO families.
 
 # %%
 advect = fvx.Advection2D(grid)
-methods_2d = ["upwind1", "superbee", "weno5"]
+methods_2d = ["upwind1", "upwind3", "superbee", "weno5", "weno7", "weno9"]
 results_2d = {}
 
 # Snapshot times (fractions of period)
@@ -372,15 +372,21 @@ fig.savefig(IMG_DIR / "weno5_snapshots.png", dpi=150, bbox_inches="tight")
 # %% [markdown]
 # ## Scheme Comparison After One Revolution
 #
-# Comparing the three schemes side by side reveals how much each one
+# Comparing the schemes side by side reveals how much each one
 # erodes the peak and distorts the shape.
 
 # %%
 exact_2d = np.asarray(q0_phys)
 
-fig, axes = plt.subplots(1, 3, figsize=(14, 4.2), sharey=True, constrained_layout=True)
+n_methods = len(methods_2d)
+ncols = 3
+nrows = (n_methods + ncols - 1) // ncols
+fig, axes = plt.subplots(
+    nrows, ncols, figsize=(14, 4.2 * nrows), sharey=True, constrained_layout=True
+)
+axes_flat = axes.ravel() if nrows > 1 else axes
 
-for ax, method in zip(axes, methods_2d):
+for ax, method in zip(axes_flat, methods_2d):
     data = results_2d[method]
     im = ax.pcolormesh(x_np, y_np, data, vmin=0, vmax=1, cmap="RdYlBu_r", shading="auto")
     ax.contour(x_np, y_np, exact_2d, levels=[0.05, 0.5, 0.95], colors="k", linewidths=0.8, linestyles="--")
@@ -389,7 +395,13 @@ for ax, method in zip(axes, methods_2d):
     ax.set_xlabel("x")
     ax.set_aspect("equal")
 
-axes[0].set_ylabel("y")
+# Hide unused subplots
+for ax in axes_flat[n_methods:]:
+    ax.set_visible(False)
+
+axes_flat[0].set_ylabel("y")
+if nrows > 1:
+    axes_flat[ncols].set_ylabel("y")
 fig.colorbar(im, ax=axes, label="q", shrink=0.85)
 fig.suptitle("Scheme Comparison After One Full Revolution", fontsize=13)
 fig.savefig(IMG_DIR / "scheme_comparison.png", dpi=150, bbox_inches="tight")
@@ -405,11 +417,14 @@ fig.savefig(IMG_DIR / "scheme_comparison.png", dpi=150, bbox_inches="tight")
 # should be none; negative values (blue) indicate mass was removed.
 
 # %%
-fig, axes = plt.subplots(1, 3, figsize=(14, 4.2), sharey=True, constrained_layout=True)
+fig, axes = plt.subplots(
+    nrows, ncols, figsize=(14, 4.2 * nrows), sharey=True, constrained_layout=True
+)
+axes_flat = axes.ravel() if nrows > 1 else axes
 
 err_max = max(float(np.max(np.abs(results_2d[m] - exact_2d))) for m in methods_2d)
 
-for ax, method in zip(axes, methods_2d):
+for ax, method in zip(axes_flat, methods_2d):
     err = results_2d[method] - exact_2d
     im = ax.pcolormesh(
         x_np, y_np, err, vmin=-err_max, vmax=err_max, cmap="RdBu_r", shading="auto"
@@ -419,7 +434,12 @@ for ax, method in zip(axes, methods_2d):
     ax.set_xlabel("x")
     ax.set_aspect("equal")
 
-axes[0].set_ylabel("y")
+for ax in axes_flat[n_methods:]:
+    ax.set_visible(False)
+
+axes_flat[0].set_ylabel("y")
+if nrows > 1:
+    axes_flat[ncols].set_ylabel("y")
 fig.colorbar(im, ax=axes, label="q(T) - q0", shrink=0.85)
 fig.suptitle("Error After One Revolution", fontsize=13)
 fig.savefig(IMG_DIR / "error_maps.png", dpi=150, bbox_inches="tight")
@@ -439,7 +459,14 @@ j_centre = ny // 2  # row index for y ≈ 0.5
 fig, ax = plt.subplots(figsize=(8, 4))
 ax.plot(x_np, exact_2d[j_centre, :], "k--", lw=2, label="Exact")
 
-colours_2d = {"upwind1": "#d62728", "superbee": "#2ca02c", "weno5": "#ff7f0e"}
+colours_2d = {
+    "upwind1": "#d62728",
+    "upwind3": "#1f77b4",
+    "superbee": "#2ca02c",
+    "weno5": "#ff7f0e",
+    "weno7": "#9467bd",
+    "weno9": "#17becf",
+}
 for method in methods_2d:
     ax.plot(
         x_np,
@@ -466,12 +493,16 @@ fig.savefig(IMG_DIR / "cross_section.png", dpi=150, bbox_inches="tight")
 # | Scheme | Peak at $t=T$ | $L_2$ error | Character |
 # |--------|:---:|:---:|-----------|
 # | `upwind1` | low | high | Massive diffusion, bell nearly flat |
+# | `upwind3` | moderate | moderate | 3rd-order upwind, less diffusion |
 # | `superbee` | moderate | moderate | TVD-sharp edges, some steepening |
-# | `weno5` | high | low | Best shape preservation overall |
+# | `weno5` | high | low | Good shape preservation |
+# | `weno7` | very high | very low | Sharper peaks and finer features |
+# | `weno9` | very high | very low | Highest fidelity on smooth flows |
 #
-# The numbers confirm the 1-D findings: **`weno5`** is the best
-# general-purpose choice, while **`superbee`** trades peak accuracy for
-# strict monotonicity.
+# Higher-order WENO schemes (`weno7`, `weno9`) preserve the peak better
+# and resolve fine structure more sharply.  The improvement from `weno5` to
+# `weno7` is typically larger than from `weno7` to `weno9`, since both are
+# limited by the 3rd-order time integrator at coarse CFL.
 #
 # ## Next Steps
 #
