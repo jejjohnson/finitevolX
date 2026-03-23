@@ -72,7 +72,7 @@
 # %% [markdown]
 # ## The Four Schemes We Compare
 #
-# We test four schemes spanning the library's range:
+# We test six schemes spanning the library's range:
 #
 # | Scheme | Type | Order | Character |
 # |--------|------|-------|-----------|
@@ -80,6 +80,8 @@
 # | `upwind3` | Upwind | 3 | Less diffusion, mild Gibbs-like oscillations |
 # | `superbee` | TVD limiter | 2 | Sharpest monotone scheme — compresses fronts |
 # | `weno5` | WENO | 5 | High-order smooth + non-oscillatory near shocks |
+# | `weno7` | WENO | 7 | Higher-order, sharper resolution of fine features |
+# | `weno9` | WENO | 9 | Highest-order, best for smooth flows |
 #
 # **Upwind 1st-order** reconstructs the face value as the upwind cell value:
 #
@@ -148,8 +150,8 @@ IMG_DIR.mkdir(parents=True, exist_ok=True)
 #   ← ng →                                 ← ng →
 # ```
 #
-# We use `ng = 4` ghost cells per side, which is enough for all schemes
-# up to WENO7.
+# We use `ng = 5` ghost cells per side, which is enough for all schemes
+# up to WENO9.
 
 # %%
 # --- physical parameters ---
@@ -158,7 +160,7 @@ Lx = 1.0  # domain length
 c = 1.0  # advection velocity
 
 # --- ghost ring ---
-ng = 4  # ghost cells per side (≥ 3 for WENO5)
+ng = 5  # ghost cells per side (≥ 5 for WENO9)
 
 # --- grid ---
 dx = Lx / nx
@@ -288,7 +290,7 @@ print(f"CFL = {cfl}, dt = {dt:.4e}, nsteps = {nsteps}")
 
 # %%
 advect = fvx.Advection1D(grid)
-methods = ["upwind1", "upwind3", "superbee", "weno5"]
+methods = ["upwind1", "upwind3", "superbee", "weno5", "weno7", "weno9"]
 results = {}
 
 for method in methods:
@@ -326,7 +328,14 @@ x_np = np.asarray(x_phys)
 fig, ax = plt.subplots(figsize=(10, 5))
 ax.plot(x_np, exact, "k--", lw=2, label="Exact", zorder=5)
 
-colours = {"upwind1": "#d62728", "upwind3": "#1f77b4", "superbee": "#2ca02c", "weno5": "#ff7f0e"}
+colours = {
+    "upwind1": "#d62728",
+    "upwind3": "#1f77b4",
+    "superbee": "#2ca02c",
+    "weno5": "#ff7f0e",
+    "weno7": "#9467bd",
+    "weno9": "#17becf",
+}
 
 for method in methods:
     ax.plot(x_np, results[method], color=colours[method], lw=1.5, label=method)
@@ -415,6 +424,8 @@ for method in methods:
 # | `upwind3` | 3 |
 # | `superbee` | 2 |
 # | `weno5` | 5 |
+# | `weno7` | 7 (capped at ~3 by RK3 time integrator) |
+# | `weno9` | 9 (capped at ~3 by RK3 time integrator) |
 #
 # > **Note:** for a discontinuous profile (our square wave), all schemes
 # > degrade to 1st-order at the discontinuities.  We therefore also run
@@ -475,7 +486,7 @@ for method in methods:
     ax.loglog(dx_arr, convergence[method], "o-", color=colours[method], lw=1.5, label=method)
 
 # Reference slopes
-for order, ls in [(1, ":"), (2, "-."), (3, "--"), (5, "-")]:
+for order, ls in [(1, ":"), (2, "-."), (3, "--"), (5, "-"), (7, (0, (3, 1, 1, 1)))]:
     ref = convergence["upwind1"][0] * (dx_arr / dx_arr[0]) ** order
     ax.loglog(dx_arr, ref, color="grey", ls=ls, lw=0.8, alpha=0.5, label=f"O(Δx$^{order}$)")
 
@@ -499,9 +510,12 @@ fig.savefig(IMG_DIR / "convergence.png", dpi=150, bbox_inches="tight")
 # | **upwind3** | Much less diffusion than upwind1 | Oscillations near discontinuities |
 # | **superbee** | Sharpest monotone (TVD) scheme | Can create staircase artefacts on smooth profiles |
 # | **weno5** | High-order smooth, low oscillation | Slightly more expensive per cell |
+# | **weno7** | Sharper features than weno5 | Wider stencil (8 pts), higher cost |
+# | **weno9** | Highest accuracy on smooth flows | Widest stencil (10 pts), highest cost |
 #
-# **Recommendation:** Use **`weno5`** as the default.  Switch to a TVD
-# limiter (`superbee` or `van_leer`) when strict monotonicity is required
+# **Recommendation:** Use **`weno5`** as the default.  Switch to **`weno7`**
+# or **`weno9`** when resolving fine-scale structure in smooth flows.  Use a
+# TVD limiter (`superbee` or `van_leer`) when strict monotonicity is required
 # (e.g., positive-definite tracers).  Use `upwind1` only as a fallback near
 # boundaries.
 #
