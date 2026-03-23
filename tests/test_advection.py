@@ -504,10 +504,11 @@ class TestAdvection2DRotationStability:
 
 
 class TestNegativeFlowExactness:
-    """Each scheme must reconstruct a smooth profile exactly under negative flow.
+    """Each scheme must give zero tendency for constant fields under negative flow.
 
-    For linear data h(x) = x with u = -1, a single Euler step should shift
-    the profile by dt.  On constant data the tendency must be zero.
+    These tests use u = -1 (negative velocity) and verify that, in both 1-D and
+    2-D, the discrete advection tendency vanishes in the interior region when
+    the advected field h is spatially constant.
     """
 
     @pytest.mark.parametrize(
@@ -520,7 +521,8 @@ class TestNegativeFlowExactness:
         h = jnp.ones(grid.Nx)
         u = -jnp.ones(grid.Nx)
         result = adv(h, u, method=method)
-        np.testing.assert_allclose(result[4:-4], 0.0, atol=1e-8)
+        # Wide stencils (weno9) accumulate ~1e-6 error in float32
+        np.testing.assert_allclose(result[4:-4], 0.0, atol=1e-5)
 
     @pytest.mark.parametrize(
         "method",
@@ -533,7 +535,7 @@ class TestNegativeFlowExactness:
         u = -jnp.ones((grid.Ny, grid.Nx))
         v = -jnp.ones((grid.Ny, grid.Nx))
         result = adv(h, u, v, method=method)
-        np.testing.assert_allclose(result[4:-4, 4:-4], 0.0, atol=1e-6)
+        np.testing.assert_allclose(result[4:-4, 4:-4], 0.0, atol=1e-5)
 
 
 # ── 1-D convergence rate under negative flow ───────────────────────────────
@@ -613,7 +615,7 @@ class TestNegativeFlowConvergence:
 
 
 class TestAdvectionConservation:
-    """Total mass (sum * dx) must be conserved to machine precision."""
+    """Total mass (sum * dx) must be conserved to float32 accumulation tolerance."""
 
     @pytest.mark.parametrize(
         "method",
