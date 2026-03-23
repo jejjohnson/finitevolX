@@ -502,7 +502,7 @@ wheels = [
 
 [[package]]
 name = "finitevolx"
-version = "0.0.35"
+version = "0.0.37"
 source = { editable = "." }
 dependencies = [
     { name = "beartype" },
@@ -2105,8 +2105,8 @@ wheels = [
 
 [[package]]
 name = "spectraldiffx"
-version = "0.0.5"
-source = { git = "https://github.com/jejjohnson/spectraldiffx.git#7261a58d33f9efb0d5c3bfbf54bcf1dfffe27d7a" }
+version = "0.0.10"
+source = { git = "https://github.com/jejjohnson/spectraldiffx.git#3eb41382642c7a90f2c1590c144387af677f284e" }
 dependencies = [
     { name = "beartype" },
     { name = "equinox" },
