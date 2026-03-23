@@ -269,13 +269,19 @@ print(f"Residual norm: {info.residual_norm:.2e}")
 
     ```python
     M_inv = fvx.make_nystrom_preconditioner(
-        A, shape=(Ny, Nx), rank=50, key=jax.random.PRNGKey(0)
+        A, shape=(Ny, Nx), rank=100, key=jax.random.PRNGKey(0)
     )
+    psi, info = fvx.solve_cg(A, rhs, preconditioner=M_inv, rtol=1e-8)
     ```
 
     Builds a low-rank approximate inverse by probing the operator with
     random vectors.  Useful when you only have `matvec` access to the
-    operator, or when the spectral preconditioner is not effective enough.
+    operator (e.g., a black-box PDE operator), or when the spectral
+    preconditioner is not effective enough.
+
+    The `rank` parameter controls quality vs. setup cost: higher ranks
+    give better preconditioning.  A rank of 50–200 is typical for 2-D
+    problems.
 
 === "Multigrid (most powerful)"
 
