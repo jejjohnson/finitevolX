@@ -383,6 +383,61 @@ class TestNystromPreconditioner:
         assert info.converged
         np.testing.assert_allclose(np.array(psi), np.array(psi_exact), atol=1e-6)
 
+    def test_low_rank_converges(self, periodic_grid):
+        """Low-rank Nyström preconditioner must still converge (regression #187).
+
+        When rank << n, the old implementation mapped directions outside the
+        captured subspace to zero, causing CG to falsely report convergence
+        while the true relative residual remained ~1.0.
+        """
+        Ny, Nx, dx, dy = periodic_grid
+        lam = 4.0
+        eigx = fft_eigenvalues(Nx, dx)
+        eigy = fft_eigenvalues(Ny, dy)
+
+        j = jnp.arange(Ny)[:, None]
+        i = jnp.arange(Nx)[None, :]
+        rhs = jnp.sin(jnp.pi * (j + 1) / (Ny + 1)) * jnp.sin(
+            jnp.pi * (i + 1) / (Nx + 1)
+        )
+
+        def A(psi):
+            eig2d = eigy[:, None] + eigx[None, :] - lam
+            return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
+
+        M_inv = make_nystrom_preconditioner(A, (Ny, Nx), rank=50)
+        psi, _info = solve_cg(
+            A, rhs, preconditioner=M_inv, rtol=1e-6, atol=1e-6, max_steps=500
+        )
+        # The actual residual must be small, not ~1.0
+        r = rhs - A(psi)
+        rel_res = float(jnp.linalg.norm(r)) / float(jnp.linalg.norm(rhs))
+        assert rel_res < 1e-3, f"Relative residual {rel_res:.2e} too large"
+
+    def test_low_rank_with_masked_laplacian(self):
+        """Nyström preconditioner works on masked-domain problems (#187)."""
+        Ny, Nx = 32, 32
+        dx, dy = 1.0 / Nx, 1.0 / Ny
+        lam = 4.0
+        mask = jnp.ones((Ny, Nx))
+
+        def A(x):
+            return masked_laplacian(x, mask, dx, dy, lambda_=lam)
+
+        j = jnp.arange(Ny)[:, None]
+        i = jnp.arange(Nx)[None, :]
+        rhs = jnp.sin(jnp.pi * (j + 1) / (Ny + 1)) * jnp.sin(
+            jnp.pi * (i + 1) / (Nx + 1)
+        )
+
+        M_inv = make_nystrom_preconditioner(A, (Ny, Nx), rank=50)
+        psi, _info = solve_cg(
+            A, rhs, preconditioner=M_inv, rtol=1e-6, atol=1e-6, max_steps=500
+        )
+        r = rhs - A(psi)
+        rel_res = float(jnp.linalg.norm(r)) / float(jnp.linalg.norm(rhs))
+        assert rel_res < 1e-3, f"Relative residual {rel_res:.2e} too large"
+
 
 # ---------------------------------------------------------------------------
 # Masked Laplacian
