@@ -50,6 +50,30 @@ def _ghost_ring(field):
 # ===========================================================================
 
 
+class TestPadWidthValidation:
+    def test_pad_width_zero_raises(self):
+        f = jnp.ones((8, 8))
+        with pytest.raises(ValueError, match="pad_width must be >= 1"):
+            zero_boundaries(f, pad_width=0)
+
+    def test_pad_width_too_large_raises(self):
+        f = jnp.ones((6, 6))
+        with pytest.raises(ValueError, match="too large"):
+            zero_boundaries(f, pad_width=3)
+
+    def test_all_functions_validate(self):
+        """All pad_width functions should reject invalid pad_width."""
+        f = jnp.ones((6, 6))
+        for fn in (
+            zero_boundaries,
+            zero_gradient_boundaries,
+            no_slip_boundaries,
+            free_slip_boundaries,
+        ):
+            with pytest.raises(ValueError):
+                fn(f, pad_width=0)
+
+
 class TestZeroBoundaries:
     def test_ghost_is_zero(self):
         f = _interior_field(8, 8)
@@ -111,6 +135,15 @@ class TestZeroGradientBoundaries:
         out = zero_gradient_boundaries(f)
         np.testing.assert_array_equal(out, f)
 
+    def test_pad_width_2(self):
+        f = _interior_field(10, 10)
+        out = zero_gradient_boundaries(f, pad_width=2)
+        assert out.shape == (10, 10)
+        np.testing.assert_array_equal(out[2:-2, 2:-2], f[2:-2, 2:-2])
+        # Edge of 2-cell ghost should equal nearest interior
+        np.testing.assert_array_equal(out[0, 2:-2], f[2, 2:-2])
+        np.testing.assert_array_equal(out[1, 2:-2], f[2, 2:-2])
+
 
 # ===========================================================================
 # no_flux_boundaries
@@ -158,6 +191,16 @@ class TestNoSlipBoundaries:
         out = no_slip_boundaries(f)
         np.testing.assert_array_equal(out[1:-1, 1:-1], f[1:-1, 1:-1])
 
+    def test_pad_width_2(self):
+        f = _interior_field(10, 10)
+        out = no_slip_boundaries(f, pad_width=2)
+        assert out.shape == (10, 10)
+        np.testing.assert_array_equal(out[2:-2, 2:-2], f[2:-2, 2:-2])
+        # Outermost south ghost row (excluding corners): negate 2nd interior row
+        np.testing.assert_allclose(out[0, 2:-2], -f[3, 2:-2], atol=1e-14)
+        # Inner south ghost row (excluding corners): negate 1st interior row
+        np.testing.assert_allclose(out[1, 2:-2], -f[2, 2:-2], atol=1e-14)
+
 
 # ===========================================================================
 # free_slip_boundaries
@@ -189,6 +232,16 @@ class TestFreeSlipBoundaries:
         f = _interior_field(8, 8)
         out = free_slip_boundaries(f)
         np.testing.assert_array_equal(out[1:-1, 1:-1], f[1:-1, 1:-1])
+
+    def test_pad_width_2(self):
+        f = _interior_field(10, 10)
+        out = free_slip_boundaries(f, pad_width=2)
+        assert out.shape == (10, 10)
+        np.testing.assert_array_equal(out[2:-2, 2:-2], f[2:-2, 2:-2])
+        # Outermost south ghost row (excluding corners): copy 2nd interior row
+        np.testing.assert_allclose(out[0, 2:-2], f[3, 2:-2], atol=1e-14)
+        # Inner south ghost row (excluding corners): copy 1st interior row
+        np.testing.assert_allclose(out[1, 2:-2], f[2, 2:-2], atol=1e-14)
 
 
 # ===========================================================================
@@ -242,7 +295,7 @@ class TestWallBoundaries:
     def test_h_grid_zero_gradient(self):
         """h-grid: tracer gets free-slip (zero gradient) + corners."""
         f = _interior_field(8, 8)
-        out = wall_boundaries(f, grid="h")
+        out = wall_boundaries(f, staggering="h")
         # Ghost should equal interior (free-slip)
         np.testing.assert_allclose(out[0, 1:-1], f[1, 1:-1], atol=1e-14)
         np.testing.assert_allclose(out[-1, 1:-1], f[-2, 1:-1], atol=1e-14)
@@ -250,7 +303,7 @@ class TestWallBoundaries:
     def test_u_grid_no_flux_ew(self):
         """u-grid: zero at E/W walls (normal flux), free-slip at N/S."""
         f = _interior_field(8, 8)
-        out = wall_boundaries(f, grid="u")
+        out = wall_boundaries(f, staggering="u")
         # E/W ghost cols should be zero
         np.testing.assert_array_equal(out[1:-1, 0], 0.0)
         np.testing.assert_array_equal(out[1:-1, -1], 0.0)
@@ -261,7 +314,7 @@ class TestWallBoundaries:
     def test_v_grid_no_flux_ns(self):
         """v-grid: zero at N/S walls (normal flux), free-slip at E/W."""
         f = _interior_field(8, 8)
-        out = wall_boundaries(f, grid="v")
+        out = wall_boundaries(f, staggering="v")
         # N/S ghost rows should be zero
         np.testing.assert_array_equal(out[0, 1:-1], 0.0)
         np.testing.assert_array_equal(out[-1, 1:-1], 0.0)
@@ -272,7 +325,7 @@ class TestWallBoundaries:
     def test_q_grid_no_slip(self):
         """q-grid: no-slip (sign-flipped) at all walls."""
         f = _interior_field(8, 8)
-        out = wall_boundaries(f, grid="q")
+        out = wall_boundaries(f, staggering="q")
         # Ghost = -interior at all walls
         np.testing.assert_allclose(out[0, 1:-1], -f[1, 1:-1], atol=1e-14)
         np.testing.assert_allclose(out[-1, 1:-1], -f[-2, 1:-1], atol=1e-14)
@@ -283,16 +336,16 @@ class TestWallBoundaries:
         """All staggerings should have averaged corners."""
         f = _interior_field(8, 8)
         for grid in ("h", "u", "v", "q"):
-            out = wall_boundaries(f, grid=grid)
+            out = wall_boundaries(f, staggering=grid)
             # Corner should be average of adjacent edge ghost cells
             expected_sw = 0.5 * (out[0, 1] + out[1, 0])
             assert float(out[0, 0]) == pytest.approx(float(expected_sw), abs=1e-14), (
                 f"grid={grid}"
             )
 
-    def test_invalid_grid(self):
-        with pytest.raises(ValueError, match="grid must be"):
-            wall_boundaries(jnp.ones((6, 6)), grid="z")
+    def test_invalid_staggering(self):
+        with pytest.raises(ValueError, match="staggering must be"):
+            wall_boundaries(jnp.ones((6, 6)), staggering="z")
 
 
 # ===========================================================================
@@ -335,8 +388,8 @@ class TestBoundaryPhysics:
         u = jnp.ones((Ny, Nx)) * 2.0
         v = jnp.ones((Ny, Nx)) * 3.0
 
-        u_bc = wall_boundaries(u, grid="u")
-        v_bc = wall_boundaries(v, grid="v")
+        u_bc = wall_boundaries(u, staggering="u")
+        v_bc = wall_boundaries(v, staggering="v")
 
         # u normal to E/W walls (interior edges, excluding corners)
         np.testing.assert_array_equal(u_bc[1:-1, 0], 0.0)
@@ -390,7 +443,7 @@ class TestJaxCompat:
 
         @jax.jit
         def apply(field):
-            return wall_boundaries(field, grid=grid)
+            return wall_boundaries(field, staggering=grid)
 
         result = apply(f)
         assert result.shape == f.shape

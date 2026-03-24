@@ -78,6 +78,17 @@ def enforce_periodic(
 # ── Functional padding wrappers ──────────────────────────────────────────────
 
 
+def _validate_pad_width(pad_width: int, field_shape: tuple[int, ...]) -> None:
+    """Raise ``ValueError`` if *pad_width* is out of range."""
+    if pad_width < 1:
+        raise ValueError(f"pad_width must be >= 1, got {pad_width}")
+    Ny, Nx = field_shape
+    if 2 * pad_width >= Ny or 2 * pad_width >= Nx:
+        raise ValueError(
+            f"pad_width={pad_width} too large for field shape {field_shape}"
+        )
+
+
 def zero_boundaries(
     field: Float[Array, "Ny Nx"],
     pad_width: int = 1,
@@ -92,13 +103,14 @@ def zero_boundaries(
     field : Float[Array, "Ny Nx"]
         Input array with ghost ring.
     pad_width : int
-        Width of the ghost ring to fill (default 1).
+        Width of the ghost ring to fill (default 1).  Must be >= 1.
 
     Returns
     -------
     Float[Array, "Ny Nx"]
         Array with zero-filled ghost ring.
     """
+    _validate_pad_width(pad_width, field.shape)
     interior = field[pad_width:-pad_width, pad_width:-pad_width]
     return jnp.pad(interior, pad_width=pad_width, mode="constant", constant_values=0.0)
 
@@ -124,6 +136,7 @@ def zero_gradient_boundaries(
     Float[Array, "Ny Nx"]
         Array with edge-extrapolated ghost ring.
     """
+    _validate_pad_width(pad_width, field.shape)
     interior = field[pad_width:-pad_width, pad_width:-pad_width]
     return jnp.pad(interior, pad_width=pad_width, mode="edge")
 
@@ -177,18 +190,24 @@ def no_slip_boundaries(
     Returns
     -------
     Float[Array, "Ny Nx"]
-        Array with no-slip ghost ring.
+        Array with no-slip ghost ring.  Corner cells are left
+        unchanged; apply :func:`fix_boundary_corners` afterwards
+        if smooth corners are needed.
     """
+    _validate_pad_width(pad_width, field.shape)
+    p = pad_width
     out = field
-    for k in range(pad_width):
-        # South ghost row: negate first interior row
-        out = out.at[k, :].set(-field[2 * pad_width - 1 - k, :])
-        # North ghost row: negate last interior row
-        out = out.at[-(k + 1), :].set(-field[-(2 * pad_width - k), :])
-        # West ghost col: negate first interior col
-        out = out.at[:, k].set(-field[:, 2 * pad_width - 1 - k])
-        # East ghost col: negate last interior col
-        out = out.at[:, -(k + 1)].set(-field[:, -(2 * pad_width - k)])
+    for k in range(p):
+        src_row = 2 * p - 1 - k
+        src_col = 2 * p - 1 - k
+        # South ghost row (excluding corners)
+        out = out.at[k, p:-p].set(-field[src_row, p:-p])
+        # North ghost row (excluding corners)
+        out = out.at[-(k + 1), p:-p].set(-field[-(2 * p - k), p:-p])
+        # West ghost col (excluding corners)
+        out = out.at[p:-p, k].set(-field[p:-p, src_col])
+        # East ghost col (excluding corners)
+        out = out.at[p:-p, -(k + 1)].set(-field[p:-p, -(2 * p - k)])
     return out
 
 
@@ -215,18 +234,24 @@ def free_slip_boundaries(
     Returns
     -------
     Float[Array, "Ny Nx"]
-        Array with free-slip ghost ring.
+        Array with free-slip ghost ring.  Corner cells are left
+        unchanged; apply :func:`fix_boundary_corners` afterwards
+        if smooth corners are needed.
     """
+    _validate_pad_width(pad_width, field.shape)
+    p = pad_width
     out = field
-    for k in range(pad_width):
-        # South ghost row: copy first interior row
-        out = out.at[k, :].set(field[2 * pad_width - 1 - k, :])
-        # North ghost row: copy last interior row
-        out = out.at[-(k + 1), :].set(field[-(2 * pad_width - k), :])
-        # West ghost col: copy first interior col
-        out = out.at[:, k].set(field[:, 2 * pad_width - 1 - k])
-        # East ghost col: copy last interior col
-        out = out.at[:, -(k + 1)].set(field[:, -(2 * pad_width - k)])
+    for k in range(p):
+        src_row = 2 * p - 1 - k
+        src_col = 2 * p - 1 - k
+        # South ghost row (excluding corners)
+        out = out.at[k, p:-p].set(field[src_row, p:-p])
+        # North ghost row (excluding corners)
+        out = out.at[-(k + 1), p:-p].set(field[-(2 * p - k), p:-p])
+        # West ghost col (excluding corners)
+        out = out.at[p:-p, k].set(field[p:-p, src_col])
+        # East ghost col (excluding corners)
+        out = out.at[p:-p, -(k + 1)].set(field[p:-p, -(2 * p - k)])
     return out
 
 
@@ -266,7 +291,7 @@ def fix_boundary_corners(
 
 def wall_boundaries(
     field: Float[Array, "Ny Nx"],
-    grid: str = "h",
+    staggering: str = "h",
 ) -> Float[Array, "Ny Nx"]:
     """Apply wall boundary conditions appropriate for a C-grid staggering.
 
@@ -284,7 +309,7 @@ def wall_boundaries(
     ----------
     field : Float[Array, "Ny Nx"]
         Input array with ghost ring.
-    grid : {'h', 'u', 'v', 'q'}
+    staggering : {'h', 'u', 'v', 'q'}
         Which C-grid staggering the field represents.
 
     Returns
@@ -292,10 +317,10 @@ def wall_boundaries(
     Float[Array, "Ny Nx"]
         Array with wall boundary conditions applied.
     """
-    if grid == "h":
+    if staggering == "h":
         # Tracer: zero-gradient (outflow/free-slip)
         out = free_slip_boundaries(field)
-    elif grid == "u":
+    elif staggering == "u":
         # u-velocity: zero at E/W walls (normal), free-slip at N/S
         out = field
         # North/south: free-slip (copy interior)
@@ -304,7 +329,7 @@ def wall_boundaries(
         # East/west: no-flux (zero normal velocity)
         out = out.at[:, 0].set(0.0)
         out = out.at[:, -1].set(0.0)
-    elif grid == "v":
+    elif staggering == "v":
         # v-velocity: zero at N/S walls (normal), free-slip at E/W
         out = field
         # East/west: free-slip (copy interior)
@@ -313,10 +338,12 @@ def wall_boundaries(
         # North/south: no-flux (zero normal velocity)
         out = out.at[0, :].set(0.0)
         out = out.at[-1, :].set(0.0)
-    elif grid == "q":
+    elif staggering == "q":
         # Vorticity: no-slip at all walls
         out = no_slip_boundaries(field)
     else:
-        raise ValueError(f"grid must be 'h', 'u', 'v', or 'q', got {grid!r}")
+        raise ValueError(
+            f"staggering must be 'h', 'u', 'v', or 'q', got {staggering!r}"
+        )
 
     return fix_boundary_corners(out)
