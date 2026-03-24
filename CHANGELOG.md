@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.0.38](https://github.com/jejjohnson/finitevolX/compare/v0.0.37...v0.0.38) (2026-03-24)
+
+
+### Features
+
+* upgrade spectraldiffx dependency to &gt;=0.0.10 ([af8c9a8](https://github.com/jejjohnson/finitevolX/commit/af8c9a87764dcb2a1ef6d74793b328614034cbd1))
+* upgrade spectraldiffx to &gt;=0.0.10 ([336e7a2](https://github.com/jejjohnson/finitevolX/commit/336e7a2de1824c7ff32bd3c9ea1159c93f8aca6f))
+
+
+### Bug Fixes
+
+* address PR review comments ([3871618](https://github.com/jejjohnson/finitevolX/commit/3871618625c562de099ed802903f143ecc81c28d))
+* address PR review comments on advection tests ([8d873f3](https://github.com/jejjohnson/finitevolX/commit/8d873f3abe57d09ba0bff00edcaa6dfe3949092e))
+* nyström preconditioner false convergence with low rank ([#187](https://github.com/jejjohnson/finitevolX/issues/187)) ([91080d2](https://github.com/jejjohnson/finitevolX/commit/91080d2f51ee9db985d4d9ccd806be4e3346b912))
+* Nyström preconditioner full-rank correction for low-rank usage ([#187](https://github.com/jejjohnson/finitevolX/issues/187)) ([a0517ea](https://github.com/jejjohnson/finitevolX/commit/a0517eaaaef5340757ef7bf49b6ecb6be3d8f753))
+* use non-trivial mask in Nystrom masked-domain test ([61b749f](https://github.com/jejjohnson/finitevolX/commit/61b749f9720c2bf60df4abd6ef57de09486409b4))
+* weno7/9 right-biased reconstruction for negative flow ([c906949](https://github.com/jejjohnson/finitevolX/commit/c90694904b0b22363017e333cc5cc1297bdb15cb))
+* WENO7/9 right-biased reconstruction for negative flow ([ad07fa6](https://github.com/jejjohnson/finitevolX/commit/ad07fa6de967c3df76e053392038d9dcd6cdd0f5)), closes [#191](https://github.com/jejjohnson/finitevolX/issues/191)
+
 ## [0.0.37](https://github.com/jejjohnson/finitevolX/compare/v0.0.36...v0.0.37) (2026-03-20)
 
 
