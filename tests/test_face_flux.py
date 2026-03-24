@@ -134,6 +134,37 @@ class TestUvNodeFluxBasic:
         np.testing.assert_allclose(uq[1:-1, 1:-1], C, atol=1e-12)
         np.testing.assert_allclose(vq[1:-1, 1:-1], C, atol=1e-12)
 
+    def test_nonconstant_positive_velocity(self, periodic_grid):
+        """Non-constant q with positive velocity: upwind1 picks left/below value."""
+        grid, Ny, Nx = periodic_grid
+        # q increasing in x: q[j, i] = i
+        i_vals = jnp.arange(Nx, dtype=float)[None, :]
+        q = jnp.broadcast_to(i_vals, (Ny, Nx))
+        u = jnp.ones((Ny, Nx))  # positive x-velocity
+        v = jnp.zeros((Ny, Nx))
+        uq, _vq = uv_node_flux(q, u, v, grid, method="upwind1")
+        # With positive u, upwind1 picks q[j, i] for east face → flux = q[j, i] * u
+        # Interior east-face flux at [j, i] should equal i (the left cell value)
+        for j in range(2, Ny - 2):
+            for i in range(2, Nx - 2):
+                assert float(uq[j, i]) == pytest.approx(float(q[j, i]), abs=1e-12)
+
+    def test_nonconstant_negative_velocity(self, periodic_grid):
+        """Non-constant q with negative velocity: upwind1 picks right/above value."""
+        grid, Ny, Nx = periodic_grid
+        # q increasing in y: q[j, i] = j
+        j_vals = jnp.arange(Ny, dtype=float)[:, None]
+        q = jnp.broadcast_to(j_vals, (Ny, Nx))
+        u = jnp.zeros((Ny, Nx))
+        v = -jnp.ones((Ny, Nx))  # negative y-velocity
+        _uq, vq = uv_node_flux(q, u, v, grid, method="upwind1")
+        # With negative v, upwind1 picks q[j+1, i] for north face → flux = q[j+1, i] * v
+        for j in range(2, Ny - 2):
+            for i in range(2, Nx - 2):
+                assert float(vq[j, i]) == pytest.approx(
+                    float(q[j + 1, i]) * (-1.0), abs=1e-12
+                )
+
 
 # ===========================================================================
 # Consistency with Advection2D

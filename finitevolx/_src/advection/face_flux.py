@@ -10,7 +10,7 @@ Typical usage::
 
     from finitevolx import uv_center_flux, ArakawaCGrid2D
 
-    grid = ArakawaCGrid2D.from_interior(ny, nx, Ly, Lx)
+    grid = ArakawaCGrid2D.from_interior(nx, ny, Lx, Ly)
     fe, fn = uv_center_flux(h, u, v, grid)
 
 See Also
@@ -97,7 +97,8 @@ def uv_node_flux(
 
     Analogous to :func:`uv_center_flux` but for a tracer *q* that lives at
     grid nodes (vorticity / psi points) rather than cell centres.  The
-    reconstruction is performed with the *same* stencil methods but applied
+    reconstruction uses the same stencil methods as ``Advection2D`` — the
+    x-stencil for east faces and the y-stencil for north faces — applied
     to the q-point field.
 
     Parameters
