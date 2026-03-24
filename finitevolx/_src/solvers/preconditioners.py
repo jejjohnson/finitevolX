@@ -173,11 +173,27 @@ def make_nystrom_preconditioner(
     # decomposition of the rank-k approximate inverse.
     W = Q @ U  # [n, k], orthonormal columns
 
+    # Full-rank correction: for directions orthogonal to the captured subspace,
+    # apply a scalar scaling instead of mapping to zero.  Without this, CG
+    # falsely "converges" in the preconditioned norm while the true residual
+    # remains ~1.0 (see #187).
+    #
+    # Random probing preferentially captures the largest-magnitude eigenvalues
+    # of A; the uncaptured directions tend to have smaller-magnitude eigenvalues
+    # and therefore *larger*-magnitude inverses.  Using s_inv[-1] (the largest-
+    # magnitude captured inverse, from the smallest captured |eigenvalue|) as
+    # the fallback keeps the preconditioned spectrum of uncaptured directions
+    # close to 1, which is what CG needs for fast convergence.
+    #
+    # Rewrite:  M^{-1} x = a*x + W*((s_inv - a)*(W^T x))
+    # which avoids explicit projection and is efficient.
+    alpha_shift = s_inv[-1]  # best estimate for uncaptured (small |eig|) directions
+    s_eff = s_inv - alpha_shift  # extra scaling for the captured subspace
+
     def _preconditioner(r: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         r_flat = r.ravel()  # [n]
-        # M^{-1} r ≈ W diag(s_inv) Wᵀ r
         coeffs = W.T @ r_flat  # [k]
-        result = W @ (s_inv * coeffs)  # [n]
+        result = alpha_shift * r_flat + W @ (s_eff * coeffs)  # [n]
         return result.reshape(Ny, Nx)
 
     return _preconditioner
