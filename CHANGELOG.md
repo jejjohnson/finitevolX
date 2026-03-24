@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.0.39](https://github.com/jejjohnson/finitevolX/compare/v0.0.38...v0.0.39) (2026-03-24)
+
+
+### Features
+
+* expose functional boundary helpers for wall, padding, and corners ([19312bf](https://github.com/jejjohnson/finitevolX/commit/19312bf3579cf50fbe1cced8ea70181490c7c796))
+* expose functional boundary helpers for wall, padding, and corners ([#152](https://github.com/jejjohnson/finitevolX/issues/152)) ([0d7277a](https://github.com/jejjohnson/finitevolX/commit/0d7277ab2486a733bd486837c7bc8becb71d318d))
+* expose raw face fluxes as public functional API ([6298323](https://github.com/jejjohnson/finitevolX/commit/6298323ee00ae440d420571d7340dae8ee3ed16c))
+* expose raw face fluxes as public functional API ([#143](https://github.com/jejjohnson/finitevolX/issues/143)) ([291be3b](https://github.com/jejjohnson/finitevolX/commit/291be3b53d68c3523a76adbf80731b86a70b2566))
+* expose reconstruction pipeline as public functional API ([47748d4](https://github.com/jejjohnson/finitevolX/commit/47748d49ed41e08e351b72854bf7248a4c3fc44b))
+* expose reconstruction pipeline as public functional API ([#151](https://github.com/jejjohnson/finitevolX/issues/151)) ([945f15d](https://github.com/jejjohnson/finitevolX/commit/945f15d3f118f4c67f78214e4a76020f4e0793f7))
+
+
+### Bug Fixes
+
+* address PR [#197](https://github.com/jejjohnson/finitevolX/issues/197) review comments ([46890be](https://github.com/jejjohnson/finitevolX/commit/46890beb5a964857152a52a9bc759d6e86e7158d))
+* address PR [#198](https://github.com/jejjohnson/finitevolX/issues/198) review comments ([902c55d](https://github.com/jejjohnson/finitevolX/commit/902c55dba4831e43145407febeee561124b1e9f3))
+* address PR [#199](https://github.com/jejjohnson/finitevolX/issues/199) review comments ([8a632e6](https://github.com/jejjohnson/finitevolX/commit/8a632e69c573543c89ca87ec1f503c9577ba2b16))
+
 ## [0.0.38](https://github.com/jejjohnson/finitevolX/compare/v0.0.37...v0.0.38) (2026-03-24)
 
 
