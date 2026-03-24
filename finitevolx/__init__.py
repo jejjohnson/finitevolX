@@ -19,7 +19,17 @@ from finitevolx._src.boundary.bc_1d import (
 )
 from finitevolx._src.boundary.bc_field import FieldBCSet
 from finitevolx._src.boundary.bc_set import BoundaryConditionSet
-from finitevolx._src.boundary.boundary import enforce_periodic, pad_interior
+from finitevolx._src.boundary.boundary import (
+    enforce_periodic,
+    fix_boundary_corners,
+    free_slip_boundaries,
+    no_flux_boundaries,
+    no_slip_boundaries,
+    pad_interior,
+    wall_boundaries,
+    zero_boundaries,
+    zero_gradient_boundaries,
+)
 from finitevolx._src.diffusion.diffusion import (
     BiharmonicDiffusion2D,
     BiharmonicDiffusion3D,
@@ -347,8 +357,15 @@ __all__ = [
     "divergence_2d",
     # Boundary helpers
     "enforce_periodic",
+    "fix_boundary_corners",
+    "free_slip_boundaries",
     "interior",
+    "no_flux_boundaries",
+    "no_slip_boundaries",
     "pad_interior",
+    "wall_boundaries",
+    "zero_boundaries",
+    "zero_gradient_boundaries",
     # Interpolation
     "Interpolation1D",
     "Interpolation2D",
