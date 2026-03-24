@@ -1,4 +1,5 @@
 from finitevolx._src.advection.advection import Advection1D, Advection2D, Advection3D
+from finitevolx._src.advection.face_flux import uv_center_flux, uv_node_flux
 from finitevolx._src.advection.flux import upwind_flux
 from finitevolx._src.advection.limiters import mc, minmod, superbee, van_leer
 from finitevolx._src.advection.reconstruction import (
@@ -269,6 +270,9 @@ from finitevolx._src.vertical.vertical_modes import (
 __all__ = [
     # Upwind flux dispatch
     "upwind_flux",
+    # Raw face fluxes
+    "uv_center_flux",
+    "uv_node_flux",
     # Advection
     "Advection1D",
     "Advection2D",
