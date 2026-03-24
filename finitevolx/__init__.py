@@ -1,10 +1,40 @@
 from finitevolx._src.advection.advection import Advection1D, Advection2D, Advection3D
 from finitevolx._src.advection.flux import upwind_flux
 from finitevolx._src.advection.limiters import mc, minmod, superbee, van_leer
+from finitevolx._src.advection.linear import (
+    linear_2pts,
+    linear_3pts_left,
+    linear_3pts_right,
+    linear_4pts,
+    linear_5pts_left,
+    linear_5pts_right,
+    linear_6pts,
+)
+from finitevolx._src.advection.reconstruct_fn import (
+    plusminus,
+    reconstruct,
+    upwind_1pt,
+    upwind_3pt,
+    upwind_5pt,
+)
 from finitevolx._src.advection.reconstruction import (
     Reconstruction1D,
     Reconstruction2D,
     Reconstruction3D,
+)
+from finitevolx._src.advection.weno import (
+    weno_3pts,
+    weno_3pts_improved,
+    weno_3pts_improved_right,
+    weno_3pts_right,
+    weno_5pts,
+    weno_5pts_improved,
+    weno_5pts_improved_right,
+    weno_5pts_right,
+    weno_7pts,
+    weno_7pts_right,
+    weno_9pts,
+    weno_9pts_right,
 )
 from finitevolx._src.boundary.bc_1d import (
     Dirichlet1D,
@@ -273,6 +303,33 @@ __all__ = [
     "Advection1D",
     "Advection2D",
     "Advection3D",
+    # WENO stencil functions
+    "weno_3pts",
+    "weno_3pts_improved",
+    "weno_3pts_improved_right",
+    "weno_3pts_right",
+    "weno_5pts",
+    "weno_5pts_improved",
+    "weno_5pts_improved_right",
+    "weno_5pts_right",
+    "weno_7pts",
+    "weno_7pts_right",
+    "weno_9pts",
+    "weno_9pts_right",
+    # Linear stencil functions
+    "linear_2pts",
+    "linear_3pts_left",
+    "linear_3pts_right",
+    "linear_4pts",
+    "linear_5pts_left",
+    "linear_5pts_right",
+    "linear_6pts",
+    # Functional reconstruction dispatcher
+    "reconstruct",
+    "plusminus",
+    "upwind_1pt",
+    "upwind_3pt",
+    "upwind_5pt",
     # Coriolis
     "Coriolis2D",
     "Coriolis3D",

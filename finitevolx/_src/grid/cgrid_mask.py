@@ -357,6 +357,35 @@ class ArakawaCGridMask(eqx.Module):
         bnd = bnd.at[:, -1].set(True)
         return bnd
 
+    # ── distbound accessors for stencil blending ────────────────────────────────
+
+    @property
+    def distbound1(self) -> Bool[Array, "Ny Nx"]:
+        """Cells exactly 1 wet cell from land (coast).
+
+        At these cells only a 1st-order (2-point) upwind stencil is safe.
+        Corresponds to ``classification == 1``.
+        """
+        return self.classification == 1
+
+    @property
+    def distbound2(self) -> Bool[Array, "Ny Nx"]:
+        """Cells exactly 2 wet cells from land (near-coast).
+
+        At these cells a 3-point stencil (WENO3 / TVD) fits but not wider.
+        Corresponds to ``classification == 2``.
+        """
+        return self.classification == 2
+
+    @property
+    def distbound3plus(self) -> Bool[Array, "Ny Nx"]:
+        """Cells 3 or more wet cells from land (open ocean).
+
+        At these cells a 5-point or wider stencil is available.
+        Corresponds to ``classification == 3``.
+        """
+        return self.classification == 3
+
     # ── adaptive WENO stencil masks ───────────────────────────────────────────
 
     def get_adaptive_masks(
