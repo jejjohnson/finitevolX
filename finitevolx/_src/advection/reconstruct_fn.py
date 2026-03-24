@@ -261,9 +261,7 @@ def reconstruct(
     if num_pts not in (1, 3, 5):
         raise ValueError(f"num_pts must be 1, 3, or 5, got {num_pts!r}")
     if method not in _VALID_METHODS:
-        raise ValueError(
-            f"method must be one of {_VALID_METHODS}, got {method!r}"
-        )
+        raise ValueError(f"method must be one of {_VALID_METHODS}, got {method!r}")
 
     if dim == 1:
         # x-direction: operate on interior rows along last axis
