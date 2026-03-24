@@ -197,28 +197,6 @@ def upwind_5pt(
     return jnp.where(u >= 0.0, h_pos, h_neg)
 
 
-# ── Boundary fallback helpers ─────────────────────────────────────────────────
-
-
-def _upwind_2pt_boundary(
-    q: Float[Array, "..."], u: Float[Array, "..."]
-) -> Float[Array, "..."]:
-    """2nd-order upwind at a single boundary face (2-point stencil).
-
-    Positive flow:  h = 3/2 q[0] - 1/2 q[-1]   (extrapolation from left)
-    Negative flow:  h = 3/2 q[1] - 1/2 q[2]     (extrapolation from right)
-
-    Parameters
-    ----------
-    q : array, shape (..., >=3)
-    u : array, shape (..., 1)
-    """
-    h_pos = 1.5 * q[..., :-1] - 0.5 * q[..., 1:]
-    h_neg = 1.5 * q[..., 1:] - 0.5 * q[..., :-1]
-    # Only valid for pairs of adjacent cells; take the face between them
-    return jnp.where(u >= 0.0, h_pos, h_neg)
-
-
 # ── Top-level dispatcher ─────────────────────────────────────────────────────
 
 
@@ -277,10 +255,15 @@ def reconstruct(
     >>> flux.shape
     (10, 10)
     """
+    _VALID_METHODS = ("weno", "wenoz", "linear")
     if dim not in (0, 1):
         raise ValueError(f"dim must be 0 (y) or 1 (x), got {dim!r}")
     if num_pts not in (1, 3, 5):
         raise ValueError(f"num_pts must be 1, 3, or 5, got {num_pts!r}")
+    if method not in _VALID_METHODS:
+        raise ValueError(
+            f"method must be one of {_VALID_METHODS}, got {method!r}"
+        )
 
     if dim == 1:
         # x-direction: operate on interior rows along last axis

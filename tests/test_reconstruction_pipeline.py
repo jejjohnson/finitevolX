@@ -14,7 +14,8 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.advection.linear import (
+from finitevolx import (
+    ArakawaCGridMask,
     linear_2pts,
     linear_3pts_left,
     linear_3pts_right,
@@ -22,15 +23,12 @@ from finitevolx._src.advection.linear import (
     linear_5pts_left,
     linear_5pts_right,
     linear_6pts,
-)
-from finitevolx._src.advection.reconstruct_fn import (
     plusminus,
     reconstruct,
     upwind_1pt,
     upwind_3pt,
     upwind_5pt,
 )
-from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
 
 jax.config.update("jax_enable_x64", True)
 
@@ -95,10 +93,10 @@ class TestLinear3pts:
         assert float(linear_3pts_right(*vals)) == pytest.approx(C)
 
     def test_linear_field(self):
-        """f(x) = x at cells 0, 1, 2. Face at 0+1/2 should be 0.5."""
+        """f(x) = x at cells 0, 1, 2. Face between cells 1 and 2 (1+1/2) is 1.5."""
         qm, q0, qp = _scalar(0.0), _scalar(1.0), _scalar(2.0)
         assert float(linear_3pts_left(qm, q0, qp)) == pytest.approx(1.5)
-        # Right-biased: q0=1, qp=2, qpp=3, face at q0+1/2 = 1.5
+        # Right-biased: q0=1, qp=2, qpp=3, face between cells 1 and 2 (1+1/2) = 1.5
         assert float(
             linear_3pts_right(_scalar(1.0), _scalar(2.0), _scalar(3.0))
         ) == pytest.approx(1.5)
@@ -563,8 +561,11 @@ class TestReconstructValidation:
     def test_invalid_method(self):
         q = jnp.ones((5, 5))
         u = jnp.ones((5, 5))
-        with pytest.raises(ValueError, match="Unknown"):
+        with pytest.raises(ValueError, match="method must be one of"):
             reconstruct(q, u, dim=1, method="bogus", num_pts=3)
+        # Also rejected for num_pts=1 (method is validated up-front)
+        with pytest.raises(ValueError, match="method must be one of"):
+            reconstruct(q, u, dim=1, method="bogus", num_pts=1)
 
 
 # ===========================================================================
