@@ -8,6 +8,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
+from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
 from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators.difference import Difference2D, _curl_2d
@@ -35,6 +36,7 @@ class Vorticity2D(eqx.Module):
         self,
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
     ) -> Float[Array, "Ny Nx"]:
         """Relative vorticity at X-points (corners).
 
@@ -48,13 +50,16 @@ class Vorticity2D(eqx.Module):
             x-velocity at U-points.
         v : Float[Array, "Ny Nx"]
             y-velocity at V-points.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, the corner-point output
+            is multiplied by ``mask.psi`` (strict 4-of-4 corner mask).
 
         Returns
         -------
         Float[Array, "Ny Nx"]
             Relative vorticity at X-points.
         """
-        return self.diff.curl(u, v)
+        return self.diff.curl(u, v, mask=mask)
 
     def potential_vorticity(
         self,
@@ -62,6 +67,7 @@ class Vorticity2D(eqx.Module):
         v: Float[Array, "Ny Nx"],
         h: Float[Array, "Ny Nx"],
         f: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
     ) -> Float[Array, "Ny Nx"]:
         """Potential vorticity at X-points (corners).
 
@@ -78,6 +84,9 @@ class Vorticity2D(eqx.Module):
             Layer thickness at T-points.
         f : Float[Array, "Ny Nx"]
             Coriolis parameter at T-points.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, the corner-point output
+            is multiplied by ``mask.psi``.
 
         Returns
         -------
@@ -91,6 +100,8 @@ class Vorticity2D(eqx.Module):
         num = zeta[1:-1, 1:-1] + f_on_q[1:-1, 1:-1]
         den = h_on_q[1:-1, 1:-1]
         out = interior(jnp.where(den == 0, jnp.nan, num / den), h)
+        if mask is not None:
+            out = out * mask.psi
         return out
 
     def pv_flux_energy_conserving(
@@ -98,6 +109,7 @@ class Vorticity2D(eqx.Module):
         q: Float[Array, "Ny Nx"],
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
     ) -> tuple:
         """Energy-conserving PV flux.
 
@@ -114,6 +126,9 @@ class Vorticity2D(eqx.Module):
             x-velocity at U-points.
         v : Float[Array, "Ny Nx"]
             y-velocity at V-points.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, ``qu`` is multiplied by
+            ``mask.u`` and ``qv`` by ``mask.v``.
 
         Returns
         -------
@@ -126,6 +141,9 @@ class Vorticity2D(eqx.Module):
         qu = interior(q_on_u[1:-1, 1:-1] * u[1:-1, 1:-1], u)
         # qv[j+1/2, i] = q_on_v[j+1/2, i] * v[j+1/2, i]
         qv = interior(q_on_v[1:-1, 1:-1] * v[1:-1, 1:-1], v)
+        if mask is not None:
+            qu = qu * mask.u
+            qv = qv * mask.v
         return qu, qv
 
     def pv_flux_enstrophy_conserving(
@@ -133,6 +151,7 @@ class Vorticity2D(eqx.Module):
         q: Float[Array, "Ny Nx"],
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
     ) -> tuple:
         """Enstrophy-conserving PV flux.
 
@@ -149,6 +168,9 @@ class Vorticity2D(eqx.Module):
             x-velocity at U-points.
         v : Float[Array, "Ny Nx"]
             y-velocity at V-points.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, ``qu`` is multiplied by
+            ``mask.u`` and ``qv`` by ``mask.v``.
 
         Returns
         -------
@@ -165,6 +187,9 @@ class Vorticity2D(eqx.Module):
         # Interpolate back to faces
         qu = self.interp.X_to_U(qu_at_q)  # qu[j, i+1/2]
         qv = self.interp.X_to_V(qv_at_q)  # qv[j+1/2, i]
+        if mask is not None:
+            qu = qu * mask.u
+            qv = qv * mask.v
         return qu, qv
 
     def pv_flux_arakawa_lamb(
@@ -173,6 +198,7 @@ class Vorticity2D(eqx.Module):
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
         alpha: float = 1.0 / 3.0,
+        mask: ArakawaCGridMask | None = None,
     ) -> tuple:
         """Arakawa-Lamb PV flux: weighted blend of energy and enstrophy.
 
@@ -188,6 +214,9 @@ class Vorticity2D(eqx.Module):
             y-velocity at V-points.
         alpha : float
             Blending weight.  Default 1/3 gives Arakawa-Lamb scheme.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, ``qu`` is multiplied by
+            ``mask.u`` and ``qv`` by ``mask.v``.
 
         Returns
         -------
@@ -199,6 +228,9 @@ class Vorticity2D(eqx.Module):
         # Weighted blend
         qu = alpha * qu_e + (1.0 - alpha) * qu_s
         qv = alpha * qv_e + (1.0 - alpha) * qv_s
+        if mask is not None:
+            qu = qu * mask.u
+            qv = qv * mask.v
         return qu, qv
 
 
@@ -216,6 +248,7 @@ class Vorticity3D(eqx.Module):
         self,
         u: Float[Array, "Nz Ny Nx"],
         v: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
     ) -> Float[Array, "Nz Ny Nx"]:
         """Relative vorticity at X-points over all z-levels.
 
@@ -228,6 +261,9 @@ class Vorticity3D(eqx.Module):
             x-velocity at U-points.
         v : Float[Array, "Nz Ny Nx"]
             y-velocity at V-points.
+        mask : ArakawaCGridMask or None
+            Optional 2-D land/ocean mask, broadcast over all z-levels. If
+            provided, the output is multiplied by ``mask.psi``.
 
         Returns
         -------
@@ -238,4 +274,7 @@ class Vorticity3D(eqx.Module):
             lambda u_k, v_k: _curl_2d(u_k, v_k, self.grid.dx, self.grid.dy)
         )(u, v)
         # Zero z-ghost slices to match 3D ghost-ring convention.
-        return zero_z_ghosts(out)
+        out = zero_z_ghosts(out)
+        if mask is not None:
+            out = out * mask.psi
+        return out

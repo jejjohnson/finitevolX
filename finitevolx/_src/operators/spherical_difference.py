@@ -22,6 +22,7 @@ from __future__ import annotations
 import equinox as eqx
 from jaxtyping import Array, Float
 
+from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
 from finitevolx._src.grid.spherical_grid import (
     SphericalArakawaCGrid2D,
     SphericalArakawaCGrid3D,
@@ -51,165 +52,155 @@ class SphericalDifference2D(eqx.Module):
     # Forward differences (centre/face → face/corner)
     # ------------------------------------------------------------------
 
-    def diff_lon_T_to_U(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
-        """Zonal derivative T → U on a sphere.
+    def diff_lon_T_to_U(
+        self,
+        h: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Ny Nx"]:
+        """Zonal derivative T -> U on a sphere.
 
-        dh/dx[j, i+½] = (h[j, i+1] − h[j, i]) / (R · cos(lat_U) · dlon)
+        dh/dx[j, i+1/2] = (h[j, i+1] - h[j, i]) / (R * cos(lat_U) * dlon)
 
-        Parameters
-        ----------
-        h : Float[Array, "Ny Nx"]
-            Scalar at T-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Zonal derivative at U-points.
+        ``mask`` is an optional :class:`ArakawaCGridMask`; if provided,
+        the U-point output is multiplied by ``mask.u``.
         """
         raw = diff_x_fwd(h)
         cos_U = self.grid.cos_lat_U[1:-1, 1:-1]
         out = interior(_safe_div_cos(raw, cos_U, self.grid.R * self.grid.dlon), h)
+        if mask is not None:
+            out = out * mask.u
         return out
 
-    def diff_lat_T_to_V(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
-        """Meridional derivative T → V on a sphere.
+    def diff_lat_T_to_V(
+        self,
+        h: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Ny Nx"]:
+        """Meridional derivative T -> V on a sphere.
 
-        dh/dy[j+½, i] = (h[j+1, i] − h[j, i]) / (R · dlat)
+        dh/dy[j+1/2, i] = (h[j+1, i] - h[j, i]) / (R * dlat)
 
-        Parameters
-        ----------
-        h : Float[Array, "Ny Nx"]
-            Scalar at T-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Meridional derivative at V-points.
+        ``mask`` is an optional :class:`ArakawaCGridMask`; if provided,
+        the V-point output is multiplied by ``mask.v``.
         """
         raw = diff_y_fwd(h)
         out = interior(raw / (self.grid.R * self.grid.dlat), h)
+        if mask is not None:
+            out = out * mask.v
         return out
 
-    def diff_lon_V_to_X(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
-        """Zonal derivative V → X (corner) on a sphere.
+    def diff_lon_V_to_X(
+        self,
+        v: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Ny Nx"]:
+        """Zonal derivative V -> X (corner) on a sphere.
 
-        dv/dx[j+½, i+½] = (v[j+½, i+1] − v[j+½, i]) / (R · cos(lat_X) · dlon)
+        dv/dx[j+1/2, i+1/2] = (v[j+1/2, i+1] - v[j+1/2, i]) / (R * cos(lat_X) * dlon)
 
-        Parameters
-        ----------
-        v : Float[Array, "Ny Nx"]
-            Velocity at V-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Zonal derivative at X-points.
+        ``mask`` is an optional :class:`ArakawaCGridMask`; if provided,
+        the X-point output is multiplied by ``mask.psi``.
         """
         raw = diff_x_fwd(v)
         cos_X = self.grid.cos_lat_X[1:-1, 1:-1]
         out = interior(_safe_div_cos(raw, cos_X, self.grid.R * self.grid.dlon), v)
+        if mask is not None:
+            out = out * mask.psi
         return out
 
-    def diff_lat_U_to_X(self, u: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
-        """Meridional derivative U → X (corner) on a sphere.
+    def diff_lat_U_to_X(
+        self,
+        u: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Ny Nx"]:
+        """Meridional derivative U -> X (corner) on a sphere.
 
-        du/dy[j+½, i+½] = (u[j+1, i+½] − u[j, i+½]) / (R · dlat)
+        du/dy[j+1/2, i+1/2] = (u[j+1, i+1/2] - u[j, i+1/2]) / (R * dlat)
 
-        Parameters
-        ----------
-        u : Float[Array, "Ny Nx"]
-            Velocity at U-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Meridional derivative at X-points.
+        ``mask`` is an optional :class:`ArakawaCGridMask`; if provided,
+        the X-point output is multiplied by ``mask.psi``.
         """
         raw = diff_y_fwd(u)
         out = interior(raw / (self.grid.R * self.grid.dlat), u)
+        if mask is not None:
+            out = out * mask.psi
         return out
 
     # ------------------------------------------------------------------
     # Backward differences (face/corner → centre/face)
     # ------------------------------------------------------------------
 
-    def diff_lon_U_to_T(self, u: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
-        """Backward zonal derivative U → T on a sphere.
+    def diff_lon_U_to_T(
+        self,
+        u: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Ny Nx"]:
+        """Backward zonal derivative U -> T on a sphere.
 
-        du/dx[j, i] = (u[j, i+½] − u[j, i−½]) / (R · cos(lat_T) · dlon)
+        du/dx[j, i] = (u[j, i+1/2] - u[j, i-1/2]) / (R * cos(lat_T) * dlon)
 
-        Parameters
-        ----------
-        u : Float[Array, "Ny Nx"]
-            Velocity at U-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Zonal derivative at T-points.
+        ``mask`` is an optional :class:`ArakawaCGridMask`; if provided,
+        the T-point output is multiplied by ``mask.h``.
         """
         raw = diff_x_bwd(u)
         cos_T = self.grid.cos_lat_T[1:-1, 1:-1]
         out = interior(_safe_div_cos(raw, cos_T, self.grid.R * self.grid.dlon), u)
+        if mask is not None:
+            out = out * mask.h
         return out
 
-    def diff_lat_V_to_T(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
-        """Backward meridional derivative V → T on a sphere.
+    def diff_lat_V_to_T(
+        self,
+        v: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Ny Nx"]:
+        """Backward meridional derivative V -> T on a sphere.
 
-        dv/dy[j, i] = (v[j+½, i] − v[j−½, i]) / (R · dlat)
+        dv/dy[j, i] = (v[j+1/2, i] - v[j-1/2, i]) / (R * dlat)
 
-        Parameters
-        ----------
-        v : Float[Array, "Ny Nx"]
-            Velocity at V-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Meridional derivative at T-points.
+        ``mask`` is an optional :class:`ArakawaCGridMask`; if provided,
+        the T-point output is multiplied by ``mask.h``.
         """
         raw = diff_y_bwd(v)
         out = interior(raw / (self.grid.R * self.grid.dlat), v)
+        if mask is not None:
+            out = out * mask.h
         return out
 
     # ------------------------------------------------------------------
     # Second-order derivatives
     # ------------------------------------------------------------------
 
-    def diff2_lon(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def diff2_lon(
+        self,
+        h: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Ny Nx"]:
         """Second zonal derivative at T-points on a sphere.
 
-        d²h/dx² = 1/(R² cos²φ) · (h[j,i+1] − 2h[j,i] + h[j,i−1]) / dlon²
+        d^2h/dx^2 = 1/(R^2 cos^2 phi) * (h[j,i+1] - 2 h[j,i] + h[j,i-1]) / dlon^2
 
-        Parameters
-        ----------
-        h : Float[Array, "Ny Nx"]
-            Scalar at T-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Second zonal derivative at T-points.
+        ``mask`` is an optional :class:`ArakawaCGridMask`; if provided,
+        the T-point output is multiplied by ``mask.h``.
         """
         cos_T = self.grid.cos_lat_T[1:-1, 1:-1]
         d2h = (diff_x_fwd(h) - diff_x_bwd(h)) / self.grid.dlon**2
         out = interior(_safe_div_cos(d2h, cos_T, self.grid.R**2 * cos_T), h)
+        if mask is not None:
+            out = out * mask.h
         return out
 
-    def laplacian_merid(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def laplacian_merid(
+        self,
+        h: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Ny Nx"]:
         """Meridional term of the spherical Laplacian at T-points.
 
-        1/(R² cosφ) · d/dφ(cosφ · dh/dφ)
+        1/(R^2 cos phi) * d/dphi(cos phi * dh/dphi)
 
-        Parameters
-        ----------
-        h : Float[Array, "Ny Nx"]
-            Scalar at T-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Meridional Laplacian term at T-points.
+        ``mask`` is an optional :class:`ArakawaCGridMask`; if provided,
+        the T-point output is multiplied by ``mask.h``.
         """
         cos_T = self.grid.cos_lat_T[1:-1, 1:-1]
         dlat = self.grid.dlat
@@ -221,6 +212,8 @@ class SphericalDifference2D(eqx.Module):
         cos_S = 0.5 * (cos_T + self.grid.cos_lat_T[:-2, 1:-1])
         d_cos_dh = (cos_N * dh_N - cos_S * dh_S) / dlat
         out = interior(_safe_div_cos(d_cos_dh, cos_T, self.grid.R**2), h)
+        if mask is not None:
+            out = out * mask.h
         return out
 
 
@@ -242,34 +235,94 @@ class SphericalDifference3D(eqx.Module):
         self.grid = grid
         self._diff2d = SphericalDifference2D(grid=grid.horizontal_grid())
 
-    def diff_lon_T_to_U(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
-        """Zonal derivative T → U over all z-levels."""
-        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lon_T_to_U)(h))
+    def diff_lon_T_to_U(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """Zonal derivative T -> U over all z-levels.
 
-    def diff_lat_T_to_V(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
-        """Meridional derivative T → V over all z-levels."""
-        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lat_T_to_V)(h))
+        ``mask`` is an optional 2-D :class:`ArakawaCGridMask` broadcast
+        over all z-levels.
+        """
+        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lon_T_to_U)(h))
+        if mask is not None:
+            out = out * mask.u
+        return out
 
-    def diff_lon_V_to_X(self, v: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
-        """Zonal derivative V → X over all z-levels."""
-        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lon_V_to_X)(v))
+    def diff_lat_T_to_V(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """Meridional derivative T -> V over all z-levels."""
+        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lat_T_to_V)(h))
+        if mask is not None:
+            out = out * mask.v
+        return out
 
-    def diff_lat_U_to_X(self, u: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
-        """Meridional derivative U → X over all z-levels."""
-        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lat_U_to_X)(u))
+    def diff_lon_V_to_X(
+        self,
+        v: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """Zonal derivative V -> X over all z-levels."""
+        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lon_V_to_X)(v))
+        if mask is not None:
+            out = out * mask.psi
+        return out
 
-    def diff_lon_U_to_T(self, u: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
-        """Backward zonal derivative U → T over all z-levels."""
-        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lon_U_to_T)(u))
+    def diff_lat_U_to_X(
+        self,
+        u: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """Meridional derivative U -> X over all z-levels."""
+        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lat_U_to_X)(u))
+        if mask is not None:
+            out = out * mask.psi
+        return out
 
-    def diff_lat_V_to_T(self, v: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
-        """Backward meridional derivative V → T over all z-levels."""
-        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lat_V_to_T)(v))
+    def diff_lon_U_to_T(
+        self,
+        u: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """Backward zonal derivative U -> T over all z-levels."""
+        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lon_U_to_T)(u))
+        if mask is not None:
+            out = out * mask.h
+        return out
 
-    def diff2_lon(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
+    def diff_lat_V_to_T(
+        self,
+        v: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """Backward meridional derivative V -> T over all z-levels."""
+        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lat_V_to_T)(v))
+        if mask is not None:
+            out = out * mask.h
+        return out
+
+    def diff2_lon(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Nz Ny Nx"]:
         """Second zonal derivative at T-points over all z-levels."""
-        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff2_lon)(h))
+        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff2_lon)(h))
+        if mask is not None:
+            out = out * mask.h
+        return out
 
-    def laplacian_merid(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
+    def laplacian_merid(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Nz Ny Nx"]:
         """Meridional Laplacian term at T-points over all z-levels."""
-        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.laplacian_merid)(h))
+        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.laplacian_merid)(h))
+        if mask is not None:
+            out = out * mask.h
+        return out

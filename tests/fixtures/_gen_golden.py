@@ -159,6 +159,357 @@ def _register_all() -> list[Entry]:
     for method, fn in diff3d_masked:
         entries.append(("Difference3D", method, "masked", fn))
 
+    # ------------------------------------------------------------------
+    # Divergence2D
+    # ------------------------------------------------------------------
+    from finitevolx._src.operators.divergence import Divergence2D
+
+    div2d = Divergence2D(grid=grid2d)
+    entries += [
+        ("Divergence2D", "__call__", "unmasked", lambda: div2d(u2d, v2d)),
+        ("Divergence2D", "__call__", "masked", lambda: div2d(u2d, v2d, mask=mask2d)),
+        ("Divergence2D", "noflux", "unmasked", lambda: div2d.noflux(u2d, v2d)),
+        (
+            "Divergence2D",
+            "noflux",
+            "masked",
+            lambda: div2d.noflux(u2d, v2d, mask=mask2d),
+        ),
+    ]
+
+    # ------------------------------------------------------------------
+    # Interpolation2D / Interpolation3D
+    # ------------------------------------------------------------------
+    from finitevolx._src.operators.interpolation import (
+        Interpolation2D,
+        Interpolation3D,
+    )
+
+    interp2d = Interpolation2D(grid=grid2d)
+    interp3d = Interpolation3D(grid=grid3d)
+
+    interp2d_calls: list[tuple[str, Callable[[], object], Callable[[], object]]] = [
+        # (method_name, unmasked_fn, masked_fn)
+        (
+            "T_to_U",
+            lambda: interp2d.T_to_U(h2d),
+            lambda: interp2d.T_to_U(h2d, mask=mask2d),
+        ),
+        (
+            "T_to_V",
+            lambda: interp2d.T_to_V(h2d),
+            lambda: interp2d.T_to_V(h2d, mask=mask2d),
+        ),
+        (
+            "T_to_X",
+            lambda: interp2d.T_to_X(h2d),
+            lambda: interp2d.T_to_X(h2d, mask=mask2d),
+        ),
+        (
+            "X_to_U",
+            lambda: interp2d.X_to_U(q2d),
+            lambda: interp2d.X_to_U(q2d, mask=mask2d),
+        ),
+        (
+            "X_to_V",
+            lambda: interp2d.X_to_V(q2d),
+            lambda: interp2d.X_to_V(q2d, mask=mask2d),
+        ),
+        (
+            "U_to_T",
+            lambda: interp2d.U_to_T(u2d),
+            lambda: interp2d.U_to_T(u2d, mask=mask2d),
+        ),
+        (
+            "V_to_T",
+            lambda: interp2d.V_to_T(v2d),
+            lambda: interp2d.V_to_T(v2d, mask=mask2d),
+        ),
+        (
+            "X_to_T",
+            lambda: interp2d.X_to_T(q2d),
+            lambda: interp2d.X_to_T(q2d, mask=mask2d),
+        ),
+        (
+            "U_to_X",
+            lambda: interp2d.U_to_X(u2d),
+            lambda: interp2d.U_to_X(u2d, mask=mask2d),
+        ),
+        (
+            "V_to_X",
+            lambda: interp2d.V_to_X(v2d),
+            lambda: interp2d.V_to_X(v2d, mask=mask2d),
+        ),
+        (
+            "U_to_V",
+            lambda: interp2d.U_to_V(u2d),
+            lambda: interp2d.U_to_V(u2d, mask=mask2d),
+        ),
+        (
+            "V_to_U",
+            lambda: interp2d.V_to_U(v2d),
+            lambda: interp2d.V_to_U(v2d, mask=mask2d),
+        ),
+    ]
+    for method, unmasked_fn, masked_fn in interp2d_calls:
+        entries.append(("Interpolation2D", method, "unmasked", unmasked_fn))
+        entries.append(("Interpolation2D", method, "masked", masked_fn))
+
+    interp3d_calls: list[tuple[str, Callable[[], object], Callable[[], object]]] = [
+        (
+            "T_to_U",
+            lambda: interp3d.T_to_U(h3d),
+            lambda: interp3d.T_to_U(h3d, mask=mask2d),
+        ),
+        (
+            "T_to_V",
+            lambda: interp3d.T_to_V(h3d),
+            lambda: interp3d.T_to_V(h3d, mask=mask2d),
+        ),
+        (
+            "U_to_T",
+            lambda: interp3d.U_to_T(u3d),
+            lambda: interp3d.U_to_T(u3d, mask=mask2d),
+        ),
+        (
+            "V_to_T",
+            lambda: interp3d.V_to_T(v3d),
+            lambda: interp3d.V_to_T(v3d, mask=mask2d),
+        ),
+    ]
+    for method, unmasked_fn, masked_fn in interp3d_calls:
+        entries.append(("Interpolation3D", method, "unmasked", unmasked_fn))
+        entries.append(("Interpolation3D", method, "masked", masked_fn))
+
+    # ------------------------------------------------------------------
+    # Vorticity2D / Vorticity3D
+    # ------------------------------------------------------------------
+    from finitevolx._src.operators.vorticity import Vorticity2D, Vorticity3D
+
+    vort2d = Vorticity2D(grid=grid2d)
+    vort3d = Vorticity3D(grid=grid3d)
+    f2d = make_h_field_2d() * 0.0 + 1.0  # placeholder constant Coriolis
+    # Build a usable PV-like q2d from relative_vorticity for the flux tests.
+    q_vort = vort2d.relative_vorticity(u2d, v2d)
+
+    vort2d_calls: list[tuple[str, Callable[[], object], Callable[[], object]]] = [
+        (
+            "relative_vorticity",
+            lambda: vort2d.relative_vorticity(u2d, v2d),
+            lambda: vort2d.relative_vorticity(u2d, v2d, mask=mask2d),
+        ),
+        (
+            "potential_vorticity",
+            lambda: vort2d.potential_vorticity(u2d, v2d, h2d, f2d),
+            lambda: vort2d.potential_vorticity(u2d, v2d, h2d, f2d, mask=mask2d),
+        ),
+        (
+            "pv_flux_energy_conserving",
+            lambda: vort2d.pv_flux_energy_conserving(q_vort, u2d, v2d),
+            lambda: vort2d.pv_flux_energy_conserving(q_vort, u2d, v2d, mask=mask2d),
+        ),
+        (
+            "pv_flux_enstrophy_conserving",
+            lambda: vort2d.pv_flux_enstrophy_conserving(q_vort, u2d, v2d),
+            lambda: vort2d.pv_flux_enstrophy_conserving(q_vort, u2d, v2d, mask=mask2d),
+        ),
+        (
+            "pv_flux_arakawa_lamb",
+            lambda: vort2d.pv_flux_arakawa_lamb(q_vort, u2d, v2d),
+            lambda: vort2d.pv_flux_arakawa_lamb(q_vort, u2d, v2d, mask=mask2d),
+        ),
+    ]
+    for method, unmasked_fn, masked_fn in vort2d_calls:
+        entries.append(("Vorticity2D", method, "unmasked", unmasked_fn))
+        entries.append(("Vorticity2D", method, "masked", masked_fn))
+
+    entries += [
+        (
+            "Vorticity3D",
+            "relative_vorticity",
+            "unmasked",
+            lambda: vort3d.relative_vorticity(u3d, v3d),
+        ),
+        (
+            "Vorticity3D",
+            "relative_vorticity",
+            "masked",
+            lambda: vort3d.relative_vorticity(u3d, v3d, mask=mask2d),
+        ),
+    ]
+
+    # ------------------------------------------------------------------
+    # Spherical operators (SphericalDifference{2D,3D},
+    # SphericalDivergence{2D,3D}, SphericalLaplacian{2D,3D},
+    # SphericalVorticity{2D,3D})
+    # ------------------------------------------------------------------
+    from finitevolx._src.grid.spherical_grid import (
+        SphericalArakawaCGrid2D,
+        SphericalArakawaCGrid3D,
+    )
+    from finitevolx._src.operators.spherical_compound import (
+        SphericalDivergence2D,
+        SphericalDivergence3D,
+        SphericalLaplacian2D,
+        SphericalLaplacian3D,
+        SphericalVorticity2D,
+        SphericalVorticity3D,
+    )
+    from finitevolx._src.operators.spherical_difference import (
+        SphericalDifference2D,
+        SphericalDifference3D,
+    )
+    from tests.fixtures.inputs import (
+        NX_INTERIOR,
+        NY_INTERIOR,
+        NZ_INTERIOR,
+    )
+
+    sgrid2 = SphericalArakawaCGrid2D.from_interior(
+        NX_INTERIOR,
+        NY_INTERIOR,
+        lon_range=(0.0, 10.0),
+        lat_range=(10.0, 20.0),
+    )
+    sgrid3 = SphericalArakawaCGrid3D.from_interior(
+        NX_INTERIOR,
+        NY_INTERIOR,
+        NZ_INTERIOR,
+        lon_range=(0.0, 10.0),
+        lat_range=(10.0, 20.0),
+        Lz=1.0,
+    )
+    sdiff2 = SphericalDifference2D(grid=sgrid2)
+    sdiff3 = SphericalDifference3D(grid=sgrid3)
+    sdiv2 = SphericalDivergence2D(grid=sgrid2)
+    sdiv3 = SphericalDivergence3D(grid=sgrid3)
+    slap2 = SphericalLaplacian2D(grid=sgrid2)
+    slap3 = SphericalLaplacian3D(grid=sgrid3)
+    svort2 = SphericalVorticity2D(grid=sgrid2)
+    svort3 = SphericalVorticity3D(grid=sgrid3)
+
+    sdiff2_calls: list[tuple[str, Callable[[], object], Callable[[], object]]] = [
+        (
+            "diff_lon_T_to_U",
+            lambda: sdiff2.diff_lon_T_to_U(h2d),
+            lambda: sdiff2.diff_lon_T_to_U(h2d, mask=mask2d),
+        ),
+        (
+            "diff_lat_T_to_V",
+            lambda: sdiff2.diff_lat_T_to_V(h2d),
+            lambda: sdiff2.diff_lat_T_to_V(h2d, mask=mask2d),
+        ),
+        (
+            "diff_lon_V_to_X",
+            lambda: sdiff2.diff_lon_V_to_X(v2d),
+            lambda: sdiff2.diff_lon_V_to_X(v2d, mask=mask2d),
+        ),
+        (
+            "diff_lat_U_to_X",
+            lambda: sdiff2.diff_lat_U_to_X(u2d),
+            lambda: sdiff2.diff_lat_U_to_X(u2d, mask=mask2d),
+        ),
+        (
+            "diff_lon_U_to_T",
+            lambda: sdiff2.diff_lon_U_to_T(u2d),
+            lambda: sdiff2.diff_lon_U_to_T(u2d, mask=mask2d),
+        ),
+        (
+            "diff_lat_V_to_T",
+            lambda: sdiff2.diff_lat_V_to_T(v2d),
+            lambda: sdiff2.diff_lat_V_to_T(v2d, mask=mask2d),
+        ),
+        (
+            "diff2_lon",
+            lambda: sdiff2.diff2_lon(h2d),
+            lambda: sdiff2.diff2_lon(h2d, mask=mask2d),
+        ),
+        (
+            "laplacian_merid",
+            lambda: sdiff2.laplacian_merid(h2d),
+            lambda: sdiff2.laplacian_merid(h2d, mask=mask2d),
+        ),
+    ]
+    for method, unmasked_fn, masked_fn in sdiff2_calls:
+        entries.append(("SphericalDifference2D", method, "unmasked", unmasked_fn))
+        entries.append(("SphericalDifference2D", method, "masked", masked_fn))
+
+    sdiff3_calls: list[tuple[str, Callable[[], object], Callable[[], object]]] = [
+        (
+            "diff_lon_T_to_U",
+            lambda: sdiff3.diff_lon_T_to_U(h3d),
+            lambda: sdiff3.diff_lon_T_to_U(h3d, mask=mask2d),
+        ),
+        (
+            "diff_lat_T_to_V",
+            lambda: sdiff3.diff_lat_T_to_V(h3d),
+            lambda: sdiff3.diff_lat_T_to_V(h3d, mask=mask2d),
+        ),
+        (
+            "diff_lon_U_to_T",
+            lambda: sdiff3.diff_lon_U_to_T(u3d),
+            lambda: sdiff3.diff_lon_U_to_T(u3d, mask=mask2d),
+        ),
+        (
+            "diff_lat_V_to_T",
+            lambda: sdiff3.diff_lat_V_to_T(v3d),
+            lambda: sdiff3.diff_lat_V_to_T(v3d, mask=mask2d),
+        ),
+        (
+            "laplacian_merid",
+            lambda: sdiff3.laplacian_merid(h3d),
+            lambda: sdiff3.laplacian_merid(h3d, mask=mask2d),
+        ),
+    ]
+    for method, unmasked_fn, masked_fn in sdiff3_calls:
+        entries.append(("SphericalDifference3D", method, "unmasked", unmasked_fn))
+        entries.append(("SphericalDifference3D", method, "masked", masked_fn))
+
+    entries += [
+        ("SphericalDivergence2D", "__call__", "unmasked", lambda: sdiv2(u2d, v2d)),
+        (
+            "SphericalDivergence2D",
+            "__call__",
+            "masked",
+            lambda: sdiv2(u2d, v2d, mask=mask2d),
+        ),
+        ("SphericalDivergence3D", "__call__", "unmasked", lambda: sdiv3(u3d, v3d)),
+        (
+            "SphericalDivergence3D",
+            "__call__",
+            "masked",
+            lambda: sdiv3(u3d, v3d, mask=mask2d),
+        ),
+        ("SphericalLaplacian2D", "__call__", "unmasked", lambda: slap2(h2d)),
+        ("SphericalLaplacian2D", "__call__", "masked", lambda: slap2(h2d, mask=mask2d)),
+        ("SphericalLaplacian3D", "__call__", "unmasked", lambda: slap3(h3d)),
+        ("SphericalLaplacian3D", "__call__", "masked", lambda: slap3(h3d, mask=mask2d)),
+        (
+            "SphericalVorticity2D",
+            "relative_vorticity",
+            "unmasked",
+            lambda: svort2.relative_vorticity(u2d, v2d),
+        ),
+        (
+            "SphericalVorticity2D",
+            "relative_vorticity",
+            "masked",
+            lambda: svort2.relative_vorticity(u2d, v2d, mask=mask2d),
+        ),
+        (
+            "SphericalVorticity3D",
+            "relative_vorticity",
+            "unmasked",
+            lambda: svort3.relative_vorticity(u3d, v3d),
+        ),
+        (
+            "SphericalVorticity3D",
+            "relative_vorticity",
+            "masked",
+            lambda: svort3.relative_vorticity(u3d, v3d, mask=mask2d),
+        ),
+    ]
+
     return entries
 
 

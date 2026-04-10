@@ -9,6 +9,7 @@ from __future__ import annotations
 import equinox as eqx
 from jaxtyping import Array, Float
 
+from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
 from finitevolx._src.grid.grid import ArakawaCGrid2D
 from finitevolx._src.operators.difference import Difference2D, _divergence_2d
 
@@ -93,6 +94,7 @@ class Divergence2D(eqx.Module):
         self,
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
     ) -> Float[Array, "Ny Nx"]:
         """Divergence of (u, v) at T-points.
 
@@ -105,18 +107,22 @@ class Divergence2D(eqx.Module):
             x-velocity at U-points.
         v : Float[Array, "Ny Nx"]
             y-velocity at V-points.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, the T-point output is
+            multiplied by ``mask.h``.
 
         Returns
         -------
         Float[Array, "Ny Nx"]
             Divergence at T-points.
         """
-        return self.diff.divergence(u, v)
+        return self.diff.divergence(u, v, mask=mask)
 
     def noflux(
         self,
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
     ) -> Float[Array, "Ny Nx"]:
         """Divergence with closed-basin no-flux boundary conditions.
 
@@ -138,6 +144,9 @@ class Divergence2D(eqx.Module):
             x-velocity at U-points.
         v : Float[Array, "Ny Nx"]
             y-velocity at V-points.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, the T-point output is
+            multiplied by ``mask.h`` after the no-flux BCs are applied.
 
         Returns
         -------
@@ -146,4 +155,4 @@ class Divergence2D(eqx.Module):
         """
         u_bc = u.at[:, 0].set(0.0).at[:, -2].set(0.0)  # zero west & east wall U-faces
         v_bc = v.at[0, :].set(0.0).at[-2, :].set(0.0)  # zero south & north wall V-faces
-        return self.diff.divergence(u_bc, v_bc)
+        return self.diff.divergence(u_bc, v_bc, mask=mask)

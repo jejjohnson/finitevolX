@@ -15,6 +15,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
+from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
 from finitevolx._src.grid.spherical_grid import (
     SphericalArakawaCGrid2D,
     SphericalArakawaCGrid3D,
@@ -31,7 +32,7 @@ from finitevolx._src.operators.stencils import (
 class SphericalDivergence2D(eqx.Module):
     """Horizontal divergence on a 2-D spherical Arakawa C-grid.
 
-    div = 1/(R·cosφ) · [du/dλ + d(v·cosφ)/dφ]   at T-points
+    div = 1/(R*cos(phi)) * [du/dlon + d(v*cos(phi))/dphi]   at T-points
 
     Coriolis is coordinate-independent — use ``Coriolis2D`` directly
     with a spherical grid.
@@ -48,10 +49,11 @@ class SphericalDivergence2D(eqx.Module):
         self,
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
     ) -> Float[Array, "Ny Nx"]:
         """Horizontal divergence at T-points.
 
-        div[j, i] = 1/(R·cos(lat_T)) · [du/dλ + d(v·cos(lat_V))/dφ]
+        div[j, i] = 1/(R*cos(lat_T)) * [du/dlon + d(v*cos(lat_V))/dphi]
 
         Parameters
         ----------
@@ -59,6 +61,9 @@ class SphericalDivergence2D(eqx.Module):
             Zonal velocity at U-points.
         v : Float[Array, "Ny Nx"]
             Meridional velocity at V-points.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, the T-point output is
+            multiplied by ``mask.h``.
 
         Returns
         -------
@@ -69,23 +74,25 @@ class SphericalDivergence2D(eqx.Module):
         dlat = self.grid.dlat
         R = self.grid.R
 
-        # du/dλ at T: backward diff U → T
+        # du/dlon at T: backward diff U -> T
         du_dlon = diff_x_bwd(u) / dlon
 
-        # d(v·cosφ)/dφ at T: backward diff V → T
+        # d(v*cos(phi))/dphi at T: backward diff V -> T
         v_cos_N = v[1:-1, 1:-1] * self.grid.cos_lat_V[1:-1, 1:-1]
         v_cos_S = v[:-2, 1:-1] * self.grid.cos_lat_V[:-2, 1:-1]
         dvc_dlat = (v_cos_N - v_cos_S) / dlat
 
         cos_T = self.grid.cos_lat_T[1:-1, 1:-1]
         out = interior(_safe_div_cos(du_dlon + dvc_dlat, cos_T, R), u)
+        if mask is not None:
+            out = out * mask.h
         return out
 
 
 class SphericalVorticity2D(eqx.Module):
     """Vorticity and PV-flux operators on a 2-D spherical Arakawa C-grid.
 
-    ζ = 1/(R·cosφ) · [dv/dλ − d(u·cosφ)/dφ]   at X-points
+    zeta = 1/(R*cos(phi)) * [dv/dlon - d(u*cos(phi))/dphi]   at X-points
 
     The PV flux methods (energy-conserving, enstrophy-conserving,
     Arakawa-Lamb) are coordinate-independent: they involve only
@@ -112,10 +119,11 @@ class SphericalVorticity2D(eqx.Module):
         self,
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
     ) -> Float[Array, "Ny Nx"]:
         """Relative vorticity (curl) at X-points on a sphere.
 
-        ζ[j+½, i+½] = 1/(R·cos(lat_X)) · [dv/dλ − d(u·cosφ)/dφ]
+        zeta[j+1/2, i+1/2] = 1/(R*cos(lat_X)) * [dv/dlon - d(u*cos(phi))/dphi]
 
         Parameters
         ----------
@@ -123,6 +131,9 @@ class SphericalVorticity2D(eqx.Module):
             Zonal velocity at U-points.
         v : Float[Array, "Ny Nx"]
             Meridional velocity at V-points.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, the X-point output
+            is multiplied by ``mask.psi``.
 
         Returns
         -------
@@ -133,16 +144,18 @@ class SphericalVorticity2D(eqx.Module):
         dlat = self.grid.dlat
         R = self.grid.R
 
-        # dv/dλ at X: forward diff V → X
+        # dv/dlon at X: forward diff V -> X
         dv_dlon = diff_x_fwd(v) / dlon
 
-        # d(u·cosφ)/dφ at X: forward diff U → X
+        # d(u*cos(phi))/dphi at X: forward diff U -> X
         u_cos_N = u[2:, 1:-1] * self.grid.cos_lat_U[2:, 1:-1]
         u_cos_S = u[1:-1, 1:-1] * self.grid.cos_lat_U[1:-1, 1:-1]
         duc_dlat = (u_cos_N - u_cos_S) / dlat
 
         cos_X = self.grid.cos_lat_X[1:-1, 1:-1]
         out = interior(_safe_div_cos(dv_dlon - duc_dlat, cos_X, R), u)
+        if mask is not None:
+            out = out * mask.psi
         return out
 
     def potential_vorticity(
@@ -151,26 +164,14 @@ class SphericalVorticity2D(eqx.Module):
         v: Float[Array, "Ny Nx"],
         h: Float[Array, "Ny Nx"],
         f: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
     ) -> Float[Array, "Ny Nx"]:
         """Potential vorticity at X-points on a sphere.
 
-        q = (ζ + f) / h
+        q = (zeta + f) / h
 
-        Parameters
-        ----------
-        u : Float[Array, "Ny Nx"]
-            Zonal velocity at U-points.
-        v : Float[Array, "Ny Nx"]
-            Meridional velocity at V-points.
-        h : Float[Array, "Ny Nx"]
-            Layer thickness at T-points.
-        f : Float[Array, "Ny Nx"]
-            Coriolis parameter at T-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Potential vorticity at X-points.
+        ``mask`` is an optional :class:`ArakawaCGridMask`; if provided,
+        the X-point output is multiplied by ``mask.psi``.
         """
         zeta = self.relative_vorticity(u, v)
         f_on_X = self._interp.T_to_X(f)
@@ -178,6 +179,8 @@ class SphericalVorticity2D(eqx.Module):
         num = zeta[1:-1, 1:-1] + f_on_X[1:-1, 1:-1]
         den = h_on_X[1:-1, 1:-1]
         out = interior(jnp.where(den == 0, jnp.nan, num / den), u)
+        if mask is not None:
+            out = out * mask.psi
         return out
 
     def pv_flux_energy_conserving(
@@ -185,27 +188,20 @@ class SphericalVorticity2D(eqx.Module):
         q: Float[Array, "Ny Nx"],
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
         """Energy-conserving PV flux (coordinate-independent).
 
-        Parameters
-        ----------
-        q : Float[Array, "Ny Nx"]
-            Potential vorticity at X-points.
-        u : Float[Array, "Ny Nx"]
-            Zonal velocity at U-points.
-        v : Float[Array, "Ny Nx"]
-            Meridional velocity at V-points.
-
-        Returns
-        -------
-        tuple
-            (qu at U-points, qv at V-points)
+        ``mask`` is an optional :class:`ArakawaCGridMask`; if provided,
+        ``qu`` is multiplied by ``mask.u`` and ``qv`` by ``mask.v``.
         """
         q_on_u = self._interp.X_to_U(q)
         q_on_v = self._interp.X_to_V(q)
         qu = interior(q_on_u[1:-1, 1:-1] * u[1:-1, 1:-1], u)
         qv = interior(q_on_v[1:-1, 1:-1] * v[1:-1, 1:-1], v)
+        if mask is not None:
+            qu = qu * mask.u
+            qv = qv * mask.v
         return qu, qv
 
     def pv_flux_enstrophy_conserving(
@@ -213,22 +209,12 @@ class SphericalVorticity2D(eqx.Module):
         q: Float[Array, "Ny Nx"],
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
         """Enstrophy-conserving PV flux (coordinate-independent).
 
-        Parameters
-        ----------
-        q : Float[Array, "Ny Nx"]
-            Potential vorticity at X-points.
-        u : Float[Array, "Ny Nx"]
-            Zonal velocity at U-points.
-        v : Float[Array, "Ny Nx"]
-            Meridional velocity at V-points.
-
-        Returns
-        -------
-        tuple
-            (qu at U-points, qv at V-points)
+        ``mask`` is an optional :class:`ArakawaCGridMask`; if provided,
+        ``qu`` is multiplied by ``mask.u`` and ``qv`` by ``mask.v``.
         """
         u_on_q = self._interp.U_to_X(u)
         v_on_q = self._interp.V_to_X(v)
@@ -236,6 +222,9 @@ class SphericalVorticity2D(eqx.Module):
         qv_at_q = interior(q[1:-1, 1:-1] * v_on_q[1:-1, 1:-1], q)
         qu = self._interp.X_to_U(qu_at_q)
         qv = self._interp.X_to_V(qv_at_q)
+        if mask is not None:
+            qu = qu * mask.u
+            qv = qv * mask.v
         return qu, qv
 
     def pv_flux_arakawa_lamb(
@@ -244,36 +233,28 @@ class SphericalVorticity2D(eqx.Module):
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
         alpha: float = 1.0 / 3.0,
+        mask: ArakawaCGridMask | None = None,
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
         """Arakawa-Lamb PV flux: weighted blend of energy and enstrophy.
 
-        Parameters
-        ----------
-        q : Float[Array, "Ny Nx"]
-            Potential vorticity at X-points.
-        u : Float[Array, "Ny Nx"]
-            Zonal velocity at U-points.
-        v : Float[Array, "Ny Nx"]
-            Meridional velocity at V-points.
-        alpha : float
-            Blending weight (default 1/3).
-
-        Returns
-        -------
-        tuple
-            (qu at U-points, qv at V-points)
+        ``mask`` is an optional :class:`ArakawaCGridMask`; if provided,
+        ``qu`` is multiplied by ``mask.u`` and ``qv`` by ``mask.v``.
         """
         qu_e, qv_e = self.pv_flux_energy_conserving(q, u, v)
         qu_s, qv_s = self.pv_flux_enstrophy_conserving(q, u, v)
         qu = alpha * qu_e + (1.0 - alpha) * qu_s
         qv = alpha * qv_e + (1.0 - alpha) * qv_s
+        if mask is not None:
+            qu = qu * mask.u
+            qv = qv * mask.v
         return qu, qv
 
 
 class SphericalLaplacian2D(eqx.Module):
     """Spherical Laplacian on a 2-D Arakawa C-grid.
 
-    ∇²h = 1/(R²cos²φ) · d²h/dλ² + 1/(R²cosφ) · d/dφ(cosφ · dh/dφ)
+    nabla^2 h = 1/(R^2 cos^2 phi) * d^2h/dlon^2
+              + 1/(R^2 cos phi) * d/dphi(cos phi * dh/dphi)
 
     Parameters
     ----------
@@ -283,28 +264,25 @@ class SphericalLaplacian2D(eqx.Module):
 
     grid: SphericalArakawaCGrid2D
 
-    def __call__(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def __call__(
+        self,
+        h: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Ny Nx"]:
         """Laplacian at T-points on a sphere.
 
-        Parameters
-        ----------
-        h : Float[Array, "Ny Nx"]
-            Scalar at T-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Laplacian at T-points.
+        ``mask`` is an optional :class:`ArakawaCGridMask`; if provided,
+        the T-point output is multiplied by ``mask.h``.
         """
         R = self.grid.R
         dlon = self.grid.dlon
         dlat = self.grid.dlat
         cos_T = self.grid.cos_lat_T[1:-1, 1:-1]
 
-        # d²h/dλ²
+        # d^2h/dlon^2
         d2h_dlon2 = (diff_x_fwd(h) - diff_x_bwd(h)) / dlon**2
 
-        # d/dφ(cosφ · dh/dφ)
+        # d/dphi(cos(phi) * dh/dphi)
         dh_N = (h[2:, 1:-1] - h[1:-1, 1:-1]) / dlat
         dh_S = (h[1:-1, 1:-1] - h[:-2, 1:-1]) / dlat
         cos_V_N = 0.5 * (cos_T + self.grid.cos_lat_T[2:, 1:-1])
@@ -314,6 +292,8 @@ class SphericalLaplacian2D(eqx.Module):
         lon_term = _safe_div_cos(d2h_dlon2, cos_T, R**2 * cos_T)
         lat_term = _safe_div_cos(d_coslat_dh, cos_T, R**2)
         out = interior(lon_term + lat_term, h)
+        if mask is not None:
+            out = out * mask.h
         return out
 
 
@@ -325,8 +305,12 @@ def geostrophic_velocity_sphere(
 ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
     """Geostrophic velocity from free-surface height on a sphere.
 
-    u_g = -g/(f·R) · dh/dφ       at U-points
-    v_g =  g/(f·R·cosφ) · dh/dλ  at V-points
+    u_g = -g/(f*R) * dh/dphi       at U-points
+    v_g =  g/(f*R*cos(phi)) * dh/dlon  at V-points
+
+    This is a functional helper (no class wrapper); per the design
+    decision functional ops do not take masks. Apply ``* mask.u`` and
+    ``* mask.v`` after the call if you need masking.
 
     Parameters
     ----------
@@ -386,9 +370,18 @@ class SphericalDivergence3D(eqx.Module):
         self,
         u: Float[Array, "Nz Ny Nx"],
         v: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
     ) -> Float[Array, "Nz Ny Nx"]:
-        """Horizontal divergence at T-points over all z-levels."""
-        return zero_z_ghosts(eqx.filter_vmap(self._div2d)(u, v))
+        """Horizontal divergence at T-points over all z-levels.
+
+        ``mask`` is an optional 2-D :class:`ArakawaCGridMask` broadcast
+        over all z-levels; if provided, the output is multiplied by
+        ``mask.h``.
+        """
+        out = zero_z_ghosts(eqx.filter_vmap(self._div2d)(u, v))
+        if mask is not None:
+            out = out * mask.h
+        return out
 
 
 class SphericalVorticity3D(eqx.Module):
@@ -410,9 +403,18 @@ class SphericalVorticity3D(eqx.Module):
         self,
         u: Float[Array, "Nz Ny Nx"],
         v: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
     ) -> Float[Array, "Nz Ny Nx"]:
-        """Relative vorticity at X-points over all z-levels."""
-        return zero_z_ghosts(eqx.filter_vmap(self._vort2d.relative_vorticity)(u, v))
+        """Relative vorticity at X-points over all z-levels.
+
+        ``mask`` is an optional 2-D :class:`ArakawaCGridMask` broadcast
+        over all z-levels; if provided, the output is multiplied by
+        ``mask.psi``.
+        """
+        out = zero_z_ghosts(eqx.filter_vmap(self._vort2d.relative_vorticity)(u, v))
+        if mask is not None:
+            out = out * mask.psi
+        return out
 
 
 class SphericalLaplacian3D(eqx.Module):
@@ -430,6 +432,18 @@ class SphericalLaplacian3D(eqx.Module):
         self.grid = grid
         self._lap2d = SphericalLaplacian2D(grid=grid.horizontal_grid())
 
-    def __call__(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
-        """Laplacian at T-points over all z-levels."""
-        return zero_z_ghosts(eqx.filter_vmap(self._lap2d)(h))
+    def __call__(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """Laplacian at T-points over all z-levels.
+
+        ``mask`` is an optional 2-D :class:`ArakawaCGridMask` broadcast
+        over all z-levels; if provided, the output is multiplied by
+        ``mask.h``.
+        """
+        out = zero_z_ghosts(eqx.filter_vmap(self._lap2d)(h))
+        if mask is not None:
+            out = out * mask.h
+        return out
