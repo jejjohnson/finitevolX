@@ -87,32 +87,6 @@ class TestDiffusion2DFunctional:
         r2 = diffusion_2d(h, kappa=2.0, dx=grid.dx, dy=grid.dy)
         np.testing.assert_allclose(r2[1:-1, 1:-1], 2.0 * r1[1:-1, 1:-1], rtol=1e-10)
 
-    def test_mask_u_zeros_east_flux(self, grid):
-        """mask_u = 0 everywhere zeroes all east-face fluxes → zero tendency."""
-        x = jnp.arange(grid.Nx, dtype=float) * grid.dx
-        h = jnp.broadcast_to(x**2, (grid.Ny, grid.Nx))
-        mask_u = jnp.zeros_like(h)
-        result = diffusion_2d(h, kappa=1.0, dx=grid.dx, dy=grid.dy, mask_u=mask_u)
-        np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-12)
-
-    def test_mask_v_zeros_north_flux(self, grid):
-        """mask_v = 0 everywhere zeroes all north-face fluxes → zero tendency."""
-        y = jnp.arange(grid.Ny, dtype=float) * grid.dy
-        h = jnp.broadcast_to(y[:, None] ** 2, (grid.Ny, grid.Nx))
-        mask_v = jnp.zeros_like(h)
-        result = diffusion_2d(h, kappa=1.0, dx=grid.dx, dy=grid.dy, mask_v=mask_v)
-        np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-12)
-
-    def test_mask_h_zeros_land_tendency(self, grid):
-        """mask_h = 0 at a cell forces its tendency to zero."""
-        x = jnp.arange(grid.Nx, dtype=float) * grid.dx
-        h = jnp.broadcast_to(x**2, (grid.Ny, grid.Nx))
-        mask_h = jnp.ones_like(h)
-        # Mark the interior cell (3, 3) as land
-        mask_h = mask_h.at[3, 3].set(0.0)
-        result = diffusion_2d(h, kappa=1.0, dx=grid.dx, dy=grid.dy, mask_h=mask_h)
-        assert float(result[3, 3]) == pytest.approx(0.0, abs=1e-12)
-
     def test_no_nan_output(self, grid):
         h = jnp.ones((grid.Ny, grid.Nx))
         result = diffusion_2d(h, kappa=1.0, dx=grid.dx, dy=grid.dy)
@@ -145,26 +119,27 @@ class TestDiffusion2DClass:
             atol=1e-12,
         )
 
-    def test_matches_functional_api_with_masks(self, diff_op, grid):
-        """Class API with masks must match functional API with same masks."""
+    def test_mask_zeros_dry_cell_tendency(self, diff_op, grid):
+        """An ArakawaCGridMask with a dry interior cell forces the
+        tendency at that cell to zero."""
+        from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
+
         x = jnp.arange(grid.Nx, dtype=float) * grid.dx
         h = jnp.broadcast_to(x**2, (grid.Ny, grid.Nx))
-        mask_h = jnp.ones_like(h).at[2:4, 2:4].set(0.0)
-        mask_u = jnp.ones_like(h).at[:, 0].set(0.0)
-        mask_v = jnp.ones_like(h).at[0, :].set(0.0)
-        kappa = 0.7
-        np.testing.assert_allclose(
-            diff_op(h, kappa=kappa, mask_h=mask_h, mask_u=mask_u, mask_v=mask_v),
-            diffusion_2d(
-                h,
-                kappa=kappa,
-                dx=grid.dx,
-                dy=grid.dy,
-                mask_h=mask_h,
-                mask_u=mask_u,
-                mask_v=mask_v,
-            ),
-            atol=1e-12,
+        # Build a mask with one dry interior T-cell.
+        h_mask_arr = np.ones((grid.Ny, grid.Nx), dtype=bool)
+        h_mask_arr[3, 3] = False
+        mask = ArakawaCGridMask.from_mask(h_mask_arr)
+        result = diff_op(h, kappa=1.0, mask=mask)
+        assert float(result[3, 3]) == pytest.approx(0.0, abs=1e-12)
+
+    def test_mask_none_matches_default(self, diff_op, grid):
+        """Passing mask=None matches omitting the argument."""
+        x = jnp.arange(grid.Nx, dtype=float) * grid.dx
+        h = jnp.broadcast_to(x**2, (grid.Ny, grid.Nx))
+        np.testing.assert_array_equal(
+            diff_op(h, kappa=1.0),
+            diff_op(h, kappa=1.0, mask=None),
         )
 
     def test_spatially_varying_kappa(self, diff_op, grid):
@@ -234,14 +209,18 @@ class TestDiffusion2DFluxes:
         )
         np.testing.assert_allclose(tendency, div_flux, atol=1e-12)
 
-    def test_mask_u_zeros_east_flux(self, diff_op, grid):
-        """mask_u = 0 zeros east-face fluxes; north fluxes unaffected."""
+    def test_mask_zeros_dry_face_flux(self, diff_op, grid):
+        """An all-dry mask zeros all face fluxes."""
+        from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
+
         c = 1.0
         x = jnp.arange(grid.Nx, dtype=float) * grid.dx
         h = jnp.broadcast_to(c * x, (grid.Ny, grid.Nx))
-        mask_u = jnp.zeros_like(h)
-        fx, _fy = diff_op.fluxes(h, kappa=1.0, mask_u=mask_u)
+        all_dry = np.zeros((grid.Ny, grid.Nx), dtype=bool)
+        mask = ArakawaCGridMask.from_mask(all_dry)
+        fx, fy = diff_op.fluxes(h, kappa=1.0, mask=mask)
         np.testing.assert_allclose(fx, 0.0, atol=1e-12)
+        np.testing.assert_allclose(fy, 0.0, atol=1e-12)
 
     def test_ghost_ring_is_zero(self, diff_op, grid):
         x = jnp.arange(grid.Nx, dtype=float) * grid.dx

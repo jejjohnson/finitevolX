@@ -196,8 +196,10 @@ grid = ArakawaCGrid2D.from_interior(64, 64, 1e6, 1e6)
 diff_op = Diffusion2D(grid=grid)
 dh_dt = diff_op(h, kappa=100.0)
 
-# With masking
-dh_dt = diff_op(h, kappa=100.0, mask_h=mask.h, mask_u=mask.u, mask_v=mask.v)
+# With masking — pass an ArakawaCGridMask; the operator applies
+# mask.u to east-face fluxes, mask.v to north-face fluxes, and
+# mask.h to the final tendency.
+dh_dt = diff_op(h, kappa=100.0, mask=mask)
 
 # Biharmonic (scale-selective)
 biharm_op = BiharmonicDiffusion2D(grid=grid)

@@ -465,6 +465,87 @@ def _register_all() -> list[Entry]:
         entries.append(("SphericalDifference3D", method, "unmasked", unmasked_fn))
         entries.append(("SphericalDifference3D", method, "masked", masked_fn))
 
+    # ------------------------------------------------------------------
+    # Diffusion2D / Diffusion3D / BiharmonicDiffusion2D / BiharmonicDiffusion3D
+    # ------------------------------------------------------------------
+    from finitevolx._src.diffusion.diffusion import (
+        BiharmonicDiffusion2D,
+        BiharmonicDiffusion3D,
+        Diffusion2D,
+        Diffusion3D,
+    )
+
+    diffop2d = Diffusion2D(grid=grid2d)
+    diffop3d = Diffusion3D(grid=grid3d)
+    biharm2d = BiharmonicDiffusion2D(grid=grid2d)
+    biharm3d = BiharmonicDiffusion3D(grid=grid3d)
+    kappa = 1e-3
+
+    entries += [
+        ("Diffusion2D", "__call__", "unmasked", lambda: diffop2d(h2d, kappa=kappa)),
+        (
+            "Diffusion2D",
+            "__call__",
+            "masked",
+            lambda: diffop2d(h2d, kappa=kappa, mask=mask2d),
+        ),
+        (
+            "Diffusion2D",
+            "fluxes",
+            "unmasked",
+            lambda: diffop2d.fluxes(h2d, kappa=kappa),
+        ),
+        (
+            "Diffusion2D",
+            "fluxes",
+            "masked",
+            lambda: diffop2d.fluxes(h2d, kappa=kappa, mask=mask2d),
+        ),
+        ("Diffusion3D", "__call__", "unmasked", lambda: diffop3d(h3d, kappa=kappa)),
+        (
+            "Diffusion3D",
+            "__call__",
+            "masked",
+            lambda: diffop3d(h3d, kappa=kappa, mask=mask2d),
+        ),
+        (
+            "Diffusion3D",
+            "fluxes",
+            "unmasked",
+            lambda: diffop3d.fluxes(h3d, kappa=kappa),
+        ),
+        (
+            "Diffusion3D",
+            "fluxes",
+            "masked",
+            lambda: diffop3d.fluxes(h3d, kappa=kappa, mask=mask2d),
+        ),
+        (
+            "BiharmonicDiffusion2D",
+            "__call__",
+            "unmasked",
+            lambda: biharm2d(h2d, kappa=kappa),
+        ),
+        (
+            "BiharmonicDiffusion2D",
+            "__call__",
+            "masked",
+            lambda: biharm2d(h2d, kappa=kappa, mask=mask2d),
+        ),
+        (
+            "BiharmonicDiffusion3D",
+            "__call__",
+            "unmasked",
+            lambda: biharm3d(h3d, kappa=kappa),
+        ),
+        (
+            "BiharmonicDiffusion3D",
+            "__call__",
+            "masked",
+            lambda: biharm3d(h3d, kappa=kappa, mask=mask2d),
+        ),
+    ]
+
     entries += [
         ("SphericalDivergence2D", "__call__", "unmasked", lambda: sdiv2(u2d, v2d)),
         (

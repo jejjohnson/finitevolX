@@ -35,24 +35,31 @@ from finitevolx._src.operators.stencils import (
 def kinetic_energy(
     u: Float[Array, "Ny Nx"],
     v: Float[Array, "Ny Nx"],
-    mask: Float[Array, "Ny Nx"] | None = None,
 ) -> Float[Array, "Ny Nx"]:
     """Kinetic energy at T-points (cell centers) on an Arakawa C-grid.
 
     Eq:
-        ke[j, i] = 0.5 * (u²_on_T[j, i] + v²_on_T[j, i])
+        ke[j, i] = 0.5 * (u^2_on_T[j, i] + v^2_on_T[j, i])
 
-    where u² and v² are averaged from face-points to T-points:
-        u²_on_T[j, i] = 0.5 * (u[j, i+1/2]² + u[j, i-1/2]²)
-                       = 0.5 * (u[j, i]² + u[j, i-1]²)
-        v²_on_T[j, i] = 0.5 * (v[j+1/2, i]² + v[j-1/2, i]²)
-                       = 0.5 * (v[j, i]² + v[j-1, i]²)
+    where u^2 and v^2 are averaged from face-points to T-points:
+        u^2_on_T[j, i] = 0.5 * (u[j, i+1/2]^2 + u[j, i-1/2]^2)
+                       = 0.5 * (u[j, i]^2 + u[j, i-1]^2)
+        v^2_on_T[j, i] = 0.5 * (v[j+1/2, i]^2 + v[j-1/2, i]^2)
+                       = 0.5 * (v[j, i]^2 + v[j-1, i]^2)
+
+    This is a pure functional helper.  Per the design decision that
+    masks live at the class-operator layer only, ``kinetic_energy``
+    does not accept a mask argument; if you need masked KE on an
+    irregular domain, multiply the result by ``mask.h`` at the call
+    site:
+
+        ke = kinetic_energy(u, v) * mask.h
+
+    See ``docs/concepts/masking.md`` for the design rationale.
 
     Args:
         u (Array): x-velocity at U-points (east faces), shape [Ny, Nx].
         v (Array): y-velocity at V-points (north faces), shape [Ny, Nx].
-        mask (Array | None): optional binary mask at T-points.  If provided,
-            KE is zeroed where mask is 0.
 
     Returns:
         ke (Array): kinetic energy at T-points, shape [Ny, Nx].
@@ -63,13 +70,11 @@ def kinetic_energy(
     v_float = jnp.asarray(v, dtype=dtype)
     u2 = u_float**2
     v2 = v_float**2
-    # u²_on_T[j, i] = 0.5 * (u²[j, i] + u²[j, i-1])  (east + west U-faces)
-    # v²_on_T[j, i] = 0.5 * (v²[j, i] + v²[j-1, i])  (north + south V-faces)
+    # u^2_on_T[j, i] = 0.5 * (u^2[j, i] + u^2[j, i-1])  (east + west U-faces)
+    # v^2_on_T[j, i] = 0.5 * (v^2[j, i] + v^2[j-1, i])  (north + south V-faces)
     u2_on_T = avg_x_bwd(u2)
     v2_on_T = avg_y_bwd(v2)
     ke_int = 0.5 * (u2_on_T + v2_on_T)
-    if mask is not None:
-        ke_int = ke_int * mask[1:-1, 1:-1]
     out = interior(ke_int, u_float)
     return out
 
@@ -308,40 +313,39 @@ def okubo_weiss(
 
 def enstrophy(
     omega: Float[Array, "Ny Nx"],
-    mask: Float[Array, "Ny Nx"] | None = None,
 ) -> Float[Array, "Ny Nx"]:
     """Enstrophy (pointwise).
 
     Z = 0.5 * omega^2
 
+    Pure functional helper; per the design decision masks live at the
+    class-operator layer only, so apply ``* mask.psi`` (or whichever
+    stagger is appropriate to the input ``omega``) at the call site if
+    needed.
+
     Parameters
     ----------
     omega : Float[Array, "Ny Nx"]
         Relative vorticity (typically at X-points).
-    mask : Float[Array, "Ny Nx"] | None, optional
-        Binary mask.  If provided, result is zeroed where mask is 0.
 
     Returns
     -------
     Float[Array, "Ny Nx"]
         Enstrophy at the same grid points as *omega*.
     """
-    out = 0.5 * omega**2
-    if mask is not None:
-        out = out * mask
-    return out
+    return 0.5 * omega**2
 
 
 def potential_enstrophy(
     q: Float[Array, "Ny Nx"],
     h: Float[Array, "Ny Nx"],
-    mask: Float[Array, "Ny Nx"] | None = None,
 ) -> Float[Array, "Ny Nx"]:
     """Potential enstrophy (pointwise).
 
     PE = 0.5 * q^2 * h
 
-    Inputs must live on the same grid points.
+    Inputs must live on the same grid points.  Pure functional helper;
+    apply a mask at the call site if needed (see :func:`enstrophy`).
 
     Parameters
     ----------
@@ -349,18 +353,13 @@ def potential_enstrophy(
         Potential vorticity.
     h : Float[Array, "Ny Nx"]
         Layer thickness (or depth).
-    mask : Float[Array, "Ny Nx"] | None, optional
-        Binary mask.  If provided, result is zeroed where mask is 0.
 
     Returns
     -------
     Float[Array, "Ny Nx"]
         Potential enstrophy.
     """
-    out = 0.5 * q**2 * h
-    if mask is not None:
-        out = out * mask
-    return out
+    return 0.5 * q**2 * h
 
 
 # ======================================================================

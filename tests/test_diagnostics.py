@@ -544,37 +544,33 @@ class TestPotentialVorticity:
 
 
 # ======================================================================
-# Mask support tests
+# Caller-side masking
 # ======================================================================
+# Per the masks-everywhere design (see docs/concepts/masking.md),
+# functional diagnostics do not accept a ``mask`` argument; the caller
+# multiplies the result by the appropriate ``mask.<stagger>`` field.
+# These tests just pin that the documented call-site idiom works.
 
 
-class TestMaskSupport:
-    def test_kinetic_energy_mask(self, grid2d):
+class TestCallerSideMasking:
+    def test_kinetic_energy_with_caller_side_mask(self, grid2d):
         u = 3.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
         v = 3.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
         mask = jnp.zeros((grid2d.Ny, grid2d.Nx))
-        result = kinetic_energy(u, v, mask=mask)
+        result = kinetic_energy(u, v) * mask
         np.testing.assert_allclose(result, 0.0, atol=1e-10)
 
-    def test_kinetic_energy_mask_partial(self, grid2d):
-        u = 3.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
-        v = 3.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
-        mask = jnp.ones((grid2d.Ny, grid2d.Nx))
-        result_nomask = kinetic_energy(u, v)
-        result_mask = kinetic_energy(u, v, mask=mask)
-        np.testing.assert_allclose(result_mask, result_nomask, atol=1e-10)
-
-    def test_enstrophy_mask(self):
+    def test_enstrophy_with_caller_side_mask(self):
         omega = 4.0 * jnp.ones((10, 10))
         mask = jnp.zeros((10, 10))
-        result = enstrophy(omega, mask=mask)
+        result = enstrophy(omega) * mask
         np.testing.assert_allclose(result, 0.0, atol=1e-10)
 
-    def test_potential_enstrophy_mask(self):
+    def test_potential_enstrophy_with_caller_side_mask(self):
         q = 2.0 * jnp.ones((10, 10))
         h = 3.0 * jnp.ones((10, 10))
         mask = jnp.zeros((10, 10))
-        result = potential_enstrophy(q, h, mask=mask)
+        result = potential_enstrophy(q, h) * mask
         np.testing.assert_allclose(result, 0.0, atol=1e-10)
 
 
