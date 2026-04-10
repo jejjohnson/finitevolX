@@ -36,7 +36,7 @@ from finitevolx._src.grid.cartesian import (
     CartesianGrid2D,
     CartesianGrid3D,
 )
-from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.mask import Mask2D
 from finitevolx._src.operators._ghost import interior
 
 # Small epsilon to avoid division by zero in TVD slope ratios.
@@ -1105,7 +1105,7 @@ class Reconstruction2D(eqx.Module):
         self,
         h: Float[Array, "Ny Nx"],
         u: Float[Array, "Ny Nx"],
-        mask: ArakawaCGridMask,
+        mask: Mask2D,
         limiter: str = "minmod",
     ) -> Float[Array, "Ny Nx"]:
         """TVD east-face flux with mask-aware stencil selection.
@@ -1119,7 +1119,7 @@ class Reconstruction2D(eqx.Module):
             Cell-centre tracer field.
         u : Float[Array, "Ny Nx"]
             East-face velocity.
-        mask : ArakawaCGridMask
+        mask : Mask2D
             Arakawa C-grid mask providing stencil-capability information.
         limiter : str
             Flux limiter name: ``'minmod'``, ``'van_leer'``, ``'superbee'``,
@@ -1141,7 +1141,7 @@ class Reconstruction2D(eqx.Module):
         self,
         h: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
-        mask: ArakawaCGridMask,
+        mask: Mask2D,
         limiter: str = "minmod",
     ) -> Float[Array, "Ny Nx"]:
         """TVD north-face flux with mask-aware stencil selection.
@@ -1155,7 +1155,7 @@ class Reconstruction2D(eqx.Module):
             Cell-centre tracer field.
         v : Float[Array, "Ny Nx"]
             North-face velocity.
-        mask : ArakawaCGridMask
+        mask : Mask2D
             Arakawa C-grid mask providing stencil-capability information.
         limiter : str
             Flux limiter name: ``'minmod'``, ``'van_leer'``, ``'superbee'``,
@@ -1177,7 +1177,7 @@ class Reconstruction2D(eqx.Module):
         self,
         h: Float[Array, "Ny Nx"],
         u: Float[Array, "Ny Nx"],
-        mask: ArakawaCGridMask,
+        mask: Mask2D,
     ) -> Float[Array, "Ny Nx"]:
         """5-point WENO east-face flux with mask-aware adaptive stencil selection.
 
@@ -1190,7 +1190,7 @@ class Reconstruction2D(eqx.Module):
             Cell-centre tracer field.
         u : Float[Array, "Ny Nx"]
             East-face velocity.
-        mask : ArakawaCGridMask
+        mask : Mask2D
             Arakawa C-grid mask providing stencil-capability information.
 
         Returns
@@ -1210,7 +1210,7 @@ class Reconstruction2D(eqx.Module):
         self,
         h: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
-        mask: ArakawaCGridMask,
+        mask: Mask2D,
     ) -> Float[Array, "Ny Nx"]:
         """5-point WENO north-face flux with mask-aware adaptive stencil selection.
 
@@ -1223,7 +1223,7 @@ class Reconstruction2D(eqx.Module):
             Cell-centre tracer field.
         v : Float[Array, "Ny Nx"]
             North-face velocity.
-        mask : ArakawaCGridMask
+        mask : Mask2D
             Arakawa C-grid mask providing stencil-capability information.
 
         Returns
@@ -1243,7 +1243,7 @@ class Reconstruction2D(eqx.Module):
         self,
         h: Float[Array, "Ny Nx"],
         u: Float[Array, "Ny Nx"],
-        mask: ArakawaCGridMask,
+        mask: Mask2D,
     ) -> Float[Array, "Ny Nx"]:
         """5-point WENO-Z east-face flux with mask-aware adaptive stencil selection.
 
@@ -1256,7 +1256,7 @@ class Reconstruction2D(eqx.Module):
             Cell-centre tracer field.
         u : Float[Array, "Ny Nx"]
             East-face velocity.
-        mask : ArakawaCGridMask
+        mask : Mask2D
             Arakawa C-grid mask providing stencil-capability information.
 
         Returns
@@ -1276,7 +1276,7 @@ class Reconstruction2D(eqx.Module):
         self,
         h: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
-        mask: ArakawaCGridMask,
+        mask: Mask2D,
     ) -> Float[Array, "Ny Nx"]:
         """5-point WENO-Z north-face flux with mask-aware adaptive stencil selection.
 
@@ -1289,7 +1289,7 @@ class Reconstruction2D(eqx.Module):
             Cell-centre tracer field.
         v : Float[Array, "Ny Nx"]
             North-face velocity.
-        mask : ArakawaCGridMask
+        mask : Mask2D
             Arakawa C-grid mask providing stencil-capability information.
 
         Returns
@@ -1778,7 +1778,7 @@ class Reconstruction3D(eqx.Module):
         self,
         h: Float[Array, "Nz Ny Nx"],
         u: Float[Array, "Nz Ny Nx"],
-        mask: ArakawaCGridMask,
+        mask: Mask2D,
         limiter: str = "minmod",
     ) -> Float[Array, "Nz Ny Nx"]:
         """TVD east-face flux over all z-levels with mask-aware stencil selection.
@@ -1792,7 +1792,7 @@ class Reconstruction3D(eqx.Module):
             Cell-centre tracer field.
         u : Float[Array, "Nz Ny Nx"]
             East-face velocity.
-        mask : ArakawaCGridMask
+        mask : Mask2D
             2-D Arakawa C-grid mask (broadcast over z).
         limiter : str
             Flux limiter name: ``'minmod'``, ``'van_leer'``, ``'superbee'``,
@@ -1817,7 +1817,7 @@ class Reconstruction3D(eqx.Module):
         self,
         h: Float[Array, "Nz Ny Nx"],
         v: Float[Array, "Nz Ny Nx"],
-        mask: ArakawaCGridMask,
+        mask: Mask2D,
         limiter: str = "minmod",
     ) -> Float[Array, "Nz Ny Nx"]:
         """TVD north-face flux over all z-levels with mask-aware stencil selection.
@@ -1831,7 +1831,7 @@ class Reconstruction3D(eqx.Module):
             Cell-centre tracer field.
         v : Float[Array, "Nz Ny Nx"]
             North-face velocity.
-        mask : ArakawaCGridMask
+        mask : Mask2D
             2-D Arakawa C-grid mask (broadcast over z).
         limiter : str
             Flux limiter name: ``'minmod'``, ``'van_leer'``, ``'superbee'``,
@@ -1856,7 +1856,7 @@ class Reconstruction3D(eqx.Module):
         self,
         h: Float[Array, "Nz Ny Nx"],
         u: Float[Array, "Nz Ny Nx"],
-        mask: ArakawaCGridMask,
+        mask: Mask2D,
     ) -> Float[Array, "Nz Ny Nx"]:
         """3-point WENO east-face flux over all z-levels with mask-aware stencil selection.
 
@@ -1869,7 +1869,7 @@ class Reconstruction3D(eqx.Module):
             Cell-centre tracer field.
         u : Float[Array, "Nz Ny Nx"]
             East-face velocity.
-        mask : ArakawaCGridMask
+        mask : Mask2D
             2-D Arakawa C-grid mask (broadcast over z).
 
         Returns
@@ -1891,7 +1891,7 @@ class Reconstruction3D(eqx.Module):
         self,
         h: Float[Array, "Nz Ny Nx"],
         v: Float[Array, "Nz Ny Nx"],
-        mask: ArakawaCGridMask,
+        mask: Mask2D,
     ) -> Float[Array, "Nz Ny Nx"]:
         """3-point WENO north-face flux over all z-levels with mask-aware stencil selection.
 
@@ -1904,7 +1904,7 @@ class Reconstruction3D(eqx.Module):
             Cell-centre tracer field.
         v : Float[Array, "Nz Ny Nx"]
             North-face velocity.
-        mask : ArakawaCGridMask
+        mask : Mask2D
             2-D Arakawa C-grid mask (broadcast over z).
 
         Returns
@@ -1926,7 +1926,7 @@ class Reconstruction3D(eqx.Module):
         self,
         h: Float[Array, "Nz Ny Nx"],
         u: Float[Array, "Nz Ny Nx"],
-        mask: ArakawaCGridMask,
+        mask: Mask2D,
     ) -> Float[Array, "Nz Ny Nx"]:
         """5-point WENO east-face flux over all z-levels with mask-aware adaptive stencil.
 
@@ -1940,7 +1940,7 @@ class Reconstruction3D(eqx.Module):
             Cell-centre tracer field.
         u : Float[Array, "Nz Ny Nx"]
             East-face velocity.
-        mask : ArakawaCGridMask
+        mask : Mask2D
             2-D Arakawa C-grid mask (broadcast over z).
 
         Returns
@@ -1972,7 +1972,7 @@ class Reconstruction3D(eqx.Module):
         self,
         h: Float[Array, "Nz Ny Nx"],
         v: Float[Array, "Nz Ny Nx"],
-        mask: ArakawaCGridMask,
+        mask: Mask2D,
     ) -> Float[Array, "Nz Ny Nx"]:
         """5-point WENO north-face flux over all z-levels with mask-aware adaptive stencil.
 
@@ -1986,7 +1986,7 @@ class Reconstruction3D(eqx.Module):
             Cell-centre tracer field.
         v : Float[Array, "Nz Ny Nx"]
             North-face velocity.
-        mask : ArakawaCGridMask
+        mask : Mask2D
             2-D Arakawa C-grid mask (broadcast over z).
 
         Returns
@@ -2018,7 +2018,7 @@ class Reconstruction3D(eqx.Module):
         self,
         h: Float[Array, "Nz Ny Nx"],
         u: Float[Array, "Nz Ny Nx"],
-        mask: ArakawaCGridMask,
+        mask: Mask2D,
     ) -> Float[Array, "Nz Ny Nx"]:
         """5-point WENO-Z east-face flux over all z-levels with mask-aware adaptive stencil.
 
@@ -2032,7 +2032,7 @@ class Reconstruction3D(eqx.Module):
             Cell-centre tracer field.
         u : Float[Array, "Nz Ny Nx"]
             East-face velocity.
-        mask : ArakawaCGridMask
+        mask : Mask2D
             2-D Arakawa C-grid mask (broadcast over z).
 
         Returns
@@ -2061,7 +2061,7 @@ class Reconstruction3D(eqx.Module):
         self,
         h: Float[Array, "Nz Ny Nx"],
         v: Float[Array, "Nz Ny Nx"],
-        mask: ArakawaCGridMask,
+        mask: Mask2D,
     ) -> Float[Array, "Nz Ny Nx"]:
         """5-point WENO-Z north-face flux over all z-levels with mask-aware adaptive stencil.
 
@@ -2075,7 +2075,7 @@ class Reconstruction3D(eqx.Module):
             Cell-centre tracer field.
         v : Float[Array, "Nz Ny Nx"]
             North-face velocity.
-        mask : ArakawaCGridMask
+        mask : Mask2D
             2-D Arakawa C-grid mask (broadcast over z).
 
         Returns

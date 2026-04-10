@@ -34,7 +34,7 @@ from spectraldiffx import (
     build_capacitance_solver as _build_capacitance_solver_base,
 )
 
-from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.mask import Mask2D
 
 # Re-export from iterative module
 from finitevolx._src.solvers.iterative import (  # noqa: F401
@@ -139,12 +139,12 @@ from finitevolx._src.solvers.spectral import (  # noqa: F401
 )
 
 # ---------------------------------------------------------------------------
-# Capacitance matrix solver — thin wrapper for ArakawaCGridMask support
+# Capacitance matrix solver — thin wrapper for Mask2D support
 # ---------------------------------------------------------------------------
 
 
 def build_capacitance_solver(
-    mask: np.ndarray | ArakawaCGridMask,
+    mask: np.ndarray | Mask2D,
     dx: float,
     dy: float,
     lambda_: float = 0.0,
@@ -158,11 +158,11 @@ def build_capacitance_solver(
 
     Parameters
     ----------
-    mask : np.ndarray of bool shape (Ny, Nx), or ArakawaCGridMask
+    mask : np.ndarray of bool shape (Ny, Nx), or Mask2D
         Physical domain mask.  ``True`` = interior (ocean/fluid),
         ``False`` = exterior (land/walls).
 
-        When an :class:`ArakawaCGridMask` is passed, the ``psi``
+        When an :class:`Mask2D` is passed, the ``psi``
         staggering mask is extracted automatically.
     dx : float
         Grid spacing in x.
@@ -178,7 +178,7 @@ def build_capacitance_solver(
     CapacitanceSolver
         A callable equinox Module with all precomputed arrays baked in.
     """
-    if isinstance(mask, ArakawaCGridMask):
+    if isinstance(mask, Mask2D):
         mask = np.asarray(mask.xy_corner_strict, dtype=bool)
     return _build_capacitance_solver_base(mask, dx, dy, lambda_, base_bc)
 
@@ -188,7 +188,7 @@ def build_capacitance_solver(
 # ---------------------------------------------------------------------------
 
 # Type alias for the mask parameter accepted by the convenience wrappers.
-_MaskLike = Float[Array, "Ny Nx"] | ArakawaCGridMask
+_MaskLike = Float[Array, "Ny Nx"] | Mask2D
 _PrecondLike = Callable[[Float[Array, "Ny Nx"]], Float[Array, "Ny Nx"]]
 
 
@@ -198,7 +198,7 @@ def _resolve_mask_arr(
     """Extract a float mask array from *mask*, or return None."""
     if mask is None:
         return None
-    if isinstance(mask, ArakawaCGridMask):
+    if isinstance(mask, Mask2D):
         return jnp.asarray(mask.xy_corner_strict, dtype=jnp.float32)
     return mask
 
@@ -225,7 +225,7 @@ def _solve_cg_method(
     """Solve using preconditioned Conjugate Gradient on a masked domain."""
     mask_arr = _resolve_mask_arr(mask)
     if mask_arr is None:
-        raise ValueError("method='cg' requires a mask (array or ArakawaCGridMask)")
+        raise ValueError("method='cg' requires a mask (array or Mask2D)")
 
     def _matvec(x: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         return masked_laplacian(x, mask_arr, dx, dy, lambda_=lambda_)
@@ -317,9 +317,9 @@ def streamfunction_from_vorticity(
         inversion: (∇² − λ)ψ = q.
     method : {"spectral", "cg", "capacitance"}
         Solver method.  Default: ``"spectral"``.
-    mask : Float[Array, "Ny Nx"] or ArakawaCGridMask or None
+    mask : Float[Array, "Ny Nx"] or Mask2D or None
         Domain mask.  Required for ``method="cg"``.  When an
-        :class:`ArakawaCGridMask` is passed the ``psi`` staggering mask is
+        :class:`Mask2D` is passed the ``psi`` staggering mask is
         extracted automatically.
     capacitance_solver : CapacitanceSolver or None
         Pre-built capacitance solver.  Required for
@@ -369,7 +369,7 @@ def pressure_from_divergence(
         pressure with solid walls.
     method : {"spectral", "cg", "capacitance"}
         Solver method.  Default: ``"spectral"``.
-    mask : Float[Array, "Ny Nx"] or ArakawaCGridMask or None
+    mask : Float[Array, "Ny Nx"] or Mask2D or None
         Domain mask.  Required for ``method="cg"``.
     capacitance_solver : CapacitanceSolver or None
         Pre-built capacitance solver.  Required for
@@ -421,7 +421,7 @@ def pv_inversion(
         Boundary-condition type (for ``method="spectral"``).
     method : {"spectral", "cg", "capacitance"}
         Solver method.  Default: ``"spectral"``.
-    mask : Float[Array, "Ny Nx"] or ArakawaCGridMask or None
+    mask : Float[Array, "Ny Nx"] or Mask2D or None
         Domain mask.  Required for ``method="cg"``.
     capacitance_solver : CapacitanceSolver or None
         Pre-built capacitance solver.  Required for

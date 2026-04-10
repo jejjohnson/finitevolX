@@ -1,46 +1,25 @@
-"""
-Arakawa C-grid mask module for finitevolX.
+"""Cartesian Arakawa C-grid masks (1-D / 2-D / 3-D).
 
-Provides a unified mask class for 2-D Arakawa C-grid domains with land/sea
-topology, staggered face/corner masks, boundary classification, directional
-stencil capability, and adaptive WENO stencil selection.
+Concrete mask classes for uniform-spacing Cartesian grids.  All
+construction logic uses numpy/scipy (masks are built once at setup
+time and stored as JAX arrays for use in JIT-traced kernels).
 
-Grid layout (Arakawa & Lamb 1977)
-----------------------------------
-::
-
-    y
-    ^
-    :           :
-    w-----v-----w..
-    |           |
-    |           |
-    u     h     u
-    |           |
-    |           |
-    w-----v-----w..   > x
-
-Index convention (same as AGENTS.md)
---------------------------------------
-::
+Same-index colocation convention (matches the grid module)::
 
     h[j, i]    cell centre   at (j,     i    )
     u[j, i]    y-face        at (j-1/2, i    )   [kernel (2,1) from h]
     v[j, i]    x-face        at (j,     i-1/2)   [kernel (1,2) from h]
-    w[j, i]    SW corner     at (j-1/2, i-1/2)   [kernel (2,2), lenient]
-    psi[j, i]  SW corner     at (j-1/2, i-1/2)   [kernel (2,2), strict]
+    xy_corner[j, i]          SW corner            [kernel (2,2), lenient]
+    xy_corner_strict[j, i]   SW corner            [kernel (2,2), strict]
 
-Staggered masks are derived from the h-mask using 2-D average pooling with
-top/left zero-padding so the output shape equals the input shape:
+Staggered masks are derived from the h-mask using n-D average pooling
+with leading-side zero-padding so the output shape equals the input
+shape::
 
-    u[j, i]   = (h[j, i] + h[j-1, i]) / 2  > 3/4  → both y-neighbours wet
-    v[j, i]   = (h[j, i] + h[j, i-1]) / 2  > 3/4  → both x-neighbours wet
-    w[j, i]   = (h[j,i]+h[j-1,i]+h[j,i-1]+h[j-1,i-1]) / 4 > 1/8  → ≥1 wet
-    psi[j, i] = same sum                             / 4 > 7/8  → all 4 wet
-
-All heavy computation in the factory methods uses **numpy / scipy** (since
-masks are built once, not traced through JAX JIT).  The resulting arrays are
-stored as JAX arrays for use in downstream JAX computations.
+    u[j, i]                = (h[j, i] + h[j-1, i]) / 2 > 3/4
+    v[j, i]                = (h[j, i] + h[j, i-1]) / 2 > 3/4
+    xy_corner[j, i]        = sum of 4 SW-corner h-cells / 4 > 1/8  (lenient)
+    xy_corner_strict[j, i] = sum of 4 SW-corner h-cells / 4 > 7/8  (strict)
 """
 
 from __future__ import annotations
@@ -52,8 +31,8 @@ import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float, Int
 import numpy as np
 
+from finitevolx._src.mask.base import StencilCapability2D
 from finitevolx._src.mask.utils import (
-    _count_contiguous,
     _dilate,
     _make_sponge,
     _pool_bool,
@@ -64,156 +43,12 @@ type Nirr = int
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# StencilCapability — 1-D / 2-D / 3-D variants
+# Mask2D
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-class StencilCapability1D(eqx.Module):
-    """Directional count of contiguous wet neighbours for each 1-D grid cell.
-
-    At each cell ``i``, stores the number of consecutive wet cells (including
-    the cell itself) reachable before hitting a dry cell or the domain edge.
-
-    Parameters
-    ----------
-    x_pos : Int[Array, "Nx"]
-        Count in the +x direction.
-    x_neg : Int[Array, "Nx"]
-        Count in the −x direction.
-    """
-
-    x_pos: Int[Array, "Nx"]
-    x_neg: Int[Array, "Nx"]
-
-    @classmethod
-    def from_mask(cls, h: np.ndarray | Bool[Array, "Nx"]) -> StencilCapability1D:
-        """Build stencil capability from a 1-D wet/dry mask.
-
-        Parameters
-        ----------
-        h : array-like [Nx] bool
-
-        Returns
-        -------
-        StencilCapability1D
-        """
-        h_np = np.asarray(h, dtype=bool)
-        return cls(
-            x_pos=jnp.asarray(_count_contiguous(h_np, axis=0, forward=True)),
-            x_neg=jnp.asarray(_count_contiguous(h_np, axis=0, forward=False)),
-        )
-
-
-class StencilCapability2D(eqx.Module):
-    """Directional count of contiguous wet neighbours for each 2-D grid cell.
-
-    At each cell ``(j, i)``, stores the number of consecutive wet cells
-    (including the cell itself) reachable before hitting a dry cell or
-    the domain edge.
-
-    Parameters
-    ----------
-    x_pos : Int[Array, "Ny Nx"]
-        Count in the +x direction.
-    x_neg : Int[Array, "Ny Nx"]
-        Count in the −x direction.
-    y_pos : Int[Array, "Ny Nx"]
-        Count in the +y direction.
-    y_neg : Int[Array, "Ny Nx"]
-        Count in the −y direction.
-    """
-
-    x_pos: Int[Array, "Ny Nx"]
-    x_neg: Int[Array, "Ny Nx"]
-    y_pos: Int[Array, "Ny Nx"]
-    y_neg: Int[Array, "Ny Nx"]
-
-    @classmethod
-    def from_mask(cls, h: np.ndarray | Bool[Array, "Ny Nx"]) -> StencilCapability2D:
-        """Build stencil capability from a 2-D wet/dry mask.
-
-        Construction uses numpy; stored arrays are JAX int32.
-
-        Parameters
-        ----------
-        h : array-like [Ny, Nx] bool
-            Wet (True) / dry (False) mask.
-
-        Returns
-        -------
-        StencilCapability2D
-        """
-        h_np = np.asarray(h, dtype=bool)
-        return cls(
-            x_pos=jnp.asarray(_count_contiguous(h_np, axis=1, forward=True)),
-            x_neg=jnp.asarray(_count_contiguous(h_np, axis=1, forward=False)),
-            y_pos=jnp.asarray(_count_contiguous(h_np, axis=0, forward=True)),
-            y_neg=jnp.asarray(_count_contiguous(h_np, axis=0, forward=False)),
-        )
-
-
-class StencilCapability3D(eqx.Module):
-    """Directional count of contiguous wet neighbours for each 3-D grid cell.
-
-    At each cell ``(k, j, i)``, stores the number of consecutive wet cells
-    (including the cell itself) reachable before hitting a dry cell or
-    the domain edge.
-
-    Parameters
-    ----------
-    x_pos : Int[Array, "Nz Ny Nx"]
-        Count in the +x direction.
-    x_neg : Int[Array, "Nz Ny Nx"]
-        Count in the −x direction.
-    y_pos : Int[Array, "Nz Ny Nx"]
-        Count in the +y direction.
-    y_neg : Int[Array, "Nz Ny Nx"]
-        Count in the −y direction.
-    z_pos : Int[Array, "Nz Ny Nx"]
-        Count in the +z direction.
-    z_neg : Int[Array, "Nz Ny Nx"]
-        Count in the −z direction.
-    """
-
-    x_pos: Int[Array, "Nz Ny Nx"]
-    x_neg: Int[Array, "Nz Ny Nx"]
-    y_pos: Int[Array, "Nz Ny Nx"]
-    y_neg: Int[Array, "Nz Ny Nx"]
-    z_pos: Int[Array, "Nz Ny Nx"]
-    z_neg: Int[Array, "Nz Ny Nx"]
-
-    @classmethod
-    def from_mask(
-        cls, h: np.ndarray | Bool[Array, "Nz Ny Nx"]
-    ) -> StencilCapability3D:
-        """Build stencil capability from a 3-D wet/dry mask.
-
-        Parameters
-        ----------
-        h : array-like [Nz, Ny, Nx] bool
-
-        Returns
-        -------
-        StencilCapability3D
-        """
-        h_np = np.asarray(h, dtype=bool)
-        return cls(
-            x_pos=jnp.asarray(_count_contiguous(h_np, axis=2, forward=True)),
-            x_neg=jnp.asarray(_count_contiguous(h_np, axis=2, forward=False)),
-            y_pos=jnp.asarray(_count_contiguous(h_np, axis=1, forward=True)),
-            y_neg=jnp.asarray(_count_contiguous(h_np, axis=1, forward=False)),
-            z_pos=jnp.asarray(_count_contiguous(h_np, axis=0, forward=True)),
-            z_neg=jnp.asarray(_count_contiguous(h_np, axis=0, forward=False)),
-        )
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# ArakawaCGridMask
-# ──────────────────────────────────────────────────────────────────────────────
-
-
-class ArakawaCGridMask(eqx.Module):
-    """Unified Arakawa C-grid mask for a 2-D domain.
+class Mask2D(eqx.Module):
+    """Unified Arakawa C-grid mask for a 2-D Cartesian domain.
 
     Stores binary masks on all five Arakawa C-grid staggerings (cell
     centre ``h``, x-face ``u``, y-face ``v``, xy-corner lenient
@@ -432,7 +267,7 @@ class ArakawaCGridMask(eqx.Module):
         mask_hgrid: np.ndarray | Bool[Array, "Ny Nx"],
         sponge_width: int | None = None,
         k_bottom: Array | None = None,
-    ) -> ArakawaCGridMask:
+    ) -> Mask2D:
         """Construct from a binary h-grid (cell-centre) mask.
 
         All intermediate computations use numpy/scipy for efficiency.
@@ -450,7 +285,7 @@ class ArakawaCGridMask(eqx.Module):
 
         Returns
         -------
-        ArakawaCGridMask
+        Mask2D
         """
         h_np = np.asarray(mask_hgrid, dtype=bool)
         Ny, Nx = h_np.shape
@@ -557,7 +392,7 @@ class ArakawaCGridMask(eqx.Module):
         ssh: Float[Array, "Ny Nx"],
         sponge_width: int | None = None,
         k_bottom: Array | None = None,
-    ) -> ArakawaCGridMask:
+    ) -> Mask2D:
         """Construct from a sea-surface-height field (NaN marks land).
 
         Parameters
@@ -571,7 +406,7 @@ class ArakawaCGridMask(eqx.Module):
 
         Returns
         -------
-        ArakawaCGridMask
+        Mask2D
         """
         ssh_np = np.asarray(ssh)
         h_mask = np.isfinite(ssh_np)
@@ -583,7 +418,7 @@ class ArakawaCGridMask(eqx.Module):
         ny: int,
         nx: int,
         sponge_width: int | None = None,
-    ) -> ArakawaCGridMask:
+    ) -> Mask2D:
         """Construct an all-ocean domain of given shape.
 
         Parameters
@@ -595,6 +430,6 @@ class ArakawaCGridMask(eqx.Module):
 
         Returns
         -------
-        ArakawaCGridMask
+        Mask2D
         """
         return cls.from_mask(np.ones((ny, nx), dtype=bool), sponge_width=sponge_width)

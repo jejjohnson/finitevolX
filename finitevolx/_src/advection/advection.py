@@ -3,7 +3,7 @@ Advection operators for Arakawa C-grids.
 
 Computes -div(h * u_vec) at T-points using face-value reconstruction.
 
-When an :class:`~finitevolx.ArakawaCGridMask` is supplied to the 2-D or 3-D
+When an :class:`~finitevolx.Mask2D` is supplied to the 2-D or 3-D
 operators, the flux computation automatically falls back to a lower-order
 stencil near irregular boundaries, using
 :func:`~finitevolx.upwind_flux` as the unified dispatch mechanism.
@@ -28,7 +28,7 @@ from finitevolx._src.grid.cartesian import (
     CartesianGrid2D,
     CartesianGrid3D,
 )
-from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.mask import Mask2D
 from finitevolx._src.operators._ghost import interior
 
 # TVD limiter names supported by the advection operators.
@@ -183,7 +183,7 @@ class Advection2D(eqx.Module):
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
         method: str = "upwind1",
-        mask: ArakawaCGridMask | None = None,
+        mask: Mask2D | None = None,
     ) -> Float[Array, "Ny Nx"]:
         """Advective tendency -div(h * u_vec) at T-points.
 
@@ -203,7 +203,7 @@ class Advection2D(eqx.Module):
             ``'upwind3'``, ``'weno3'``, ``'weno5'``, ``'weno7'``, ``'weno9'``,
             ``'wenoz5'``, or a flux-limiter TVD scheme: ``'minmod'``,
             ``'van_leer'``, ``'superbee'``, ``'mc'``.
-        mask : ArakawaCGridMask | None
+        mask : Mask2D | None
             When provided and *method* supports mask dispatch (``'weno3'``,
             ``'weno5'``, ``'wenoz5'``, or any TVD limiter), stencil-width
             fallback is applied via :func:`upwind_flux`.  ``None`` (default)
@@ -294,7 +294,7 @@ class Advection3D(eqx.Module):
         u: Float[Array, "Nz Ny Nx"],
         v: Float[Array, "Nz Ny Nx"],
         method: str = "upwind1",
-        mask: ArakawaCGridMask | None = None,
+        mask: Mask2D | None = None,
     ) -> Float[Array, "Nz Ny Nx"]:
         """Advective tendency -div(h * u_vec) at T-points over all z-levels.
 
@@ -310,7 +310,7 @@ class Advection3D(eqx.Module):
             Reconstruction method: ``'naive'``, ``'upwind1'``, ``'weno3'``,
             ``'weno5'``, ``'weno7'``, ``'weno9'``, or a flux-limiter TVD
             scheme: ``'minmod'``, ``'van_leer'``, ``'superbee'``, ``'mc'``.
-        mask : ArakawaCGridMask | None
+        mask : Mask2D | None
             When provided and *method* supports mask dispatch (``'weno3'``,
             ``'weno5'``, or any TVD limiter), the masked reconstruction
             variants are used.  The 2-D mask is broadcast over the

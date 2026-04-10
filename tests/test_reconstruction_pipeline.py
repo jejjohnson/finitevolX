@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 
 from finitevolx import (
-    ArakawaCGridMask,
+    Mask2D,
     linear_2pts,
     linear_3pts_left,
     linear_3pts_right,
@@ -574,7 +574,7 @@ class TestReconstructValidation:
 
 
 class TestDistboundAccessors:
-    """Test the ind_coast/2/3plus properties on ArakawaCGridMask."""
+    """Test the ind_coast/2/3plus properties on Mask2D."""
 
     @pytest.fixture()
     def island_mask(self):
@@ -583,11 +583,11 @@ class TestDistboundAccessors:
         h = np.ones((Ny, Nx), dtype=bool)
         # Create island
         h[6:10, 6:10] = False
-        return ArakawaCGridMask.from_mask(h)
+        return Mask2D.from_mask(h)
 
     @pytest.fixture()
     def all_ocean(self):
-        return ArakawaCGridMask.from_dimensions(10, 10)
+        return Mask2D.from_dimensions(10, 10)
 
     def test_distbound_mutual_exclusion(self, island_mask):
         """ind_coast, ind_near_coast, ind_ocean are mutually exclusive on wet cells."""
@@ -672,7 +672,7 @@ class TestDistboundPhysics:
         Ny, Nx = 20, 20
         h = np.ones((Ny, Nx), dtype=bool)
         h[8:12, 8:12] = False  # island
-        mask = ArakawaCGridMask.from_mask(h)
+        mask = Mask2D.from_mask(h)
 
         coast = np.array(mask.ind_coast)
         land = np.array(mask.ind_land)
@@ -699,7 +699,7 @@ class TestDistboundPhysics:
         Ny, Nx = 20, 20
         h = np.ones((Ny, Nx), dtype=bool)
         h[8:12, 8:12] = False
-        mask = ArakawaCGridMask.from_mask(h)
+        mask = Mask2D.from_mask(h)
 
         near_coast = np.array(mask.ind_near_coast)
         land = np.array(mask.ind_land)

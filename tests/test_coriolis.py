@@ -10,7 +10,7 @@ import pytest
 jax.config.update("jax_enable_x64", True)
 
 from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
-from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.mask import Mask2D
 from finitevolx._src.operators.coriolis import Coriolis2D, Coriolis3D
 
 
@@ -158,7 +158,7 @@ class TestCoriolis2D:
         # Build a mask with a land column at index 5
         h_mask = np_cpu.ones((grid2d.Ny, grid2d.Nx), dtype=bool)
         h_mask[:, 5] = False
-        mask = ArakawaCGridMask.from_mask(h_mask)
+        mask = Mask2D.from_mask(h_mask)
 
         du_masked, dv_masked = cor(u, v, f, mask=mask)
         du_unmasked, _ = cor(u, v, f)
@@ -326,7 +326,7 @@ class TestCoriolis3D:
         # Land column at index 4 of an (Ny, Nx) = (8, 8) h-mask
         h_mask = np_cpu.ones((grid3d.Ny, grid3d.Nx), dtype=bool)
         h_mask[:, 4] = False
-        mask = ArakawaCGridMask.from_mask(h_mask)
+        mask = Mask2D.from_mask(h_mask)
 
         du_masked, dv_masked = cor(u, v, f, mask=mask)
         du_unmasked, _ = cor(u, v, f)

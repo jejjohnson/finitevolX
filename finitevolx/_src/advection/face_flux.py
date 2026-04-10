@@ -30,7 +30,7 @@ from finitevolx._src.advection.advection import (
 from finitevolx._src.advection.flux import upwind_flux
 from finitevolx._src.advection.reconstruction import Reconstruction2D
 from finitevolx._src.grid.cartesian import CartesianGrid2D
-from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.mask import Mask2D
 
 
 def uv_center_flux(
@@ -39,7 +39,7 @@ def uv_center_flux(
     v: Float[Array, "Ny Nx"],
     grid: CartesianGrid2D,
     method: str = "upwind1",
-    mask: ArakawaCGridMask | None = None,
+    mask: Mask2D | None = None,
 ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
     """Compute raw face fluxes for a cell-centred scalar on a C-grid.
 
@@ -70,7 +70,7 @@ def uv_center_flux(
         ``'upwind3'``, ``'weno3'``, ``'weno5'``, ``'wenoz5'``, ``'weno7'``,
         ``'weno9'``, or a TVD limiter: ``'minmod'``, ``'van_leer'``,
         ``'superbee'``, ``'mc'``.
-    mask : ArakawaCGridMask | None
+    mask : Mask2D | None
         When provided and *method* supports mask dispatch, stencil-width
         fallback is applied via :func:`~finitevolx.upwind_flux`.
 
@@ -91,7 +91,7 @@ def uv_node_flux(
     v: Float[Array, "Ny Nx"],
     grid: CartesianGrid2D,
     method: str = "upwind1",
-    mask: ArakawaCGridMask | None = None,
+    mask: Mask2D | None = None,
 ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
     """Compute raw face fluxes for a node-centred tracer on a C-grid.
 
@@ -113,7 +113,7 @@ def uv_node_flux(
         Grid object (used only for creating the reconstruction engine).
     method : str
         Reconstruction method (same options as :func:`uv_center_flux`).
-    mask : ArakawaCGridMask | None
+    mask : Mask2D | None
         Optional mask for stencil-width fallback.
 
     Returns
@@ -133,7 +133,7 @@ def _compute_face_fluxes(
     u: Float[Array, "Ny Nx"],
     v: Float[Array, "Ny Nx"],
     method: str,
-    mask: ArakawaCGridMask | None,
+    mask: Mask2D | None,
 ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
     """Shared implementation for face-flux computation.
 

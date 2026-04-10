@@ -26,7 +26,7 @@ import equinox as eqx
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
-from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.mask import Mask2D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators.interpolation import Interpolation2D
 
@@ -72,7 +72,7 @@ class Coriolis2D(eqx.Module):
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
         f: Float[Array, "Ny Nx"],
-        mask: ArakawaCGridMask | None = None,
+        mask: Mask2D | None = None,
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
         """Coriolis tendencies (du_cor, dv_cor).
 
@@ -87,7 +87,7 @@ class Coriolis2D(eqx.Module):
             y-velocity at V-points (north faces).
         f : Float[Array, "Ny Nx"]
             Coriolis parameter at T-points.
-        mask : ArakawaCGridMask or None
+        mask : Mask2D or None
             Optional land/ocean mask.  If provided, ``du_cor`` is multiplied
             by ``mask.u`` and ``dv_cor`` by ``mask.v``.
 
@@ -157,7 +157,7 @@ class Coriolis3D(eqx.Module):
         u: Float[Array, "Nz Ny Nx"],
         v: Float[Array, "Nz Ny Nx"],
         f: Float[Array, "Ny Nx"],
-        mask: ArakawaCGridMask | None = None,
+        mask: Mask2D | None = None,
     ) -> tuple[Float[Array, "Nz Ny Nx"], Float[Array, "Nz Ny Nx"]]:
         """Coriolis tendencies over all z-levels.
 
@@ -172,7 +172,7 @@ class Coriolis3D(eqx.Module):
             y-velocity at V-points.
         f : Float[Array, "Ny Nx"]
             Coriolis parameter at T-points (depth-independent).
-        mask : ArakawaCGridMask or None
+        mask : Mask2D or None
             Optional land/ocean mask.  If provided, ``du_cor`` is multiplied
             by ``mask.u`` and ``dv_cor`` by ``mask.v``.
 

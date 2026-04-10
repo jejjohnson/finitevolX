@@ -11,7 +11,7 @@ from finitevolx._src.grid.cartesian import (
     CartesianGrid2D,
     CartesianGrid3D,
 )
-from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.mask import Mask2D
 
 
 @pytest.fixture
@@ -283,7 +283,7 @@ class TestAdvection2DMask:
 
     @pytest.fixture
     def all_ocean(self):
-        return ArakawaCGridMask.from_dimensions(10, 10)
+        return Mask2D.from_dimensions(10, 10)
 
     @pytest.fixture
     def coastal(self):
@@ -291,7 +291,7 @@ class TestAdvection2DMask:
 
         h = _np.ones((10, 10), dtype=bool)
         h[:, 4:6] = False
-        return ArakawaCGridMask.from_mask(h)
+        return Mask2D.from_mask(h)
 
     def test_output_shape(self, grid, all_ocean):
         adv = Advection2D(grid=grid)
@@ -372,7 +372,7 @@ class TestAdvection3DMask:
 
     @pytest.fixture
     def all_ocean(self):
-        return ArakawaCGridMask.from_dimensions(8, 8)
+        return Mask2D.from_dimensions(8, 8)
 
     def test_output_shape(self, grid, all_ocean):
         adv = Advection3D(grid=grid)
@@ -414,7 +414,7 @@ class TestAdvection3DMask:
 
         h_mask = _np.ones((8, 8), dtype=bool)
         h_mask[:, 3:5] = False
-        coastal = ArakawaCGridMask.from_mask(h_mask)
+        coastal = Mask2D.from_mask(h_mask)
         grid = CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
         adv = Advection3D(grid=grid)
         h = jnp.ones((grid.Nz, grid.Ny, grid.Nx))

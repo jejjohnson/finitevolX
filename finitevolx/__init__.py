@@ -86,8 +86,8 @@ from finitevolx._src.grid.spherical import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
-from finitevolx._src.mask.cgrid_mask import (
-    ArakawaCGridMask,
+from finitevolx._src.mask import (
+    Mask2D,
     StencilCapability1D,
     StencilCapability2D,
     StencilCapability3D,
@@ -387,7 +387,7 @@ __all__ = [
     "SphericalGrid2D",
     "SphericalGrid3D",
     # Mask
-    "ArakawaCGridMask",
+    "Mask2D",
     # Boundary condition sets and 1D BCs
     "BoundaryConditionSet",
     "Dirichlet1D",

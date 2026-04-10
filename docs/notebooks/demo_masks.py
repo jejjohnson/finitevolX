@@ -15,7 +15,7 @@
 # %% [markdown]
 # # Demo: Arakawa C-Grid Masks
 #
-# This notebook demonstrates how `ArakawaCGridMask` builds staggered masks
+# This notebook demonstrates how `Mask2D` builds staggered masks
 # from a cell-centre wet/dry field and how they relate to the Arakawa C-grid
 # layout used in ocean models.
 #
@@ -33,7 +33,7 @@
 #     X ── V ── X ── V ── X
 # ```
 #
-# The **h-mask** (cell centres) is the primary input.  `ArakawaCGridMask`
+# The **h-mask** (cell centres) is the primary input.  `Mask2D`
 # derives all staggered masks, a 4-level land/coast classification,
 # directional stencil capability arrays, and vorticity boundary flags
 # automatically.
@@ -60,7 +60,7 @@ import numpy as np
 
 jax.config.update("jax_enable_x64", True)
 
-from finitevolx import CartesianGrid2D, ArakawaCGridMask
+from finitevolx import CartesianGrid2D, Mask2D
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "demo_masks"
 IMG_DIR.mkdir(parents=True, exist_ok=True)
@@ -68,7 +68,7 @@ IMG_DIR.mkdir(parents=True, exist_ok=True)
 # %% [markdown]
 # ## 1. Creating masks from different domain topologies
 #
-# `ArakawaCGridMask.from_mask` takes a binary h-grid mask and derives all
+# `Mask2D.from_mask` takes a binary h-grid mask and derives all
 # staggered masks (u, v, w, psi), boundary classification, and stencil
 # capability arrays automatically.
 #
@@ -90,7 +90,7 @@ h_basin[-1, :] = False  # north wall
 h_basin[:, 0] = False  # west wall
 h_basin[:, -1] = False  # east wall
 
-masks_basin = ArakawaCGridMask.from_mask(h_basin)
+masks_basin = Mask2D.from_mask(h_basin)
 print(f"Basin: h shape = {masks_basin.h.shape}")
 print(f"  Wet h-cells: {int(masks_basin.h.sum())}")
 print(f"  Wet u-cells: {int(masks_basin.u.sum())}")
@@ -106,7 +106,7 @@ h_island[:, 0] = False
 h_island[:, -1] = False
 h_island[4:7, 4:7] = False  # island
 
-masks_island = ArakawaCGridMask.from_mask(h_island)
+masks_island = Mask2D.from_mask(h_island)
 print(
     f"Island: h shape = {masks_island.h.shape}, Wet h-cells = {int(masks_island.h.sum())}"
 )
@@ -118,7 +118,7 @@ h_channel = np.ones((n, 3 * n // 4), dtype=bool)
 h_channel[:, 0] = False  # south wall
 h_channel[:, -1] = False  # north wall
 
-masks_channel = ArakawaCGridMask.from_mask(h_channel)
+masks_channel = Mask2D.from_mask(h_channel)
 print(
     f"Channel: h shape = {masks_channel.h.shape}, "
     f"Wet h-cells = {int(masks_channel.h.sum())}"
@@ -136,7 +136,7 @@ h_irregular[0, n - 1] = False
 h_irregular[1, n - 1] = False
 h_irregular[2, n - 1] = False
 
-masks_irregular = ArakawaCGridMask.from_mask(h_irregular)
+masks_irregular = Mask2D.from_mask(h_irregular)
 print(
     f"Irregular: h shape = {masks_irregular.h.shape}, Wet h-cells = {int(masks_irregular.h.sum())}"
 )
@@ -147,7 +147,7 @@ print(
 # %% [markdown]
 # ## 2. Visualising the staggered masks
 #
-# The `ArakawaCGridMask` stores five staggered masks plus a 4-level
+# The `Mask2D` stores five staggered masks plus a 4-level
 # land/coast classification:
 #
 # | Value | Meaning |
@@ -315,7 +315,7 @@ plt.show()
 # everywhere) and all stencil capabilities are maximal.
 
 # %%
-masks_simple = ArakawaCGridMask.from_dimensions(ny=12, nx=12)
+masks_simple = Mask2D.from_dimensions(ny=12, nx=12)
 print(
     f"All-ocean: h shape = {masks_simple.h.shape}, "
     f"all wet = {bool(masks_simple.h.all())}, "
@@ -364,7 +364,7 @@ print(
 # %%
 # Demonstrate with a grid + masks for a small basin
 grid = CartesianGrid2D.from_interior(8, 8, Lx=8e4, Ly=8e4)
-masks = ArakawaCGridMask.from_dimensions(ny=grid.Ny, nx=grid.Nx)
+masks = Mask2D.from_dimensions(ny=grid.Ny, nx=grid.Nx)
 print(f"Grid: {grid.Ny}x{grid.Nx} (8 interior + 2 ghost = 10 per side)")
 print(f"  dx = {grid.dx:.0f} m, dy = {grid.dy:.0f} m")
 print(
@@ -385,5 +385,5 @@ print(
 # | **Stencil capability** | Per-cell count of contiguous wet neighbours in each direction |
 # | **Adaptive stencils** | Mutually-exclusive masks for WENO-5 / TVD-3 / upwind-1 |
 # | **Vorticity flags** | `w_valid`, `w_vertical_bound`, `w_horizontal_bound`, `w_cornerout_bound` |
-# | **All-ocean shortcut** | `ArakawaCGridMask.from_dimensions(ny, nx)` |
-# | **Factory** | `ArakawaCGridMask.from_mask(h_bool_array)` |
+# | **All-ocean shortcut** | `Mask2D.from_dimensions(ny, nx)` |
+# | **Factory** | `Mask2D.from_mask(h_bool_array)` |

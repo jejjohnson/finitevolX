@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.mask import Mask2D
 from finitevolx._src.solvers.elliptic import (
     build_capacitance_solver,
     dst1_eigenvalues,
@@ -66,8 +66,8 @@ def rect_mask():
 
 @pytest.fixture
 def cgrid_mask(rect_mask):
-    """ArakawaCGridMask built from the rectangular mask."""
-    return ArakawaCGridMask.from_mask(rect_mask)
+    """Mask2D built from the rectangular mask."""
+    return Mask2D.from_mask(rect_mask)
 
 
 # ---------------------------------------------------------------------------
@@ -143,7 +143,7 @@ class TestStreamfunctionCG:
         np.testing.assert_allclose(outside, 0.0, atol=1e-12)
 
     def test_with_cgrid_mask(self, cgrid_mask):
-        """CG with ArakawaCGridMask extracts psi mask."""
+        """CG with Mask2D extracts psi mask."""
         Ny, Nx = cgrid_mask.h.shape
         dx = 1.0 / (Nx - 1)
         dy = 1.0 / (Ny - 1)
@@ -215,7 +215,7 @@ class TestStreamfunctionCapacitance:
         np.testing.assert_allclose(np.array(bc_vals), 0.0, atol=1e-10)
 
     def test_with_cgrid_mask_solver(self, cgrid_mask):
-        """Capacitance solver built from ArakawaCGridMask."""
+        """Capacitance solver built from Mask2D."""
         Ny, Nx = cgrid_mask.h.shape
         dx = 1.0 / (Nx - 1)
         dy = 1.0 / (Ny - 1)
@@ -456,13 +456,13 @@ class TestPVInversionErrors:
 
 
 # ---------------------------------------------------------------------------
-# ArakawaCGridMask integration with existing solvers
+# Mask2D integration with existing solvers
 # ---------------------------------------------------------------------------
 
 
 class TestMaskedLaplacianWithCGridMask:
     def test_cgrid_mask_matches_array_mask(self, rect_mask, cgrid_mask):
-        """ArakawaCGridMask path matches float-array path using psi mask."""
+        """Mask2D path matches float-array path using psi mask."""
         Ny, Nx = rect_mask.shape
         dx = 1.0 / (Nx - 1)
         dy = 1.0 / (Ny - 1)
@@ -479,7 +479,7 @@ class TestMaskedLaplacianWithCGridMask:
 
 class TestCapacitanceSolverWithCGridMask:
     def test_build_from_cgrid_mask(self, cgrid_mask):
-        """build_capacitance_solver accepts ArakawaCGridMask."""
+        """build_capacitance_solver accepts Mask2D."""
         Ny, Nx = cgrid_mask.h.shape
         dx = 1.0 / (Nx - 1)
         dy = 1.0 / (Ny - 1)

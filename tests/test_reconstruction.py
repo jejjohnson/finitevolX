@@ -14,7 +14,7 @@ from finitevolx._src.grid.cartesian import (
     CartesianGrid2D,
     CartesianGrid3D,
 )
-from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.mask import Mask2D
 
 
 @pytest.fixture
@@ -773,7 +773,7 @@ class TestReconstruction3D:
 @pytest.fixture
 def all_ocean_mask_2d():
     """All-ocean (no coastlines) 10x10 mask — masked methods match non-masked."""
-    return ArakawaCGridMask.from_dimensions(10, 10)
+    return Mask2D.from_dimensions(10, 10)
 
 
 @pytest.fixture
@@ -787,13 +787,13 @@ def coastal_mask_2d():
     h = np.ones((10, 10), dtype=bool)
     # Place land at interior columns 4-5 (all rows) to create a barrier
     h[:, 4:6] = False
-    return ArakawaCGridMask.from_mask(h)
+    return Mask2D.from_mask(h)
 
 
 @pytest.fixture
 def all_ocean_mask_3d():
     """All-ocean mask for 3D tests (8x8 horizontal grid)."""
-    return ArakawaCGridMask.from_dimensions(8, 8)
+    return Mask2D.from_dimensions(8, 8)
 
 
 class TestReconstruction2DMasked:

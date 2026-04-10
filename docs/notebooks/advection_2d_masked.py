@@ -150,7 +150,7 @@ fig.savefig(IMG_DIR / "domain.png", dpi=150, bbox_inches="tight")
 # %% [markdown]
 # ## Step 2: Build the Mask and Inspect Stencil Capabilities
 #
-# `ArakawaCGridMask.from_mask()` takes the boolean ocean array and
+# `Mask2D.from_mask()` takes the boolean ocean array and
 # automatically computes:
 #
 # - **Staggered masks** for U, V, and corner points.
@@ -163,7 +163,7 @@ fig.savefig(IMG_DIR / "domain.png", dpi=150, bbox_inches="tight")
 # > closed basin, or you can mark them wet for periodic domains.
 
 # %%
-mask = fvx.ArakawaCGridMask.from_mask(ocean)
+mask = fvx.Mask2D.from_mask(ocean)
 
 # The stencil capability tells us how far we can "see" in each direction.
 sc = mask.stencil_capability

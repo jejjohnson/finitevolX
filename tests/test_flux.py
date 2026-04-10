@@ -10,7 +10,7 @@ from finitevolx._src.advection.advection import Advection2D, Advection3D
 from finitevolx._src.advection.flux import upwind_flux
 from finitevolx._src.advection.reconstruction import Reconstruction2D
 from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
-from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.mask import Mask2D
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
 
@@ -24,7 +24,7 @@ def grid2d():
 @pytest.fixture
 def all_ocean_mask():
     """All-wet 10×10 mask (no land)."""
-    return ArakawaCGridMask.from_dimensions(10, 10)
+    return Mask2D.from_dimensions(10, 10)
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ def coastal_mask():
     """10×10 mask with a land column at x=4–5, forcing near-land fallback."""
     h = np.ones((10, 10), dtype=bool)
     h[:, 4:6] = False
-    return ArakawaCGridMask.from_mask(h)
+    return Mask2D.from_mask(h)
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ def island_mask():
     h[:, 0] = False
     h[:, -1] = False
     h[8:12, 8:12] = False
-    return ArakawaCGridMask.from_mask(h)
+    return Mask2D.from_mask(h)
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -211,7 +211,7 @@ class TestUpwindFluxRectangular:
         # Large enough grid for interior cells to qualify for WENO5 (stencil size 6)
         grid = CartesianGrid2D.from_interior(12, 12, 1.0, 1.0)
         recon = Reconstruction2D(grid=grid)
-        mask = ArakawaCGridMask.from_dimensions(14, 14)
+        mask = Mask2D.from_dimensions(14, 14)
         q = jnp.broadcast_to(jnp.arange(14, dtype=float), (14, 14))
         u = jnp.ones((14, 14))
         mask_hier = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4, 6))
@@ -226,7 +226,7 @@ class TestUpwindFluxRectangular:
         """On an all-ocean mask, upwind_flux must equal Reconstruction2D.weno5_y."""
         grid = CartesianGrid2D.from_interior(12, 12, 1.0, 1.0)
         recon = Reconstruction2D(grid=grid)
-        mask = ArakawaCGridMask.from_dimensions(14, 14)
+        mask = Mask2D.from_dimensions(14, 14)
         q = jnp.broadcast_to(jnp.arange(14, dtype=float)[:, None], (14, 14))
         v = jnp.ones((14, 14))
         mask_hier = mask.get_adaptive_masks(direction="y", stencil_sizes=(2, 4, 6))
@@ -339,7 +339,7 @@ class TestUpwindFluxConservation:
         """
         grid = CartesianGrid2D.from_interior(12, 12, 1.0, 1.0)
         recon = Reconstruction2D(grid=grid)
-        mask = ArakawaCGridMask.from_dimensions(14, 14)
+        mask = Mask2D.from_dimensions(14, 14)
         q = 2.0 * jnp.ones((14, 14))
         # Uniform flow, but zero at the east-wall U-face so no flux exits
         u = jnp.ones((14, 14)).at[:, -2].set(0.0)
@@ -358,7 +358,7 @@ class TestUpwindFluxConservation:
         """
         grid = CartesianGrid2D.from_interior(12, 12, 1.0, 1.0)
         recon = Reconstruction2D(grid=grid)
-        mask = ArakawaCGridMask.from_dimensions(14, 14)
+        mask = Mask2D.from_dimensions(14, 14)
         q = 5.0 * jnp.ones((14, 14))
         # Uniform flow, but zero at the north-wall V-face so no flux exits
         v = jnp.ones((14, 14)).at[-2, :].set(0.0)
@@ -381,7 +381,7 @@ class TestAdvection2DMasked:
         """On a rectangular domain, masked weno5 should match unmasked."""
         Ny, Nx = 14, 14
         grid = CartesianGrid2D.from_interior(Ny - 2, Nx - 2, 1.0, 1.0)
-        mask = ArakawaCGridMask.from_dimensions(Ny, Nx)
+        mask = Mask2D.from_dimensions(Ny, Nx)
         adv = Advection2D(grid=grid)
         h = jnp.broadcast_to(jnp.arange(Nx, dtype=float), (Ny, Nx))
         u = jnp.ones((Ny, Nx))
@@ -397,7 +397,7 @@ class TestAdvection2DMasked:
     def test_rectangular_weno3_runs(self):
         Ny, Nx = 10, 10
         grid = CartesianGrid2D.from_interior(Ny - 2, Nx - 2, 1.0, 1.0)
-        mask = ArakawaCGridMask.from_dimensions(Ny, Nx)
+        mask = Mask2D.from_dimensions(Ny, Nx)
         adv = Advection2D(grid=grid)
         h = jnp.ones((Ny, Nx))
         u = jnp.ones((Ny, Nx))
@@ -409,7 +409,7 @@ class TestAdvection2DMasked:
     def test_rectangular_tvd_runs(self):
         Ny, Nx = 10, 10
         grid = CartesianGrid2D.from_interior(Ny - 2, Nx - 2, 1.0, 1.0)
-        mask = ArakawaCGridMask.from_dimensions(Ny, Nx)
+        mask = Mask2D.from_dimensions(Ny, Nx)
         adv = Advection2D(grid=grid)
         h = jnp.ones((Ny, Nx)) * 2.0
         u = jnp.ones((Ny, Nx))
@@ -423,7 +423,7 @@ class TestAdvection2DMasked:
         Ny, Nx = 10, 10
         h_mask = np.ones((Ny, Nx), dtype=bool)
         h_mask[:, 4:6] = False
-        mask = ArakawaCGridMask.from_mask(h_mask)
+        mask = Mask2D.from_mask(h_mask)
         grid = CartesianGrid2D.from_interior(Ny - 2, Nx - 2, 1.0, 1.0)
         adv = Advection2D(grid=grid)
         h = jnp.broadcast_to(jnp.arange(Nx, dtype=float), (Ny, Nx))
@@ -438,7 +438,7 @@ class TestAdvection2DMasked:
         h_mask = np.ones((Ny, Nx), dtype=bool)
         h_mask[:, 0] = False
         h_mask[:, -1] = False
-        mask = ArakawaCGridMask.from_mask(h_mask)
+        mask = Mask2D.from_mask(h_mask)
         grid = CartesianGrid2D.from_interior(Ny - 2, Nx - 2, 1.0, 1.0)
         adv = Advection2D(grid=grid)
         h = jnp.ones((Ny, Nx))
@@ -468,7 +468,7 @@ class TestAdvection2DMasked:
         """Methods like weno7 should ignore the mask and use unmasked path."""
         Ny, Nx = 14, 14
         grid = CartesianGrid2D.from_interior(Ny - 2, Nx - 2, 1.0, 1.0)
-        mask = ArakawaCGridMask.from_dimensions(Ny, Nx)
+        mask = Mask2D.from_dimensions(Ny, Nx)
         adv = Advection2D(grid=grid)
         h = jnp.ones((Ny, Nx)) * 2.0
         u = jnp.ones((Ny, Nx))
@@ -487,7 +487,7 @@ class TestAdvection3DMasked:
     def test_rectangular_weno3_runs(self):
         Nz, Ny, Nx = 3, 10, 10
         grid = CartesianGrid3D.from_interior(Nx - 2, Ny - 2, Nz - 2, 1.0, 1.0, 1.0)
-        mask = ArakawaCGridMask.from_dimensions(Ny, Nx)
+        mask = Mask2D.from_dimensions(Ny, Nx)
         adv = Advection3D(grid=grid)
         h = jnp.ones((Nz, Ny, Nx))
         u = jnp.ones((Nz, Ny, Nx))
@@ -499,7 +499,7 @@ class TestAdvection3DMasked:
     def test_rectangular_weno5_runs(self):
         Nz, Ny, Nx = 3, 14, 14
         grid = CartesianGrid3D.from_interior(Nx - 2, Ny - 2, Nz - 2, 1.0, 1.0, 1.0)
-        mask = ArakawaCGridMask.from_dimensions(Ny, Nx)
+        mask = Mask2D.from_dimensions(Ny, Nx)
         adv = Advection3D(grid=grid)
         h = jnp.ones((Nz, Ny, Nx))
         u = jnp.ones((Nz, Ny, Nx))
@@ -511,7 +511,7 @@ class TestAdvection3DMasked:
     def test_rectangular_tvd_runs(self):
         Nz, Ny, Nx = 3, 10, 10
         grid = CartesianGrid3D.from_interior(Nx - 2, Ny - 2, Nz - 2, 1.0, 1.0, 1.0)
-        mask = ArakawaCGridMask.from_dimensions(Ny, Nx)
+        mask = Mask2D.from_dimensions(Ny, Nx)
         adv = Advection3D(grid=grid)
         h = jnp.ones((Nz, Ny, Nx)) * 2.0
         u = jnp.ones((Nz, Ny, Nx))
@@ -525,7 +525,7 @@ class TestAdvection3DMasked:
         Nz, Ny, Nx = 3, 10, 10
         h_mask = np.ones((Ny, Nx), dtype=bool)
         h_mask[:, 4:6] = False
-        mask = ArakawaCGridMask.from_mask(h_mask)
+        mask = Mask2D.from_mask(h_mask)
         grid = CartesianGrid3D.from_interior(Nx - 2, Ny - 2, Nz - 2, 1.0, 1.0, 1.0)
         adv = Advection3D(grid=grid)
         h = jnp.ones((Nz, Ny, Nx))
@@ -557,7 +557,7 @@ class TestUpwindFluxValidation:
         recon = Reconstruction2D(grid=grid2d)
         q = jnp.ones((grid2d.Ny, grid2d.Nx))
         u = jnp.ones((grid2d.Ny, grid2d.Nx))
-        mask = ArakawaCGridMask.from_dimensions(grid2d.Ny, grid2d.Nx)
+        mask = Mask2D.from_dimensions(grid2d.Ny, grid2d.Nx)
         # Only provide mask for size 2, but rec_funcs expects 2 and 6
         mask_hier = mask.get_adaptive_masks(direction="x", stencil_sizes=(2,))
         with pytest.raises(ValueError, match="missing masks"):

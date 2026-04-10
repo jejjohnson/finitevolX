@@ -40,7 +40,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 import numpy as np
 
-from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.mask import Mask2D
 
 # ---------------------------------------------------------------------------
 # Internal helpers — grid hierarchy construction (numpy, offline)
@@ -903,7 +903,7 @@ class MultigridSolver(eqx.Module):
 
 
 def build_multigrid_solver(
-    mask: np.ndarray | Float[Array, "Ny Nx"] | ArakawaCGridMask,
+    mask: np.ndarray | Float[Array, "Ny Nx"] | Mask2D,
     dx: float,
     dy: float,
     lambda_: float = 0.0,
@@ -944,10 +944,10 @@ def build_multigrid_solver(
 
     Parameters
     ----------
-    mask : array, shape (Ny, Nx), or ArakawaCGridMask
+    mask : array, shape (Ny, Nx), or Mask2D
         Domain mask (1 = fluid, 0 = land).  ``None`` is *not* accepted;
         pass ``np.ones((Ny, Nx))`` for a rectangular domain.
-        When an :class:`ArakawaCGridMask` is passed, the ``psi``
+        When an :class:`Mask2D` is passed, the ``psi``
         staggering mask is extracted automatically.
     dx, dy : float
         Fine-grid spacings (metres or non-dimensional).
@@ -989,7 +989,7 @@ def build_multigrid_solver(
         If grid dimensions are not divisible by ``2**(n_levels - 1)``.
     """
     # --- Extract mask as a NumPy float64 array ---
-    if isinstance(mask, ArakawaCGridMask):
+    if isinstance(mask, Mask2D):
         mask_np = np.asarray(mask.xy_corner_strict, dtype=np.float64)
     else:
         mask_np = np.asarray(mask, dtype=np.float64)

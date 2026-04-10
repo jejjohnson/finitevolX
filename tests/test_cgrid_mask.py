@@ -1,11 +1,11 @@
-"""Tests for ArakawaCGridMask and StencilCapability2D."""
+"""Tests for Mask2D and StencilCapability2D."""
 
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.mask.cgrid_mask import (
-    ArakawaCGridMask,
+from finitevolx._src.mask import (
+    Mask2D,
     StencilCapability2D,
 )
 from finitevolx._src.mask.utils import (
@@ -47,17 +47,17 @@ def island_mask():
 
 @pytest.fixture
 def all_ocean():
-    return ArakawaCGridMask.from_dimensions(8, 8)
+    return Mask2D.from_dimensions(8, 8)
 
 
 @pytest.fixture
 def rect_cgrid(rect_mask):
-    return ArakawaCGridMask.from_mask(rect_mask)
+    return Mask2D.from_mask(rect_mask)
 
 
 @pytest.fixture
 def island_cgrid(island_mask):
-    return ArakawaCGridMask.from_mask(island_mask)
+    return Mask2D.from_mask(island_mask)
 
 
 # ── _pool_bool ────────────────────────────────────────────────────────────────
@@ -194,7 +194,7 @@ class TestStencilCapability:
         assert bool(jnp.all(sc.x_neg >= 1))
 
 
-# ── ArakawaCGridMask construction ─────────────────────────────────────────────
+# ── Mask2D construction ─────────────────────────────────────────────
 
 
 class TestConstruction:
@@ -210,7 +210,7 @@ class TestConstruction:
         ssh = np.ones((6, 6), dtype=float)
         ssh[0, :] = np.nan
         ssh[:, 0] = np.nan
-        m = ArakawaCGridMask.from_ssh(ssh)
+        m = Mask2D.from_ssh(ssh)
         np.testing.assert_array_equal(np.asarray(m.h)[0, :], False)
         np.testing.assert_array_equal(np.asarray(m.h)[:, 0], False)
 
@@ -220,7 +220,7 @@ class TestConstruction:
         np.testing.assert_array_equal(np.asarray(m.xy_corner_strict & m.not_xy_corner_strict), False)
 
     def test_top_level_import(self):
-        from finitevolx import ArakawaCGridMask as ACM, StencilCapability2D as SC
+        from finitevolx import Mask2D as ACM, StencilCapability2D as SC
 
         assert ACM is not None
         assert SC is not None
@@ -240,7 +240,7 @@ class TestStaggeredMasks:
         # With h[0, :] = False, u[1, :] must be False
         mask = np.ones((6, 6), dtype=bool)
         mask[0, :] = False
-        m = ArakawaCGridMask.from_mask(mask)
+        m = Mask2D.from_mask(mask)
         np.testing.assert_array_equal(np.asarray(m.u)[1, :], False)
         np.testing.assert_array_equal(np.asarray(m.u)[2, :], True)
 
@@ -248,7 +248,7 @@ class TestStaggeredMasks:
         # Remove one h-cell → psi for all four surrounding corners must be False
         mask = np.ones((5, 5), dtype=bool)
         mask[2, 2] = False
-        m = ArakawaCGridMask.from_mask(mask)
+        m = Mask2D.from_mask(mask)
         # psi[2, 2] uses h[1,1], h[1,2], h[2,1], h[2,2] → h[2,2]=False → False
         assert not bool(m.xy_corner_strict[2, 2])
         assert not bool(m.xy_corner_strict[2, 3])
@@ -357,12 +357,12 @@ class TestSponge:
         np.testing.assert_allclose(np.asarray(rect_cgrid.sponge), 1.0)
 
     def test_walls_are_zero(self, rect_mask):
-        m = ArakawaCGridMask.from_mask(rect_mask, sponge_width=2)
+        m = Mask2D.from_mask(rect_mask, sponge_width=2)
         np.testing.assert_array_equal(np.asarray(m.sponge)[0, :], 0.0)
         np.testing.assert_array_equal(np.asarray(m.sponge)[:, 0], 0.0)
 
     def test_shape(self, rect_mask):
-        m = ArakawaCGridMask.from_mask(rect_mask, sponge_width=3)
+        m = Mask2D.from_mask(rect_mask, sponge_width=3)
         assert m.sponge.shape == rect_mask.shape
 
 
@@ -381,7 +381,7 @@ class TestAdaptiveMasks:
         assert bool(np.all(total <= 1))
 
     def test_large_domain_large_stencil(self):
-        m = ArakawaCGridMask.from_dimensions(20, 20)
+        m = Mask2D.from_dimensions(20, 20)
         masks = m.get_adaptive_masks(direction="x", source="h")
         # Centre cell has ≥10 wet cells in each direction → stencil 10
         assert bool(masks[10][10, 10])
@@ -401,7 +401,7 @@ class TestAdaptiveMasks:
         mask[-1, :] = False
         mask[:, 0] = False
         mask[:, -1] = False
-        m = ArakawaCGridMask.from_mask(mask)
+        m = Mask2D.from_mask(mask)
         masks = m.get_adaptive_masks(direction="x", source="h")
         assert bool(masks[2][5, 1])
         assert not bool(masks[4][5, 1])
@@ -433,7 +433,7 @@ class TestStaggeredMaskGeometry:
         """6×6 basin: land border, 4×4 ocean interior."""
         h = np.ones((6, 6), dtype=bool)
         h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
-        return h, ArakawaCGridMask.from_mask(h)
+        return h, Mask2D.from_mask(h)
 
     # ── u mask: interface between h[j-1,i] and h[j,i] ────────────────
 
@@ -486,7 +486,7 @@ class TestStaggeredMaskGeometry:
     def test_w_wet_near_single_wet_cell(self):
         h = np.zeros((4, 4), dtype=bool)
         h[1, 1] = True  # single wet cell
-        m = ArakawaCGridMask.from_mask(h)
+        m = Mask2D.from_mask(h)
         w = np.asarray(m.xy_corner)
         # w at corners of h[1,1]: (1,1), (1,2), (2,1), (2,2)
         assert w[1, 1]
@@ -497,7 +497,7 @@ class TestStaggeredMaskGeometry:
     def test_w_dry_far_from_wet_cells(self):
         h = np.zeros((6, 6), dtype=bool)
         h[1, 1] = True
-        m = ArakawaCGridMask.from_mask(h)
+        m = Mask2D.from_mask(h)
         w = np.asarray(m.xy_corner)
         # w[4,4]: SW corner uses h[3,3], h[3,4], h[4,3], h[4,4] — all dry
         assert not w[4, 4]
@@ -533,14 +533,14 @@ class TestVorticityBoundaryGeometry:
         """8×8 basin: land border, 6×6 ocean interior."""
         h = np.ones((8, 8), dtype=bool)
         h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
-        return ArakawaCGridMask.from_mask(h)
+        return Mask2D.from_mask(h)
 
     @pytest.fixture
     def channel8(self):
         """8×8 zonal channel: walls at j=0 and j=7, open in x."""
         h = np.ones((8, 8), dtype=bool)
         h[0, :] = h[-1, :] = False
-        return ArakawaCGridMask.from_mask(h)
+        return Mask2D.from_mask(h)
 
     # ── xy_corner_valid: all 4 adjacent velocity faces wet ────────────────────
 
@@ -561,7 +561,7 @@ class TestVorticityBoundaryGeometry:
         # the right 4 faces (not shifted ones).
         h = np.ones((5, 5), dtype=bool)
         h[2, 2] = False
-        m = ArakawaCGridMask.from_mask(h)
+        m = Mask2D.from_mask(h)
         va = np.asarray(m.xy_corner_valid)
 
         # w[3,3]: SW corner of cell (3,3). Adjacent faces:
@@ -594,7 +594,7 @@ class TestVorticityBoundaryGeometry:
         # 5x5 all-ocean, then kill one cell to create a single-face gap.
         h = np.ones((5, 5), dtype=bool)
         h[3, 1] = False  # makes u[3,1] dry and u[4,1] dry, v[3,1] dry, v[3,2] dry
-        m = ArakawaCGridMask.from_mask(h)
+        m = Mask2D.from_mask(h)
         va = np.asarray(m.xy_corner_valid)
         u = np.asarray(m.u)
         v = np.asarray(m.v)
@@ -639,7 +639,7 @@ class TestIrregularBoundaryGeometry:
         h = np.ones((10, 10), dtype=bool)
         h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
         h[4:7, 4:7] = False
-        m = ArakawaCGridMask.from_mask(h)
+        m = Mask2D.from_mask(h)
         psi = np.asarray(m.xy_corner_strict)
         yids = np.asarray(m.xy_corner_strict_irrbound_rows)
         xids = np.asarray(m.xy_corner_strict_irrbound_cols)
@@ -651,7 +651,7 @@ class TestIrregularBoundaryGeometry:
         h = np.ones((10, 10), dtype=bool)
         h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
         h[4:7, 4:7] = False
-        m = ArakawaCGridMask.from_mask(h)
+        m = Mask2D.from_mask(h)
         psi = np.asarray(m.xy_corner_strict)
         yids = np.asarray(m.xy_corner_strict_irrbound_rows)
         xids = np.asarray(m.xy_corner_strict_irrbound_cols)
@@ -667,7 +667,7 @@ class TestIrregularBoundaryGeometry:
         """Irregular boundary cells are in [1:-1, 1:-1], not on the edge."""
         h = np.ones((10, 10), dtype=bool)
         h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
-        m = ArakawaCGridMask.from_mask(h)
+        m = Mask2D.from_mask(h)
         Ny, Nx = h.shape
         yids = np.asarray(m.xy_corner_strict_irrbound_rows)
         xids = np.asarray(m.xy_corner_strict_irrbound_cols)
@@ -682,7 +682,7 @@ class TestClassificationGeometry:
         """Coast cells must be wet and have ≥1 land 4-neighbour."""
         h = np.ones((10, 10), dtype=bool)
         h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
-        m = ArakawaCGridMask.from_mask(h)
+        m = Mask2D.from_mask(h)
         cls = np.asarray(m.classification)
         coast = cls == 1
         # Every coast cell must be wet
@@ -696,7 +696,7 @@ class TestClassificationGeometry:
         """Near-coast cells must NOT directly touch land."""
         h = np.ones((20, 20), dtype=bool)
         h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
-        m = ArakawaCGridMask.from_mask(h)
+        m = Mask2D.from_mask(h)
         cls = np.asarray(m.classification)
         near_coast = cls == 2
         land = ~h
@@ -711,7 +711,7 @@ class TestClassificationGeometry:
         """Open-ocean cells must be >2 hops from any land cell."""
         h = np.ones((20, 20), dtype=bool)
         h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
-        m = ArakawaCGridMask.from_mask(h)
+        m = Mask2D.from_mask(h)
         cls = np.asarray(m.classification)
         ocean = cls == 3
         land = ~h
