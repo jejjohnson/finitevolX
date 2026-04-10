@@ -64,15 +64,52 @@ type Nirr = int
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# StencilCapability
+# StencilCapability — 1-D / 2-D / 3-D variants
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-class StencilCapability(eqx.Module):
-    """Directional count of contiguous wet neighbours for each grid cell.
+class StencilCapability1D(eqx.Module):
+    """Directional count of contiguous wet neighbours for each 1-D grid cell.
 
-    At each cell (j, i), stores the number of consecutive wet cells (including
+    At each cell ``i``, stores the number of consecutive wet cells (including
     the cell itself) reachable before hitting a dry cell or the domain edge.
+
+    Parameters
+    ----------
+    x_pos : Int[Array, "Nx"]
+        Count in the +x direction.
+    x_neg : Int[Array, "Nx"]
+        Count in the −x direction.
+    """
+
+    x_pos: Int[Array, "Nx"]
+    x_neg: Int[Array, "Nx"]
+
+    @classmethod
+    def from_mask(cls, h: np.ndarray | Bool[Array, "Nx"]) -> StencilCapability1D:
+        """Build stencil capability from a 1-D wet/dry mask.
+
+        Parameters
+        ----------
+        h : array-like [Nx] bool
+
+        Returns
+        -------
+        StencilCapability1D
+        """
+        h_np = np.asarray(h, dtype=bool)
+        return cls(
+            x_pos=jnp.asarray(_count_contiguous(h_np, axis=0, forward=True)),
+            x_neg=jnp.asarray(_count_contiguous(h_np, axis=0, forward=False)),
+        )
+
+
+class StencilCapability2D(eqx.Module):
+    """Directional count of contiguous wet neighbours for each 2-D grid cell.
+
+    At each cell ``(j, i)``, stores the number of consecutive wet cells
+    (including the cell itself) reachable before hitting a dry cell or
+    the domain edge.
 
     Parameters
     ----------
@@ -92,8 +129,8 @@ class StencilCapability(eqx.Module):
     y_neg: Int[Array, "Ny Nx"]
 
     @classmethod
-    def from_mask(cls, h: np.ndarray | Bool[Array, "Ny Nx"]) -> StencilCapability:
-        """Build stencil capability from a wet/dry mask.
+    def from_mask(cls, h: np.ndarray | Bool[Array, "Ny Nx"]) -> StencilCapability2D:
+        """Build stencil capability from a 2-D wet/dry mask.
 
         Construction uses numpy; stored arrays are JAX int32.
 
@@ -104,7 +141,7 @@ class StencilCapability(eqx.Module):
 
         Returns
         -------
-        StencilCapability
+        StencilCapability2D
         """
         h_np = np.asarray(h, dtype=bool)
         return cls(
@@ -112,6 +149,61 @@ class StencilCapability(eqx.Module):
             x_neg=jnp.asarray(_count_contiguous(h_np, axis=1, forward=False)),
             y_pos=jnp.asarray(_count_contiguous(h_np, axis=0, forward=True)),
             y_neg=jnp.asarray(_count_contiguous(h_np, axis=0, forward=False)),
+        )
+
+
+class StencilCapability3D(eqx.Module):
+    """Directional count of contiguous wet neighbours for each 3-D grid cell.
+
+    At each cell ``(k, j, i)``, stores the number of consecutive wet cells
+    (including the cell itself) reachable before hitting a dry cell or
+    the domain edge.
+
+    Parameters
+    ----------
+    x_pos : Int[Array, "Nz Ny Nx"]
+        Count in the +x direction.
+    x_neg : Int[Array, "Nz Ny Nx"]
+        Count in the −x direction.
+    y_pos : Int[Array, "Nz Ny Nx"]
+        Count in the +y direction.
+    y_neg : Int[Array, "Nz Ny Nx"]
+        Count in the −y direction.
+    z_pos : Int[Array, "Nz Ny Nx"]
+        Count in the +z direction.
+    z_neg : Int[Array, "Nz Ny Nx"]
+        Count in the −z direction.
+    """
+
+    x_pos: Int[Array, "Nz Ny Nx"]
+    x_neg: Int[Array, "Nz Ny Nx"]
+    y_pos: Int[Array, "Nz Ny Nx"]
+    y_neg: Int[Array, "Nz Ny Nx"]
+    z_pos: Int[Array, "Nz Ny Nx"]
+    z_neg: Int[Array, "Nz Ny Nx"]
+
+    @classmethod
+    def from_mask(
+        cls, h: np.ndarray | Bool[Array, "Nz Ny Nx"]
+    ) -> StencilCapability3D:
+        """Build stencil capability from a 3-D wet/dry mask.
+
+        Parameters
+        ----------
+        h : array-like [Nz, Ny, Nx] bool
+
+        Returns
+        -------
+        StencilCapability3D
+        """
+        h_np = np.asarray(h, dtype=bool)
+        return cls(
+            x_pos=jnp.asarray(_count_contiguous(h_np, axis=2, forward=True)),
+            x_neg=jnp.asarray(_count_contiguous(h_np, axis=2, forward=False)),
+            y_pos=jnp.asarray(_count_contiguous(h_np, axis=1, forward=True)),
+            y_neg=jnp.asarray(_count_contiguous(h_np, axis=1, forward=False)),
+            z_pos=jnp.asarray(_count_contiguous(h_np, axis=0, forward=True)),
+            z_neg=jnp.asarray(_count_contiguous(h_np, axis=0, forward=False)),
         )
 
 
@@ -172,7 +264,7 @@ class ArakawaCGridMask(eqx.Module):
     classification : Int[Array, "Ny Nx"]
         4-level integer classification: 0 = land, 1 = coast, 2 = near-coast,
         3 = open ocean.
-    stencil_capability : StencilCapability
+    stencil_capability : StencilCapability2D
         Directional contiguous-wet-cell counts on the h-grid.
     sponge : Float[Array, "Ny Nx"]
         Sponge-layer weight: 0 at domain walls, 1 in the interior.
@@ -209,7 +301,7 @@ class ArakawaCGridMask(eqx.Module):
     classification: Int[Array, "Ny Nx"]
 
     # ── stencil capability ────────────────────────────────────────────────────
-    stencil_capability: StencilCapability
+    stencil_capability: StencilCapability2D
 
     # ── optional arrays ───────────────────────────────────────────────────────
     sponge: Float[Array, "Ny Nx"]
@@ -306,8 +398,8 @@ class ArakawaCGridMask(eqx.Module):
         # Mutually-exclusive masks
         return {s: (max_s == s) for s in stencil_sizes}
 
-    def _stencil_capability_for(self, source: str) -> StencilCapability:
-        """Return a :class:`StencilCapability` for the given source grid.
+    def _stencil_capability_for(self, source: str) -> StencilCapability2D:
+        """Return a :class:`StencilCapability2D` for the given source grid.
 
         For non-``'h'`` sources the capability is re-computed from the stored
         staggered mask.  This should **not** be called inside a JIT-compiled
@@ -330,7 +422,7 @@ class ArakawaCGridMask(eqx.Module):
             )
         if source == "h":
             return self.stencil_capability
-        return StencilCapability.from_mask(grid_map[source])
+        return StencilCapability2D.from_mask(grid_map[source])
 
     # ── factory class-methods ─────────────────────────────────────────────────
 
@@ -424,7 +516,7 @@ class ArakawaCGridMask(eqx.Module):
         classification[open_ocean] = 3
 
         # ── stencil capability ────────────────────────────────────────────
-        sc = StencilCapability.from_mask(h_np)
+        sc = StencilCapability2D.from_mask(h_np)
 
         # ── sponge layer ──────────────────────────────────────────────────
         if sponge_width is None or sponge_width == 0:

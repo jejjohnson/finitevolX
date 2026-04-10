@@ -1,4 +1,4 @@
-"""Tests for ArakawaCGridMask and StencilCapability."""
+"""Tests for ArakawaCGridMask and StencilCapability2D."""
 
 import jax.numpy as jnp
 import numpy as np
@@ -6,7 +6,7 @@ import pytest
 
 from finitevolx._src.mask.cgrid_mask import (
     ArakawaCGridMask,
-    StencilCapability,
+    StencilCapability2D,
 )
 from finitevolx._src.mask.utils import (
     _count_contiguous,
@@ -171,19 +171,19 @@ class TestMakeSponge:
         np.testing.assert_allclose(s[10, 10], 1.0)
 
 
-# ── StencilCapability ─────────────────────────────────────────────────────────
+# ── StencilCapability2D ─────────────────────────────────────────────────────────
 
 
 class TestStencilCapability:
     def test_shape(self, rect_mask):
-        sc = StencilCapability.from_mask(rect_mask)
+        sc = StencilCapability2D.from_mask(rect_mask)
         assert sc.x_pos.shape == rect_mask.shape
         assert sc.x_neg.shape == rect_mask.shape
         assert sc.y_pos.shape == rect_mask.shape
         assert sc.y_neg.shape == rect_mask.shape
 
     def test_dry_cells_are_zero(self, rect_mask):
-        sc = StencilCapability.from_mask(rect_mask)
+        sc = StencilCapability2D.from_mask(rect_mask)
         land = ~rect_mask
         np.testing.assert_array_equal(np.asarray(sc.x_pos)[land], 0)
         np.testing.assert_array_equal(np.asarray(sc.x_neg)[land], 0)
@@ -220,7 +220,7 @@ class TestConstruction:
         np.testing.assert_array_equal(np.asarray(m.xy_corner_strict & m.not_xy_corner_strict), False)
 
     def test_top_level_import(self):
-        from finitevolx import ArakawaCGridMask as ACM, StencilCapability as SC
+        from finitevolx import ArakawaCGridMask as ACM, StencilCapability2D as SC
 
         assert ACM is not None
         assert SC is not None
