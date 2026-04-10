@@ -52,9 +52,7 @@ def _pool_bool(
     arr_padded = np.pad(arr_f, pad_widths)
     total = np.zeros_like(arr_f)
     for offsets in itertools.product(*(range(k) for k in kernel)):
-        slices = tuple(
-            slice(o, o + s) for o, s in zip(offsets, arr.shape, strict=True)
-        )
+        slices = tuple(slice(o, o + s) for o, s in zip(offsets, arr.shape, strict=True))
         total += arr_padded[slices]
     return total / float(np.prod(kernel)) > threshold
 

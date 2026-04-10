@@ -18,8 +18,8 @@ import pytest
 
 from finitevolx import (
     Advection2D,
-    Mask2D,
     CartesianGrid2D,
+    Mask2D,
     uv_center_flux,
     uv_node_flux,
 )

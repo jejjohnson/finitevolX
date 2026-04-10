@@ -836,9 +836,7 @@ class Mask3D(eqx.Module):
         elif direction == "z":
             cnt_pos, cnt_neg = sc.z_pos, sc.z_neg
         else:
-            raise ValueError(
-                f"direction must be 'x', 'y' or 'z', got {direction!r}"
-            )
+            raise ValueError(f"direction must be 'x', 'y' or 'z', got {direction!r}")
 
         max_s = jnp.zeros(self.h.shape, dtype=jnp.int32)
         for s in sorted(stencil_sizes):
@@ -911,9 +909,7 @@ class Mask3D(eqx.Module):
                             dk : Nz - 2 + dk, dj : Ny - 2 + dj, di : Nx - 2 + di
                         ]
             pool3 /= 27.0
-            irrbound = (~xy_corner_strict_np[1:-1, 1:-1, 1:-1]) & (
-                pool3 > 1.0 / 54.0
-            )
+            irrbound = (~xy_corner_strict_np[1:-1, 1:-1, 1:-1]) & (pool3 > 1.0 / 54.0)
             layers, rows, cols = np.where(irrbound)
             # Map from interior slice to full-array coordinates.
             layers = layers + 1

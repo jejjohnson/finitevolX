@@ -221,7 +221,9 @@ class TestConstruction:
     def test_inverted_masks(self, rect_cgrid):
         m = rect_cgrid
         np.testing.assert_array_equal(np.asarray(m.h & m.not_h), False)
-        np.testing.assert_array_equal(np.asarray(m.xy_corner_strict & m.not_xy_corner_strict), False)
+        np.testing.assert_array_equal(
+            np.asarray(m.xy_corner_strict & m.not_xy_corner_strict), False
+        )
 
     def test_top_level_import(self):
         from finitevolx import Mask2D as ACM, StencilCapability2D as SC
@@ -292,7 +294,9 @@ class TestIrregularBoundary:
 
     def test_paired_lengths(self, rect_cgrid):
         m = rect_cgrid
-        assert len(m.xy_corner_strict_irrbound_cols) == len(m.xy_corner_strict_irrbound_rows)
+        assert len(m.xy_corner_strict_irrbound_cols) == len(
+            m.xy_corner_strict_irrbound_rows
+        )
 
     def test_within_interior_bounds(self, rect_cgrid):
         m = rect_cgrid

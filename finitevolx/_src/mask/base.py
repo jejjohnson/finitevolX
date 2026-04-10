@@ -136,9 +136,7 @@ class StencilCapability3D(eqx.Module):
     z_neg: Int[Array, "Nz Ny Nx"]
 
     @classmethod
-    def from_mask(
-        cls, h: np.ndarray | Bool[Array, "Nz Ny Nx"]
-    ) -> StencilCapability3D:
+    def from_mask(cls, h: np.ndarray | Bool[Array, "Nz Ny Nx"]) -> StencilCapability3D:
         """Build stencil capability from a 3-D wet/dry mask.
 
         Parameters

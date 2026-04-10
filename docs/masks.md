@@ -1,6 +1,6 @@
 # Arakawa C-Grid Masks
 
-`ArakawaCGridMask` builds all staggered masks from a single cell-centre
+`Mask2D` builds all staggered masks from a single cell-centre
 wet/dry field, following the Arakawa & Lamb (1977) grid layout:
 
 ```
@@ -16,12 +16,13 @@ u     h     u
 w-----v-----w..   > x
 ```
 
-| Point     | Location                  | Variable                         |
-|-----------|---------------------------|----------------------------------|
-| **h**     | cell centre               | tracers, height, pressure        |
-| **u**     | y-face (east/west)        | zonal velocity                   |
-| **v**     | x-face (north/south)      | meridional velocity              |
-| **w/psi** | SW corner                 | vorticity, streamfunction        |
+| Point                | Location                  | Variable                         |
+|----------------------|---------------------------|----------------------------------|
+| **h**                | cell centre               | tracers, height, pressure        |
+| **u**                | y-face (east/west)        | zonal velocity                   |
+| **v**                | x-face (north/south)      | meridional velocity              |
+| **xy_corner**        | SW corner (lenient)       | vorticity                        |
+| **xy_corner_strict** | SW corner (strict)        | streamfunction                   |
 
 ## Creating masks
 
@@ -30,7 +31,7 @@ The factory method derives everything else:
 
 ```python
 import numpy as np
-from finitevolx import ArakawaCGridMask
+from finitevolx import Mask2D
 
 # Rectangular basin with land boundaries
 n = 10
@@ -41,19 +42,19 @@ h_mask[:, 0] = h_mask[:, -1] = False
 # With an island
 h_mask[4:7, 4:7] = False
 
-masks = ArakawaCGridMask.from_mask(h_mask)
+masks = Mask2D.from_mask(h_mask)
 ```
 
 For an all-ocean domain, use the shortcut:
 
 ```python
-masks = ArakawaCGridMask.from_dimensions(ny=12, nx=12)
+masks = Mask2D.from_dimensions(ny=12, nx=12)
 ```
 
 Or construct from an SSH field where NaN marks land:
 
 ```python
-masks = ArakawaCGridMask.from_ssh(ssh_field)
+masks = Mask2D.from_ssh(ssh_field)
 ```
 
 ## Staggered variable locations
@@ -101,18 +102,18 @@ The mask includes a 4-level classification (0 = land, 1 = coast,
 
 ## Vorticity boundary classification
 
-At vorticity (w) points, cells are classified based on their relationship
+At xy-corner points, cells are classified based on their relationship
 to adjacent velocity faces:
 
-- **w_valid** — interior: all 4 adjacent velocity faces are wet
-- **w_vertical_bound** — on a vertical (y-direction) boundary
-- **w_horizontal_bound** — on a horizontal (x-direction) boundary
-- **w_cornerout_bound** — at convex corners (both boundary types)
+- **xy_corner_valid** — interior: all 4 adjacent velocity faces are wet
+- **xy_corner_y_wall** — on a vertical (y-direction) boundary
+- **xy_corner_x_wall** — on a horizontal (x-direction) boundary
+- **xy_corner_convex** — at convex corners (both boundary types)
 
 ## Stencil capability and adaptive WENO
 
 Each cell stores how many contiguous wet neighbours it has in each
-direction via `StencilCapability`. This drives adaptive stencil
+direction via `StencilCapability2D`. This drives adaptive stencil
 selection for WENO reconstruction near coastlines:
 
 ```python

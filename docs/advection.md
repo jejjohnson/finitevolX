@@ -163,9 +163,9 @@ ENO near discontinuities.
 
 Near irregular boundaries (islands, coastlines), the standard WENO stencils
 extend into land cells and produce incorrect results.  finitevolX supports
-**mask-aware adaptive stencil selection** via `ArakawaCGridMask`:
+**mask-aware adaptive stencil selection** via `Mask2D`:
 
-- Each T-point stores a `StencilCapability` value indicating the maximum
+- Each T-point stores a `StencilCapability2D` value indicating the maximum
   symmetric stencil width supported in each direction (2, 4, or 6 points).
 - The advection operator queries these masks and selects the appropriate
   sub-scheme (upwind, WENO3, or WENO5) at each cell.
@@ -173,7 +173,7 @@ extend into land cells and produce incorrect results.  finitevolX supports
   gracefully to lower-order methods.
 
 !!! tip "When to enable mask-aware advection"
-    Pass an `ArakawaCGridMask` to `Advection2D.__init__` whenever the domain
+    Pass an `Mask2D` to `Advection2D.__init__` whenever the domain
     has land cells.  For fully periodic or rectangular domains without land,
     omit the mask for slightly lower overhead.
 
@@ -206,8 +206,8 @@ adv = Advection2D(grid=grid)
 adv_tvd = Advection2D(grid=grid, method="van_leer")
 
 # With mask-aware WENO5
-from finitevolx import ArakawaCGridMask
-mask = ArakawaCGridMask.from_mask(ocean_mask)
+from finitevolx import Mask2D
+mask = Mask2D.from_mask(ocean_mask)
 adv_masked = Advection2D(grid=grid, method="weno5", mask=mask)
 
 # Compute tracer tendency: -∇·(u*q)
@@ -239,7 +239,7 @@ Is accuracy on smooth fields important?
 └── No → Use upwind1 (1st order, maximum dissipation)
 
 Does the domain have land/islands?
-├── Yes → pass ArakawaCGridMask to Advection2D
+├── Yes → pass Mask2D to Advection2D
 └── No  → omit mask (slightly faster)
 ```
 

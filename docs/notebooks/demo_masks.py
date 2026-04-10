@@ -45,8 +45,8 @@
 # | **h** | cell centre | input mask (1 = wet, 0 = dry) |
 # | **u** | y-face | wet if both adjacent h-cells are wet |
 # | **v** | x-face | wet if both adjacent h-cells are wet |
-# | **w** | corner (lenient) | wet if *any* adjacent h-cell is wet |
-# | **psi** | corner (strict) | wet if *all four* adjacent h-cells are wet |
+# | **xy_corner** | corner (lenient) | wet if *any* adjacent h-cell is wet |
+# | **xy_corner_strict** | corner (strict) | wet if *all four* adjacent h-cells are wet |
 
 # %%
 from pathlib import Path
@@ -69,7 +69,7 @@ IMG_DIR.mkdir(parents=True, exist_ok=True)
 # ## 1. Creating masks from different domain topologies
 #
 # `Mask2D.from_mask` takes a binary h-grid mask and derives all
-# staggered masks (u, v, w, psi), boundary classification, and stencil
+# staggered masks (u, v, xy_corner, xy_corner_strict), boundary classification, and stencil
 # capability arrays automatically.
 #
 # We build four common topologies:
@@ -95,7 +95,7 @@ print(f"Basin: h shape = {masks_basin.h.shape}")
 print(f"  Wet h-cells: {int(masks_basin.h.sum())}")
 print(f"  Wet u-cells: {int(masks_basin.u.sum())}")
 print(f"  Wet v-cells: {int(masks_basin.v.sum())}")
-print(f"  Wet psi-cells: {int(masks_basin.psi.sum())}")
+print(f"  Wet xy_corner_strict cells: {int(masks_basin.xy_corner_strict.sum())}")
 
 # %%
 # --- Island: basin with a 3x3 island in the centre ---
@@ -141,7 +141,7 @@ print(
     f"Irregular: h shape = {masks_irregular.h.shape}, Wet h-cells = {int(masks_irregular.h.sum())}"
 )
 print(
-    f"  Irregular boundary psi indices: {len(masks_irregular.psi_irrbound_xids)} cells"
+    f"  Irregular boundary xy_corner_strict indices: {len(masks_irregular.xy_corner_strict_irrbound_cols)} cells"
 )
 
 # %% [markdown]
@@ -168,8 +168,8 @@ def plot_staggered_masks(masks, name, img_dir):
         "h (centre)": masks.h,
         "u (y-face)": masks.u,
         "v (x-face)": masks.v,
-        "w (corner, lenient)": masks.w,
-        "psi (corner, strict)": masks.psi,
+        "xy_corner (lenient)": masks.xy_corner,
+        "xy_corner_strict": masks.xy_corner_strict,
         "classification": masks.classification,
     }
     fig, axes = plt.subplots(2, 3, figsize=(14, 10))
@@ -219,7 +219,7 @@ for topo_name, topo_masks in all_masks.items():
     print(f"  h: {topo_masks.h.shape}, wet = {int(topo_masks.h.sum())}")
     print(f"  u: {topo_masks.u.shape}, wet = {int(topo_masks.u.sum())}")
     print(f"  v: {topo_masks.v.shape}, wet = {int(topo_masks.v.sum())}")
-    print(f"  psi: {topo_masks.psi.shape}, wet = {int(topo_masks.psi.sum())}")
+    print(f"  xy_corner_strict: {topo_masks.xy_corner_strict.shape}, wet = {int(topo_masks.xy_corner_strict.sum())}")
     plot_staggered_masks(topo_masks, topo_name, IMG_DIR)
     plot_classification(topo_masks, topo_name, IMG_DIR)
 
@@ -272,15 +272,15 @@ for size, mask in sorted(adaptive.items()):
 # %% [markdown]
 # ## 4. Vorticity boundary classification
 #
-# At vorticity (w/psi) points the mask classifies cells into four
+# At xy-corner points the mask classifies cells into four
 # categories based on the configuration of adjacent velocity faces:
 #
 # | Flag | Meaning | Boundary condition |
 # |------|---------|--------------------|
-# | `w_valid` | interior -- all 4 adjacent faces wet | standard curl stencil |
-# | `w_vertical_bound` | on a vertical (y-direction) boundary | one-sided $\partial v/\partial x$ |
-# | `w_horizontal_bound` | on a horizontal (x-direction) boundary | one-sided $\partial u/\partial y$ |
-# | `w_cornerout_bound` | convex corner (both boundary types) | diagonal extrapolation |
+# | `xy_corner_valid` | interior -- all 4 adjacent faces wet | standard curl stencil |
+# | `xy_corner_y_wall` | on a vertical (y-direction) boundary | one-sided $\partial v/\partial x$ |
+# | `xy_corner_x_wall` | on a horizontal (x-direction) boundary | one-sided $\partial u/\partial y$ |
+# | `xy_corner_convex` | convex corner (both boundary types) | diagonal extrapolation |
 #
 # These flags are essential for correctly computing vorticity
 # $\zeta = \partial v / \partial x - \partial u / \partial y$ at domain
@@ -288,12 +288,12 @@ for size, mask in sorted(adaptive.items()):
 
 # %%
 fig, axes = plt.subplots(1, 4, figsize=(16, 4))
-titles = ["w_valid", "w_vertical_bound", "w_horizontal_bound", "w_cornerout_bound"]
+titles = ["xy_corner_valid", "xy_corner_y_wall", "xy_corner_x_wall", "xy_corner_convex"]
 fields = [
-    masks_island.w_valid,
-    masks_island.w_vertical_bound,
-    masks_island.w_horizontal_bound,
-    masks_island.w_cornerout_bound,
+    masks_island.xy_corner_valid,
+    masks_island.xy_corner_y_wall,
+    masks_island.xy_corner_x_wall,
+    masks_island.xy_corner_convex,
 ]
 for ax, title, field in zip(axes, titles, fields, strict=True):
     ax.imshow(np.asarray(field), origin="lower", cmap="Blues", interpolation="nearest")
@@ -340,9 +340,9 @@ print(
 # $$
 #
 # On the C-grid: $\omega$ lives at **h-points** (cell centres), $\psi$ at
-# **psi-points** (corners), and $u, v$ at **face points**.  The mask
+# **xy-corner points**, and $u, v$ at **face points**.  The mask
 # ensures that $\nabla^2 \psi$ is only computed where all four corner
-# psi-values exist (i.e. where `psi` mask is True).
+# values exist (i.e. where `xy_corner_strict` is True).
 #
 # ### Shallow Water (SW) equations (vector-invariant form)
 #
@@ -358,7 +358,7 @@ print(
 # $p = g(h + \eta_b) + \frac{1}{2}(u^2 + v^2)$ is the Bernoulli potential.
 #
 # On the C-grid: $h$ at **h-points**, $u$ at **u-points**, $v$ at **v-points**,
-# and $q$ at **w/psi-points**.  The vorticity boundary flags (section 4)
+# and $q$ at **xy-corner points**.  The vorticity boundary flags (section 4)
 # control how $\zeta$ is computed at the domain edges.
 
 # %%
@@ -371,7 +371,7 @@ print(
     f"Masks: h={int(masks.h.sum())} wet, "
     f"u={int(masks.u.sum())} wet, "
     f"v={int(masks.v.sum())} wet, "
-    f"psi={int(masks.psi.sum())} wet"
+    f"xy_corner_strict={int(masks.xy_corner_strict.sum())} wet"
 )
 
 # %% [markdown]
@@ -380,10 +380,10 @@ print(
 # | Concept | Detail |
 # |---------|--------|
 # | **Primary input** | Binary h-mask (cell centres): 1 = wet, 0 = dry |
-# | **Derived masks** | u (y-face), v (x-face), w (corner, lenient), psi (corner, strict) |
+# | **Derived masks** | u (y-face), v (x-face), xy_corner (lenient), xy_corner_strict |
 # | **Classification** | 4-level: land (0), coast (1), near-coast (2), ocean (3) |
 # | **Stencil capability** | Per-cell count of contiguous wet neighbours in each direction |
 # | **Adaptive stencils** | Mutually-exclusive masks for WENO-5 / TVD-3 / upwind-1 |
-# | **Vorticity flags** | `w_valid`, `w_vertical_bound`, `w_horizontal_bound`, `w_cornerout_bound` |
+# | **Vorticity flags** | `xy_corner_valid`, `xy_corner_y_wall`, `xy_corner_x_wall`, `xy_corner_convex` |
 # | **All-ocean shortcut** | `Mask2D.from_dimensions(ny, nx)` |
 # | **Factory** | `Mask2D.from_mask(h_bool_array)` |

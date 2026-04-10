@@ -236,7 +236,7 @@ the full z-interior is valid, but the horizontal plane follows the same
 
 ## Masks (finitevolX-specific)
 
-* Use `ArakawaCGridMask.from_mask(h)` to derive all staggered masks from a binary h-grid mask.
+* Use `Mask2D.from_mask(h)` to derive all staggered masks from a binary h-grid mask.
 * Construction uses **numpy / scipy** (masks are built once, not traced through JAX JIT).
 * When branching on an optional mask argument, always use `if mask is not None:` — never bare `if mask:`, which raises `ValueError` for JAX arrays.
 

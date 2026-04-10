@@ -1,5 +1,66 @@
 # Changelog
 
+## Unreleased
+
+### Breaking changes — grid and mask submodule restructure
+
+The internal `_src/grid/` and `_src/mask/` packages were reorganised
+to support a layered abstraction over coordinate systems and grid
+dimensions.  Public-API renames are listed below; users who imported
+through the top-level `finitevolx` namespace need to update class
+names but no import-path changes.
+
+**Grid module** (`refactor: restructure into base / cartesian / spherical / cylindrical layout`)
+
+- `ArakawaCGrid1D / 2D / 3D` (the old concrete classes) → renamed to
+  `CartesianGrid1D / 2D / 3D`.
+- `SphericalArakawaCGrid2D / 3D` → renamed to `SphericalGrid2D / 3D`.
+  These are now siblings of `CartesianGrid*` under a common
+  `CurvilinearGrid*` base, *not* subclasses.
+- The names `ArakawaCGrid1D / 2D / 3D` are reused as a new abstract
+  topology layer (just `Nx`, `Ny`, `Nz`).
+- New abstract layer `CurvilinearGrid1D / 2D / 3D` adds the uniform
+  metric (`Lx`, `Ly`, `Lz`, `dx`, `dy`, `dz`).
+- New `CylindricalGrid` stub (TODO).
+- Path moves: `_src/grid/cgrid_mask.py` → `_src/mask/cgrid_mask.py`,
+  `_src/grid/constants.py` → `_src/utils/constants.py`.
+
+**Mask module** (`refactor: split into base / cartesian / spherical / cylindrical`)
+
+- `ArakawaCGridMask` → renamed to `Mask2D`.
+- New `Mask1D` and `Mask3D` concrete classes.  `Mask3D` includes a
+  full vertical face mask (`w`) — see below.
+- `StencilCapability` → split into `StencilCapability1D / 2D / 3D`.
+- `_src/mask/cgrid_mask.py` → split into `_src/mask/{base,cartesian}.py`
+  with TODO stubs at `_src/mask/{spherical,cylindrical}.py`.
+- New `_src/mask/utils.py` with n-D-aware helper primitives
+  (`_pool_bool`, `_dilate`, `_count_contiguous`, `_make_sponge`).
+
+**Mask2D field renames** (frees up `w` for the 3-D vertical face mask):
+
+| Old name              | New name                            |
+|-----------------------|-------------------------------------|
+| `w`                   | `xy_corner` (lenient)               |
+| `psi`                 | `xy_corner_strict` (strict)         |
+| `not_w`, `not_psi`    | `not_xy_corner`, `not_xy_corner_strict` |
+| `w_valid`             | `xy_corner_valid`                   |
+| `w_vertical_bound`    | `xy_corner_y_wall`                  |
+| `w_horizontal_bound`  | `xy_corner_x_wall`                  |
+| `w_cornerout_bound`   | `xy_corner_convex`                  |
+| `psi_irrbound_xids`   | `xy_corner_strict_irrbound_cols`    |
+| `psi_irrbound_yids`   | `xy_corner_strict_irrbound_rows`    |
+
+The last pair also fixes a long-standing naming bug: the old `_xids`
+field stored column indices and `_yids` stored row indices.
+
+**Removed:**
+
+- `Mask2D.distbound1 / distbound2 / distbound3plus` properties — these
+  were exact aliases for `ind_coast / ind_near_coast / ind_ocean`.
+- `visualize_masks()` function — plotting code does not belong in the
+  library.  Equivalent inline code is available in
+  `docs/notebooks/demo_masks.py`.
+
 ## [0.0.39](https://github.com/jejjohnson/finitevolX/compare/v0.0.38...v0.0.39) (2026-03-24)
 
 
@@ -456,7 +517,7 @@
 
 ### Features
 
-* add unified `ArakawaCGridMask`; remove legacy `MaskGrid`/`FaceMask`/`NodeMask`/`CenterMask` ([d11b995](https://github.com/jejjohnson/finitevolX/commit/d11b9951eaced1205c9a1de6fe6a8d4c5b515ac4))
+* add unified `Mask2D`; remove legacy `MaskGrid`/`FaceMask`/`NodeMask`/`CenterMask` ([d11b995](https://github.com/jejjohnson/finitevolX/commit/d11b9951eaced1205c9a1de6fe6a8d4c5b515ac4))
 
 
 ### Bug Fixes
