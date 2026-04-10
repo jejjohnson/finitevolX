@@ -51,130 +51,16 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float, Int
 import numpy as np
-from scipy.ndimage import binary_dilation
+
+from finitevolx._src.mask.utils import (
+    _count_contiguous,
+    _dilate,
+    _make_sponge,
+    _pool_bool,
+)
 
 # jaxtyping dimension variable for irregular-boundary arrays (dynamic size)
 type Nirr = int
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Internal helpers — pure numpy/scipy, used only during construction
-# ──────────────────────────────────────────────────────────────────────────────
-
-
-def _pool2d_bool(h: np.ndarray, ky: int, kx: int, threshold: float) -> np.ndarray:
-    """2-D average-pool of a mask with top/left zero-padding.
-
-    Pads ``(ky-1)`` rows at the top and ``(kx-1)`` cols at the left so the
-    output shape equals the input shape.
-
-        pool[j, i] = mean(h[j-(ky-1) : j+1, i-(kx-1) : i+1]) > threshold
-
-    Parameters
-    ----------
-    h : np.ndarray [Ny, Nx]
-        Input mask (float values in {0, 1}).
-    ky, kx : int
-        Kernel height and width.
-    threshold : float
-        Wet/dry threshold applied to the local mean.
-
-    Returns
-    -------
-    np.ndarray [Ny, Nx] bool
-    """
-    h_padded = np.pad(h.astype(float), ((ky - 1, 0), (kx - 1, 0)))
-    total = np.zeros_like(h, dtype=float)
-    for di in range(ky):
-        for dj in range(kx):
-            total += h_padded[di : di + h.shape[0], dj : dj + h.shape[1]]
-    return total / (ky * kx) > threshold
-
-
-def _dilate2d(mask: np.ndarray) -> np.ndarray:
-    """Binary dilation by 1 cell (4-connectivity, zero boundary condition).
-
-    Uses ``scipy.ndimage.binary_dilation`` with a cross structuring element.
-
-    Parameters
-    ----------
-    mask : np.ndarray [Ny, Nx] bool
-
-    Returns
-    -------
-    np.ndarray [Ny, Nx] bool
-    """
-    struct = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], dtype=bool)
-    return binary_dilation(mask.astype(bool), structure=struct, border_value=0)
-
-
-def _count_contiguous(h: np.ndarray, axis: int, forward: bool) -> np.ndarray:
-    """Count contiguous wet cells from each point along one axis.
-
-    For each cell (j, i) the result is the number of consecutive wet cells
-    starting **at** (j, i) and moving in the chosen direction.  A wet cell
-    at the start counts as 1; a dry cell returns 0.
-
-    Parameters
-    ----------
-    h : np.ndarray [Ny, Nx] bool
-        Wet/dry mask.
-    axis : int
-        0 → y-direction, 1 → x-direction.
-    forward : bool
-        ``True``  → positive-axis direction (+x or +y).
-        ``False`` → negative-axis direction (−x or −y).
-
-    Returns
-    -------
-    np.ndarray [Ny, Nx] int32
-    """
-    h_int = np.asarray(h, dtype=np.int32)
-    Ny, Nx = h_int.shape
-    count = np.zeros_like(h_int)
-
-    if axis == 1:
-        if forward:
-            # scan right-to-left: count[j, i] = h[j, i] * (1 + count[j, i+1])
-            count[:, -1] = h_int[:, -1]
-            for i in range(Nx - 2, -1, -1):
-                count[:, i] = h_int[:, i] * (1 + count[:, i + 1])
-        else:
-            # scan left-to-right: count[j, i] = h[j, i] * (1 + count[j, i-1])
-            count[:, 0] = h_int[:, 0]
-            for i in range(1, Nx):
-                count[:, i] = h_int[:, i] * (1 + count[:, i - 1])
-    elif forward:
-        # scan top-to-bottom (reversed): count[j, i] = h * (1 + count[j+1, i])
-        count[-1, :] = h_int[-1, :]
-        for j in range(Ny - 2, -1, -1):
-            count[j, :] = h_int[j, :] * (1 + count[j + 1, :])
-    else:
-        # scan bottom-to-top: count[j, i] = h * (1 + count[j-1, i])
-        count[0, :] = h_int[0, :]
-        for j in range(1, Ny):
-            count[j, :] = h_int[j, :] * (1 + count[j - 1, :])
-    return count
-
-
-def _make_sponge(Ny: int, Nx: int, width: int) -> np.ndarray:
-    """Linear sponge ramp: 0 at domain walls, 1 at distance ≥ width inside.
-
-    Parameters
-    ----------
-    Ny, Nx : int
-        Grid dimensions.
-    width : int
-        Number of cells over which the ramp rises from 0 to 1.
-
-    Returns
-    -------
-    np.ndarray [Ny, Nx] float32
-    """
-    ix = np.arange(Nx, dtype=np.float32)
-    iy = np.arange(Ny, dtype=np.float32)
-    ramp_x = np.clip(np.minimum(ix, (Nx - 1) - ix) / float(width), 0.0, 1.0)
-    ramp_y = np.clip(np.minimum(iy, (Ny - 1) - iy) / float(width), 0.0, 1.0)
-    return (ramp_y[:, None] * ramp_x[None, :]).astype(np.float32)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -504,13 +390,13 @@ class ArakawaCGridMask(eqx.Module):
 
         # ── staggered masks ───────────────────────────────────────────────
         # u[j, i] = (h[j, i] + h[j-1, i]) / 2 > 3/4  (y-direction)
-        u_np = _pool2d_bool(hf, ky=2, kx=1, threshold=3.0 / 4.0)
+        u_np = _pool_bool(hf, kernel=(2, 1), threshold=3.0 / 4.0)
         # v[j, i] = (h[j, i] + h[j, i-1]) / 2 > 3/4  (x-direction)
-        v_np = _pool2d_bool(hf, ky=1, kx=2, threshold=3.0 / 4.0)
+        v_np = _pool_bool(hf, kernel=(1, 2), threshold=3.0 / 4.0)
         # w[j, i]: at least 1 of 4 SW-corner h-cells is wet  (lenient)
-        w_np = _pool2d_bool(hf, ky=2, kx=2, threshold=1.0 / 8.0)
+        w_np = _pool_bool(hf, kernel=(2, 2), threshold=1.0 / 8.0)
         # psi[j, i]: all 4 SW-corner h-cells are wet          (strict)
-        psi_np = _pool2d_bool(hf, ky=2, kx=2, threshold=7.0 / 8.0)
+        psi_np = _pool_bool(hf, kernel=(2, 2), threshold=7.0 / 8.0)
 
         # ── vorticity boundary classification ─────────────────────────────
         # For w[j, i] at SW corner of h[j, i], the 4 adjacent velocity faces
@@ -546,9 +432,9 @@ class ArakawaCGridMask(eqx.Module):
         # ── land / coast classification ───────────────────────────────────
         # 0 = land, 1 = coast (ocean adj. to land), 2 = near-coast, 3 = ocean
         land = ~h_np
-        land_d1 = _dilate2d(land)
+        land_d1 = _dilate(land)
         coast = h_np & land_d1  # first ring of ocean
-        land_d2 = _dilate2d(land_d1)
+        land_d2 = _dilate(land_d1)
         near_coast = h_np & land_d2 & ~coast  # second ring
         open_ocean = h_np & ~land_d2  # interior ocean
 
@@ -568,7 +454,7 @@ class ArakawaCGridMask(eqx.Module):
                 raise ValueError(
                     f"sponge_width must be non-negative; got {sponge_width!r}"
                 )
-            sponge_np = _make_sponge(Ny, Nx, sponge_width)
+            sponge_np = _make_sponge((Ny, Nx), sponge_width)
 
         return cls(
             h=jnp.asarray(h_np),
