@@ -89,6 +89,7 @@ from finitevolx._src.grid.spherical import (
 from finitevolx._src.mask import (
     Mask1D,
     Mask2D,
+    Mask3D,
     StencilCapability1D,
     StencilCapability2D,
     StencilCapability3D,
@@ -390,6 +391,7 @@ __all__ = [
     # Mask
     "Mask1D",
     "Mask2D",
+    "Mask3D",
     # Boundary condition sets and 1D BCs
     "BoundaryConditionSet",
     "Dirichlet1D",

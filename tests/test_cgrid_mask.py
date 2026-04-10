@@ -1,4 +1,4 @@
-"""Tests for Mask1D / Mask2D and StencilCapability1D / 2D."""
+"""Tests for Mask1D / Mask2D / Mask3D and StencilCapability1D / 2D / 3D."""
 
 import jax.numpy as jnp
 import numpy as np
@@ -7,8 +7,10 @@ import pytest
 from finitevolx._src.mask import (
     Mask1D,
     Mask2D,
+    Mask3D,
     StencilCapability1D,
     StencilCapability2D,
+    StencilCapability3D,
 )
 from finitevolx._src.mask.utils import (
     _count_contiguous,
@@ -858,3 +860,163 @@ class TestStencilCapability1D:
         sc = StencilCapability1D.from_mask(h)
         np.testing.assert_array_equal(np.asarray(sc.x_pos), [0, 0, 0, 0, 0])
         np.testing.assert_array_equal(np.asarray(sc.x_neg), [0, 0, 0, 0, 0])
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Mask3D
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def all_ocean_3d():
+    return Mask3D.from_dimensions(4, 6, 8)
+
+
+@pytest.fixture
+def mask3d_with_island():
+    """6×8×8 domain with a 1-cell ghost border and a single dry interior cell."""
+    h = np.ones((6, 8, 8), dtype=bool)
+    h[0, :, :] = h[-1, :, :] = False
+    h[:, 0, :] = h[:, -1, :] = False
+    h[:, :, 0] = h[:, :, -1] = False
+    h[3, 4, 4] = False  # interior island
+    return h
+
+
+class TestMask3D:
+    def test_from_dimensions_shape(self, all_ocean_3d):
+        m = all_ocean_3d
+        assert m.h.shape == (4, 6, 8)
+        assert m.u.shape == (4, 6, 8)
+        assert m.v.shape == (4, 6, 8)
+        assert m.w.shape == (4, 6, 8)
+        assert m.xy_corner.shape == (4, 6, 8)
+        assert m.xy_corner_strict.shape == (4, 6, 8)
+
+    def test_classification_shape(self, all_ocean_3d):
+        assert all_ocean_3d.classification.shape == (4, 6, 8)
+
+    def test_sponge_is_2d(self, all_ocean_3d):
+        # 2-D horizontal sponge that broadcasts over z
+        assert all_ocean_3d.sponge.shape == (6, 8)
+
+    def test_sponge_with_width_is_2d(self):
+        m = Mask3D.from_dimensions(4, 10, 12, sponge_width=3)
+        assert m.sponge.shape == (10, 12)
+        s = np.asarray(m.sponge)
+        assert s[0, 0] == 0.0  # corner
+        assert s[5, 6] == 1.0  # interior
+
+    def test_stencil_capability_is_3d(self, all_ocean_3d):
+        sc = all_ocean_3d.stencil_capability
+        assert isinstance(sc, StencilCapability3D)
+        # All six counts should have the full 3-D shape
+        for fld in ("x_pos", "x_neg", "y_pos", "y_neg", "z_pos", "z_neg"):
+            assert getattr(sc, fld).shape == (4, 6, 8)
+
+    def test_stencil_capability_z_direction(self, all_ocean_3d):
+        # All-ocean domain: z_pos at k=0 should equal Nz (here 4)
+        sc = all_ocean_3d.stencil_capability
+        np.testing.assert_array_equal(np.asarray(sc.z_pos[0, 3, 4]), 4)
+        np.testing.assert_array_equal(np.asarray(sc.z_neg[3, 3, 4]), 4)
+
+    def test_w_face_lookup(self, mask3d_with_island):
+        m = Mask3D.from_mask(mask3d_with_island)
+        # w[k, j, i] needs h[k, j, i] AND h[k-1, j, i] both wet
+        # The interior island at (3, 4, 4) makes:
+        #   w[3, 4, 4] = h[3, 4, 4] AND h[2, 4, 4] = F AND T → False
+        #   w[4, 4, 4] = h[4, 4, 4] AND h[3, 4, 4] = T AND F → False
+        w = np.asarray(m.w)
+        assert not w[3, 4, 4]
+        assert not w[4, 4, 4]
+        # Cells away from the island have both z-neighbours wet
+        assert w[3, 1, 1]
+
+    def test_island_classification(self, mask3d_with_island):
+        m = Mask3D.from_mask(mask3d_with_island)
+        c = np.asarray(m.classification)
+        # The dry cell is land
+        assert c[3, 4, 4] == 0
+        # Direct neighbours (in any of 6 directions) are coast
+        assert c[3, 3, 4] == 1  # y-neighbour
+        assert c[3, 4, 3] == 1  # x-neighbour
+        assert c[2, 4, 4] == 1  # z-neighbour
+        assert c[4, 4, 4] == 1  # z-neighbour
+        # A cell ≥2 cells from any land (ghost or island) is near-coast or ocean
+        # (2, 3, 3) is min-distance 2 from k=0 ghost; ≥3 from x/y ghosts; 3 from island
+        assert c[2, 3, 3] in (2, 3)
+
+    def test_classification_indicators(self, mask3d_with_island):
+        m = Mask3D.from_mask(mask3d_with_island)
+        np.testing.assert_array_equal(m.ind_land, np.asarray(m.classification == 0))
+        np.testing.assert_array_equal(m.ind_coast, np.asarray(m.classification == 1))
+        np.testing.assert_array_equal(m.ind_ocean, np.asarray(m.classification == 3))
+
+    def test_ind_boundary_covers_all_six_faces(self, all_ocean_3d):
+        b = np.asarray(all_ocean_3d.ind_boundary)
+        # All six faces are boundary
+        assert np.all(b[0, :, :])
+        assert np.all(b[-1, :, :])
+        assert np.all(b[:, 0, :])
+        assert np.all(b[:, -1, :])
+        assert np.all(b[:, :, 0])
+        assert np.all(b[:, :, -1])
+        # Interior is not boundary
+        assert not np.any(b[1:-1, 1:-1, 1:-1])
+
+    def test_irrbound_indices_have_three_components(self, mask3d_with_island):
+        m = Mask3D.from_mask(mask3d_with_island)
+        # All three index arrays must have the same length
+        n = len(m.xy_corner_strict_irrbound_layers)
+        assert len(m.xy_corner_strict_irrbound_rows) == n
+        assert len(m.xy_corner_strict_irrbound_cols) == n
+
+    def test_get_adaptive_masks_x(self, all_ocean_3d):
+        masks = all_ocean_3d.get_adaptive_masks(direction="x", stencil_sizes=(2, 4))
+        assert set(masks.keys()) == {2, 4}
+        sum_mask = sum(np.asarray(m).astype(int) for m in masks.values())
+        assert np.all(sum_mask <= 1)
+
+    def test_get_adaptive_masks_z(self, all_ocean_3d):
+        masks = all_ocean_3d.get_adaptive_masks(direction="z", stencil_sizes=(2, 4))
+        assert set(masks.keys()) == {2, 4}
+
+    def test_get_adaptive_masks_invalid_direction(self, all_ocean_3d):
+        with pytest.raises(ValueError, match="direction must be"):
+            all_ocean_3d.get_adaptive_masks(direction="q")
+
+    def test_k_bottom_optional(self, all_ocean_3d):
+        assert all_ocean_3d.k_bottom is None
+
+    def test_k_bottom_supplied(self):
+        kb = np.full((6, 8), 3, dtype=np.int32)
+        m = Mask3D.from_mask(np.ones((4, 6, 8), dtype=bool), k_bottom=kb)
+        assert m.k_bottom is not None
+        np.testing.assert_array_equal(np.asarray(m.k_bottom), 3)
+
+
+class TestStencilCapability3D:
+    def test_from_mask_all_ocean(self):
+        h = np.ones((3, 4, 5), dtype=bool)
+        sc = StencilCapability3D.from_mask(h)
+        # Top-left corner: x_pos = Nx, y_pos = Ny, z_pos = Nz
+        assert int(sc.x_pos[0, 0, 0]) == 5
+        assert int(sc.y_pos[0, 0, 0]) == 4
+        assert int(sc.z_pos[0, 0, 0]) == 3
+
+    def test_from_mask_with_dry_cell(self):
+        h = np.ones((3, 3, 3), dtype=bool)
+        h[1, 1, 1] = False
+        sc = StencilCapability3D.from_mask(h)
+        assert int(sc.x_pos[1, 1, 1]) == 0
+        assert int(sc.y_pos[1, 1, 1]) == 0
+        assert int(sc.z_pos[1, 1, 1]) == 0
+
+    def test_all_six_directions(self):
+        h = np.ones((3, 3, 3), dtype=bool)
+        sc = StencilCapability3D.from_mask(h)
+        for fld in ("x_pos", "x_neg", "y_pos", "y_neg", "z_pos", "z_neg"):
+            arr = np.asarray(getattr(sc, fld))
+            assert arr.shape == (3, 3, 3)
+            # Every cell should have a positive count (it's all-ocean)
+            assert np.all(arr >= 1)
