@@ -56,7 +56,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 
-from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 
 
@@ -164,21 +164,21 @@ class Diffusion2D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid2D
+    grid : CartesianGrid2D
         The underlying 2-D grid.
 
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from finitevolx import ArakawaCGrid2D, Diffusion2D
-    >>> grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+    >>> from finitevolx import CartesianGrid2D, Diffusion2D
+    >>> grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> diff_op = Diffusion2D(grid=grid)
     >>> h = jnp.ones((grid.Ny, grid.Nx))
     >>> tendency = diff_op(h, kappa=1e-3)  # zero for constant tracer
     >>> flux_x, flux_y = diff_op.fluxes(h, kappa=1e-3)
     """
 
-    grid: ArakawaCGrid2D
+    grid: CartesianGrid2D
 
     def __call__(
         self,
@@ -300,20 +300,20 @@ class Diffusion3D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid3D
+    grid : CartesianGrid3D
         The underlying 3-D grid.
 
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from finitevolx import ArakawaCGrid3D, Diffusion3D
-    >>> grid = ArakawaCGrid3D.from_interior(4, 8, 8, 1.0, 1.0, 1.0)
+    >>> from finitevolx import CartesianGrid3D, Diffusion3D
+    >>> grid = CartesianGrid3D.from_interior(4, 8, 8, 1.0, 1.0, 1.0)
     >>> diff_op = Diffusion3D(grid=grid)
     >>> h = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
     >>> tendency = diff_op(h, kappa=1e-3)  # zero for constant tracer
     """
 
-    grid: ArakawaCGrid3D
+    grid: CartesianGrid3D
 
     def __call__(
         self,
@@ -460,7 +460,7 @@ class BiharmonicDiffusion2D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid2D
+    grid : CartesianGrid2D
         The underlying 2-D grid.
 
     References
@@ -473,8 +473,8 @@ class BiharmonicDiffusion2D(eqx.Module):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from finitevolx import ArakawaCGrid2D, BiharmonicDiffusion2D
-    >>> grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+    >>> from finitevolx import CartesianGrid2D, BiharmonicDiffusion2D
+    >>> grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> op = BiharmonicDiffusion2D(grid=grid)
     >>> h = jnp.ones((grid.Ny, grid.Nx))
     >>> tend = op(h, kappa=1e-6)  # zero for constant field
@@ -482,10 +482,10 @@ class BiharmonicDiffusion2D(eqx.Module):
     (10, 10)
     """
 
-    grid: ArakawaCGrid2D
+    grid: CartesianGrid2D
     _harm: Diffusion2D
 
-    def __init__(self, grid: ArakawaCGrid2D) -> None:
+    def __init__(self, grid: CartesianGrid2D) -> None:
         self.grid = grid
         self._harm = Diffusion2D(grid=grid)
 
@@ -538,14 +538,14 @@ class BiharmonicDiffusion3D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid3D
+    grid : CartesianGrid3D
         The underlying 3-D grid.
 
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from finitevolx import ArakawaCGrid3D, BiharmonicDiffusion3D
-    >>> grid = ArakawaCGrid3D.from_interior(4, 8, 8, 1.0, 1.0, 1.0)
+    >>> from finitevolx import CartesianGrid3D, BiharmonicDiffusion3D
+    >>> grid = CartesianGrid3D.from_interior(4, 8, 8, 1.0, 1.0, 1.0)
     >>> op = BiharmonicDiffusion3D(grid=grid)
     >>> h = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
     >>> tend = op(h, kappa=1e-6)
@@ -553,10 +553,10 @@ class BiharmonicDiffusion3D(eqx.Module):
     (6, 10, 10)
     """
 
-    grid: ArakawaCGrid3D
+    grid: CartesianGrid3D
     _harm: Diffusion3D
 
-    def __init__(self, grid: ArakawaCGrid3D) -> None:
+    def __init__(self, grid: CartesianGrid3D) -> None:
         self.grid = grid
         self._harm = Diffusion3D(grid=grid)
 

@@ -5,9 +5,9 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.grid.spherical_grid import (
-    SphericalArakawaCGrid2D,
-    SphericalArakawaCGrid3D,
+from finitevolx._src.grid.spherical import (
+    SphericalGrid2D,
+    SphericalGrid3D,
 )
 from finitevolx._src.operators.spherical_compound import (
     SphericalDivergence2D,
@@ -26,7 +26,7 @@ NX_INT, NY_INT = 10, 8
 
 @pytest.fixture
 def grid():
-    return SphericalArakawaCGrid2D.from_interior(
+    return SphericalGrid2D.from_interior(
         nx_interior=NX_INT,
         ny_interior=NY_INT,
         lon_range=(0.0, 360.0),
@@ -166,7 +166,7 @@ class TestGeostrophicVelocity:
 class TestSpherical3DCompound:
     @pytest.fixture
     def grid3d(self):
-        return SphericalArakawaCGrid3D.from_interior(
+        return SphericalGrid3D.from_interior(
             nx_interior=NX_INT,
             ny_interior=NY_INT,
             nz_interior=4,

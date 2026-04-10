@@ -69,12 +69,24 @@ from finitevolx._src.diffusion.diffusion import (
     diffusion_2d,
 )
 from finitevolx._src.diffusion.momentum import MomentumAdvection2D, MomentumAdvection3D
-from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask, StencilCapability
-from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
-from finitevolx._src.grid.spherical_grid import (
-    SphericalArakawaCGrid2D,
-    SphericalArakawaCGrid3D,
+from finitevolx._src.grid.base import (
+    ArakawaCGrid1D,
+    ArakawaCGrid2D,
+    ArakawaCGrid3D,
+    CurvilinearGrid1D,
+    CurvilinearGrid2D,
+    CurvilinearGrid3D,
 )
+from finitevolx._src.grid.cartesian import (
+    CartesianGrid1D,
+    CartesianGrid2D,
+    CartesianGrid3D,
+)
+from finitevolx._src.grid.spherical import (
+    SphericalGrid2D,
+    SphericalGrid3D,
+)
+from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask, StencilCapability
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.coriolis import Coriolis2D, Coriolis3D
 from finitevolx._src.operators.diagnostics import (
@@ -354,13 +366,23 @@ __all__ = [
     "arakawa_jacobian",
     # Multilayer vmap helper
     "multilayer",
-    # Grid
+    # Grid — abstract topology
     "ArakawaCGrid1D",
     "ArakawaCGrid2D",
     "ArakawaCGrid3D",
+    # Grid — curvilinear (uniform metric)
+    "CurvilinearGrid1D",
+    "CurvilinearGrid2D",
+    "CurvilinearGrid3D",
+    # Grid — Cartesian concrete
+    "CartesianGrid1D",
+    "CartesianGrid2D",
+    "CartesianGrid3D",
+    # Grid — Spherical concrete
+    "SphericalGrid2D",
+    "SphericalGrid3D",
+    # Mask
     "ArakawaCGridMask",
-    "SphericalArakawaCGrid2D",
-    "SphericalArakawaCGrid3D",
     # Boundary condition sets and 1D BCs
     "BoundaryConditionSet",
     "Dirichlet1D",

@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
 from finitevolx._src.solvers.elliptic import (
     build_capacitance_solver,
     dst1_eigenvalues,

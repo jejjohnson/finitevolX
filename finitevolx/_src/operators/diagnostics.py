@@ -14,7 +14,6 @@ from jaxtyping import (
     Float,
 )
 
-from finitevolx._src.grid.constants import GRAVITY, OMEGA, R_EARTH
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.difference import _curl_2d
 from finitevolx._src.operators.stencils import (
@@ -26,6 +25,7 @@ from finitevolx._src.operators.stencils import (
     diff_y_bwd,
     diff_y_fwd,
 )
+from finitevolx._src.utils.constants import GRAVITY, OMEGA, R_EARTH
 
 # ======================================================================
 # Kinetic energy & Bernoulli potential  (existing)

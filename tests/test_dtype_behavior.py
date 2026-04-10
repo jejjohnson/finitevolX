@@ -15,7 +15,7 @@ import pytest
 
 from finitevolx._src.advection.reconstruction import Reconstruction1D, Reconstruction2D
 from finitevolx._src.diffusion.diffusion import Diffusion2D, diffusion_2d
-from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D
+from finitevolx._src.grid.cartesian import CartesianGrid1D, CartesianGrid2D
 from finitevolx._src.operators.difference import Difference1D, Difference2D
 from finitevolx._src.operators.divergence import Divergence2D, divergence_2d
 from finitevolx._src.operators.interpolation import Interpolation2D
@@ -31,12 +31,12 @@ jax.config.update("jax_enable_x64", True)
 
 @pytest.fixture
 def grid1d():
-    return ArakawaCGrid1D.from_interior(8, 1.0)
+    return CartesianGrid1D.from_interior(8, 1.0)
 
 
 @pytest.fixture
 def grid2d():
-    return ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+    return CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -322,7 +322,7 @@ class TestNoNanOnValidInputs:
 class TestReconstructionNaNRegression:
     """Reconstruction schemes must not produce NaN near sharp discontinuities."""
 
-    def _step_field(self, grid: ArakawaCGrid2D) -> tuple[jnp.ndarray, jnp.ndarray]:
+    def _step_field(self, grid: CartesianGrid2D) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Create a step function and positive velocity field."""
         h = jnp.ones((grid.Ny, grid.Nx))
         # Introduce a step discontinuity in the middle of the domain
@@ -416,7 +416,7 @@ class TestSmallSpacingRobustness:
 
     def test_difference_small_dx_is_finite(self):
         dx = 1e-4
-        grid = ArakawaCGrid2D.from_interior(8, 8, dx * 8, dx * 8)
+        grid = CartesianGrid2D.from_interior(8, 8, dx * 8, dx * 8)
         diff = Difference2D(grid=grid)
         x = jnp.arange(grid.Nx, dtype=float) * grid.dx
         y = jnp.arange(grid.Ny, dtype=float) * grid.dy
@@ -426,7 +426,7 @@ class TestSmallSpacingRobustness:
 
     def test_interpolation_small_dx_is_finite(self):
         dx = 1e-4
-        grid = ArakawaCGrid2D.from_interior(8, 8, dx * 8, dx * 8)
+        grid = CartesianGrid2D.from_interior(8, 8, dx * 8, dx * 8)
         interp = Interpolation2D(grid=grid)
         h = jnp.ones((grid.Ny, grid.Nx))
         result = interp.T_to_U(h)

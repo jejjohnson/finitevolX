@@ -22,7 +22,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 import lineax as lx
 
-from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
 
 # ---------------------------------------------------------------------------
 # Convergence diagnostics

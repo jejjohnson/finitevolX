@@ -15,9 +15,9 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from finitevolx._src.grid.spherical_grid import (
-    SphericalArakawaCGrid2D,
-    SphericalArakawaCGrid3D,
+from finitevolx._src.grid.spherical import (
+    SphericalGrid2D,
+    SphericalGrid3D,
 )
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators._utils import _safe_div_cos
@@ -38,11 +38,11 @@ class SphericalDivergence2D(eqx.Module):
 
     Parameters
     ----------
-    grid : SphericalArakawaCGrid2D
+    grid : SphericalGrid2D
         The underlying 2-D spherical grid.
     """
 
-    grid: SphericalArakawaCGrid2D
+    grid: SphericalGrid2D
 
     def __call__(
         self,
@@ -97,14 +97,14 @@ class SphericalVorticity2D(eqx.Module):
 
     Parameters
     ----------
-    grid : SphericalArakawaCGrid2D
+    grid : SphericalGrid2D
         The underlying 2-D spherical grid.
     """
 
-    grid: SphericalArakawaCGrid2D
+    grid: SphericalGrid2D
     _interp: Interpolation2D
 
-    def __init__(self, grid: SphericalArakawaCGrid2D) -> None:
+    def __init__(self, grid: SphericalGrid2D) -> None:
         self.grid = grid
         self._interp = Interpolation2D(grid=grid)
 
@@ -277,11 +277,11 @@ class SphericalLaplacian2D(eqx.Module):
 
     Parameters
     ----------
-    grid : SphericalArakawaCGrid2D
+    grid : SphericalGrid2D
         The underlying 2-D spherical grid.
     """
 
-    grid: SphericalArakawaCGrid2D
+    grid: SphericalGrid2D
 
     def __call__(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """Laplacian at T-points on a sphere.
@@ -320,7 +320,7 @@ class SphericalLaplacian2D(eqx.Module):
 def geostrophic_velocity_sphere(
     h: Float[Array, "Ny Nx"],
     f: Float[Array, "Ny Nx"],
-    grid: SphericalArakawaCGrid2D,
+    grid: SphericalGrid2D,
     gravity: float = 9.80665,
 ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
     """Geostrophic velocity from free-surface height on a sphere.
@@ -334,7 +334,7 @@ def geostrophic_velocity_sphere(
         Free-surface height at T-points.
     f : Float[Array, "Ny Nx"]
         Coriolis parameter at T-points.
-    grid : SphericalArakawaCGrid2D
+    grid : SphericalGrid2D
         The spherical grid.
     gravity : float
         Gravitational acceleration.
@@ -372,13 +372,13 @@ class SphericalDivergence3D(eqx.Module):
 
     Parameters
     ----------
-    grid : SphericalArakawaCGrid3D
+    grid : SphericalGrid3D
     """
 
-    grid: SphericalArakawaCGrid3D
+    grid: SphericalGrid3D
     _div2d: SphericalDivergence2D
 
-    def __init__(self, grid: SphericalArakawaCGrid3D):
+    def __init__(self, grid: SphericalGrid3D):
         self.grid = grid
         self._div2d = SphericalDivergence2D(grid=grid.horizontal_grid())
 
@@ -396,13 +396,13 @@ class SphericalVorticity3D(eqx.Module):
 
     Parameters
     ----------
-    grid : SphericalArakawaCGrid3D
+    grid : SphericalGrid3D
     """
 
-    grid: SphericalArakawaCGrid3D
+    grid: SphericalGrid3D
     _vort2d: SphericalVorticity2D
 
-    def __init__(self, grid: SphericalArakawaCGrid3D):
+    def __init__(self, grid: SphericalGrid3D):
         self.grid = grid
         self._vort2d = SphericalVorticity2D(grid=grid.horizontal_grid())
 
@@ -420,13 +420,13 @@ class SphericalLaplacian3D(eqx.Module):
 
     Parameters
     ----------
-    grid : SphericalArakawaCGrid3D
+    grid : SphericalGrid3D
     """
 
-    grid: SphericalArakawaCGrid3D
+    grid: SphericalGrid3D
     _lap2d: SphericalLaplacian2D
 
-    def __init__(self, grid: SphericalArakawaCGrid3D):
+    def __init__(self, grid: SphericalGrid3D):
         self.grid = grid
         self._lap2d = SphericalLaplacian2D(grid=grid.horizontal_grid())
 

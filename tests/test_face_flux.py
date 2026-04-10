@@ -18,8 +18,8 @@ import pytest
 
 from finitevolx import (
     Advection2D,
-    ArakawaCGrid2D,
     ArakawaCGridMask,
+    CartesianGrid2D,
     uv_center_flux,
     uv_node_flux,
 )
@@ -38,7 +38,7 @@ def periodic_grid():
     """12x12 periodic-style grid with 2-cell ghost ring."""
     Ny, Nx = 12, 12
     Lx, Ly = 1.0, 1.0
-    grid = ArakawaCGrid2D.from_interior(Nx - 2, Ny - 2, Lx, Ly)
+    grid = CartesianGrid2D.from_interior(Nx - 2, Ny - 2, Lx, Ly)
     return grid, Ny, Nx
 
 
@@ -47,7 +47,7 @@ def large_grid():
     """20x20 grid for convergence tests."""
     Ny, Nx = 20, 20
     Lx, Ly = 1.0, 1.0
-    grid = ArakawaCGrid2D.from_interior(Nx - 2, Ny - 2, Lx, Ly)
+    grid = CartesianGrid2D.from_interior(Nx - 2, Ny - 2, Lx, Ly)
     return grid, Ny, Nx
 
 
@@ -274,7 +274,7 @@ class TestMaskedFlux:
     @pytest.fixture()
     def masked_setup(self):
         Ny, Nx = 16, 16
-        grid = ArakawaCGrid2D.from_interior(Nx - 2, Ny - 2, 1.0, 1.0)
+        grid = CartesianGrid2D.from_interior(Nx - 2, Ny - 2, 1.0, 1.0)
         h_mask = np.ones((Ny, Nx), dtype=bool)
         h_mask[6:10, 6:10] = False  # island
         mask = ArakawaCGridMask.from_mask(h_mask)

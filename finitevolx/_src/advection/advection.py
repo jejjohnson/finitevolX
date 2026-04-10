@@ -23,8 +23,12 @@ from finitevolx._src.advection.reconstruction import (
     Reconstruction2D,
     Reconstruction3D,
 )
-from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
-from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.grid.cartesian import (
+    CartesianGrid1D,
+    CartesianGrid2D,
+    CartesianGrid3D,
+)
+from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
 from finitevolx._src.operators._ghost import interior
 
 # TVD limiter names supported by the advection operators.
@@ -90,13 +94,13 @@ class Advection1D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid1D
+    grid : CartesianGrid1D
     """
 
-    grid: ArakawaCGrid1D
+    grid: CartesianGrid1D
     recon: Reconstruction1D
 
-    def __init__(self, grid: ArakawaCGrid1D) -> None:
+    def __init__(self, grid: CartesianGrid1D) -> None:
         self.grid = grid
         self.recon = Reconstruction1D(grid=grid)
 
@@ -163,13 +167,13 @@ class Advection2D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid2D
+    grid : CartesianGrid2D
     """
 
-    grid: ArakawaCGrid2D
+    grid: CartesianGrid2D
     recon: Reconstruction2D
 
-    def __init__(self, grid: ArakawaCGrid2D) -> None:
+    def __init__(self, grid: CartesianGrid2D) -> None:
         self.grid = grid
         self.recon = Reconstruction2D(grid=grid)
 
@@ -274,13 +278,13 @@ class Advection3D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid3D
+    grid : CartesianGrid3D
     """
 
-    grid: ArakawaCGrid3D
+    grid: CartesianGrid3D
     recon: Reconstruction3D
 
-    def __init__(self, grid: ArakawaCGrid3D) -> None:
+    def __init__(self, grid: CartesianGrid3D) -> None:
         self.grid = grid
         self.recon = Reconstruction3D(grid=grid)
 

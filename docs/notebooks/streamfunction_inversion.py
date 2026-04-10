@@ -82,7 +82,7 @@ IMG_DIR.mkdir(parents=True, exist_ok=True)
 nx, ny = 128, 128
 Lx, Ly = 2e6, 2e6  # 2000 km × 2000 km basin
 
-grid = fvx.ArakawaCGrid2D.from_interior(nx, ny, Lx, Ly)
+grid = fvx.CartesianGrid2D.from_interior(nx, ny, Lx, Ly)
 dx, dy = grid.dx, grid.dy
 
 # Vortex parameters

@@ -31,8 +31,12 @@ from finitevolx._src.advection.weno import (
     weno_9pts as _weno9,
     weno_9pts_right as _weno9_right,
 )
-from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
-from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.grid.cartesian import (
+    CartesianGrid1D,
+    CartesianGrid2D,
+    CartesianGrid3D,
+)
+from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
 from finitevolx._src.operators._ghost import interior
 
 # Small epsilon to avoid division by zero in TVD slope ratios.
@@ -285,10 +289,10 @@ class Reconstruction1D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid1D
+    grid : CartesianGrid1D
     """
 
-    grid: ArakawaCGrid1D
+    grid: CartesianGrid1D
 
     def naive_x(
         self,
@@ -570,10 +574,10 @@ class Reconstruction2D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid2D
+    grid : CartesianGrid2D
     """
 
-    grid: ArakawaCGrid2D
+    grid: CartesianGrid2D
 
     def naive_x(
         self,
@@ -1307,10 +1311,10 @@ class Reconstruction3D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid3D
+    grid : CartesianGrid3D
     """
 
-    grid: ArakawaCGrid3D
+    grid: CartesianGrid3D
 
     def naive_x(
         self,

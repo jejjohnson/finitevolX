@@ -17,7 +17,7 @@ Use :func:`multilayer` to lift any 2D callable (e.g., a bound method of
 
     >>> import jax.numpy as jnp
     >>> import finitevolx as fvx
-    >>> grid = fvx.ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+    >>> grid = fvx.CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> diff2d = fvx.Difference2D(grid=grid)
     >>> h = jnp.ones((4, grid.Ny, grid.Nx))  # 4 layers
     >>> dh_dx = fvx.multilayer(diff2d.diff_x_T_to_U)(h)  # shape [4, Ny, Nx]
@@ -79,7 +79,7 @@ def multilayer(fn: Callable[..., Any]) -> Callable[..., Any]:
 
     >>> import jax.numpy as jnp
     >>> import finitevolx as fvx
-    >>> grid = fvx.ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+    >>> grid = fvx.CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> diff2d = fvx.Difference2D(grid=grid)
     >>> h = jnp.ones((3, grid.Ny, grid.Nx))  # 3 layers
     >>> dh = fvx.multilayer(diff2d.diff_x_T_to_U)(h)

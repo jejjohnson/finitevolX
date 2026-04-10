@@ -22,13 +22,13 @@ jax.config.update("jax_enable_x64", True)
 
 @pytest.fixture
 def grid2d():
-    return fvx.ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+    return fvx.CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
 
 
 @pytest.fixture
 def grid3d():
     # 4 interior z-levels → Nz = 6 total (including ghost layers at k=0, k=5)
-    return fvx.ArakawaCGrid3D.from_interior(8, 8, 4, 1.0, 1.0, 1.0)
+    return fvx.CartesianGrid3D.from_interior(8, 8, 4, 1.0, 1.0, 1.0)
 
 
 class TestMultilayerOutputShape:

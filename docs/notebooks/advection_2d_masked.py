@@ -99,7 +99,7 @@ IMG_DIR.mkdir(parents=True, exist_ok=True)
 # %%
 nx = ny = 64
 Lx = Ly = 1.0
-grid = fvx.ArakawaCGrid2D.from_interior(nx, ny, Lx, Ly)
+grid = fvx.CartesianGrid2D.from_interior(nx, ny, Lx, Ly)
 dx, dy = grid.dx, grid.dy
 Nx, Ny = grid.Nx, grid.Ny
 

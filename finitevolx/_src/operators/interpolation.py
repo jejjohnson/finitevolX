@@ -16,7 +16,11 @@ Half-index notation
 import equinox as eqx
 from jaxtyping import Array, Float
 
-from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.grid.base import (
+    CurvilinearGrid1D,
+    CurvilinearGrid2D,
+    CurvilinearGrid3D,
+)
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.stencils import (
     avg_x_bwd,
@@ -41,11 +45,11 @@ class Interpolation1D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid1D
+    grid : CurvilinearGrid1D
         The underlying 1-D grid.
     """
 
-    grid: ArakawaCGrid1D
+    grid: CurvilinearGrid1D
 
     def T_to_U(self, h: Float[Array, "Nx"]) -> Float[Array, "Nx"]:
         """Interpolate T-point -> U-point (east face).
@@ -89,11 +93,11 @@ class Interpolation2D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid2D
+    grid : CurvilinearGrid2D
         The underlying 2-D grid.
     """
 
-    grid: ArakawaCGrid2D
+    grid: CurvilinearGrid2D
 
     # ------------------------------------------------------------------
     # T-point -> faces / corners
@@ -343,11 +347,11 @@ class Interpolation3D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid3D
+    grid : CurvilinearGrid3D
         The underlying 3-D grid.
     """
 
-    grid: ArakawaCGrid3D
+    grid: CurvilinearGrid3D
 
     def T_to_U(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """T -> U (x-average) over all z-levels.

@@ -9,19 +9,19 @@ import pytest
 
 jax.config.update("jax_enable_x64", True)
 
-from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
-from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
+from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
 from finitevolx._src.operators.coriolis import Coriolis2D, Coriolis3D
 
 
 @pytest.fixture
 def grid2d():
-    return ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+    return CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
 
 
 @pytest.fixture
 def grid3d():
-    return ArakawaCGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+    return CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
 
 
 class TestCoriolis2D:
@@ -258,7 +258,7 @@ class TestCoriolis3D:
 
     def test_consistent_with_2d_per_zlevel(self, grid3d):
         """3-D Coriolis result matches 2-D at each z-level independently."""
-        grid2d = ArakawaCGrid2D.from_interior(
+        grid2d = CartesianGrid2D.from_interior(
             grid3d.Ny - 2, grid3d.Nx - 2, grid3d.Lx, grid3d.Ly
         )
         cor2d = Coriolis2D(grid=grid2d)

@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.grid.grid import ArakawaCGrid2D
+from finitevolx._src.grid.cartesian import CartesianGrid2D
 from finitevolx._src.operators.difference import Difference2D
 from finitevolx._src.operators.divergence import Divergence2D, divergence_2d
 
@@ -16,7 +16,7 @@ jax.config.update("jax_enable_x64", True)
 
 @pytest.fixture
 def grid():
-    return ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+    return CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
 
 
 @pytest.fixture
@@ -137,7 +137,7 @@ class TestDivergence2DClass:
             v =  diff_x_X_to_V(psi)
         are exactly non-divergent at interior T-points.
         """
-        grid = ArakawaCGrid2D.from_interior(16, 16, 2.0 * np.pi, 2.0 * np.pi)
+        grid = CartesianGrid2D.from_interior(16, 16, 2.0 * np.pi, 2.0 * np.pi)
         diff = Difference2D(grid=grid)
         div_op = Divergence2D(grid=grid)
 

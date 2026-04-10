@@ -34,7 +34,7 @@ from spectraldiffx import (
     build_capacitance_solver as _build_capacitance_solver_base,
 )
 
-from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
 
 # Re-export from iterative module
 from finitevolx._src.solvers.iterative import (  # noqa: F401

@@ -8,19 +8,19 @@ import numpy as np
 import pytest
 
 from finitevolx._src.diffusion.diffusion import Diffusion2D, Diffusion3D, diffusion_2d
-from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
 
 jax.config.update("jax_enable_x64", True)
 
 
 @pytest.fixture
 def grid():
-    return ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+    return CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
 
 
 @pytest.fixture
 def grid3d():
-    return ArakawaCGrid3D.from_interior(4, 8, 8, 1.0, 1.0, 1.0)
+    return CartesianGrid3D.from_interior(4, 8, 8, 1.0, 1.0, 1.0)
 
 
 @pytest.fixture
@@ -410,7 +410,7 @@ class TestBiharmonicDiffusion2D:
         N_int = 64
         Lx = 2.0 * float(jnp.pi)
         Ly = 2.0 * float(jnp.pi)
-        grid = ArakawaCGrid2D.from_interior(N_int, N_int, Lx, Ly)
+        grid = CartesianGrid2D.from_interior(N_int, N_int, Lx, Ly)
         op = BiharmonicDiffusion2D(grid=grid)
 
         k1, k4 = 1, 4
@@ -463,7 +463,7 @@ class TestBiharmonicDiffusion2D:
         N_int = 64
         Lx = 2.0 * float(jnp.pi)
         Ly = 2.0 * float(jnp.pi)
-        grid = ArakawaCGrid2D.from_interior(N_int, N_int, Lx, Ly)
+        grid = CartesianGrid2D.from_interior(N_int, N_int, Lx, Ly)
 
         harm_op = Diffusion2D(grid=grid)
         biharm_op = BiharmonicDiffusion2D(grid=grid)

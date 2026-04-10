@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx import ArakawaCGrid2D, Difference2D, Interpolation2D
+from finitevolx import CartesianGrid2D, Difference2D, Interpolation2D
 
 xr = pytest.importorskip("xarray")
 pytest.importorskip("zarr")
@@ -185,7 +185,7 @@ def test_qg_geostrophic_velocity_helper_is_nearly_nondivergent() -> None:
     """The QG streamfunction-to-velocity mapping should preserve incompressibility."""
     module = load_script_module("qg_module", "qg_1p5_layer.py")
     config = module.QuasiGeostrophicConfig(nx=16, ny=16)
-    grid = ArakawaCGrid2D.from_interior(config.nx, config.ny, config.Lx, config.Ly)
+    grid = CartesianGrid2D.from_interior(config.nx, config.ny, config.Lx, config.Ly)
     diff = Difference2D(grid=grid)
     interp = Interpolation2D(grid=grid)
 

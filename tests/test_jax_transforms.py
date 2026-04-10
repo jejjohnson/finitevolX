@@ -13,7 +13,11 @@ import pytest
 
 from finitevolx._src.advection.reconstruction import Reconstruction1D, Reconstruction2D
 from finitevolx._src.diffusion.diffusion import Diffusion2D, diffusion_2d
-from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.grid.cartesian import (
+    CartesianGrid1D,
+    CartesianGrid2D,
+    CartesianGrid3D,
+)
 from finitevolx._src.operators.difference import (
     Difference1D,
     Difference2D,
@@ -36,17 +40,17 @@ jax.config.update("jax_enable_x64", True)
 
 @pytest.fixture
 def grid1d():
-    return ArakawaCGrid1D.from_interior(8, 1.0)
+    return CartesianGrid1D.from_interior(8, 1.0)
 
 
 @pytest.fixture
 def grid2d():
-    return ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+    return CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
 
 
 @pytest.fixture
 def grid3d():
-    return ArakawaCGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+    return CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
 
 
 # ---------------------------------------------------------------------------

@@ -164,7 +164,7 @@ ng = 5  # ghost cells per side (≥ 5 for WENO9)
 
 # --- grid ---
 dx = Lx / nx
-grid = fvx.ArakawaCGrid1D(Nx=nx + 2 * ng, Lx=Lx, dx=dx)
+grid = fvx.CartesianGrid1D(Nx=nx + 2 * ng, Lx=Lx, dx=dx)
 
 # cell-centre coordinates for the physical domain
 x_phys = jnp.linspace(0.5 * dx, Lx - 0.5 * dx, nx)
@@ -447,7 +447,7 @@ for nx_test in resolutions:
     nsteps_test = int(T_final / dt_test)
     dt_test = T_final / nsteps_test
 
-    grid_test = fvx.ArakawaCGrid1D(Nx=nx_test + 2 * ng, Lx=Lx, dx=dx_test)
+    grid_test = fvx.CartesianGrid1D(Nx=nx_test + 2 * ng, Lx=Lx, dx=dx_test)
     advect_test = fvx.Advection1D(grid_test)
     x_test = jnp.linspace(0.5 * dx_test, Lx - 0.5 * dx_test, nx_test)
     u_test = c * jnp.ones(grid_test.Nx)

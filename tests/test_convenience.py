@@ -13,8 +13,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.grid.constants import GRAVITY, OMEGA, R_EARTH
-from finitevolx._src.grid.grid import ArakawaCGrid2D
+from finitevolx._src.grid.cartesian import CartesianGrid2D
 from finitevolx._src.operators.diagnostics import (
     beta_param,
     coriolis_fn,
@@ -28,12 +27,13 @@ from finitevolx._src.operators.diagnostics import (
     sw_potential_vorticity,
     sw_potential_vorticity_multilayer,
 )
+from finitevolx._src.utils.constants import GRAVITY, OMEGA, R_EARTH
 from finitevolx._src.vertical.multilayer import multilayer
 
 
 @pytest.fixture
 def grid2d():
-    return ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+    return CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
 
 
 # ======================================================================

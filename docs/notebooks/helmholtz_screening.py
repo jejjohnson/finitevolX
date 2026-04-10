@@ -237,7 +237,7 @@ plt.show()
 # multi-layer batching.
 
 # %%
-grid = fvx.ArakawaCGrid2D.from_interior(nx, ny, Lx, Ly)
+grid = fvx.CartesianGrid2D.from_interior(nx, ny, Lx, Ly)
 
 # Existing API (uses DST-I internally — regular grid)
 psi_fvx = fvx.pv_inversion(q, dx, dy, lambda_=lam_compare, bc="dst")
