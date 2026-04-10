@@ -990,7 +990,7 @@ def build_multigrid_solver(
     """
     # --- Extract mask as a NumPy float64 array ---
     if isinstance(mask, ArakawaCGridMask):
-        mask_np = np.asarray(mask.psi, dtype=np.float64)
+        mask_np = np.asarray(mask.xy_corner_strict, dtype=np.float64)
     else:
         mask_np = np.asarray(mask, dtype=np.float64)
 

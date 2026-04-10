@@ -155,7 +155,7 @@ class TestStreamfunctionCG:
         )
         assert psi.shape == (Ny, Nx)
         # Should be zero outside the psi mask
-        psi_mask = np.array(cgrid_mask.psi)
+        psi_mask = np.array(cgrid_mask.xy_corner_strict)
         outside = np.array(psi) * (~psi_mask)
         np.testing.assert_allclose(outside, 0.0, atol=1e-12)
 
@@ -228,7 +228,7 @@ class TestStreamfunctionCapacitance:
         psi = streamfunction_from_vorticity(
             rhs, dx, dy, method="capacitance", lambda_=-1.0, capacitance_solver=solver
         )
-        j_b, i_b = _inner_boundary_indices(np.asarray(cgrid_mask.psi))
+        j_b, i_b = _inner_boundary_indices(np.asarray(cgrid_mask.xy_corner_strict))
         bc_vals = psi[j_b, i_b]
         np.testing.assert_allclose(np.array(bc_vals), 0.0, atol=1e-10)
 
@@ -469,7 +469,7 @@ class TestMaskedLaplacianWithCGridMask:
         psi = jnp.sin(jnp.arange(Ny, dtype=float)[:, None]) * jnp.cos(
             jnp.arange(Nx, dtype=float)[None, :]
         )
-        psi_mask_arr = jnp.array(cgrid_mask.psi, dtype=float)
+        psi_mask_arr = jnp.array(cgrid_mask.xy_corner_strict, dtype=float)
         result_arr = masked_laplacian(psi, psi_mask_arr, dx, dy, lambda_=-1.0)
         result_cgrid = masked_laplacian(psi, cgrid_mask, dx, dy, lambda_=-1.0)
         np.testing.assert_allclose(
@@ -502,6 +502,6 @@ class TestCapacitanceSolverWithCGridMask:
         i = jnp.arange(Nx)[None, :]
         rhs = jnp.sin(jnp.pi * j / Ny) * jnp.cos(jnp.pi * i / Nx)
         psi = solver(rhs)
-        j_b, i_b = _inner_boundary_indices(np.asarray(cgrid_mask.psi))
+        j_b, i_b = _inner_boundary_indices(np.asarray(cgrid_mask.xy_corner_strict))
         bc_vals = psi[j_b, i_b]
         np.testing.assert_allclose(np.array(bc_vals), 0.0, atol=1e-10)

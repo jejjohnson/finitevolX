@@ -574,7 +574,7 @@ class TestReconstructValidation:
 
 
 class TestDistboundAccessors:
-    """Test the distbound1/2/3plus properties on ArakawaCGridMask."""
+    """Test the ind_coast/2/3plus properties on ArakawaCGridMask."""
 
     @pytest.fixture()
     def island_mask(self):
@@ -590,10 +590,10 @@ class TestDistboundAccessors:
         return ArakawaCGridMask.from_dimensions(10, 10)
 
     def test_distbound_mutual_exclusion(self, island_mask):
-        """distbound1, distbound2, distbound3plus are mutually exclusive on wet cells."""
-        d1 = island_mask.distbound1
-        d2 = island_mask.distbound2
-        d3 = island_mask.distbound3plus
+        """ind_coast, ind_near_coast, ind_ocean are mutually exclusive on wet cells."""
+        d1 = island_mask.ind_coast
+        d2 = island_mask.ind_near_coast
+        d3 = island_mask.ind_ocean
 
         # No cell should be in more than one category
         overlap_12 = jnp.sum(d1 & d2)
@@ -604,10 +604,10 @@ class TestDistboundAccessors:
         assert int(overlap_23) == 0
 
     def test_distbound_covers_all_wet(self, island_mask):
-        """distbound1 + distbound2 + distbound3plus covers all wet cells."""
-        d1 = island_mask.distbound1
-        d2 = island_mask.distbound2
-        d3 = island_mask.distbound3plus
+        """ind_coast + ind_near_coast + ind_ocean covers all wet cells."""
+        d1 = island_mask.ind_coast
+        d2 = island_mask.ind_near_coast
+        d3 = island_mask.ind_ocean
         wet = island_mask.h
 
         covered = d1 | d2 | d3
@@ -615,22 +615,22 @@ class TestDistboundAccessors:
 
     def test_distbound_aliases_classification(self, island_mask):
         """distbound accessors should be consistent with ind_coast etc."""
-        np.testing.assert_array_equal(island_mask.distbound1, island_mask.ind_coast)
+        np.testing.assert_array_equal(island_mask.ind_coast, island_mask.ind_coast)
         np.testing.assert_array_equal(
-            island_mask.distbound2, island_mask.ind_near_coast
+            island_mask.ind_near_coast, island_mask.ind_near_coast
         )
-        np.testing.assert_array_equal(island_mask.distbound3plus, island_mask.ind_ocean)
+        np.testing.assert_array_equal(island_mask.ind_ocean, island_mask.ind_ocean)
 
     def test_all_ocean_domain(self, all_ocean):
         """All-ocean domain: no coast/near-coast, all cells are ocean."""
-        assert int(jnp.sum(all_ocean.distbound1)) == 0
-        assert int(jnp.sum(all_ocean.distbound2)) == 0
-        # All wet cells should be distbound3plus
-        assert int(jnp.sum(all_ocean.distbound3plus)) == int(jnp.sum(all_ocean.h))
+        assert int(jnp.sum(all_ocean.ind_coast)) == 0
+        assert int(jnp.sum(all_ocean.ind_near_coast)) == 0
+        # All wet cells should be ind_ocean
+        assert int(jnp.sum(all_ocean.ind_ocean)) == int(jnp.sum(all_ocean.h))
 
     def test_island_has_coast_ring(self, island_mask):
         """Island mask should have coast cells surrounding the island."""
-        d1 = island_mask.distbound1
+        d1 = island_mask.ind_coast
         # Coast ring is cells adjacent to the 4x4 island
         assert int(jnp.sum(d1)) > 0
         # Coast cells should be near the island (rows 5-10, cols 5-10 area)
@@ -639,7 +639,7 @@ class TestDistboundAccessors:
 
     def test_stencil_blending_formula(self, island_mask):
         """The distbound masks work for the documented blending formula:
-        flux = flux_1pt * distbound1 + flux_3pt * distbound2 + flux_5pt * distbound3plus
+        flux = flux_1pt * ind_coast + flux_3pt * ind_near_coast + flux_5pt * ind_ocean
         """
         Ny, Nx = island_mask.h.shape
         # Create dummy flux fields
@@ -648,19 +648,19 @@ class TestDistboundAccessors:
         flux_5pt = jnp.ones((Ny, Nx)) * 5.0
 
         blended = (
-            flux_1pt * island_mask.distbound1
-            + flux_3pt * island_mask.distbound2
-            + flux_5pt * island_mask.distbound3plus
+            flux_1pt * island_mask.ind_coast
+            + flux_3pt * island_mask.ind_near_coast
+            + flux_5pt * island_mask.ind_ocean
         )
 
         # At coast cells, value should be 1.0
-        coast_vals = blended[island_mask.distbound1]
+        coast_vals = blended[island_mask.ind_coast]
         np.testing.assert_allclose(coast_vals, 1.0)
         # At near-coast, 3.0
-        near_coast_vals = blended[island_mask.distbound2]
+        near_coast_vals = blended[island_mask.ind_near_coast]
         np.testing.assert_allclose(near_coast_vals, 3.0)
         # At ocean, 5.0
-        ocean_vals = blended[island_mask.distbound3plus]
+        ocean_vals = blended[island_mask.ind_ocean]
         np.testing.assert_allclose(ocean_vals, 5.0)
 
 
@@ -674,7 +674,7 @@ class TestDistboundPhysics:
         h[8:12, 8:12] = False  # island
         mask = ArakawaCGridMask.from_mask(h)
 
-        coast = np.array(mask.distbound1)
+        coast = np.array(mask.ind_coast)
         land = np.array(mask.ind_land)
 
         for j in range(Ny):
@@ -695,13 +695,13 @@ class TestDistboundPhysics:
                     )
 
     def test_near_coast_not_adjacent_to_land(self):
-        """Near-coast cells (distbound2) should NOT be directly adjacent to land."""
+        """Near-coast cells (ind_near_coast) should NOT be directly adjacent to land."""
         Ny, Nx = 20, 20
         h = np.ones((Ny, Nx), dtype=bool)
         h[8:12, 8:12] = False
         mask = ArakawaCGridMask.from_mask(h)
 
-        near_coast = np.array(mask.distbound2)
+        near_coast = np.array(mask.ind_near_coast)
         land = np.array(mask.ind_land)
 
         for j in range(Ny):

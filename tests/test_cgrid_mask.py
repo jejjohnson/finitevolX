@@ -200,7 +200,7 @@ class TestStencilCapability:
 class TestConstruction:
     def test_from_mask_shapes(self, rect_cgrid, rect_mask):
         m = rect_cgrid
-        for arr in (m.h, m.u, m.v, m.w, m.psi):
+        for arr in (m.h, m.u, m.v, m.xy_corner, m.xy_corner_strict):
             assert arr.shape == rect_mask.shape
 
     def test_from_dimensions_all_wet(self, all_ocean):
@@ -217,7 +217,7 @@ class TestConstruction:
     def test_inverted_masks(self, rect_cgrid):
         m = rect_cgrid
         np.testing.assert_array_equal(np.asarray(m.h & m.not_h), False)
-        np.testing.assert_array_equal(np.asarray(m.psi & m.not_psi), False)
+        np.testing.assert_array_equal(np.asarray(m.xy_corner_strict & m.not_xy_corner_strict), False)
 
     def test_top_level_import(self):
         from finitevolx import ArakawaCGridMask as ACM, StencilCapability as SC
@@ -233,7 +233,7 @@ class TestStaggeredMasks:
     def test_psi_subset_of_w(self, rect_cgrid):
         m = rect_cgrid
         # psi (strict) ⊆ w (lenient)
-        assert bool(jnp.all(jnp.where(m.psi, m.w, True)))
+        assert bool(jnp.all(jnp.where(m.xy_corner_strict, m.xy_corner, True)))
 
     def test_u_requires_both_y_neighbours(self):
         # u[j, i] needs h[j, i] and h[j-1, i] both wet
@@ -250,10 +250,10 @@ class TestStaggeredMasks:
         mask[2, 2] = False
         m = ArakawaCGridMask.from_mask(mask)
         # psi[2, 2] uses h[1,1], h[1,2], h[2,1], h[2,2] → h[2,2]=False → False
-        assert not bool(m.psi[2, 2])
-        assert not bool(m.psi[2, 3])
-        assert not bool(m.psi[3, 2])
-        assert not bool(m.psi[3, 3])
+        assert not bool(m.xy_corner_strict[2, 2])
+        assert not bool(m.xy_corner_strict[2, 3])
+        assert not bool(m.xy_corner_strict[3, 2])
+        assert not bool(m.xy_corner_strict[3, 3])
 
 
 # ── vorticity boundary classification ────────────────────────────────────────
@@ -262,18 +262,18 @@ class TestStaggeredMasks:
 class TestVorticityBoundary:
     def test_w_valid_subset_of_w(self, rect_cgrid):
         m = rect_cgrid
-        assert bool(jnp.all(jnp.where(m.w_valid, m.w, True)))
+        assert bool(jnp.all(jnp.where(m.xy_corner_valid, m.xy_corner, True)))
 
     def test_boundary_types_cover_all_wet_w(self, rect_cgrid):
         m = rect_cgrid
-        covered = m.w_valid | m.w_vertical_bound | m.w_horizontal_bound
-        assert bool(jnp.all(jnp.where(m.w, covered, True)))
+        covered = m.xy_corner_valid | m.xy_corner_y_wall | m.xy_corner_x_wall
+        assert bool(jnp.all(jnp.where(m.xy_corner, covered, True)))
 
     def test_cornerout_is_intersection(self, rect_cgrid):
         m = rect_cgrid
-        expected = m.w_vertical_bound & m.w_horizontal_bound
+        expected = m.xy_corner_y_wall & m.xy_corner_x_wall
         np.testing.assert_array_equal(
-            np.asarray(m.w_cornerout_bound), np.asarray(expected)
+            np.asarray(m.xy_corner_convex), np.asarray(expected)
         )
 
 
@@ -283,20 +283,20 @@ class TestVorticityBoundary:
 class TestIrregularBoundary:
     def test_dtype_int32(self, rect_cgrid):
         m = rect_cgrid
-        assert m.psi_irrbound_xids.dtype == jnp.int32
-        assert m.psi_irrbound_yids.dtype == jnp.int32
+        assert m.xy_corner_strict_irrbound_cols.dtype == jnp.int32
+        assert m.xy_corner_strict_irrbound_rows.dtype == jnp.int32
 
     def test_paired_lengths(self, rect_cgrid):
         m = rect_cgrid
-        assert len(m.psi_irrbound_xids) == len(m.psi_irrbound_yids)
+        assert len(m.xy_corner_strict_irrbound_cols) == len(m.xy_corner_strict_irrbound_rows)
 
     def test_within_interior_bounds(self, rect_cgrid):
         m = rect_cgrid
         Ny, Nx = m.h.shape
-        assert bool(jnp.all(m.psi_irrbound_yids >= 1))
-        assert bool(jnp.all(m.psi_irrbound_yids < Ny - 1))
-        assert bool(jnp.all(m.psi_irrbound_xids >= 1))
-        assert bool(jnp.all(m.psi_irrbound_xids < Nx - 1))
+        assert bool(jnp.all(m.xy_corner_strict_irrbound_rows >= 1))
+        assert bool(jnp.all(m.xy_corner_strict_irrbound_rows < Ny - 1))
+        assert bool(jnp.all(m.xy_corner_strict_irrbound_cols >= 1))
+        assert bool(jnp.all(m.xy_corner_strict_irrbound_cols < Nx - 1))
 
 
 # ── land / coast classification ───────────────────────────────────────────────
@@ -487,7 +487,7 @@ class TestStaggeredMaskGeometry:
         h = np.zeros((4, 4), dtype=bool)
         h[1, 1] = True  # single wet cell
         m = ArakawaCGridMask.from_mask(h)
-        w = np.asarray(m.w)
+        w = np.asarray(m.xy_corner)
         # w at corners of h[1,1]: (1,1), (1,2), (2,1), (2,2)
         assert w[1, 1]
         assert w[1, 2]
@@ -498,7 +498,7 @@ class TestStaggeredMaskGeometry:
         h = np.zeros((6, 6), dtype=bool)
         h[1, 1] = True
         m = ArakawaCGridMask.from_mask(h)
-        w = np.asarray(m.w)
+        w = np.asarray(m.xy_corner)
         # w[4,4]: SW corner uses h[3,3], h[3,4], h[4,3], h[4,4] — all dry
         assert not w[4, 4]
 
@@ -506,13 +506,13 @@ class TestStaggeredMaskGeometry:
 
     def test_psi_wet_interior(self, basin6):
         _, m = basin6
-        psi = np.asarray(m.psi)
+        psi = np.asarray(m.xy_corner_strict)
         # psi[2,2]: uses h[1,1], h[1,2], h[2,1], h[2,2] — all wet
         assert psi[2, 2]
 
     def test_psi_dry_at_land_boundary(self, basin6):
         _, m = basin6
-        psi = np.asarray(m.psi)
+        psi = np.asarray(m.xy_corner_strict)
         # psi[1,2]: uses h[0,1] (land) → dry
         assert not psi[1, 2]
 
@@ -542,27 +542,27 @@ class TestVorticityBoundaryGeometry:
         h[0, :] = h[-1, :] = False
         return ArakawaCGridMask.from_mask(h)
 
-    # ── w_valid: all 4 adjacent velocity faces wet ────────────────────
+    # ── xy_corner_valid: all 4 adjacent velocity faces wet ────────────────────
 
     def test_w_valid_deep_interior(self, basin8):
         m = basin8
         # w[4,4] is deep interior — all 4 adjacent faces should be wet
-        assert bool(m.w_valid[4, 4])
+        assert bool(m.xy_corner_valid[4, 4])
 
     def test_w_valid_not_at_boundary(self, basin8):
         m = basin8
         # w[1,2] is near the bottom wall — u[1,2] is dry → not valid
-        assert not bool(m.w_valid[1, 2])
+        assert not bool(m.xy_corner_valid[1, 2])
 
     def test_w_valid_checks_correct_four_faces(self):
         """Build a domain where only the correct adjacency passes."""
         # 5x5, all ocean except h[2,2] = land.
-        # This makes specific u/v faces dry, testing that w_valid checks
+        # This makes specific u/v faces dry, testing that xy_corner_valid checks
         # the right 4 faces (not shifted ones).
         h = np.ones((5, 5), dtype=bool)
         h[2, 2] = False
         m = ArakawaCGridMask.from_mask(h)
-        va = np.asarray(m.w_valid)
+        va = np.asarray(m.xy_corner_valid)
 
         # w[3,3]: SW corner of cell (3,3). Adjacent faces:
         #   u[3,3] = mean(h[2,3], h[3,3]) = mean(1,1) → wet
@@ -595,7 +595,7 @@ class TestVorticityBoundaryGeometry:
         h = np.ones((5, 5), dtype=bool)
         h[3, 1] = False  # makes u[3,1] dry and u[4,1] dry, v[3,1] dry, v[3,2] dry
         m = ArakawaCGridMask.from_mask(h)
-        va = np.asarray(m.w_valid)
+        va = np.asarray(m.xy_corner_valid)
         u = np.asarray(m.u)
         v = np.asarray(m.v)
 
@@ -617,18 +617,18 @@ class TestVorticityBoundaryGeometry:
         m = channel8
         # w[4,4] is in the interior of a channel → should be valid
         # (checking i≥2 to avoid left-padding artifacts)
-        assert bool(m.w_valid[4, 4])
+        assert bool(m.xy_corner_valid[4, 4])
 
     def test_channel_near_wall_not_valid(self, channel8):
         m = channel8
         # w[1,4] is near the bottom wall (j=0 is land)
         # u[1,4] = mean(h[0,4], h[1,4]) = mean(0,1) → dry
-        assert not bool(m.w_valid[1, 4])
+        assert not bool(m.xy_corner_valid[1, 4])
 
     def test_channel_horizontal_bound_near_wall(self, channel8):
         m = channel8
         # w[1,4]: u[1,4] is dry → horizontal boundary
-        assert bool(m.w_horizontal_bound[1, 4])
+        assert bool(m.xy_corner_x_wall[1, 4])
 
 
 class TestIrregularBoundaryGeometry:
@@ -640,9 +640,9 @@ class TestIrregularBoundaryGeometry:
         h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
         h[4:7, 4:7] = False
         m = ArakawaCGridMask.from_mask(h)
-        psi = np.asarray(m.psi)
-        yids = np.asarray(m.psi_irrbound_yids)
-        xids = np.asarray(m.psi_irrbound_xids)
+        psi = np.asarray(m.xy_corner_strict)
+        yids = np.asarray(m.xy_corner_strict_irrbound_rows)
+        xids = np.asarray(m.xy_corner_strict_irrbound_cols)
         for y, x in zip(yids, xids, strict=True):
             assert not psi[y, x], f"psi[{y},{x}] should be dry"
 
@@ -652,9 +652,9 @@ class TestIrregularBoundaryGeometry:
         h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
         h[4:7, 4:7] = False
         m = ArakawaCGridMask.from_mask(h)
-        psi = np.asarray(m.psi)
-        yids = np.asarray(m.psi_irrbound_yids)
-        xids = np.asarray(m.psi_irrbound_xids)
+        psi = np.asarray(m.xy_corner_strict)
+        yids = np.asarray(m.xy_corner_strict_irrbound_rows)
+        xids = np.asarray(m.xy_corner_strict_irrbound_cols)
         Ny, Nx = psi.shape
         for y, x in zip(yids, xids, strict=True):
             patch = psi[
@@ -669,8 +669,8 @@ class TestIrregularBoundaryGeometry:
         h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
         m = ArakawaCGridMask.from_mask(h)
         Ny, Nx = h.shape
-        yids = np.asarray(m.psi_irrbound_yids)
-        xids = np.asarray(m.psi_irrbound_xids)
+        yids = np.asarray(m.xy_corner_strict_irrbound_rows)
+        xids = np.asarray(m.xy_corner_strict_irrbound_cols)
         assert np.all(yids >= 1) and np.all(yids < Ny - 1)
         assert np.all(xids >= 1) and np.all(xids < Nx - 1)
 

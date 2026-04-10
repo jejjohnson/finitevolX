@@ -123,9 +123,11 @@ class StencilCapability(eqx.Module):
 class ArakawaCGridMask(eqx.Module):
     """Unified Arakawa C-grid mask for a 2-D domain.
 
-    Stores binary masks on all five Arakawa C-grid staggerings (h, u, v, w,
-    psi), boundary-type flags for vorticity cells, irregular-boundary indices,
-    a 4-level land/coast classification, directional stencil capability, and
+    Stores binary masks on all five Arakawa C-grid staggerings (cell
+    centre ``h``, x-face ``u``, y-face ``v``, xy-corner lenient
+    ``xy_corner``, xy-corner strict ``xy_corner_strict``), boundary-type
+    flags for the corner cells, irregular-boundary indices, a 4-level
+    land/coast classification, directional stencil capability, and
     optional sponge/bathymetry arrays.
 
     Construct via one of the factory class-methods:
@@ -142,28 +144,31 @@ class ArakawaCGridMask(eqx.Module):
         y-face wet mask  [kernel (2,1) from h, threshold 3/4].
     v : Bool[Array, "Ny Nx"]
         x-face wet mask  [kernel (1,2) from h, threshold 3/4].
-    w : Bool[Array, "Ny Nx"]
-        Corner wet mask (lenient)  [kernel (2,2) from h, threshold 1/8].
-    psi : Bool[Array, "Ny Nx"]
-        Corner wet mask (strict)   [kernel (2,2) from h, threshold 7/8].
-    not_h, not_u, not_v, not_w, not_psi : Bool[Array, "Ny Nx"]
+    xy_corner : Bool[Array, "Ny Nx"]
+        xy-corner wet mask, lenient (≥1 of 4 surrounding h-cells wet)
+        [kernel (2,2) from h, threshold 1/8].
+    xy_corner_strict : Bool[Array, "Ny Nx"]
+        xy-corner wet mask, strict (all 4 surrounding h-cells wet)
+        [kernel (2,2) from h, threshold 7/8].
+    not_h, not_u, not_v, not_xy_corner, not_xy_corner_strict : Bool[Array, "Ny Nx"]
         Logical inverses of the corresponding masks.
-    w_vertical_bound : Bool[Array, "Ny Nx"]
-        Vorticity cells on a vertical (y-direction) boundary: wet w cell
-        where at least one y-adjacent u-face is dry.
-    w_horizontal_bound : Bool[Array, "Ny Nx"]
-        Vorticity cells on a horizontal (x-direction) boundary: wet w cell
-        where at least one x-adjacent v-face is dry.
-    w_cornerout_bound : Bool[Array, "Ny Nx"]
-        Vorticity cells at convex corners (both types of boundary).
-    w_valid : Bool[Array, "Ny Nx"]
-        Interior vorticity cells (wet w, all 4 adjacent faces wet).
-    psi_irrbound_xids : Int[Array, "Nirr"]
-        Row (j) indices of irregular-boundary psi cells in the interior
-        ``[1:-1, 1:-1]``: dry psi cells that neighbour at least one wet psi
-        cell in their 3×3 neighbourhood.
-    psi_irrbound_yids : Int[Array, "Nirr"]
-        Column (i) indices paired with ``psi_irrbound_xids``.
+    xy_corner_y_wall : Bool[Array, "Ny Nx"]
+        xy-corner cells on a y-direction wall: wet xy_corner cell where
+        at least one y-adjacent v-face is dry.
+    xy_corner_x_wall : Bool[Array, "Ny Nx"]
+        xy-corner cells on an x-direction wall: wet xy_corner cell where
+        at least one x-adjacent u-face is dry.
+    xy_corner_convex : Bool[Array, "Ny Nx"]
+        xy-corner cells at convex corners (on both x- and y-walls).
+    xy_corner_valid : Bool[Array, "Ny Nx"]
+        Interior xy-corner cells: wet ``xy_corner`` with all 4 adjacent
+        faces wet.
+    xy_corner_strict_irrbound_rows : Int[Array, "Nirr"]
+        Row (j) indices of irregular-boundary ``xy_corner_strict`` cells
+        in the interior ``[1:-1, 1:-1]``: dry corner cells that
+        neighbour at least one wet corner cell in their 3×3 neighbourhood.
+    xy_corner_strict_irrbound_cols : Int[Array, "Nirr"]
+        Column (i) indices paired with ``xy_corner_strict_irrbound_rows``.
     classification : Int[Array, "Ny Nx"]
         4-level integer classification: 0 = land, 1 = coast, 2 = near-coast,
         3 = open ocean.
@@ -180,25 +185,25 @@ class ArakawaCGridMask(eqx.Module):
     h: Bool[Array, "Ny Nx"]
     u: Bool[Array, "Ny Nx"]
     v: Bool[Array, "Ny Nx"]
-    w: Bool[Array, "Ny Nx"]
-    psi: Bool[Array, "Ny Nx"]
+    xy_corner: Bool[Array, "Ny Nx"]
+    xy_corner_strict: Bool[Array, "Ny Nx"]
 
     # ── inverted masks ────────────────────────────────────────────────────────
     not_h: Bool[Array, "Ny Nx"]
     not_u: Bool[Array, "Ny Nx"]
     not_v: Bool[Array, "Ny Nx"]
-    not_w: Bool[Array, "Ny Nx"]
-    not_psi: Bool[Array, "Ny Nx"]
+    not_xy_corner: Bool[Array, "Ny Nx"]
+    not_xy_corner_strict: Bool[Array, "Ny Nx"]
 
-    # ── vorticity boundary classification ─────────────────────────────────────
-    w_vertical_bound: Bool[Array, "Ny Nx"]
-    w_horizontal_bound: Bool[Array, "Ny Nx"]
-    w_cornerout_bound: Bool[Array, "Ny Nx"]
-    w_valid: Bool[Array, "Ny Nx"]
+    # ── corner boundary classification ────────────────────────────────────────
+    xy_corner_y_wall: Bool[Array, "Ny Nx"]
+    xy_corner_x_wall: Bool[Array, "Ny Nx"]
+    xy_corner_convex: Bool[Array, "Ny Nx"]
+    xy_corner_valid: Bool[Array, "Ny Nx"]
 
     # ── irregular boundary indices (dynamic shape — do not use inside jit) ───
-    psi_irrbound_xids: Int[Array, Nirr]
-    psi_irrbound_yids: Int[Array, Nirr]
+    xy_corner_strict_irrbound_rows: Int[Array, Nirr]
+    xy_corner_strict_irrbound_cols: Int[Array, Nirr]
 
     # ── land/coast classification ─────────────────────────────────────────────
     classification: Int[Array, "Ny Nx"]
@@ -243,35 +248,6 @@ class ArakawaCGridMask(eqx.Module):
         bnd = bnd.at[:, -1].set(True)
         return bnd
 
-    # ── distbound accessors for stencil blending ────────────────────────────────
-
-    @property
-    def distbound1(self) -> Bool[Array, "Ny Nx"]:
-        """Cells exactly 1 wet cell from land (coast).
-
-        At these cells only a 1st-order (2-point) upwind stencil is safe.
-        Corresponds to ``classification == 1``.
-        """
-        return self.classification == 1
-
-    @property
-    def distbound2(self) -> Bool[Array, "Ny Nx"]:
-        """Cells exactly 2 wet cells from land (near-coast).
-
-        At these cells a 3-point stencil (WENO3 / TVD) fits but not wider.
-        Corresponds to ``classification == 2``.
-        """
-        return self.classification == 2
-
-    @property
-    def distbound3plus(self) -> Bool[Array, "Ny Nx"]:
-        """Cells 3 or more wet cells from land (open ocean).
-
-        At these cells a 5-point or wider stencil is available.
-        Corresponds to ``classification == 3``.
-        """
-        return self.classification == 3
-
     # ── adaptive WENO stencil masks ───────────────────────────────────────────
 
     def get_adaptive_masks(
@@ -302,7 +278,7 @@ class ArakawaCGridMask(eqx.Module):
         ----------
         direction : {'x', 'y'}
             Reconstruction direction.
-        source : {'h', 'u', 'v', 'w', 'psi'}
+        source : {'h', 'u', 'v', 'xy_corner', 'xy_corner_strict'}
             Source grid whose stencil capability to use.
         stencil_sizes : sequence of int
             Ordered candidate stencil sizes (even integers).
@@ -339,14 +315,14 @@ class ArakawaCGridMask(eqx.Module):
 
         Parameters
         ----------
-        source : {'h', 'u', 'v', 'w', 'psi'}
+        source : {'h', 'u', 'v', 'xy_corner', 'xy_corner_strict'}
         """
         grid_map = {
             "h": self.h,
             "u": self.u,
             "v": self.v,
-            "w": self.w,
-            "psi": self.psi,
+            "xy_corner": self.xy_corner,
+            "xy_corner_strict": self.xy_corner_strict,
         }
         if source not in grid_map:
             raise ValueError(
@@ -393,34 +369,38 @@ class ArakawaCGridMask(eqx.Module):
         u_np = _pool_bool(hf, kernel=(2, 1), threshold=3.0 / 4.0)
         # v[j, i] = (h[j, i] + h[j, i-1]) / 2 > 3/4  (x-direction)
         v_np = _pool_bool(hf, kernel=(1, 2), threshold=3.0 / 4.0)
-        # w[j, i]: at least 1 of 4 SW-corner h-cells is wet  (lenient)
-        w_np = _pool_bool(hf, kernel=(2, 2), threshold=1.0 / 8.0)
-        # psi[j, i]: all 4 SW-corner h-cells are wet          (strict)
-        psi_np = _pool_bool(hf, kernel=(2, 2), threshold=7.0 / 8.0)
+        # xy_corner[j, i]: at least 1 of 4 SW-corner h-cells wet  (lenient)
+        xy_corner_np = _pool_bool(hf, kernel=(2, 2), threshold=1.0 / 8.0)
+        # xy_corner_strict[j, i]: all 4 SW-corner h-cells wet     (strict)
+        xy_corner_strict_np = _pool_bool(hf, kernel=(2, 2), threshold=7.0 / 8.0)
 
-        # ── vorticity boundary classification ─────────────────────────────
-        # For w[j, i] at SW corner of h[j, i], the 4 adjacent velocity faces
-        # are u[j,i] (east), u[j,i-1] (west), v[j,i] (north), v[j-1,i] (south).
+        # ── corner boundary classification ────────────────────────────────
+        # For xy_corner[j, i] at SW corner of h[j, i], the 4 adjacent
+        # velocity faces are u[j,i] (east), u[j,i-1] (west), v[j,i] (north),
+        # v[j-1,i] (south).
         u_west = np.pad(u_np[:, :-1], ((0, 0), (1, 0)))  # u[j, i-1]
         v_south = np.pad(v_np[:-1, :], ((1, 0), (0, 0)))  # v[j-1, i]
 
-        # vertical boundary: wall along y → v-face (north or south) dry
-        w_vb = w_np & (~v_np | ~v_south)
-        # horizontal boundary: wall along x → u-face (east or west) dry
-        w_hb = w_np & (~u_np | ~u_west)
-        w_co = w_vb & w_hb  # corner-out: both
-        w_va = w_np & u_np & u_west & v_np & v_south  # valid interior
+        # y-wall: v-face (north or south) dry
+        xy_corner_y_wall = xy_corner_np & (~v_np | ~v_south)
+        # x-wall: u-face (east or west) dry
+        xy_corner_x_wall = xy_corner_np & (~u_np | ~u_west)
+        # convex corner: both walls present
+        xy_corner_convex = xy_corner_y_wall & xy_corner_x_wall
+        # valid interior corner: all 4 adjacent faces wet
+        xy_corner_valid = xy_corner_np & u_np & u_west & v_np & v_south
 
-        # ── irregular psi boundary indices ────────────────────────────────
-        # Dry psi cells in [1:-1, 1:-1] with >=1 wet psi cell in 3x3 hood.
-        psif = psi_np.astype(np.float32)
+        # ── irregular xy_corner_strict boundary indices ───────────────────
+        # Dry xy_corner_strict cells in [1:-1, 1:-1] with >=1 wet
+        # xy_corner_strict cell in their 3x3 neighbourhood.
+        psif = xy_corner_strict_np.astype(np.float32)
         if Ny >= 3 and Nx >= 3:
             pool3 = np.zeros((Ny - 2, Nx - 2), dtype=np.float32)
             for di in range(3):
                 for dj in range(3):
                     pool3 += psif[di : Ny - 2 + di, dj : Nx - 2 + dj]
             pool3 /= 9.0
-            irrbound = (~psi_np[1:-1, 1:-1]) & (pool3 > 1.0 / 18.0)
+            irrbound = (~xy_corner_strict_np[1:-1, 1:-1]) & (pool3 > 1.0 / 18.0)
             rows, cols = np.where(irrbound)
             # Map back from interior slice to full-array coordinates.
             rows = rows + 1
@@ -460,19 +440,19 @@ class ArakawaCGridMask(eqx.Module):
             h=jnp.asarray(h_np),
             u=jnp.asarray(u_np),
             v=jnp.asarray(v_np),
-            w=jnp.asarray(w_np),
-            psi=jnp.asarray(psi_np),
+            xy_corner=jnp.asarray(xy_corner_np),
+            xy_corner_strict=jnp.asarray(xy_corner_strict_np),
             not_h=jnp.asarray(~h_np),
             not_u=jnp.asarray(~u_np),
             not_v=jnp.asarray(~v_np),
-            not_w=jnp.asarray(~w_np),
-            not_psi=jnp.asarray(~psi_np),
-            w_vertical_bound=jnp.asarray(w_vb),
-            w_horizontal_bound=jnp.asarray(w_hb),
-            w_cornerout_bound=jnp.asarray(w_co),
-            w_valid=jnp.asarray(w_va),
-            psi_irrbound_yids=jnp.asarray(rows.astype(np.int32)),
-            psi_irrbound_xids=jnp.asarray(cols.astype(np.int32)),
+            not_xy_corner=jnp.asarray(~xy_corner_np),
+            not_xy_corner_strict=jnp.asarray(~xy_corner_strict_np),
+            xy_corner_y_wall=jnp.asarray(xy_corner_y_wall),
+            xy_corner_x_wall=jnp.asarray(xy_corner_x_wall),
+            xy_corner_convex=jnp.asarray(xy_corner_convex),
+            xy_corner_valid=jnp.asarray(xy_corner_valid),
+            xy_corner_strict_irrbound_rows=jnp.asarray(rows.astype(np.int32)),
+            xy_corner_strict_irrbound_cols=jnp.asarray(cols.astype(np.int32)),
             classification=jnp.asarray(classification),
             stencil_capability=sc,
             sponge=jnp.asarray(sponge_np),
@@ -526,51 +506,3 @@ class ArakawaCGridMask(eqx.Module):
         ArakawaCGridMask
         """
         return cls.from_mask(np.ones((ny, nx), dtype=bool), sponge_width=sponge_width)
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Optional visualisation
-# ──────────────────────────────────────────────────────────────────────────────
-
-
-def visualize_masks(
-    masks: ArakawaCGridMask,
-    figsize: tuple[int, int] = (14, 10),
-) -> None:
-    """Plot the five staggered masks plus the land/coast classification.
-
-    Requires ``matplotlib``.
-
-    Parameters
-    ----------
-    masks : ArakawaCGridMask
-        Mask object to visualise.
-    figsize : tuple[int, int]
-        Figure size passed to ``plt.subplots``.
-    """
-    try:
-        import matplotlib.pyplot as plt
-    except ImportError as exc:
-        raise ImportError(
-            "matplotlib is required for visualize_masks(). "
-            "Install it with: pip install matplotlib"
-        ) from exc
-
-    fields = {
-        "h (centre)": masks.h,
-        "u (y-face)": masks.u,
-        "v (x-face)": masks.v,
-        "w (corner, lenient)": masks.w,
-        "psi (corner, strict)": masks.psi,
-        "classification": masks.classification,
-    }
-    fig, axes = plt.subplots(2, 3, figsize=figsize)
-    for ax, (title, data) in zip(axes.ravel(), fields.items(), strict=True):
-        ax.imshow(
-            np.asarray(data), origin="lower", interpolation="nearest", cmap="viridis"
-        )
-        ax.set_title(title)
-        ax.axis("off")
-    fig.suptitle("ArakawaCGridMask", fontsize=14)
-    plt.tight_layout()
-    plt.show()

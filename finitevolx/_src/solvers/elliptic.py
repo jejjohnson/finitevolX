@@ -179,7 +179,7 @@ def build_capacitance_solver(
         A callable equinox Module with all precomputed arrays baked in.
     """
     if isinstance(mask, ArakawaCGridMask):
-        mask = np.asarray(mask.psi, dtype=bool)
+        mask = np.asarray(mask.xy_corner_strict, dtype=bool)
     return _build_capacitance_solver_base(mask, dx, dy, lambda_, base_bc)
 
 
@@ -199,7 +199,7 @@ def _resolve_mask_arr(
     if mask is None:
         return None
     if isinstance(mask, ArakawaCGridMask):
-        return jnp.asarray(mask.psi, dtype=jnp.float32)
+        return jnp.asarray(mask.xy_corner_strict, dtype=jnp.float32)
     return mask
 
 
