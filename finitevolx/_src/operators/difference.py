@@ -19,6 +19,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
+from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
 from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.stencils import (
@@ -150,7 +151,11 @@ class Difference2D(eqx.Module):
     # Forward differences
     # ------------------------------------------------------------------
 
-    def diff_x_T_to_U(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def diff_x_T_to_U(
+        self,
+        h: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Ny Nx"]:
         """Forward x-difference: T-point -> U-point.
 
         dh_dx[j, i+1/2] = (h[j, i+1] - h[j, i]) / dx
@@ -159,6 +164,9 @@ class Difference2D(eqx.Module):
         ----------
         h : Float[Array, "Ny Nx"]
             Scalar field at T-points.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, the U-point output is
+            multiplied by ``mask.u`` (post-compute zero by output stagger).
 
         Returns
         -------
@@ -166,9 +174,15 @@ class Difference2D(eqx.Module):
             Forward x-difference at U-points.
         """
         out = interior(diff_x_fwd(h) / self.grid.dx, h)
+        if mask is not None:
+            out = out * mask.u
         return out
 
-    def diff_y_T_to_V(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def diff_y_T_to_V(
+        self,
+        h: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Ny Nx"]:
         """Forward y-difference: T-point -> V-point.
 
         dh_dy[j+1/2, i] = (h[j+1, i] - h[j, i]) / dy
@@ -177,6 +191,9 @@ class Difference2D(eqx.Module):
         ----------
         h : Float[Array, "Ny Nx"]
             Scalar field at T-points.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, the V-point output is
+            multiplied by ``mask.v`` (post-compute zero by output stagger).
 
         Returns
         -------
@@ -184,9 +201,15 @@ class Difference2D(eqx.Module):
             Forward y-difference at V-points.
         """
         out = interior(diff_y_fwd(h) / self.grid.dy, h)
+        if mask is not None:
+            out = out * mask.v
         return out
 
-    def diff_y_U_to_X(self, u: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def diff_y_U_to_X(
+        self,
+        u: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Ny Nx"]:
         """Forward y-difference: U-point -> X-point (corner).
 
         du_dy[j+1/2, i+1/2] = (u[j+1, i+1/2] - u[j, i+1/2]) / dy
@@ -195,6 +218,9 @@ class Difference2D(eqx.Module):
         ----------
         u : Float[Array, "Ny Nx"]
             Velocity field at U-points.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, the corner-point output
+            is multiplied by ``mask.psi`` (strict 4-of-4 corner mask).
 
         Returns
         -------
@@ -202,9 +228,15 @@ class Difference2D(eqx.Module):
             Forward y-difference at X-points.
         """
         out = interior(diff_y_fwd(u) / self.grid.dy, u)
+        if mask is not None:
+            out = out * mask.psi
         return out
 
-    def diff_x_V_to_X(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def diff_x_V_to_X(
+        self,
+        v: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Ny Nx"]:
         """Forward x-difference: V-point -> X-point (corner).
 
         dv_dx[j+1/2, i+1/2] = (v[j+1/2, i+1] - v[j+1/2, i]) / dx
@@ -213,6 +245,9 @@ class Difference2D(eqx.Module):
         ----------
         v : Float[Array, "Ny Nx"]
             Velocity field at V-points.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, the corner-point output
+            is multiplied by ``mask.psi`` (strict 4-of-4 corner mask).
 
         Returns
         -------
@@ -220,9 +255,15 @@ class Difference2D(eqx.Module):
             Forward x-difference at X-points.
         """
         out = interior(diff_x_fwd(v) / self.grid.dx, v)
+        if mask is not None:
+            out = out * mask.psi
         return out
 
-    def diff_y_X_to_U(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def diff_y_X_to_U(
+        self,
+        q: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Ny Nx"]:
         """Backward y-difference: X-point -> U-point.
 
         dq_dy[j, i] = (q[j+1/2, i+1/2] - q[j-1/2, i+1/2]) / dy
@@ -231,6 +272,9 @@ class Difference2D(eqx.Module):
         ----------
         q : Float[Array, "Ny Nx"]
             Scalar field at X-points.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, the U-point output is
+            multiplied by ``mask.u``.
 
         Returns
         -------
@@ -238,9 +282,15 @@ class Difference2D(eqx.Module):
             Backward y-difference at U-points.
         """
         out = interior(diff_y_bwd(q) / self.grid.dy, q)
+        if mask is not None:
+            out = out * mask.u
         return out
 
-    def diff_x_X_to_V(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def diff_x_X_to_V(
+        self,
+        q: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Ny Nx"]:
         """Backward x-difference: X-point -> V-point.
 
         dq_dx[j, i] = (q[j+1/2, i+1/2] - q[j+1/2, i-1/2]) / dx
@@ -249,6 +299,9 @@ class Difference2D(eqx.Module):
         ----------
         q : Float[Array, "Ny Nx"]
             Scalar field at X-points.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, the V-point output is
+            multiplied by ``mask.v``.
 
         Returns
         -------
@@ -256,13 +309,19 @@ class Difference2D(eqx.Module):
             Backward x-difference at V-points.
         """
         out = interior(diff_x_bwd(q) / self.grid.dx, q)
+        if mask is not None:
+            out = out * mask.v
         return out
 
     # ------------------------------------------------------------------
     # Backward differences
     # ------------------------------------------------------------------
 
-    def diff_x_U_to_T(self, u: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def diff_x_U_to_T(
+        self,
+        u: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Ny Nx"]:
         """Backward x-difference: U-point -> T-point.
 
         du_dx[j, i] = (u[j, i+1/2] - u[j, i-1/2]) / dx
@@ -271,6 +330,9 @@ class Difference2D(eqx.Module):
         ----------
         u : Float[Array, "Ny Nx"]
             Velocity field at U-points.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, the T-point output is
+            multiplied by ``mask.h``.
 
         Returns
         -------
@@ -278,9 +340,15 @@ class Difference2D(eqx.Module):
             Backward x-difference at T-points.
         """
         out = interior(diff_x_bwd(u) / self.grid.dx, u)
+        if mask is not None:
+            out = out * mask.h
         return out
 
-    def diff_y_V_to_T(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def diff_y_V_to_T(
+        self,
+        v: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Ny Nx"]:
         """Backward y-difference: V-point -> T-point.
 
         dv_dy[j, i] = (v[j+1/2, i] - v[j-1/2, i]) / dy
@@ -289,6 +357,9 @@ class Difference2D(eqx.Module):
         ----------
         v : Float[Array, "Ny Nx"]
             Velocity field at V-points.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, the T-point output is
+            multiplied by ``mask.h``.
 
         Returns
         -------
@@ -296,6 +367,8 @@ class Difference2D(eqx.Module):
             Backward y-difference at T-points.
         """
         out = interior(diff_y_bwd(v) / self.grid.dy, v)
+        if mask is not None:
+            out = out * mask.h
         return out
 
     # ------------------------------------------------------------------
@@ -306,6 +379,7 @@ class Difference2D(eqx.Module):
         self,
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
     ) -> Float[Array, "Ny Nx"]:
         """Divergence of (u, v) at T-points.
 
@@ -319,18 +393,25 @@ class Difference2D(eqx.Module):
             x-velocity at U-points.
         v : Float[Array, "Ny Nx"]
             y-velocity at V-points.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, the T-point output is
+            multiplied by ``mask.h``.
 
         Returns
         -------
         Float[Array, "Ny Nx"]
             Divergence at T-points.
         """
-        return _divergence_2d(u, v, self.grid.dx, self.grid.dy)
+        out = _divergence_2d(u, v, self.grid.dx, self.grid.dy)
+        if mask is not None:
+            out = out * mask.h
+        return out
 
     def curl(
         self,
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
     ) -> Float[Array, "Ny Nx"]:
         """Curl (relative vorticity) of (u, v) at X-points (corners).
 
@@ -344,15 +425,25 @@ class Difference2D(eqx.Module):
             x-velocity at U-points.
         v : Float[Array, "Ny Nx"]
             y-velocity at V-points.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, the corner-point output
+            is multiplied by ``mask.psi`` (strict 4-of-4 corner mask).
 
         Returns
         -------
         Float[Array, "Ny Nx"]
             Relative vorticity at X-points (corners).
         """
-        return _curl_2d(u, v, self.grid.dx, self.grid.dy)
+        out = _curl_2d(u, v, self.grid.dx, self.grid.dy)
+        if mask is not None:
+            out = out * mask.psi
+        return out
 
-    def laplacian(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def laplacian(
+        self,
+        h: Float[Array, "Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Ny Nx"]:
         """Laplacian at T-points.
 
         nabla2_h[j, i] = (h[j, i+1] - 2*h[j, i] + h[j, i-1]) / dx^2
@@ -362,6 +453,11 @@ class Difference2D(eqx.Module):
         ----------
         h : Float[Array, "Ny Nx"]
             Scalar field at T-points.
+        mask : ArakawaCGridMask or None
+            Optional land/ocean mask. If provided, the T-point output is
+            multiplied by ``mask.h``. Note: the second-order stencil
+            still reads h at dry neighbours; for full no-flux behaviour
+            the input ``h`` should already be zero in dry cells.
 
         Returns
         -------
@@ -372,13 +468,14 @@ class Difference2D(eqx.Module):
         d2x = (diff_x_fwd(h) - diff_x_bwd(h)) / self.grid.dx**2
         d2y = (diff_y_fwd(h) - diff_y_bwd(h)) / self.grid.dy**2
         out = interior(d2x + d2y, h)
+        if mask is not None:
+            out = out * mask.h
         return out
 
     def grad_perp(
         self,
         psi: Float[Array, "Ny Nx"],
-        mask_u: Float[Array, "Ny Nx"] | None = None,
-        mask_v: Float[Array, "Ny Nx"] | None = None,
+        mask: ArakawaCGridMask | None = None,
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
         """Perpendicular gradient: T-point streamfunction to geostrophic velocity.
 
@@ -400,10 +497,10 @@ class Difference2D(eqx.Module):
         ----------
         psi : Float[Array, "Ny Nx"]
             Streamfunction at T-points.
-        mask_u : Float[Array, "Ny Nx"] | None, optional
-            Binary mask at U-points. If provided, u is zeroed where mask is 0.
-        mask_v : Float[Array, "Ny Nx"] | None, optional
-            Binary mask at V-points. If provided, v is zeroed where mask is 0.
+        mask : ArakawaCGridMask or None, optional
+            Optional land/ocean mask. If provided, ``u`` is multiplied by
+            ``mask.u`` and ``v`` by ``mask.v``. Note that masking breaks
+            the discretely non-divergent property of the unmasked output.
 
         Returns
         -------
@@ -426,24 +523,23 @@ class Difference2D(eqx.Module):
         >>> psi = jnp.ones((grid.Ny, grid.Nx))
         >>> u, v = diff.grad_perp(psi)
         """
-        # u[j, i+1/2] = -(ψ[j+1,i] + ψ[j+1,i+1] - ψ[j-1,i] - ψ[j-1,i+1]) / (4·dy)
+        # u[j, i+1/2] = -(psi[j+1,i] + psi[j+1,i+1] - psi[j-1,i] - psi[j-1,i+1]) / (4*dy)
         u = interior(
             -(psi[2:, 1:-1] + psi[2:, 2:] - psi[:-2, 1:-1] - psi[:-2, 2:])
             / (4.0 * self.grid.dy),
             psi,
         )
 
-        # v[j+1/2, i] = (ψ[j,i+1] + ψ[j+1,i+1] - ψ[j,i-1] - ψ[j+1,i-1]) / (4·dx)
+        # v[j+1/2, i] = (psi[j,i+1] + psi[j+1,i+1] - psi[j,i-1] - psi[j+1,i-1]) / (4*dx)
         v = interior(
             (psi[1:-1, 2:] + psi[2:, 2:] - psi[1:-1, :-2] - psi[2:, :-2])
             / (4.0 * self.grid.dx),
             psi,
         )
 
-        if mask_u is not None:
-            u = u * mask_u
-        if mask_v is not None:
-            v = v * mask_v
+        if mask is not None:
+            u = u * mask.u
+            v = v * mask.v
 
         return u, v
 
@@ -462,7 +558,11 @@ class Difference3D(eqx.Module):
 
     grid: ArakawaCGrid3D
 
-    def diff_x_T_to_U(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
+    def diff_x_T_to_U(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Nz Ny Nx"]:
         """Forward x-difference over all z-levels: T -> U.
 
         dh_dx[k, j, i+1/2] = (h[k, j, i+1] - h[k, j, i]) / dx
@@ -471,6 +571,9 @@ class Difference3D(eqx.Module):
         ----------
         h : Float[Array, "Nz Ny Nx"]
             Scalar field at T-points.
+        mask : ArakawaCGridMask or None
+            Optional 2-D land/ocean mask, broadcast over all z-levels. If
+            provided, the output is multiplied by ``mask.u``.
 
         Returns
         -------
@@ -478,9 +581,15 @@ class Difference3D(eqx.Module):
             Forward x-difference at U-points.
         """
         out = interior(diff_x_fwd_3d(h) / self.grid.dx, h)
+        if mask is not None:
+            out = out * mask.u
         return out
 
-    def diff_y_T_to_V(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
+    def diff_y_T_to_V(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Nz Ny Nx"]:
         """Forward y-difference over all z-levels: T -> V.
 
         dh_dy[k, j+1/2, i] = (h[k, j+1, i] - h[k, j, i]) / dy
@@ -489,6 +598,9 @@ class Difference3D(eqx.Module):
         ----------
         h : Float[Array, "Nz Ny Nx"]
             Scalar field at T-points.
+        mask : ArakawaCGridMask or None
+            Optional 2-D land/ocean mask, broadcast over all z-levels. If
+            provided, the output is multiplied by ``mask.v``.
 
         Returns
         -------
@@ -496,9 +608,15 @@ class Difference3D(eqx.Module):
             Forward y-difference at V-points.
         """
         out = interior(diff_y_fwd_3d(h) / self.grid.dy, h)
+        if mask is not None:
+            out = out * mask.v
         return out
 
-    def diff_x_U_to_T(self, u: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
+    def diff_x_U_to_T(
+        self,
+        u: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Nz Ny Nx"]:
         """Backward x-difference over all z-levels: U -> T.
 
         du_dx[k, j, i] = (u[k, j, i+1/2] - u[k, j, i-1/2]) / dx
@@ -507,6 +625,9 @@ class Difference3D(eqx.Module):
         ----------
         u : Float[Array, "Nz Ny Nx"]
             x-velocity at U-points.
+        mask : ArakawaCGridMask or None
+            Optional 2-D land/ocean mask, broadcast over all z-levels. If
+            provided, the output is multiplied by ``mask.h``.
 
         Returns
         -------
@@ -514,9 +635,15 @@ class Difference3D(eqx.Module):
             Backward x-difference at T-points.
         """
         out = interior(diff_x_bwd_3d(u) / self.grid.dx, u)
+        if mask is not None:
+            out = out * mask.h
         return out
 
-    def diff_y_V_to_T(self, v: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
+    def diff_y_V_to_T(
+        self,
+        v: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Nz Ny Nx"]:
         """Backward y-difference over all z-levels: V -> T.
 
         dv_dy[k, j, i] = (v[k, j+1/2, i] - v[k, j-1/2, i]) / dy
@@ -525,6 +652,9 @@ class Difference3D(eqx.Module):
         ----------
         v : Float[Array, "Nz Ny Nx"]
             y-velocity at V-points.
+        mask : ArakawaCGridMask or None
+            Optional 2-D land/ocean mask, broadcast over all z-levels. If
+            provided, the output is multiplied by ``mask.h``.
 
         Returns
         -------
@@ -532,12 +662,15 @@ class Difference3D(eqx.Module):
             Backward y-difference at T-points.
         """
         out = interior(diff_y_bwd_3d(v) / self.grid.dy, v)
+        if mask is not None:
+            out = out * mask.h
         return out
 
     def divergence(
         self,
         u: Float[Array, "Nz Ny Nx"],
         v: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
     ) -> Float[Array, "Nz Ny Nx"]:
         """Horizontal divergence at T-points over all z-levels.
 
@@ -549,15 +682,27 @@ class Difference3D(eqx.Module):
             x-velocity at U-points.
         v : Float[Array, "Nz Ny Nx"]
             y-velocity at V-points.
+        mask : ArakawaCGridMask or None
+            Optional 2-D land/ocean mask, broadcast over all z-levels. If
+            provided, the T-point output is multiplied by ``mask.h``.
 
         Returns
         -------
         Float[Array, "Nz Ny Nx"]
             Divergence at T-points.
         """
-        return self.diff_x_U_to_T(u) + self.diff_y_V_to_T(v)
+        # Apply mask once at the end (instead of inside both diff_*_to_T calls)
+        # to avoid multiplying by mask.h twice through the addition.
+        out = self.diff_x_U_to_T(u) + self.diff_y_V_to_T(v)
+        if mask is not None:
+            out = out * mask.h
+        return out
 
-    def laplacian(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
+    def laplacian(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        mask: ArakawaCGridMask | None = None,
+    ) -> Float[Array, "Nz Ny Nx"]:
         """Horizontal Laplacian at T-points over all z-levels.
 
         nabla2_h[k, j, i] = (h[k, j, i+1] - 2*h[k, j, i] + h[k, j, i-1]) / dx^2
@@ -567,6 +712,9 @@ class Difference3D(eqx.Module):
         ----------
         h : Float[Array, "Nz Ny Nx"]
             Scalar field at T-points.
+        mask : ArakawaCGridMask or None
+            Optional 2-D land/ocean mask, broadcast over all z-levels. If
+            provided, the T-point output is multiplied by ``mask.h``.
 
         Returns
         -------
@@ -576,4 +724,6 @@ class Difference3D(eqx.Module):
         d2x = (diff_x_fwd_3d(h) - diff_x_bwd_3d(h)) / self.grid.dx**2
         d2y = (diff_y_fwd_3d(h) - diff_y_bwd_3d(h)) / self.grid.dy**2
         out = interior(d2x + d2y, h)
+        if mask is not None:
+            out = out * mask.h
         return out

@@ -93,15 +93,71 @@ def _register_all() -> list[Entry]:
     v3d = make_v_field_3d()
 
     # ------------------------------------------------------------------
-    # Operator families are wired up in subsequent commits.  This first
-    # commit only ships the infrastructure; entries are added alongside
-    # the operator changes themselves so each commit is self-contained.
+    # Difference2D / Difference3D
     # ------------------------------------------------------------------
+    from finitevolx._src.operators.difference import Difference2D, Difference3D
 
-    # Touch the bindings to keep linters from complaining about unused
-    # locals while the registration tables are still being written
-    # commit-by-commit.  These references are deliberately cheap.
-    _ = (grid2d, grid3d, mask2d, h2d, u2d, v2d, q2d, h3d, u3d, v3d)
+    diff2d = Difference2D(grid=grid2d)
+    diff3d = Difference3D(grid=grid3d)
+
+    # 2D — single-input methods, exhaustive coverage of every public method.
+    diff2d_methods: list[
+        tuple[str, Callable[[], object]]  # (method_name, masked-output factory)
+    ] = [
+        ("diff_x_T_to_U", lambda: diff2d.diff_x_T_to_U(h2d, mask=mask2d)),
+        ("diff_y_T_to_V", lambda: diff2d.diff_y_T_to_V(h2d, mask=mask2d)),
+        ("diff_y_U_to_X", lambda: diff2d.diff_y_U_to_X(u2d, mask=mask2d)),
+        ("diff_x_V_to_X", lambda: diff2d.diff_x_V_to_X(v2d, mask=mask2d)),
+        ("diff_y_X_to_U", lambda: diff2d.diff_y_X_to_U(q2d, mask=mask2d)),
+        ("diff_x_X_to_V", lambda: diff2d.diff_x_X_to_V(q2d, mask=mask2d)),
+        ("diff_x_U_to_T", lambda: diff2d.diff_x_U_to_T(u2d, mask=mask2d)),
+        ("diff_y_V_to_T", lambda: diff2d.diff_y_V_to_T(v2d, mask=mask2d)),
+        ("divergence", lambda: diff2d.divergence(u2d, v2d, mask=mask2d)),
+        ("curl", lambda: diff2d.curl(u2d, v2d, mask=mask2d)),
+        ("laplacian", lambda: diff2d.laplacian(h2d, mask=mask2d)),
+        ("grad_perp", lambda: diff2d.grad_perp(h2d, mask=mask2d)),
+    ]
+    diff2d_unmasked: list[tuple[str, Callable[[], object]]] = [
+        ("diff_x_T_to_U", lambda: diff2d.diff_x_T_to_U(h2d)),
+        ("diff_y_T_to_V", lambda: diff2d.diff_y_T_to_V(h2d)),
+        ("diff_y_U_to_X", lambda: diff2d.diff_y_U_to_X(u2d)),
+        ("diff_x_V_to_X", lambda: diff2d.diff_x_V_to_X(v2d)),
+        ("diff_y_X_to_U", lambda: diff2d.diff_y_X_to_U(q2d)),
+        ("diff_x_X_to_V", lambda: diff2d.diff_x_X_to_V(q2d)),
+        ("diff_x_U_to_T", lambda: diff2d.diff_x_U_to_T(u2d)),
+        ("diff_y_V_to_T", lambda: diff2d.diff_y_V_to_T(v2d)),
+        ("divergence", lambda: diff2d.divergence(u2d, v2d)),
+        ("curl", lambda: diff2d.curl(u2d, v2d)),
+        ("laplacian", lambda: diff2d.laplacian(h2d)),
+        ("grad_perp", lambda: diff2d.grad_perp(h2d)),
+    ]
+    for method, fn in diff2d_unmasked:
+        entries.append(("Difference2D", method, "unmasked", fn))
+    for method, fn in diff2d_methods:
+        entries.append(("Difference2D", method, "masked", fn))
+
+    # 3D — subset of methods (exhaustive 3D coverage isn't load-bearing
+    # because each method is a vmap over the 2D version).
+    diff3d_unmasked: list[tuple[str, Callable[[], object]]] = [
+        ("diff_x_T_to_U", lambda: diff3d.diff_x_T_to_U(h3d)),
+        ("diff_y_T_to_V", lambda: diff3d.diff_y_T_to_V(h3d)),
+        ("diff_x_U_to_T", lambda: diff3d.diff_x_U_to_T(u3d)),
+        ("diff_y_V_to_T", lambda: diff3d.diff_y_V_to_T(v3d)),
+        ("divergence", lambda: diff3d.divergence(u3d, v3d)),
+        ("laplacian", lambda: diff3d.laplacian(h3d)),
+    ]
+    diff3d_masked: list[tuple[str, Callable[[], object]]] = [
+        ("diff_x_T_to_U", lambda: diff3d.diff_x_T_to_U(h3d, mask=mask2d)),
+        ("diff_y_T_to_V", lambda: diff3d.diff_y_T_to_V(h3d, mask=mask2d)),
+        ("diff_x_U_to_T", lambda: diff3d.diff_x_U_to_T(u3d, mask=mask2d)),
+        ("diff_y_V_to_T", lambda: diff3d.diff_y_V_to_T(v3d, mask=mask2d)),
+        ("divergence", lambda: diff3d.divergence(u3d, v3d, mask=mask2d)),
+        ("laplacian", lambda: diff3d.laplacian(h3d, mask=mask2d)),
+    ]
+    for method, fn in diff3d_unmasked:
+        entries.append(("Difference3D", method, "unmasked", fn))
+    for method, fn in diff3d_masked:
+        entries.append(("Difference3D", method, "masked", fn))
 
     return entries
 

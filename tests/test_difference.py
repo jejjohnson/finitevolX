@@ -397,23 +397,29 @@ class TestGradPerp2D:
         # ∂ψ/∂y = c, so u = -c at interior [1:-1, 1:-1]
         np.testing.assert_allclose(u[1:-1, 1:-1], -c, rtol=1e-5)
 
-    def test_mask_u_zeros_velocity(self, grid2d):
-        """mask_u zeroes u at masked points."""
+    def test_mask_zeros_both_velocities(self, grid2d):
+        """An all-dry mask zeros both u and v."""
+        from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
+
         diff = Difference2D(grid=grid2d)
         y = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
         psi = jnp.broadcast_to(y[:, None], (grid2d.Ny, grid2d.Nx))
-        mask_u = jnp.zeros((grid2d.Ny, grid2d.Nx))
-        u, _v = diff.grad_perp(psi, mask_u=mask_u)
+        # All-dry h-mask -> all-dry u/v masks too.
+        all_dry = jnp.zeros((grid2d.Ny, grid2d.Nx), dtype=bool)
+        mask = ArakawaCGridMask.from_mask(all_dry)
+        u, v = diff.grad_perp(psi, mask=mask)
         np.testing.assert_allclose(u, 0.0, atol=1e-12)
+        np.testing.assert_allclose(v, 0.0, atol=1e-12)
 
-    def test_mask_v_zeros_velocity(self, grid2d):
-        """mask_v zeroes v at masked points."""
+    def test_mask_none_matches_unmasked(self, grid2d):
+        """Passing mask=None must give the same result as omitting it."""
         diff = Difference2D(grid=grid2d)
         x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
         psi = jnp.broadcast_to(x, (grid2d.Ny, grid2d.Nx))
-        mask_v = jnp.zeros((grid2d.Ny, grid2d.Nx))
-        _u, v = diff.grad_perp(psi, mask_v=mask_v)
-        np.testing.assert_allclose(v, 0.0, atol=1e-12)
+        u_default, v_default = diff.grad_perp(psi)
+        u_none, v_none = diff.grad_perp(psi, mask=None)
+        np.testing.assert_array_equal(u_default, u_none)
+        np.testing.assert_array_equal(v_default, v_none)
 
     def test_no_nan_output(self, grid2d):
         """grad_perp must not produce NaN for well-defined inputs."""
