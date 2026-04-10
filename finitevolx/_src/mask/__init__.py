@@ -5,7 +5,7 @@ from finitevolx._src.mask.base import (
     StencilCapability2D,
     StencilCapability3D,
 )
-from finitevolx._src.mask.cartesian import Mask2D
+from finitevolx._src.mask.cartesian import Mask1D, Mask2D
 
 __all__ = [
     # Stencil capability
@@ -13,5 +13,6 @@ __all__ = [
     "StencilCapability2D",
     "StencilCapability3D",
     # Concrete mask classes
+    "Mask1D",
     "Mask2D",
 ]

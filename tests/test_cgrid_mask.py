@@ -1,11 +1,13 @@
-"""Tests for Mask2D and StencilCapability2D."""
+"""Tests for Mask1D / Mask2D and StencilCapability1D / 2D."""
 
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
 from finitevolx._src.mask import (
+    Mask1D,
     Mask2D,
+    StencilCapability1D,
     StencilCapability2D,
 )
 from finitevolx._src.mask.utils import (
@@ -718,3 +720,141 @@ class TestClassificationGeometry:
         dilated_2 = _dilate(_dilate(land))
         # Open ocean must NOT overlap with 2-dilation of land
         assert not np.any(ocean & dilated_2)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Mask1D
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def mask1d_basin():
+    """16-cell 1-D domain with a 1-cell land border on each end."""
+    h = np.ones(16, dtype=bool)
+    h[0] = h[-1] = False
+    return h
+
+
+@pytest.fixture
+def all_ocean_1d():
+    return Mask1D.from_dimensions(8)
+
+
+class TestMask1D:
+    def test_from_dimensions_shape(self):
+        m = Mask1D.from_dimensions(10)
+        assert m.h.shape == (10,)
+        assert m.u.shape == (10,)
+        assert bool(jnp.all(m.h))
+
+    def test_from_mask_shape(self, mask1d_basin):
+        m = Mask1D.from_mask(mask1d_basin)
+        assert m.h.shape == (16,)
+        assert m.u.shape == (16,)
+
+    def test_from_mask_h_preserved(self, mask1d_basin):
+        m = Mask1D.from_mask(mask1d_basin)
+        np.testing.assert_array_equal(np.asarray(m.h), mask1d_basin)
+
+    def test_u_face_lookahead(self, mask1d_basin):
+        # u[i] needs h[i-1] AND h[i] both wet (kernel (2,) threshold 3/4)
+        m = Mask1D.from_mask(mask1d_basin)
+        u = np.asarray(m.u)
+        # u[0] is padded with 0 in i-1 → False
+        assert not u[0]
+        # u[1] needs h[0]=F AND h[1]=T → False
+        assert not u[1]
+        # u[2] needs h[1]=T AND h[2]=T → True
+        assert u[2]
+        # u[15] needs h[14]=T AND h[15]=F → False
+        assert not u[15]
+
+    def test_not_h_is_inverse(self, mask1d_basin):
+        m = Mask1D.from_mask(mask1d_basin)
+        np.testing.assert_array_equal(np.asarray(m.not_h), ~mask1d_basin)
+
+    def test_classification_levels(self, mask1d_basin):
+        m = Mask1D.from_mask(mask1d_basin)
+        c = np.asarray(m.classification)
+        # Endpoints are land
+        assert c[0] == 0 and c[-1] == 0
+        # Cells immediately adjacent to land are coast
+        assert c[1] == 1 and c[-2] == 1
+        # Next ring is near-coast
+        assert c[2] == 2 and c[-3] == 2
+        # Deep interior is open ocean
+        assert c[8] == 3
+
+    def test_classification_indicators(self, mask1d_basin):
+        m = Mask1D.from_mask(mask1d_basin)
+        np.testing.assert_array_equal(m.ind_land, np.asarray(m.classification == 0))
+        np.testing.assert_array_equal(m.ind_coast, np.asarray(m.classification == 1))
+        np.testing.assert_array_equal(
+            m.ind_near_coast, np.asarray(m.classification == 2)
+        )
+        np.testing.assert_array_equal(m.ind_ocean, np.asarray(m.classification == 3))
+
+    def test_ind_boundary(self, all_ocean_1d):
+        b = np.asarray(all_ocean_1d.ind_boundary)
+        assert b[0] and b[-1]
+        assert not np.any(b[1:-1])
+
+    def test_stencil_capability_is_1d(self, all_ocean_1d):
+        sc = all_ocean_1d.stencil_capability
+        assert isinstance(sc, StencilCapability1D)
+        assert sc.x_pos.shape == (8,)
+        assert sc.x_neg.shape == (8,)
+
+    def test_stencil_capability_all_ocean(self, all_ocean_1d):
+        # In an all-ocean 1-D domain of length 8: x_pos[0]=8, x_neg[0]=1
+        sc = all_ocean_1d.stencil_capability
+        np.testing.assert_array_equal(np.asarray(sc.x_pos), [8, 7, 6, 5, 4, 3, 2, 1])
+        np.testing.assert_array_equal(np.asarray(sc.x_neg), [1, 2, 3, 4, 5, 6, 7, 8])
+
+    def test_sponge_default_all_ones(self, all_ocean_1d):
+        np.testing.assert_array_equal(np.asarray(all_ocean_1d.sponge), 1.0)
+
+    def test_sponge_with_width(self):
+        m = Mask1D.from_mask(np.ones(16, dtype=bool), sponge_width=3)
+        s = np.asarray(m.sponge)
+        # Endpoints are zero
+        assert s[0] == 0.0 and s[-1] == 0.0
+        # Interior is 1.0
+        assert s[8] == 1.0
+
+    def test_get_adaptive_masks_all_ocean(self, all_ocean_1d):
+        masks = all_ocean_1d.get_adaptive_masks(stencil_sizes=(2, 4, 6))
+        # Mutually exclusive
+        sum_mask = sum(np.asarray(m).astype(int) for m in masks.values())
+        assert np.all(sum_mask <= 1)
+
+    def test_get_adaptive_masks_keys(self, all_ocean_1d):
+        masks = all_ocean_1d.get_adaptive_masks(stencil_sizes=(2, 4))
+        assert set(masks.keys()) == {2, 4}
+
+    def test_from_ssh(self):
+        ssh = np.array([1.0, 2.0, np.nan, 3.0, 4.0])
+        m = Mask1D.from_mask(np.isfinite(ssh))
+        # Compare against from_ssh
+        m2 = Mask1D.from_ssh(ssh)
+        np.testing.assert_array_equal(np.asarray(m.h), np.asarray(m2.h))
+
+
+class TestStencilCapability1D:
+    def test_from_mask(self):
+        h = np.array([True, True, False, True, True, True])
+        sc = StencilCapability1D.from_mask(h)
+        np.testing.assert_array_equal(np.asarray(sc.x_pos), [2, 1, 0, 3, 2, 1])
+        np.testing.assert_array_equal(np.asarray(sc.x_neg), [1, 2, 0, 1, 2, 3])
+
+    def test_all_ocean(self):
+        h = np.ones(5, dtype=bool)
+        sc = StencilCapability1D.from_mask(h)
+        np.testing.assert_array_equal(np.asarray(sc.x_pos), [5, 4, 3, 2, 1])
+        np.testing.assert_array_equal(np.asarray(sc.x_neg), [1, 2, 3, 4, 5])
+
+    def test_all_land(self):
+        h = np.zeros(5, dtype=bool)
+        sc = StencilCapability1D.from_mask(h)
+        np.testing.assert_array_equal(np.asarray(sc.x_pos), [0, 0, 0, 0, 0])
+        np.testing.assert_array_equal(np.asarray(sc.x_neg), [0, 0, 0, 0, 0])
