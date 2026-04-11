@@ -43,23 +43,36 @@ def pool_bool(
     arr: np.ndarray,
     kernel: tuple[int, ...],
     threshold: float,
+    direction: str = "leading",
 ) -> np.ndarray:
-    """n-D average-pool of a binary mask with leading-side zero padding.
+    """n-D average-pool of a binary mask with one-sided zero padding.
 
     Computes a windowed average of ``arr`` over the given ``kernel``
-    footprint and compares against ``threshold``.  The leading side of
-    each axis is zero-padded by ``kernel[a] - 1`` cells so the output
-    shape equals the input shape.  This is the forward stencil that
-    derives staggered (u, v, w, xy_corner) masks from an h-grid mask on
-    an Arakawa C-grid::
+    footprint and compares against ``threshold``.  One side of each
+    axis is zero-padded by ``kernel[a] - 1`` cells so the output shape
+    equals the input shape.  This is the forward stencil that derives
+    staggered (u, v, w, xy_corner) masks from an h-grid mask on an
+    Arakawa C-grid.
 
-        pool[idx] = mean(arr[idx - (kernel - 1) : idx + 1, ...]) > threshold
+    The ``direction`` argument selects which side of the same-index rule
+    the pooled cell sits on:
+
+    * ``'leading'`` — pad the **start** of each axis; ``pool[j]`` then
+      depends on ``arr[j - (k-1) : j + 1]``.  Encodes the *negative*
+      half-step convention (south / west / SW endpoint).  Boundary
+      cells at index ``0`` see ``k-1`` zero-pad neighbours.
+    * ``'trailing'`` — pad the **end** of each axis; ``pool[j]`` then
+      depends on ``arr[j : j + k]``.  Encodes the *positive* half-step
+      convention (north / east / NE endpoint), matching the grid
+      module's same-index rule (``U[j, i]`` at ``i + 1/2``,
+      ``V[j, i]`` at ``j + 1/2``, ``X[j, i]`` at NE corner).  Boundary
+      cells at index ``N - 1`` see ``k - 1`` zero-pad neighbours.
 
     Algorithm
     ---------
     1. Cast ``arr`` to float so the mean is well-defined.
-    2. Pre-pad the leading side of each axis with ``k - 1`` zeros so
-       the windowed sum lines up at index 0.
+    2. Pre-pad ``k - 1`` zeros on the chosen side of each axis so the
+       windowed sum lines up at the appropriate boundary index.
     3. Sum every shifted view ``arr_padded[off : off + N, ...]`` over
        all kernel offsets ``off ∈ [0, k)``.
     4. Divide by ``prod(kernel)`` to get the local mean and compare
@@ -72,8 +85,8 @@ def pool_bool(
         ``{0.0, 1.0}`` internally.
     kernel : tuple of int
         Per-axis kernel sizes; ``len(kernel)`` must equal ``arr.ndim``.
-        Each ``k_a`` controls how many leading cells along axis *a*
-        contribute to each pooled output cell.
+        Each ``k_a`` controls how many cells along axis *a* contribute
+        to each pooled output cell.
     threshold : float
         Wet/dry threshold applied to the local mean.  For a binary
         input the mean takes values in ``{i / prod(kernel) : i = 0..K}``
@@ -81,6 +94,9 @@ def pool_bool(
 
         * ``> (K-1)/K`` — *all* cells must be wet (strict).
         * ``> 1/K``     — *at least one* cell must be wet (lenient).
+    direction : {'leading', 'trailing'}
+        Which side of the same-index rule the pooled cell sits on.
+        Default ``'leading'`` (south/west/SW convention).
 
     Returns
     -------
@@ -89,13 +105,22 @@ def pool_bool(
 
     Examples
     --------
-    Strict y-face mask on a 1-D h-grid (kernel ``(2,)``, threshold 3/4 →
-    "both adjacent h-cells wet"):
+    Strict south-face mask under the leading (negative half-step)
+    convention (kernel ``(2,)``, threshold 3/4 → "both adjacent h-cells
+    wet"):
 
     >>> import numpy as np
     >>> h = np.array([True, True, False, True, True])
     >>> pool_bool(h, kernel=(2,), threshold=3.0 / 4.0)
     array([False,  True, False, False,  True])
+
+    The same mask under the trailing (positive half-step) convention.
+    The wet/dry pattern is the same set of physical faces, but indexed
+    one cell to the left because ``pool[j]`` is now ``h[j] AND h[j+1]``
+    instead of ``h[j-1] AND h[j]``:
+
+    >>> pool_bool(h, kernel=(2,), threshold=3.0 / 4.0, direction="trailing")
+    array([ True, False, False,  True, False])
 
     Lenient 2x2 corner mask (threshold 1/8 → "at least one of the 4
     surrounding cells wet"):
@@ -109,15 +134,21 @@ def pool_bool(
         raise ValueError(
             f"kernel length {len(kernel)} does not match arr.ndim {arr.ndim}"
         )
+    if direction not in ("leading", "trailing"):
+        raise ValueError(
+            f"direction must be 'leading' or 'trailing', got {direction!r}"
+        )
 
     # Cast to float so the windowed sum is well-defined.  Shape: arr.shape
     arr_f = arr.astype(float)
 
-    # Leading-side zero pad: pad k-1 cells before axis a so that the windowed
-    # sum lines up at output index 0 (which sees only the rightmost cell of
-    # the window — the rest are pad zeros).  Shape: arr.shape + (k_a - 1) on
-    # the leading side of each axis a.
-    pad_widths = tuple((k - 1, 0) for k in kernel)
+    # One-sided zero pad: pad k-1 cells on the leading or trailing side of each
+    # axis so that the windowed sum lines up at the appropriate boundary
+    # output index (index 0 for leading, index N-1 for trailing).
+    if direction == "leading":
+        pad_widths = tuple((k - 1, 0) for k in kernel)
+    else:
+        pad_widths = tuple((0, k - 1) for k in kernel)
     arr_padded = np.pad(arr_f, pad_widths)
 
     # Sum the prod(kernel) shifted views.  For each multi-axis offset
@@ -137,13 +168,14 @@ def h_from_pooled(
     pooled_mask: np.ndarray,
     kernel: tuple[int, ...],
     mode: str = "permissive",
+    direction: str = "leading",
 ) -> np.ndarray:
     """Inverse of :func:`pool_bool` for binary inputs.
 
     Given a same-shape staggered mask that was forward-pooled with the
-    given ``kernel``, infer an underlying h-grid (cell-centre) mask.
-    The inverse mapping is non-unique, so the result depends on
-    ``mode``:
+    given ``kernel`` and ``direction``, infer an underlying h-grid
+    (cell-centre) mask.  The inverse mapping is non-unique, so the
+    result depends on ``mode``:
 
     * ``'permissive'``  — h is wet iff *any* contributing pooled cell
       is wet (logical OR over the kernel footprint).  Yields the
@@ -156,16 +188,25 @@ def h_from_pooled(
 
     Algorithm
     ---------
-    For each axis *a* where ``kernel[a] = k``, ``h[..., j, ...]`` is
-    constrained by the pooled cells at indices ``j, j+1, ..., j+k-1``.
+    For each axis *a* where ``kernel[a] = k``:
+
+    * ``direction='leading'`` — ``pool[..., j, ...]`` was built from
+      ``arr[..., j-(k-1) : j+1, ...]``, so ``h[..., j, ...]`` is
+      constrained by the pooled cells at indices ``j, j+1, ..., j+k-1``
+      (the function shifts pooled *right* and combines).
+    * ``direction='trailing'`` — ``pool[..., j, ...]`` was built from
+      ``arr[..., j : j+k, ...]``, so ``h[..., j, ...]`` is constrained
+      by the pooled cells at indices ``j-(k-1), ..., j-1, j`` (the
+      function shifts pooled *left* and combines).
+
     The function takes shifted views of ``pooled_mask`` along each axis
     (offsets ``0..k-1``) and reduces them with OR (permissive) or AND
     (conservative) elementwise.
 
-    Indices beyond ``N - 1`` are padded with the *identity element* of
-    the chosen mode — ``False`` for ``permissive`` (OR's identity) and
-    ``True`` for ``conservative`` (AND's identity) — so out-of-bounds
-    entries do not artificially wipe or fill the trailing boundary.
+    Indices outside ``[0, N - 1]`` are padded with the *identity element*
+    of the chosen mode — ``False`` for ``permissive`` (OR's identity)
+    and ``True`` for ``conservative`` (AND's identity) — so out-of-bounds
+    entries do not artificially wipe or fill the boundary.
 
     Note that the round-trip ``pool_bool → h_from_pooled`` is **lossy**
     in the permissive direction at isolated wet cells (an h-cell with
@@ -183,6 +224,10 @@ def h_from_pooled(
         to :func:`pool_bool` to derive ``pooled_mask`` from h).
     mode : {'permissive', 'conservative'}
         Inversion strategy when the inverse is ambiguous.
+    direction : {'leading', 'trailing'}
+        Pad direction of the forward :func:`pool_bool` call.  Must
+        match the direction the input was produced with.  Default
+        ``'leading'``.
 
     Returns
     -------
@@ -209,6 +254,10 @@ def h_from_pooled(
     """
     if mode not in ("permissive", "conservative"):
         raise ValueError(f"mode must be 'permissive' or 'conservative', got {mode!r}")
+    if direction not in ("leading", "trailing"):
+        raise ValueError(
+            f"direction must be 'leading' or 'trailing', got {direction!r}"
+        )
     if len(kernel) != pooled_mask.ndim:
         raise ValueError(
             f"kernel length {len(kernel)} does not match pooled_mask.ndim "
@@ -228,19 +277,30 @@ def h_from_pooled(
         identity = True  # x AND True == x
 
     # For each multi-axis offset (o_0, ..., o_{ndim-1}) with 0 <= o_a < k_a,
-    # build the shifted view pooled[..., j + o_a, ...] and combine it into
-    # `result`.  Shape: pooled_mask.shape (every shifted view is padded back
-    # up to full shape with `identity`).
+    # build the shifted view pooled[..., j + o_a, ...] (leading) or
+    # pooled[..., j - o_a, ...] (trailing) and combine it into `result`.
+    # Shape: pooled_mask.shape (every shifted view is padded back up to full
+    # shape with `identity`).
     for offsets in itertools.product(*(range(k) for k in kernel)):
         shifted = pooled_b
         for axis, off in enumerate(offsets):
             if off == 0:
                 continue
             sl = [slice(None)] * ndim
-            sl[axis] = slice(off, None)
-            front = shifted[tuple(sl)]
             pad_width = [(0, 0)] * ndim
-            pad_width[axis] = (0, off)
+            if direction == "leading":
+                # Shift pooled RIGHT by `off` (take from `off` to end, pad
+                # trailing).  This aligns pooled[..., j + off, ...] with the
+                # h[..., j, ...] slot.
+                sl[axis] = slice(off, None)
+                pad_width[axis] = (0, off)
+            else:
+                # Shift pooled LEFT by `off` (take from start to `-off`, pad
+                # leading).  This aligns pooled[..., j - off, ...] with the
+                # h[..., j, ...] slot.
+                sl[axis] = slice(0, -off)
+                pad_width[axis] = (off, 0)
+            front = shifted[tuple(sl)]
             shifted = np.pad(front, pad_width, constant_values=identity)
 
         if mode == "permissive":

@@ -4,22 +4,24 @@ Concrete mask classes for uniform-spacing Cartesian grids.  All
 construction logic uses numpy/scipy (masks are built once at setup
 time and stored as JAX arrays for use in JIT-traced kernels).
 
-Same-index colocation convention (matches the grid module)::
+Same-index colocation convention (matches the grid module's
+``CartesianGrid2D`` / ``CartesianGrid3D`` positive-half-step rule)::
 
-    h[j, i]    cell centre   at (j,     i    )
-    u[j, i]    y-face        at (j-1/2, i    )   [kernel (2,1) from h]
-    v[j, i]    x-face        at (j,     i-1/2)   [kernel (1,2) from h]
-    xy_corner[j, i]          SW corner            [kernel (2,2), lenient]
-    xy_corner_strict[j, i]   SW corner            [kernel (2,2), strict]
+    h[j, i]                cell centre  at ( j,        i       )
+    u[j, i]                east face    at ( j,        i + 1/2 )
+    v[j, i]                north face   at ( j + 1/2,  i       )
+    xy_corner[j, i]        NE corner    at ( j + 1/2,  i + 1/2 )  (lenient)
+    xy_corner_strict[j, i] NE corner    at ( j + 1/2,  i + 1/2 )  (strict)
 
 Staggered masks are derived from the h-mask using n-D average pooling
-with leading-side zero-padding so the output shape equals the input
-shape::
+with **trailing-side** zero padding so the output shape equals the
+input shape and ``mask.u[j, i]`` / ``mask.v[j, i]`` align with the
+grid module's ``U[j, i]`` / ``V[j, i]`` positions::
 
-    u[j, i]                = (h[j, i] + h[j-1, i]) / 2 > 3/4
-    v[j, i]                = (h[j, i] + h[j, i-1]) / 2 > 3/4
-    xy_corner[j, i]        = sum of 4 SW-corner h-cells / 4 > 1/8  (lenient)
-    xy_corner_strict[j, i] = sum of 4 SW-corner h-cells / 4 > 7/8  (strict)
+    u[j, i]                = (h[j, i  ] + h[j,   i+1]) / 2 > 3/4
+    v[j, i]                = (h[j, i  ] + h[j+1, i  ]) / 2 > 3/4
+    xy_corner[j, i]        = sum of 4 NE-corner h-cells / 4 > 1/8  (lenient)
+    xy_corner_strict[j, i] = sum of 4 NE-corner h-cells / 4 > 7/8  (strict)
 """
 
 from __future__ import annotations
@@ -197,7 +199,8 @@ class Mask1D(eqx.Module):
         Notes
         -----
         The staggered u-face mask is derived from ``mask_hgrid`` via
-        :func:`pool_bool` with the following kernel/threshold pair:
+        :func:`pool_bool` with the following kernel/threshold pair
+        (trailing-pad direction → ``u[i] = h[i] AND h[i+1]``):
 
         ====== ========= =========  ====================================
         Mask   Kernel    Threshold  Semantics
@@ -213,8 +216,9 @@ class Mask1D(eqx.Module):
         (Nx,) = h_np.shape
         hf = h_np.astype(np.float32)
 
-        # Staggered u-face: kernel (2,) → (h[i] + h[i-1]) / 2 > 3/4
-        u_np = pool_bool(hf, kernel=(2,), threshold=3.0 / 4.0)
+        # Staggered u-face (east face of T[i]): kernel (2,) trailing
+        # → u[i] = (h[i] + h[i+1]) / 2 > 3/4 (both adjacent h-cells wet)
+        u_np = pool_bool(hf, kernel=(2,), threshold=3.0 / 4.0, direction="trailing")
 
         # ── land / coast classification ───────────────────────────────────
         # 0 = land, 1 = coast (ocean adj. to land), 2 = near-coast, 3 = ocean
@@ -308,7 +312,7 @@ class Mask1D(eqx.Module):
         Mask1D
         """
         u_mask = np.isfinite(np.asarray(field))
-        h_mask = h_from_pooled(u_mask, kernel=(2,), mode=mode)
+        h_mask = h_from_pooled(u_mask, kernel=(2,), mode=mode, direction="trailing")
         return cls.from_mask(h_mask, sponge_width=sponge_width)
 
     @classmethod
@@ -603,16 +607,17 @@ class Mask2D(eqx.Module):
         Notes
         -----
         The four staggered masks are derived from ``mask_hgrid`` via
-        :func:`pool_bool` with the following kernel/threshold pairs:
+        :func:`pool_bool` with the following kernel/threshold pairs
+        (trailing-pad direction → positive half-step convention):
 
-        ==================== ========== =========  ===============================
+        ==================== ========== =========  ====================================
         Mask                 Kernel     Threshold  Semantics
-        ==================== ========== =========  ===============================
-        ``u``                ``(2, 1)`` ``3/4``    both y-adjacent h-cells wet
-        ``v``                ``(1, 2)`` ``3/4``    both x-adjacent h-cells wet
-        ``xy_corner``        ``(2, 2)`` ``1/8``    ≥ 1 of 4 surrounding h-cells wet
-        ``xy_corner_strict`` ``(2, 2)`` ``7/8``    all 4 surrounding h-cells wet
-        ==================== ========== =========  ===============================
+        ==================== ========== =========  ====================================
+        ``u`` (east face)    ``(1, 2)`` ``3/4``    ``h[j, i] AND h[j, i+1]``
+        ``v`` (north face)   ``(2, 1)`` ``3/4``    ``h[j, i] AND h[j+1, i]``
+        ``xy_corner``        ``(2, 2)`` ``1/8``    ≥ 1 of 4 NE-corner h-cells wet
+        ``xy_corner_strict`` ``(2, 2)`` ``7/8``    all 4 NE-corner h-cells wet
+        ==================== ========== =========  ====================================
 
         The land/coast classification uses two successive
         :func:`dilate_mask` passes on ``~mask_hgrid``; the stencil
@@ -623,30 +628,44 @@ class Mask2D(eqx.Module):
         hf = h_np.astype(np.float32)
 
         # ── staggered masks ───────────────────────────────────────────────
-        # u[j, i] = (h[j, i] + h[j-1, i]) / 2 > 3/4  (y-direction)
-        u_np = pool_bool(hf, kernel=(2, 1), threshold=3.0 / 4.0)
-        # v[j, i] = (h[j, i] + h[j, i-1]) / 2 > 3/4  (x-direction)
-        v_np = pool_bool(hf, kernel=(1, 2), threshold=3.0 / 4.0)
-        # xy_corner[j, i]: at least 1 of 4 SW-corner h-cells wet  (lenient)
-        xy_corner_np = pool_bool(hf, kernel=(2, 2), threshold=1.0 / 8.0)
-        # xy_corner_strict[j, i]: all 4 SW-corner h-cells wet     (strict)
-        xy_corner_strict_np = pool_bool(hf, kernel=(2, 2), threshold=7.0 / 8.0)
+        # All staggered masks use the trailing-pad (positive half-step)
+        # convention, matching the grid module's same-index rule:
+        # U[j, i] at east face (i+1/2), V[j, i] at north face (j+1/2),
+        # X[j, i] at NE corner (i+1/2, j+1/2).
+
+        # u[j, i] = (h[j, i] + h[j, i+1]) / 2 > 3/4  (east face = U-point)
+        u_np = pool_bool(hf, kernel=(1, 2), threshold=3.0 / 4.0, direction="trailing")
+        # v[j, i] = (h[j, i] + h[j+1, i]) / 2 > 3/4  (north face = V-point)
+        v_np = pool_bool(hf, kernel=(2, 1), threshold=3.0 / 4.0, direction="trailing")
+        # xy_corner[j, i]: at least 1 of 4 NE-corner h-cells wet  (lenient)
+        xy_corner_np = pool_bool(
+            hf, kernel=(2, 2), threshold=1.0 / 8.0, direction="trailing"
+        )
+        # xy_corner_strict[j, i]: all 4 NE-corner h-cells wet     (strict)
+        xy_corner_strict_np = pool_bool(
+            hf, kernel=(2, 2), threshold=7.0 / 8.0, direction="trailing"
+        )
 
         # ── corner boundary classification ────────────────────────────────
-        # For xy_corner[j, i] at SW corner of h[j, i], the 4 adjacent
-        # velocity faces are u[j,i] (east), u[j,i-1] (west), v[j,i] (north),
-        # v[j-1,i] (south).
-        u_west = np.pad(u_np[:, :-1], ((0, 0), (1, 0)))  # u[j, i-1]
-        v_south = np.pad(v_np[:-1, :], ((1, 0), (0, 0)))  # v[j-1, i]
+        # For xy_corner[j, i] at NE corner of h[j, i], the 4 incident
+        # velocity faces are:
+        #   u[j,   i] = east face of h[j,i]    → south of corner (vertical)
+        #   u[j+1, i] = east face of h[j+1,i]  → north of corner (vertical)
+        #   v[j, i  ] = north face of h[j,i]   → west of corner  (horizontal)
+        #   v[j, i+1] = north face of h[j,i+1] → east of corner  (horizontal)
+        # u_north and v_east are the +1-shifted neighbours; trailing-side
+        # zero-pad supplies the implicit boundary face beyond the array.
+        u_north = np.pad(u_np[1:, :], ((0, 1), (0, 0)))  # u[j+1, i]
+        v_east = np.pad(v_np[:, 1:], ((0, 0), (0, 1)))  # v[j, i+1]
 
-        # y-wall: v-face (north or south) dry
-        xy_corner_y_wall = xy_corner_np & (~v_np | ~v_south)
-        # x-wall: u-face (east or west) dry
-        xy_corner_x_wall = xy_corner_np & (~u_np | ~u_west)
+        # y-wall (vertical wall): one of the two u-faces (vertical lines) dry
+        xy_corner_y_wall = xy_corner_np & (~u_np | ~u_north)
+        # x-wall (horizontal wall): one of the two v-faces (horizontal lines) dry
+        xy_corner_x_wall = xy_corner_np & (~v_np | ~v_east)
         # convex corner: both walls present
         xy_corner_convex = xy_corner_y_wall & xy_corner_x_wall
         # valid interior corner: all 4 adjacent faces wet
-        xy_corner_valid = xy_corner_np & u_np & u_west & v_np & v_south
+        xy_corner_valid = xy_corner_np & u_np & u_north & v_np & v_east
 
         # ── irregular xy_corner_strict boundary indices ───────────────────
         # Dry xy_corner_strict cells in [1:-1, 1:-1] with >=1 wet
@@ -757,9 +776,10 @@ class Mask2D(eqx.Module):
         """Construct from a field at u-faces, deriving the h-grid mask.
 
         ``NaN`` values are treated as dry u-faces.  The h-grid mask is
-        then inferred via :func:`h_from_pooled` with kernel ``(2, 1)``
-        and the requested ``mode``; the remaining staggered masks are
-        produced by :meth:`from_mask`.
+        then inferred via :func:`h_from_pooled` with kernel ``(1, 2)``
+        (trailing-pad direction, matching the grid's positive-half-step
+        convention) and the requested ``mode``; the remaining staggered
+        masks are produced by :meth:`from_mask`.
 
         Parameters
         ----------
@@ -778,7 +798,7 @@ class Mask2D(eqx.Module):
         Mask2D
         """
         u_mask = np.isfinite(np.asarray(field))
-        h_mask = h_from_pooled(u_mask, kernel=(2, 1), mode=mode)
+        h_mask = h_from_pooled(u_mask, kernel=(1, 2), mode=mode, direction="trailing")
         return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
 
     @classmethod
@@ -792,8 +812,8 @@ class Mask2D(eqx.Module):
         """Construct from a field at v-faces, deriving the h-grid mask.
 
         ``NaN`` values are treated as dry v-faces.  The h-grid mask is
-        then inferred via :func:`h_from_pooled` with kernel ``(1, 2)``
-        and the requested ``mode``.
+        then inferred via :func:`h_from_pooled` with kernel ``(2, 1)``
+        (trailing-pad direction) and the requested ``mode``.
 
         Parameters
         ----------
@@ -812,7 +832,7 @@ class Mask2D(eqx.Module):
         Mask2D
         """
         v_mask = np.isfinite(np.asarray(field))
-        h_mask = h_from_pooled(v_mask, kernel=(1, 2), mode=mode)
+        h_mask = h_from_pooled(v_mask, kernel=(2, 1), mode=mode, direction="trailing")
         return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
 
     @classmethod
@@ -827,8 +847,9 @@ class Mask2D(eqx.Module):
 
         ``NaN`` values are treated as dry corners.  The h-grid mask is
         then inferred via :func:`h_from_pooled` with kernel ``(2, 2)``
-        and the requested ``mode``.  This is the natural constructor for
-        vertex-stored quantities such as relative vorticity.
+        (trailing-pad direction) and the requested ``mode``.  This is
+        the natural constructor for vertex-stored quantities such as
+        relative vorticity.
 
         Parameters
         ----------
@@ -847,7 +868,7 @@ class Mask2D(eqx.Module):
         Mask2D
         """
         c_mask = np.isfinite(np.asarray(field))
-        h_mask = h_from_pooled(c_mask, kernel=(2, 2), mode=mode)
+        h_mask = h_from_pooled(c_mask, kernel=(2, 2), mode=mode, direction="trailing")
         return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
 
     @classmethod
@@ -1116,17 +1137,18 @@ class Mask3D(eqx.Module):
         Notes
         -----
         The five staggered masks are derived from ``mask_hgrid`` via
-        :func:`pool_bool` with the following kernel/threshold pairs:
+        :func:`pool_bool` with the following kernel/threshold pairs
+        (trailing-pad direction → positive half-step convention):
 
-        ==================== ============= =========  ====================================
+        ==================== ============= =========  =========================================
         Mask                 Kernel        Threshold  Semantics
-        ==================== ============= =========  ====================================
-        ``u``                ``(1, 2, 1)`` ``3/4``    both y-adjacent h-cells wet
-        ``v``                ``(1, 1, 2)`` ``3/4``    both x-adjacent h-cells wet
-        ``w``                ``(2, 1, 1)`` ``3/4``    both z-adjacent h-cells wet
-        ``xy_corner``        ``(1, 2, 2)`` ``1/8``    ≥ 1 of 4 horizontal h-cells wet
-        ``xy_corner_strict`` ``(1, 2, 2)`` ``7/8``    all 4 horizontal h-cells wet
-        ==================== ============= =========  ====================================
+        ==================== ============= =========  =========================================
+        ``u`` (east face)    ``(1, 1, 2)`` ``3/4``    ``h[k, j, i] AND h[k, j, i+1]``
+        ``v`` (north face)   ``(1, 2, 1)`` ``3/4``    ``h[k, j, i] AND h[k, j+1, i]``
+        ``w`` (top z-face)   ``(2, 1, 1)`` ``3/4``    ``h[k, j, i] AND h[k+1, j, i]``
+        ``xy_corner``        ``(1, 2, 2)`` ``1/8``    ≥ 1 of 4 NE-corner h-cells wet (per k)
+        ``xy_corner_strict`` ``(1, 2, 2)`` ``7/8``    all 4 NE-corner h-cells wet (per k)
+        ==================== ============= =========  =========================================
 
         The land/coast classification uses two successive
         :func:`dilate_mask` passes on ``~mask_hgrid`` with a 6-connected
@@ -1138,25 +1160,43 @@ class Mask3D(eqx.Module):
         hf = h_np.astype(np.float32)
 
         # ── staggered masks ───────────────────────────────────────────────
-        # u[k, j, i] = (h[k, j, i] + h[k, j-1, i]) / 2 > 3/4   (y-face)
-        u_np = pool_bool(hf, kernel=(1, 2, 1), threshold=3.0 / 4.0)
-        # v[k, j, i] = (h[k, j, i] + h[k, j, i-1]) / 2 > 3/4   (x-face)
-        v_np = pool_bool(hf, kernel=(1, 1, 2), threshold=3.0 / 4.0)
-        # w[k, j, i] = (h[k, j, i] + h[k-1, j, i]) / 2 > 3/4   (z-face, NEW in 3-D)
-        w_np = pool_bool(hf, kernel=(2, 1, 1), threshold=3.0 / 4.0)
-        # xy_corner[k, j, i]: at least 1 of 4 SW-corner h-cells wet (lenient)
-        xy_corner_np = pool_bool(hf, kernel=(1, 2, 2), threshold=1.0 / 8.0)
-        # xy_corner_strict: all 4 SW-corner h-cells wet (strict)
-        xy_corner_strict_np = pool_bool(hf, kernel=(1, 2, 2), threshold=7.0 / 8.0)
+        # All staggered masks use the trailing-pad (positive half-step)
+        # convention, matching the grid module's same-index rule.
+
+        # u[k, j, i] = (h[k, j, i] + h[k, j, i+1]) / 2 > 3/4  (east face = U-point)
+        u_np = pool_bool(
+            hf, kernel=(1, 1, 2), threshold=3.0 / 4.0, direction="trailing"
+        )
+        # v[k, j, i] = (h[k, j, i] + h[k, j+1, i]) / 2 > 3/4  (north face = V-point)
+        v_np = pool_bool(
+            hf, kernel=(1, 2, 1), threshold=3.0 / 4.0, direction="trailing"
+        )
+        # w[k, j, i] = (h[k, j, i] + h[k+1, j, i]) / 2 > 3/4  (top z-face)
+        w_np = pool_bool(
+            hf, kernel=(2, 1, 1), threshold=3.0 / 4.0, direction="trailing"
+        )
+        # xy_corner[k, j, i]: at least 1 of 4 NE-corner h-cells wet (lenient)
+        xy_corner_np = pool_bool(
+            hf, kernel=(1, 2, 2), threshold=1.0 / 8.0, direction="trailing"
+        )
+        # xy_corner_strict: all 4 NE-corner h-cells wet (strict)
+        xy_corner_strict_np = pool_bool(
+            hf, kernel=(1, 2, 2), threshold=7.0 / 8.0, direction="trailing"
+        )
 
         # ── corner boundary classification (per z-level) ──────────────────
-        u_west = np.pad(u_np[:, :, :-1], ((0, 0), (0, 0), (1, 0)))  # u[k,j,i-1]
-        v_south = np.pad(v_np[:, :-1, :], ((0, 0), (1, 0), (0, 0)))  # v[k,j-1,i]
+        # For xy_corner[k, j, i] at NE corner of h[k, j, i] (per z-level),
+        # the 4 incident horizontal velocity faces are u[k, j, i] /
+        # u[k, j+1, i] (vertical lines) and v[k, j, i] / v[k, j, i+1]
+        # (horizontal lines).  Trailing-side zero-pad supplies the implicit
+        # boundary face beyond the array.
+        u_north = np.pad(u_np[:, 1:, :], ((0, 0), (0, 1), (0, 0)))  # u[k, j+1, i]
+        v_east = np.pad(v_np[:, :, 1:], ((0, 0), (0, 0), (0, 1)))  # v[k, j, i+1]
 
-        xy_corner_y_wall = xy_corner_np & (~v_np | ~v_south)
-        xy_corner_x_wall = xy_corner_np & (~u_np | ~u_west)
+        xy_corner_y_wall = xy_corner_np & (~u_np | ~u_north)
+        xy_corner_x_wall = xy_corner_np & (~v_np | ~v_east)
         xy_corner_convex = xy_corner_y_wall & xy_corner_x_wall
-        xy_corner_valid = xy_corner_np & u_np & u_west & v_np & v_south
+        xy_corner_valid = xy_corner_np & u_np & u_north & v_np & v_east
 
         # ── irregular xy_corner_strict boundary indices ───────────────────
         # Dry xy_corner_strict cells in [1:-1, 1:-1, 1:-1] with >=1 wet
@@ -1274,7 +1314,8 @@ class Mask3D(eqx.Module):
 
         ``NaN`` values are treated as dry u-faces.  The h-grid mask is
         then inferred via :func:`h_from_pooled` with kernel
-        ``(1, 2, 1)`` and the requested ``mode``.
+        ``(1, 1, 2)`` (trailing-pad direction) and the requested
+        ``mode``.
 
         Parameters
         ----------
@@ -1293,7 +1334,9 @@ class Mask3D(eqx.Module):
         Mask3D
         """
         u_mask = np.isfinite(np.asarray(field))
-        h_mask = h_from_pooled(u_mask, kernel=(1, 2, 1), mode=mode)
+        h_mask = h_from_pooled(
+            u_mask, kernel=(1, 1, 2), mode=mode, direction="trailing"
+        )
         return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
 
     @classmethod
@@ -1308,7 +1351,8 @@ class Mask3D(eqx.Module):
 
         ``NaN`` values are treated as dry v-faces.  The h-grid mask is
         then inferred via :func:`h_from_pooled` with kernel
-        ``(1, 1, 2)`` and the requested ``mode``.
+        ``(1, 2, 1)`` (trailing-pad direction) and the requested
+        ``mode``.
 
         Parameters
         ----------
@@ -1327,7 +1371,9 @@ class Mask3D(eqx.Module):
         Mask3D
         """
         v_mask = np.isfinite(np.asarray(field))
-        h_mask = h_from_pooled(v_mask, kernel=(1, 1, 2), mode=mode)
+        h_mask = h_from_pooled(
+            v_mask, kernel=(1, 2, 1), mode=mode, direction="trailing"
+        )
         return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
 
     @classmethod
@@ -1342,8 +1388,9 @@ class Mask3D(eqx.Module):
 
         ``NaN`` values are treated as dry w-faces.  The h-grid mask is
         then inferred via :func:`h_from_pooled` with kernel
-        ``(2, 1, 1)`` and the requested ``mode``.  This is the natural
-        constructor for vertical-velocity fields stored at z-faces.
+        ``(2, 1, 1)`` (trailing-pad direction) and the requested
+        ``mode``.  This is the natural constructor for vertical-velocity
+        fields stored at z-faces.
 
         Parameters
         ----------
@@ -1362,7 +1409,9 @@ class Mask3D(eqx.Module):
         Mask3D
         """
         w_mask = np.isfinite(np.asarray(field))
-        h_mask = h_from_pooled(w_mask, kernel=(2, 1, 1), mode=mode)
+        h_mask = h_from_pooled(
+            w_mask, kernel=(2, 1, 1), mode=mode, direction="trailing"
+        )
         return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
 
     @classmethod
@@ -1377,8 +1426,9 @@ class Mask3D(eqx.Module):
 
         ``NaN`` values are treated as dry corners.  The h-grid mask is
         then inferred via :func:`h_from_pooled` with kernel
-        ``(1, 2, 2)`` and the requested ``mode``.  Corners in 3-D are
-        per-z-level (no z-staggering on corners).
+        ``(1, 2, 2)`` (trailing-pad direction) and the requested
+        ``mode``.  Corners in 3-D are per-z-level (no z-staggering on
+        corners).
 
         Parameters
         ----------
@@ -1397,7 +1447,9 @@ class Mask3D(eqx.Module):
         Mask3D
         """
         c_mask = np.isfinite(np.asarray(field))
-        h_mask = h_from_pooled(c_mask, kernel=(1, 2, 2), mode=mode)
+        h_mask = h_from_pooled(
+            c_mask, kernel=(1, 2, 2), mode=mode, direction="trailing"
+        )
         return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
 
     @classmethod

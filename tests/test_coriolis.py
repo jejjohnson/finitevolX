@@ -142,43 +142,39 @@ class TestCoriolis2D:
     def test_mask_zeros_land_points(self, grid2d):
         """Mask zeros tendencies at dry face cells and leaves wet cells unchanged.
 
-        A land column at index 5 makes mask.u[:, 5] = 0 (y-adjacent pair
-        contains a dry h-cell) and mask.v[:, 5:7] = 0 (x-adjacent pair
-        contains a dry h-cell on either side of the column).  du_cor / dv_cor
-        must be exactly zero at those face cells, and match the unmasked result
-        at an interior column away from the land.
+        Under the trailing-pad (positive half-step) convention,
+        ``mask.u[j, i] = h[j, i] AND h[j, i+1]`` (the east face of T[j, i]),
+        so a land column at index 5 zeros ``mask.u[:, 4]`` (east face of
+        column 4 borders land) and ``mask.u[:, 5]`` (east face of column 5
+        is land).  The ``mask.v`` (north face) is unaffected by a single
+        land column except *at* column 5, where ``mask.v[:, 5] =
+        h[:, 5] AND h[:+1, 5] = F``.
         """
-        import numpy as np_cpu
-
         cor = Coriolis2D(grid=grid2d)
         u = jnp.ones((grid2d.Ny, grid2d.Nx))
         v = jnp.ones((grid2d.Ny, grid2d.Nx))
         f = jnp.ones((grid2d.Ny, grid2d.Nx))
 
-        # Build a mask with a land column at index 5
-        h_mask = np_cpu.ones((grid2d.Ny, grid2d.Nx), dtype=bool)
+        # Build a mask with a land column at index 5.
+        h_mask = np.ones((grid2d.Ny, grid2d.Nx), dtype=bool)
         h_mask[:, 5] = False
         mask = Mask2D.from_mask(h_mask)
 
         du_masked, dv_masked = cor(u, v, f, mask=mask)
         du_unmasked, _ = cor(u, v, f)
 
-        # mask.u[:, 5] == 0 because the y-pair (h[:,5], h[:,4]) contains land
-        land_u_cols = np_cpu.where(~np_cpu.asarray(mask.u[:, 5]))[0]
-        assert len(land_u_cols) > 0, "Expected some dry U-face cells in column 5"
-        np.testing.assert_allclose(
-            np.asarray(du_masked[land_u_cols, 5]), 0.0, atol=1e-15
-        )
+        # mask.u (east face) is dry at columns 4 and 5: column 4's east
+        # face borders the land column 5, and column 5's east face is land.
+        for col in (4, 5):
+            assert not bool(mask.u[3, col].item()), f"mask.u[:, {col}] should be dry"
+            np.testing.assert_allclose(np.asarray(du_masked[:, col]), 0.0, atol=1e-15)
 
-        # mask.v[:, 5] and mask.v[:, 6] == 0 (x-pair straddles the land column)
-        for col in (5, 6):
-            land_v_rows = np_cpu.where(~np_cpu.asarray(mask.v[:, col]))[0]
-            if len(land_v_rows) > 0:
-                np.testing.assert_allclose(
-                    np.asarray(dv_masked[land_v_rows, col]), 0.0, atol=1e-15
-                )
+        # mask.v (north face) is dry only at column 5 (north face of land
+        # column 5 is itself land); column 6 is unaffected by the gap.
+        assert not bool(mask.v[3, 5].item()), "mask.v[:, 5] should be dry"
+        np.testing.assert_allclose(np.asarray(dv_masked[:, 5]), 0.0, atol=1e-15)
 
-        # An interior column away from land should match the unmasked result
+        # An interior column away from land should match the unmasked result.
         np.testing.assert_allclose(
             np.asarray(du_masked[1:-1, 2]),
             np.asarray(du_unmasked[1:-1, 2]),
@@ -312,43 +308,42 @@ class TestCoriolis3D:
     def test_mask_zeros_land_points_3d(self, grid3d):
         """3-D mask broadcasts over z: dry face cells are zeroed at every level.
 
-        A land column at index 4 (for the 8×8 grid) causes mask.u[:, 4] = 0.
-        After applying the mask, du_cor[:, :, 4] must be zero at all z-levels,
-        while an adjacent wet column is left unchanged.
+        Under the trailing-pad (positive half-step) convention,
+        ``mask.u[j, i] = h[j, i] AND h[j, i+1]`` (the east face of T[j, i]),
+        so a land column at index 4 zeros ``mask.u[:, 3]`` (east face of
+        column 3 borders land) and ``mask.u[:, 4]`` (east face of column 4
+        is land).  After applying the mask, ``du_cor[:, :, 3]`` and
+        ``du_cor[:, :, 4]`` must be zero at all z-levels, while an
+        adjacent wet column is left unchanged.
         """
-        import numpy as np_cpu
-
         cor = Coriolis3D(grid=grid3d)
         u = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         v = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         f = jnp.ones((grid3d.Ny, grid3d.Nx))
 
-        # Land column at index 4 of an (Ny, Nx) = (8, 8) h-mask
-        h_mask = np_cpu.ones((grid3d.Ny, grid3d.Nx), dtype=bool)
+        # Land column at index 4 of an (Ny, Nx) = (8, 8) h-mask.
+        h_mask = np.ones((grid3d.Ny, grid3d.Nx), dtype=bool)
         h_mask[:, 4] = False
         mask = Mask2D.from_mask(h_mask)
 
         du_masked, dv_masked = cor(u, v, f, mask=mask)
         du_unmasked, _ = cor(u, v, f)
 
-        # All z-levels: column 4 of du_cor must be zero where mask.u is dry
-        land_rows = np_cpu.where(~np_cpu.asarray(mask.u[:, 4]))[0]
-        assert len(land_rows) > 0, "Expected dry U-face cells in column 4"
-        np.testing.assert_allclose(
-            np.asarray(du_masked[:, land_rows, 4]), 0.0, atol=1e-15
-        )
+        # mask.u (east face) is dry at columns 3 and 4: column 3's east
+        # face borders land column 4, and column 4's east face is land.
+        for col in (3, 4):
+            assert not bool(mask.u[3, col].item()), f"mask.u[:, {col}] should be dry"
+            np.testing.assert_allclose(
+                np.asarray(du_masked[:, :, col]), 0.0, atol=1e-15
+            )
 
-        # mask.v[:, 4] and mask.v[:, 5] must be zero (x-pair straddles land col)
-        for col in (4, 5):
-            land_v_rows = np_cpu.where(~np_cpu.asarray(mask.v[:, col]))[0]
-            if len(land_v_rows) > 0:
-                np.testing.assert_allclose(
-                    np.asarray(dv_masked[:, land_v_rows, col]), 0.0, atol=1e-15
-                )
+        # mask.v (north face) is dry only at column 4 (the land column).
+        assert not bool(mask.v[3, 4].item()), "mask.v[:, 4] should be dry"
+        np.testing.assert_allclose(np.asarray(dv_masked[:, :, 4]), 0.0, atol=1e-15)
 
-        # An interior column well away from land should match the unmasked result
+        # An interior column well away from land should match the unmasked result.
         np.testing.assert_allclose(
-            np.asarray(du_masked[1:-1, 1:-1, 2]),
-            np.asarray(du_unmasked[1:-1, 1:-1, 2]),
+            np.asarray(du_masked[1:-1, 1:-1, 1]),
+            np.asarray(du_unmasked[1:-1, 1:-1, 1]),
             rtol=1e-6,
         )

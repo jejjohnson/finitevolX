@@ -25,9 +25,9 @@
 #     X ── V ── X ── V ── X
 #     |         |         |
 #     U    T    U    T    U     T = tracer / height / pressure (cell centre)
-#     |         |         |     U = u-velocity (east / y-face)
-#     X ── V ── X ── V ── X     V = v-velocity (north / x-face)
-#     |         |         |     X = vorticity / streamfunction (corner)
+#     |         |         |     U = u-velocity (east face, perpendicular to x)
+#     X ── V ── X ── V ── X     V = v-velocity (north face, perpendicular to y)
+#     |         |         |     X = vorticity / streamfunction (NE corner)
 #     U    T    U    T    U
 #     |         |         |
 #     X ── V ── X ── V ── X
@@ -36,17 +36,20 @@
 # The **h-mask** (cell centres) is the primary input.  `Mask2D`
 # derives all staggered masks, a 4-level land/coast classification,
 # directional stencil capability arrays, and vorticity boundary flags
-# automatically.
+# automatically.  All staggered masks use the **same-index positive
+# half-step** convention (matching the grid module): ``mask.u[j, i]``
+# is at ``(j, i + 1/2)``, ``mask.v[j, i]`` at ``(j + 1/2, i)``,
+# ``mask.xy_corner[j, i]`` at ``(j + 1/2, i + 1/2)``.
 #
 # ### Mask derivation rules
 #
 # | Variable | Location | Rule |
 # |----------|----------|------|
 # | **h** | cell centre | input mask (1 = wet, 0 = dry) |
-# | **u** | y-face | wet if both adjacent h-cells are wet |
-# | **v** | x-face | wet if both adjacent h-cells are wet |
-# | **xy_corner** | corner (lenient) | wet if *any* adjacent h-cell is wet |
-# | **xy_corner_strict** | corner (strict) | wet if *all four* adjacent h-cells are wet |
+# | **u** | east face | wet iff `h[j, i]` and `h[j, i+1]` both wet |
+# | **v** | north face | wet iff `h[j, i]` and `h[j+1, i]` both wet |
+# | **xy_corner** | NE corner (lenient) | wet iff *any* of the 4 NE-corner h-cells wet |
+# | **xy_corner_strict** | NE corner (strict) | wet iff *all four* NE-corner h-cells wet |
 
 # %%
 from pathlib import Path
@@ -166,8 +169,8 @@ def plot_staggered_masks(masks, name, img_dir):
     """Plot the 5 staggered masks + classification in a 2x3 grid."""
     fields = {
         "h (centre)": masks.h,
-        "u (y-face)": masks.u,
-        "v (x-face)": masks.v,
+        "u (east face)": masks.u,
+        "v (north face)": masks.v,
         "xy_corner (lenient)": masks.xy_corner,
         "xy_corner_strict": masks.xy_corner_strict,
         "classification": masks.classification,
@@ -380,7 +383,7 @@ print(
 # | Concept | Detail |
 # |---------|--------|
 # | **Primary input** | Binary h-mask (cell centres): 1 = wet, 0 = dry |
-# | **Derived masks** | u (y-face), v (x-face), xy_corner (lenient), xy_corner_strict |
+# | **Derived masks** | u (east face), v (north face), xy_corner (lenient), xy_corner_strict |
 # | **Classification** | 4-level: land (0), coast (1), near-coast (2), ocean (3) |
 # | **Stencil capability** | Per-cell count of contiguous wet neighbours in each direction |
 # | **Adaptive stencils** | Mutually-exclusive masks for WENO-5 / TVD-3 / upwind-1 |
