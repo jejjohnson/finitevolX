@@ -56,7 +56,7 @@ state_next = fvx.heun_step(tendency_fn, state, dt)
 | Component | Description |
 |-----------|-------------|
 | `ArakawaCGrid1D/2D/3D` | Staggered C-grid containers with T, U, V, X point locations |
-| `Mask2D` | Land/ocean masks with automatic staggered derivation (h, u, v, psi) |
+| `Mask1D/2D/3D` | Land/ocean masks with automatic staggered derivation (h, u, v, w, xy_corner, xy_corner_strict) |
 | Boundary classification | 4-level land/coast/near-coast/ocean + vorticity boundary categories |
 | Stencil capability | Adaptive WENO stencil dispatch at irregular coastlines |
 | `SphericalArakawaCGrid2D/3D` | Spherical coordinate grids |

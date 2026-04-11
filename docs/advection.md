@@ -173,9 +173,10 @@ extend into land cells and produce incorrect results.  finitevolX supports
   gracefully to lower-order methods.
 
 !!! tip "When to enable mask-aware advection"
-    Pass an `Mask2D` to `Advection2D.__init__` whenever the domain
-    has land cells.  For fully periodic or rectangular domains without land,
-    omit the mask for slightly lower overhead.
+    Pass a `Mask2D` to `Advection2D.__call__` (via the `mask=` keyword)
+    whenever the domain has land cells.  For fully periodic or rectangular
+    domains without land, omit the `mask` argument for slightly lower
+    overhead.
 
 ---
 
@@ -195,27 +196,29 @@ The 1-D operator writes to `[2:-2]`.
 
 ```python
 import jax.numpy as jnp
-from finitevolx import ArakawaCGrid2D, Advection2D
+from finitevolx import ArakawaCGrid2D, Advection2D, Mask2D
 
 grid = ArakawaCGrid2D.from_interior(64, 64, 1e6, 1e6)
 
-# Default: WENO5 without mask
+# Construct once; the operator is method-agnostic.
 adv = Advection2D(grid=grid)
 
-# With TVD/van Leer
-adv_tvd = Advection2D(grid=grid, method="van_leer")
+# T-point tracer and U/V-point velocities
+q = jnp.ones((grid.Ny, grid.Nx))   # T-point tracer
+u = jnp.zeros((grid.Ny, grid.Nx))  # U-point velocity
+v = jnp.zeros((grid.Ny, grid.Nx))  # V-point velocity
 
-# With mask-aware WENO5
-from finitevolx import Mask2D
+# Default upwind1 (no mask)
+dq_dt = adv(q, u, v)
+
+# Choose a method per-call
+dq_dt_tvd = adv(q, u, v, method="van_leer")
+dq_dt_weno = adv(q, u, v, method="weno5")
+
+# With mask-aware adaptive stencil dispatch
 mask = Mask2D.from_mask(ocean_mask)
-adv_masked = Advection2D(grid=grid, method="weno5", mask=mask)
-
-# Compute tracer tendency: -∇·(u*q)
-q = jnp.ones((grid.Ny, grid.Nx))  # T-point tracer
-u = jnp.zeros((grid.Ny, grid.Nx)) # U-point velocity
-v = jnp.zeros((grid.Ny, grid.Nx)) # V-point velocity
-
-dq_dt = adv(q, u, v)   # shape [Ny, Nx], non-zero only in [2:-2, 2:-2]
+dq_dt_masked = adv(q, u, v, method="weno5", mask=mask)
+# shape [Ny, Nx], non-zero only in [2:-2, 2:-2]
 ```
 
 ---

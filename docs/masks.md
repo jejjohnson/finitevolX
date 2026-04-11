@@ -19,10 +19,17 @@ w-----v-----w..   > x
 | Point                | Location                  | Variable                         |
 |----------------------|---------------------------|----------------------------------|
 | **h**                | cell centre               | tracers, height, pressure        |
-| **u**                | y-face (east/west)        | zonal velocity                   |
-| **v**                | x-face (north/south)      | meridional velocity              |
-| **xy_corner**        | SW corner (lenient)       | vorticity                        |
-| **xy_corner_strict** | SW corner (strict)        | streamfunction                   |
+| **u**                | east face                 | zonal velocity                   |
+| **v**                | north face                | meridional velocity              |
+| **xy_corner**        | NE corner (lenient)       | vorticity                        |
+| **xy_corner_strict** | NE corner (strict)        | streamfunction                   |
+
+All staggered points use the *same-index, positive half-step* convention:
+``u[j, i]`` is the east face of ``h[j, i]``, ``v[j, i]`` is the north face,
+and ``xy_corner[j, i]`` is the NE corner — matching ``CartesianGrid2D``.
+See [the Arakawa C-grid discretization notes](cgrid_discretization.md) for
+the underlying convention and a comparison with negative half-step
+alternatives.
 
 ## Creating masks
 

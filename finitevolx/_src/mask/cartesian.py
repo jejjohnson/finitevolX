@@ -373,14 +373,16 @@ class Mask2D(eqx.Module):
         ocean, ``False`` = dry / land.  This is the canonical mask that
         the other staggered masks are derived from.
     u : Bool[Array, "Ny Nx"]
-        Wet mask at y-faces (the south/north boundaries of each cell).
-        A y-face is wet iff *both* of its meridionally adjacent cell
-        centres are wet — i.e. flow through the face is physically
-        meaningful.
+        Wet mask at x-faces (the west/east boundaries of each cell), where
+        the zonal velocity ``u`` lives.  ``u[j, i]`` is the *east* face of
+        ``h[j, i]`` (positive half-step / NE convention).  Wet iff *both*
+        of the zonally adjacent cell centres are wet — i.e. flow through
+        the face is physically meaningful.
     v : Bool[Array, "Ny Nx"]
-        Wet mask at x-faces (the west/east boundaries of each cell).
-        An x-face is wet iff *both* of its zonally adjacent cell centres
-        are wet.
+        Wet mask at y-faces (the south/north boundaries of each cell), where
+        the meridional velocity ``v`` lives.  ``v[j, i]`` is the *north*
+        face of ``h[j, i]``.  Wet iff *both* of the meridionally adjacent
+        cell centres are wet.
     xy_corner : Bool[Array, "Ny Nx"]
         Lenient wet mask at xy-corners (vertices).  ``True`` wherever
         *at least one* of the four surrounding cell centres is wet —
@@ -931,20 +933,24 @@ class Mask3D(eqx.Module):
         ``False`` = dry / land.  This is the canonical mask that the
         other staggered masks are derived from.
     u : Bool[Array, "Nz Ny Nx"]
-        Wet mask at y-faces (the south/north boundaries of each cell).
-        A y-face is wet iff *both* of its meridionally adjacent cell
-        centres at the same z-level are wet.
+        Wet mask at x-faces (the west/east boundaries of each cell), where
+        the zonal velocity ``u`` lives.  ``u[k, j, i]`` is the *east* face
+        of ``h[k, j, i]`` (positive half-step / NE convention).  Wet iff
+        *both* of the zonally adjacent cell centres at the same z-level
+        are wet.
     v : Bool[Array, "Nz Ny Nx"]
-        Wet mask at x-faces (the west/east boundaries of each cell).
-        An x-face is wet iff *both* of its zonally adjacent cell centres
-        at the same z-level are wet.
+        Wet mask at y-faces (the south/north boundaries of each cell), where
+        the meridional velocity ``v`` lives.  ``v[k, j, i]`` is the *north*
+        face of ``h[k, j, i]``.  Wet iff *both* of the meridionally adjacent
+        cell centres at the same z-level are wet.
     w : Bool[Array, "Nz Ny Nx"]
-        Wet mask at z-faces (the bottom/top boundaries of each cell).
-        A z-face is wet iff *both* of its vertically adjacent cell
-        centres at the same horizontal position are wet.  ``w[k, j, i]``
-        is the *bottom* face of cell ``(k, j, i)``; stored at the same
-        shape as ``h`` (no extra ``Nz+1`` layer — the topmost surface
-        face is implicit).
+        Wet mask at z-faces (the top/bottom boundaries of each cell), where
+        the vertical velocity ``w`` lives.  ``w[k, j, i]`` is the *top*
+        face of cell ``(k, j, i)`` (positive half-step convention, matching
+        ``u`` and ``v``).  Wet iff *both* of the vertically adjacent cell
+        centres at the same horizontal position are wet.  Stored at the
+        same shape as ``h`` (no extra ``Nz+1`` layer — the bottom surface
+        of the lowest interior cell is implicit in the bottom ghost shell).
     xy_corner : Bool[Array, "Nz Ny Nx"]
         Lenient wet mask at xy-corners (vertices), per z-level.
         ``True`` wherever *at least one* of the four surrounding cell

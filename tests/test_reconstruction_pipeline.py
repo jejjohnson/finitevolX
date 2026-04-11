@@ -618,12 +618,12 @@ class TestDistboundAccessors:
         np.testing.assert_array_equal(covered, wet)
 
     def test_distbound_aliases_classification(self, island_mask):
-        """distbound accessors should be consistent with ind_coast etc."""
-        np.testing.assert_array_equal(island_mask.ind_coast, island_mask.ind_coast)
-        np.testing.assert_array_equal(
-            island_mask.ind_near_coast, island_mask.ind_near_coast
-        )
-        np.testing.assert_array_equal(island_mask.ind_ocean, island_mask.ind_ocean)
+        """ind_* boolean accessors are consistent with the underlying classification field."""
+        cls_ = island_mask.classification
+        np.testing.assert_array_equal(island_mask.ind_land, cls_ == 0)
+        np.testing.assert_array_equal(island_mask.ind_coast, cls_ == 1)
+        np.testing.assert_array_equal(island_mask.ind_near_coast, cls_ == 2)
+        np.testing.assert_array_equal(island_mask.ind_ocean, cls_ == 3)
 
     def test_all_ocean_domain(self, all_ocean):
         """All-ocean domain: no coast/near-coast, all cells are ocean."""

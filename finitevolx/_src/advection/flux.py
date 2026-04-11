@@ -12,7 +12,7 @@ Typical usage::
     from finitevolx import Mask2D, upwind_flux
     from finitevolx import Reconstruction2D, CartesianGrid2D
 
-    grid = CartesianGrid2D.from_interior(Ny, Nx, dy, dx)
+    grid = CartesianGrid2D.from_interior(nx_interior, ny_interior, Lx, Ly)
     recon = Reconstruction2D(grid=grid)
     mask = Mask2D.from_mask(h_mask)
 
