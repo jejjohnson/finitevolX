@@ -179,6 +179,13 @@ def _register_all() -> list[Entry]:
         )
     )
 
+    # ------------------------------------------------------------------
+    # Coriolis2D / Coriolis3D
+    # ------------------------------------------------------------------
+    entries.extend(
+        _coriolis_entries(grid2d, grid3d, mask2d, mask3d, u2d, v2d, u3d, v3d)
+    )
+
     return entries
 
 
@@ -741,6 +748,28 @@ def _spherical_entries(
     )
 
     return entries
+
+
+def _coriolis_entries(
+    grid2d, grid3d, mask2d, mask3d, u2d, v2d, u3d, v3d
+) -> list[Entry]:
+    """Register goldens for Coriolis2D / Coriolis3D."""
+    from finitevolx._src.operators.coriolis import Coriolis2D, Coriolis3D
+    from tests.fixtures.inputs import make_f_field_2d
+
+    f2d = make_f_field_2d()
+
+    c2 = Coriolis2D(grid=grid2d)
+    c2m = Coriolis2D(grid=grid2d, mask=mask2d)
+    c3 = Coriolis3D(grid=grid3d)
+    c3m = Coriolis3D(grid=grid3d, mask=mask3d)
+
+    return [
+        ("Coriolis2D", "__call__", "unmasked", lambda: c2(u2d, v2d, f2d)),
+        ("Coriolis2D", "__call__", "masked", lambda: c2m(u2d, v2d, f2d)),
+        ("Coriolis3D", "__call__", "unmasked", lambda: c3(u3d, v3d, f2d)),
+        ("Coriolis3D", "__call__", "masked", lambda: c3m(u3d, v3d, f2d)),
+    ]
 
 
 def main() -> int:
