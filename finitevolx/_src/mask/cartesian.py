@@ -126,19 +126,25 @@ class Mask1D(eqx.Module):
         bnd = bnd.at[-1].set(True)
         return bnd
 
-    # ── adaptive WENO stencil masks ───────────────────────────────────────────
+    # ── adaptive stencil masks ────────────────────────────────────────────────
 
     def get_adaptive_masks(
         self,
         stencil_sizes: tp.Sequence[int] = (2, 4, 6, 8, 10),
     ) -> dict[int, Bool[Array, "Nx"]]:
-        """Per-point adaptive stencil-size masks for 1-D WENO reconstruction.
+        """Per-point adaptive stencil-size masks for 1-D operators.
 
         For each stencil size *s*, returns a boolean mask that is ``True``
         at cells where a symmetric stencil of half-width ``s//2`` is fully
         supported by contiguous wet neighbours.  The masks are mutually
         exclusive hierarchical tiers (the mask for size *s* is True only
         where *s* is the *largest* usable stencil).
+
+        These masks are useful for any operator that wants to fall back
+        to a narrower stencil near coastlines or irregular boundaries —
+        not just WENO reconstruction, but also higher-order upwind
+        advection, higher-order finite-difference operators, and
+        higher-order interpolation kernels.
 
         Parameters
         ----------
@@ -447,7 +453,7 @@ class Mask2D(eqx.Module):
         bnd = bnd.at[:, -1].set(True)
         return bnd
 
-    # ── adaptive WENO stencil masks ───────────────────────────────────────────
+    # ── adaptive stencil masks ────────────────────────────────────────────────
 
     def get_adaptive_masks(
         self,
@@ -455,19 +461,23 @@ class Mask2D(eqx.Module):
         source: str = "h",
         stencil_sizes: tp.Sequence[int] = (2, 4, 6, 8, 10),
     ) -> dict[int, Bool[Array, "Ny Nx"]]:
-        """Per-point adaptive stencil-size masks for WENO reconstruction.
+        """Per-point adaptive stencil-size masks for 2-D operators.
 
         For each stencil size *s* in ``stencil_sizes``, returns a boolean mask
         that is ``True`` at cells where a symmetric stencil of half-width
         *s//2* is fully supported by contiguous wet neighbours.
 
-        Stencil sizes correspond to WENO orders:
+        These masks are useful for any operator that wants to fall back
+        to a narrower stencil near coastlines or irregular boundaries.
+        Common consumers include:
 
-        * size 2  → 1st-order upwind  (half-width 1)
-        * size 4  → WENO3             (half-width 2)
-        * size 6  → WENO5             (half-width 3)
-        * size 8  → WENO7             (half-width 4)
-        * size 10 → WENO9             (half-width 5)
+        * **WENO reconstruction**: size 2 → upwind1, 4 → WENO3, 6 → WENO5,
+          8 → WENO7, 10 → WENO9 (half-widths 1 / 2 / 3 / 4 / 5).
+        * **Higher-order upwind advection** (e.g. 3rd / 5th-order upwind).
+        * **Higher-order centred finite-difference** operators (4th / 6th /
+          8th-order Laplacians, gradients, etc.).
+        * **Higher-order interpolation** kernels (cubic / quintic
+          T↔face / T↔corner interpolations).
 
         The returned masks are **mutually exclusive** hierarchical tiers: the
         mask for size *s* is ``True`` only where *s* is the *largest* usable
@@ -476,7 +486,7 @@ class Mask2D(eqx.Module):
         Parameters
         ----------
         direction : {'x', 'y'}
-            Reconstruction direction.
+            Stencil direction.
         source : {'h', 'u', 'v', 'xy_corner', 'xy_corner_strict'}
             Source grid whose stencil capability to use.
         stencil_sizes : sequence of int
@@ -966,23 +976,29 @@ class Mask3D(eqx.Module):
         bnd = bnd.at[:, :, -1].set(True)
         return bnd
 
-    # ── adaptive WENO stencil masks ───────────────────────────────────────────
+    # ── adaptive stencil masks ────────────────────────────────────────────────
 
     def get_adaptive_masks(
         self,
         direction: str = "x",
         stencil_sizes: tp.Sequence[int] = (2, 4, 6, 8, 10),
     ) -> dict[int, Bool[Array, "Nz Ny Nx"]]:
-        """Per-point adaptive stencil-size masks for 3-D WENO reconstruction.
+        """Per-point adaptive stencil-size masks for 3-D operators.
 
         For each stencil size *s*, returns a boolean mask that is ``True``
         at cells where a symmetric stencil of half-width ``s//2`` is
         fully supported by contiguous wet neighbours along ``direction``.
 
+        These masks are useful for any operator that wants to fall back
+        to a narrower stencil near coastlines or irregular boundaries —
+        not just WENO reconstruction, but also higher-order upwind
+        advection, higher-order finite-difference operators, and
+        higher-order interpolation kernels.
+
         Parameters
         ----------
         direction : {'x', 'y', 'z'}
-            Reconstruction direction.
+            Stencil direction.
         stencil_sizes : sequence of int
             Ordered candidate stencil sizes (even integers).
 
