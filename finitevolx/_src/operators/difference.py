@@ -24,6 +24,7 @@ from finitevolx._src.grid.cartesian import (
     CartesianGrid2D,
     CartesianGrid3D,
 )
+from finitevolx._src.mask import Mask1D, Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.stencils import (
     diff_x_bwd,
@@ -80,9 +81,19 @@ class Difference1D(eqx.Module):
     ----------
     grid : CartesianGrid1D
         The underlying 1-D grid.
+    mask : Mask1D or None, optional
+        Optional land/ocean mask.  When provided, every method
+        post-multiplies its output by the mask field matching the
+        output stagger:
+
+        * T-output → ``mask.h``
+        * U-output → ``mask.u``
+
+        ``None`` (default) leaves every output untouched.
     """
 
     grid: CartesianGrid1D
+    mask: Mask1D | None = None
 
     def diff_x_T_to_U(self, h: Float[Array, "Nx"]) -> Float[Array, "Nx"]:
         """Forward difference in x: T-point -> U-point.
@@ -98,8 +109,12 @@ class Difference1D(eqx.Module):
         -------
         Float[Array, "Nx"]
             Forward x-difference at U-points, same shape as input.
+            When ``self.mask`` is set, the output is zeroed at dry
+            U-faces via ``* self.mask.u``.
         """
         out = interior(diff_x_fwd_1d(h) / self.grid.dx, h)
+        if self.mask is not None:
+            out = out * self.mask.u
         return out
 
     def diff_x_U_to_T(self, u: Float[Array, "Nx"]) -> Float[Array, "Nx"]:
@@ -116,8 +131,12 @@ class Difference1D(eqx.Module):
         -------
         Float[Array, "Nx"]
             Backward x-difference at T-points, same shape as input.
+            When ``self.mask`` is set, the output is zeroed at dry
+            T-cells via ``* self.mask.h``.
         """
         out = interior(diff_x_bwd_1d(u) / self.grid.dx, u)
+        if self.mask is not None:
+            out = out * self.mask.h
         return out
 
     def laplacian(self, h: Float[Array, "Nx"]) -> Float[Array, "Nx"]:
@@ -133,9 +152,13 @@ class Difference1D(eqx.Module):
         Returns
         -------
         Float[Array, "Nx"]
-            Laplacian at T-points, same shape as input.
+            Laplacian at T-points, same shape as input.  When
+            ``self.mask`` is set, the output is zeroed at dry T-cells
+            via ``* self.mask.h``.
         """
         out = interior((diff_x_fwd_1d(h) - diff_x_bwd_1d(h)) / self.grid.dx**2, h)
+        if self.mask is not None:
+            out = out * self.mask.h
         return out
 
 
@@ -146,9 +169,23 @@ class Difference2D(eqx.Module):
     ----------
     grid : CartesianGrid2D
         The underlying 2-D grid.
+    mask : Mask2D or None, optional
+        Optional land/ocean mask.  When provided, every method
+        post-multiplies its output by the mask field matching the
+        output stagger:
+
+        * T-output → ``mask.h`` (divergence, laplacian, U→T, V→T)
+        * U-output → ``mask.u`` (T→U, X→U, grad_perp's u component)
+        * V-output → ``mask.v`` (T→V, X→V, grad_perp's v component)
+        * X-output → ``mask.xy_corner_strict`` (curl, U→X, V→X)
+
+        The strict corner mask is used because an X-point output is
+        trusted only when all four surrounding T-cells are wet.
+        ``None`` (default) leaves every output untouched.
     """
 
     grid: CartesianGrid2D
+    mask: Mask2D | None = None
 
     # ------------------------------------------------------------------
     # Forward differences
@@ -167,9 +204,12 @@ class Difference2D(eqx.Module):
         Returns
         -------
         Float[Array, "Ny Nx"]
-            Forward x-difference at U-points.
+            Forward x-difference at U-points.  When ``self.mask`` is
+            set, the output is zeroed at dry U-faces via ``* mask.u``.
         """
         out = interior(diff_x_fwd(h) / self.grid.dx, h)
+        if self.mask is not None:
+            out = out * self.mask.u
         return out
 
     def diff_y_T_to_V(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -185,9 +225,12 @@ class Difference2D(eqx.Module):
         Returns
         -------
         Float[Array, "Ny Nx"]
-            Forward y-difference at V-points.
+            Forward y-difference at V-points.  When ``self.mask`` is
+            set, the output is zeroed at dry V-faces via ``* mask.v``.
         """
         out = interior(diff_y_fwd(h) / self.grid.dy, h)
+        if self.mask is not None:
+            out = out * self.mask.v
         return out
 
     def diff_y_U_to_X(self, u: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -203,9 +246,13 @@ class Difference2D(eqx.Module):
         Returns
         -------
         Float[Array, "Ny Nx"]
-            Forward y-difference at X-points.
+            Forward y-difference at X-points.  When ``self.mask`` is
+            set, the output is zeroed at dry X-corners via
+            ``* mask.xy_corner_strict``.
         """
         out = interior(diff_y_fwd(u) / self.grid.dy, u)
+        if self.mask is not None:
+            out = out * self.mask.xy_corner_strict
         return out
 
     def diff_x_V_to_X(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -221,9 +268,13 @@ class Difference2D(eqx.Module):
         Returns
         -------
         Float[Array, "Ny Nx"]
-            Forward x-difference at X-points.
+            Forward x-difference at X-points.  When ``self.mask`` is
+            set, the output is zeroed at dry X-corners via
+            ``* mask.xy_corner_strict``.
         """
         out = interior(diff_x_fwd(v) / self.grid.dx, v)
+        if self.mask is not None:
+            out = out * self.mask.xy_corner_strict
         return out
 
     def diff_y_X_to_U(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -239,9 +290,12 @@ class Difference2D(eqx.Module):
         Returns
         -------
         Float[Array, "Ny Nx"]
-            Backward y-difference at U-points.
+            Backward y-difference at U-points.  When ``self.mask`` is
+            set, the output is zeroed at dry U-faces via ``* mask.u``.
         """
         out = interior(diff_y_bwd(q) / self.grid.dy, q)
+        if self.mask is not None:
+            out = out * self.mask.u
         return out
 
     def diff_x_X_to_V(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -257,9 +311,12 @@ class Difference2D(eqx.Module):
         Returns
         -------
         Float[Array, "Ny Nx"]
-            Backward x-difference at V-points.
+            Backward x-difference at V-points.  When ``self.mask`` is
+            set, the output is zeroed at dry V-faces via ``* mask.v``.
         """
         out = interior(diff_x_bwd(q) / self.grid.dx, q)
+        if self.mask is not None:
+            out = out * self.mask.v
         return out
 
     # ------------------------------------------------------------------
@@ -279,9 +336,12 @@ class Difference2D(eqx.Module):
         Returns
         -------
         Float[Array, "Ny Nx"]
-            Backward x-difference at T-points.
+            Backward x-difference at T-points.  When ``self.mask`` is
+            set, the output is zeroed at dry T-cells via ``* mask.h``.
         """
         out = interior(diff_x_bwd(u) / self.grid.dx, u)
+        if self.mask is not None:
+            out = out * self.mask.h
         return out
 
     def diff_y_V_to_T(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -297,9 +357,12 @@ class Difference2D(eqx.Module):
         Returns
         -------
         Float[Array, "Ny Nx"]
-            Backward y-difference at T-points.
+            Backward y-difference at T-points.  When ``self.mask`` is
+            set, the output is zeroed at dry T-cells via ``* mask.h``.
         """
         out = interior(diff_y_bwd(v) / self.grid.dy, v)
+        if self.mask is not None:
+            out = out * self.mask.h
         return out
 
     # ------------------------------------------------------------------
@@ -327,9 +390,13 @@ class Difference2D(eqx.Module):
         Returns
         -------
         Float[Array, "Ny Nx"]
-            Divergence at T-points.
+            Divergence at T-points.  When ``self.mask`` is set, the
+            output is zeroed at dry T-cells via ``* mask.h``.
         """
-        return _divergence_2d(u, v, self.grid.dx, self.grid.dy)
+        out = _divergence_2d(u, v, self.grid.dx, self.grid.dy)
+        if self.mask is not None:
+            out = out * self.mask.h
+        return out
 
     def curl(
         self,
@@ -352,9 +419,14 @@ class Difference2D(eqx.Module):
         Returns
         -------
         Float[Array, "Ny Nx"]
-            Relative vorticity at X-points (corners).
+            Relative vorticity at X-points (corners).  When
+            ``self.mask`` is set, the output is zeroed at dry X-corners
+            via ``* mask.xy_corner_strict``.
         """
-        return _curl_2d(u, v, self.grid.dx, self.grid.dy)
+        out = _curl_2d(u, v, self.grid.dx, self.grid.dy)
+        if self.mask is not None:
+            out = out * self.mask.xy_corner_strict
+        return out
 
     def laplacian(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """Laplacian at T-points.
@@ -370,19 +442,20 @@ class Difference2D(eqx.Module):
         Returns
         -------
         Float[Array, "Ny Nx"]
-            Laplacian at T-points.
+            Laplacian at T-points.  When ``self.mask`` is set, the
+            output is zeroed at dry T-cells via ``* mask.h``.
         """
         # nabla2_h[j, i] = d^2h/dx^2 + d^2h/dy^2
         d2x = (diff_x_fwd(h) - diff_x_bwd(h)) / self.grid.dx**2
         d2y = (diff_y_fwd(h) - diff_y_bwd(h)) / self.grid.dy**2
         out = interior(d2x + d2y, h)
+        if self.mask is not None:
+            out = out * self.mask.h
         return out
 
     def grad_perp(
         self,
         psi: Float[Array, "Ny Nx"],
-        mask_u: Float[Array, "Ny Nx"] | None = None,
-        mask_v: Float[Array, "Ny Nx"] | None = None,
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
         """Perpendicular gradient: T-point streamfunction to geostrophic velocity.
 
@@ -397,17 +470,14 @@ class Difference2D(eqx.Module):
         v[j+1/2, i] =  (ψ[j,i+1] + ψ[j+1,i+1] - ψ[j,i-1] - ψ[j+1,i-1]) / (4·dx)
 
         The resulting (unmasked) velocity field is discretely non-divergent:
-        div(u, v) = 0 at T-points. When masks are applied, the divergence-free
-        property no longer holds in general.
+        div(u, v) = 0 at T-points. When ``self.mask`` is set, ``u`` is
+        multiplied by ``self.mask.u`` and ``v`` by ``self.mask.v``; the
+        divergence-free property no longer holds in general in that case.
 
         Parameters
         ----------
         psi : Float[Array, "Ny Nx"]
             Streamfunction at T-points.
-        mask_u : Float[Array, "Ny Nx"] | None, optional
-            Binary mask at U-points. If provided, u is zeroed where mask is 0.
-        mask_v : Float[Array, "Ny Nx"] | None, optional
-            Binary mask at V-points. If provided, v is zeroed where mask is 0.
 
         Returns
         -------
@@ -444,10 +514,9 @@ class Difference2D(eqx.Module):
             psi,
         )
 
-        if mask_u is not None:
-            u = u * mask_u
-        if mask_v is not None:
-            v = v * mask_v
+        if self.mask is not None:
+            u = u * self.mask.u
+            v = v * self.mask.v
 
         return u, v
 
@@ -462,9 +531,15 @@ class Difference3D(eqx.Module):
     ----------
     grid : CartesianGrid3D
         The underlying 3-D grid.
+    mask : Mask3D or None, optional
+        Optional land/ocean mask.  When provided, every method
+        post-multiplies its output by the mask field matching the
+        output stagger (``mask.h``, ``mask.u``, or ``mask.v``).
+        ``None`` (default) leaves every output untouched.
     """
 
     grid: CartesianGrid3D
+    mask: Mask3D | None = None
 
     def diff_x_T_to_U(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Forward x-difference over all z-levels: T -> U.
@@ -479,9 +554,12 @@ class Difference3D(eqx.Module):
         Returns
         -------
         Float[Array, "Nz Ny Nx"]
-            Forward x-difference at U-points.
+            Forward x-difference at U-points.  When ``self.mask`` is
+            set, the output is zeroed at dry U-faces via ``* mask.u``.
         """
         out = interior(diff_x_fwd_3d(h) / self.grid.dx, h)
+        if self.mask is not None:
+            out = out * self.mask.u
         return out
 
     def diff_y_T_to_V(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -497,9 +575,12 @@ class Difference3D(eqx.Module):
         Returns
         -------
         Float[Array, "Nz Ny Nx"]
-            Forward y-difference at V-points.
+            Forward y-difference at V-points.  When ``self.mask`` is
+            set, the output is zeroed at dry V-faces via ``* mask.v``.
         """
         out = interior(diff_y_fwd_3d(h) / self.grid.dy, h)
+        if self.mask is not None:
+            out = out * self.mask.v
         return out
 
     def diff_x_U_to_T(self, u: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -515,9 +596,12 @@ class Difference3D(eqx.Module):
         Returns
         -------
         Float[Array, "Nz Ny Nx"]
-            Backward x-difference at T-points.
+            Backward x-difference at T-points.  When ``self.mask`` is
+            set, the output is zeroed at dry T-cells via ``* mask.h``.
         """
         out = interior(diff_x_bwd_3d(u) / self.grid.dx, u)
+        if self.mask is not None:
+            out = out * self.mask.h
         return out
 
     def diff_y_V_to_T(self, v: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -533,9 +617,12 @@ class Difference3D(eqx.Module):
         Returns
         -------
         Float[Array, "Nz Ny Nx"]
-            Backward y-difference at T-points.
+            Backward y-difference at T-points.  When ``self.mask`` is
+            set, the output is zeroed at dry T-cells via ``* mask.h``.
         """
         out = interior(diff_y_bwd_3d(v) / self.grid.dy, v)
+        if self.mask is not None:
+            out = out * self.mask.h
         return out
 
     def divergence(
@@ -557,7 +644,11 @@ class Difference3D(eqx.Module):
         Returns
         -------
         Float[Array, "Nz Ny Nx"]
-            Divergence at T-points.
+            Divergence at T-points.  When ``self.mask`` is set, the
+            output is zeroed at dry T-cells via ``* mask.h`` (applied
+            inside the ``diff_*`` sub-calls — both sub-methods share
+            the same T-point output stagger, so the mask is already
+            baked into each addend).
         """
         return self.diff_x_U_to_T(u) + self.diff_y_V_to_T(v)
 
@@ -575,9 +666,12 @@ class Difference3D(eqx.Module):
         Returns
         -------
         Float[Array, "Nz Ny Nx"]
-            Laplacian at T-points.
+            Laplacian at T-points.  When ``self.mask`` is set, the
+            output is zeroed at dry T-cells via ``* mask.h``.
         """
         d2x = (diff_x_fwd_3d(h) - diff_x_bwd_3d(h)) / self.grid.dx**2
         d2y = (diff_y_fwd_3d(h) - diff_y_bwd_3d(h)) / self.grid.dy**2
         out = interior(d2x + d2y, h)
+        if self.mask is not None:
+            out = out * self.mask.h
         return out

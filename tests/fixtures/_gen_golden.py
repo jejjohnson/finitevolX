@@ -47,14 +47,26 @@ while _REPO_ROOT in sys.path:
     sys.path.remove(_REPO_ROOT)
 sys.path.insert(0, _REPO_ROOT)
 
+# Enable float64 *before* any finitevolx/JAX import.  The goldens must
+# be saved in the same dtype regime that the test suite runs under; the
+# test-side sibling ``tests/fixtures/__init__.py`` does the same thing.
+import jax
+
+jax.config.update("jax_enable_x64", True)
+
 from tests.fixtures._helpers import save_golden
 from tests.fixtures.inputs import (
+    make_grid_1d,
     make_grid_2d,
     make_grid_3d,
+    make_h_field_1d,
     make_h_field_2d,
     make_h_field_3d,
+    make_mask_1d,
     make_mask_2d,
+    make_mask_3d,
     make_q_field_2d,
+    make_u_field_1d,
     make_u_field_2d,
     make_u_field_3d,
     make_v_field_2d,
@@ -81,9 +93,14 @@ def _register_all() -> list[Entry]:
         the unmasked output.
     """
     entries: list[Entry] = []
+    grid1d = make_grid_1d()
     grid2d = make_grid_2d()
     grid3d = make_grid_3d()
+    mask1d = make_mask_1d()
     mask2d = make_mask_2d()
+    mask3d = make_mask_3d()
+    h1d = make_h_field_1d()
+    u1d = make_u_field_1d()
     h2d = make_h_field_2d()
     u2d = make_u_field_2d()
     v2d = make_v_field_2d()
@@ -92,16 +109,162 @@ def _register_all() -> list[Entry]:
     u3d = make_u_field_3d()
     v3d = make_v_field_3d()
 
-    # ------------------------------------------------------------------
-    # Operator families are wired up in subsequent commits.  This first
-    # commit only ships the infrastructure; entries are added alongside
-    # the operator changes themselves so each commit is self-contained.
-    # ------------------------------------------------------------------
+    # Touch q2d so the linter doesn't complain about unused locals until
+    # later commits wire in operators that consume X-point fields.
+    _ = q2d
 
-    # Touch the bindings to keep linters from complaining about unused
-    # locals while the registration tables are still being written
-    # commit-by-commit.  These references are deliberately cheap.
-    _ = (grid2d, grid3d, mask2d, h2d, u2d, v2d, q2d, h3d, u3d, v3d)
+    # ------------------------------------------------------------------
+    # Difference1D / 2D / 3D
+    # ------------------------------------------------------------------
+    entries.extend(
+        _difference_entries(
+            grid1d,
+            grid2d,
+            grid3d,
+            mask1d,
+            mask2d,
+            mask3d,
+            h1d,
+            u1d,
+            h2d,
+            u2d,
+            v2d,
+            h3d,
+            u3d,
+            v3d,
+        )
+    )
+
+    return entries
+
+
+def _difference_entries(
+    grid1d,
+    grid2d,
+    grid3d,
+    mask1d,
+    mask2d,
+    mask3d,
+    h1d,
+    u1d,
+    h2d,
+    u2d,
+    v2d,
+    h3d,
+    u3d,
+    v3d,
+) -> list[Entry]:
+    """Register goldens for Difference1D / Difference2D / Difference3D."""
+    from finitevolx._src.operators.difference import (
+        Difference1D,
+        Difference2D,
+        Difference3D,
+    )
+
+    entries: list[Entry] = []
+
+    # --- Difference1D -------------------------------------------------
+    d1 = Difference1D(grid=grid1d)
+    d1m = Difference1D(grid=grid1d, mask=mask1d)
+    for method, arg in (
+        ("diff_x_T_to_U", h1d),
+        ("diff_x_U_to_T", u1d),
+        ("laplacian", h1d),
+    ):
+        entries.append(
+            (
+                "Difference1D",
+                method,
+                "unmasked",
+                (lambda m=method, a=arg: getattr(d1, m)(a)),
+            )
+        )
+        entries.append(
+            (
+                "Difference1D",
+                method,
+                "masked",
+                (lambda m=method, a=arg: getattr(d1m, m)(a)),
+            )
+        )
+
+    # --- Difference2D -------------------------------------------------
+    d2 = Difference2D(grid=grid2d)
+    d2m = Difference2D(grid=grid2d, mask=mask2d)
+    # (method_name, *args_to_pass)
+    d2_unary_specs = (
+        ("diff_x_T_to_U", h2d),
+        ("diff_y_T_to_V", h2d),
+        ("diff_y_U_to_X", u2d),
+        ("diff_x_V_to_X", v2d),
+        ("diff_y_X_to_U", h2d),  # pretend h2d lives at X — smooth analytic field
+        ("diff_x_X_to_V", h2d),
+        ("diff_x_U_to_T", u2d),
+        ("diff_y_V_to_T", v2d),
+        ("laplacian", h2d),
+    )
+    for method, arg in d2_unary_specs:
+        entries.append(
+            (
+                "Difference2D",
+                method,
+                "unmasked",
+                (lambda m=method, a=arg: getattr(d2, m)(a)),
+            )
+        )
+        entries.append(
+            (
+                "Difference2D",
+                method,
+                "masked",
+                (lambda m=method, a=arg: getattr(d2m, m)(a)),
+            )
+        )
+    # Compound: divergence, curl, grad_perp (grad_perp takes psi only).
+    entries.append(
+        ("Difference2D", "divergence", "unmasked", lambda: d2.divergence(u2d, v2d))
+    )
+    entries.append(
+        ("Difference2D", "divergence", "masked", lambda: d2m.divergence(u2d, v2d))
+    )
+    entries.append(("Difference2D", "curl", "unmasked", lambda: d2.curl(u2d, v2d)))
+    entries.append(("Difference2D", "curl", "masked", lambda: d2m.curl(u2d, v2d)))
+    entries.append(("Difference2D", "grad_perp", "unmasked", lambda: d2.grad_perp(h2d)))
+    entries.append(("Difference2D", "grad_perp", "masked", lambda: d2m.grad_perp(h2d)))
+
+    # --- Difference3D -------------------------------------------------
+    d3 = Difference3D(grid=grid3d)
+    d3m = Difference3D(grid=grid3d, mask=mask3d)
+    d3_unary_specs = (
+        ("diff_x_T_to_U", h3d),
+        ("diff_y_T_to_V", h3d),
+        ("diff_x_U_to_T", u3d),
+        ("diff_y_V_to_T", v3d),
+        ("laplacian", h3d),
+    )
+    for method, arg in d3_unary_specs:
+        entries.append(
+            (
+                "Difference3D",
+                method,
+                "unmasked",
+                (lambda m=method, a=arg: getattr(d3, m)(a)),
+            )
+        )
+        entries.append(
+            (
+                "Difference3D",
+                method,
+                "masked",
+                (lambda m=method, a=arg: getattr(d3m, m)(a)),
+            )
+        )
+    entries.append(
+        ("Difference3D", "divergence", "unmasked", lambda: d3.divergence(u3d, v3d))
+    )
+    entries.append(
+        ("Difference3D", "divergence", "masked", lambda: d3m.divergence(u3d, v3d))
+    )
 
     return entries
 

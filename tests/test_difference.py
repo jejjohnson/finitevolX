@@ -401,23 +401,38 @@ class TestGradPerp2D:
         # ∂ψ/∂y = c, so u = -c at interior [1:-1, 1:-1]
         np.testing.assert_allclose(u[1:-1, 1:-1], -c, rtol=1e-5)
 
-    def test_mask_u_zeros_velocity(self, grid2d):
-        """mask_u zeroes u at masked points."""
-        diff = Difference2D(grid=grid2d)
+    def test_all_dry_mask_zeros_u(self, grid2d):
+        """An all-dry Mask2D zeroes both u and v — here we assert u."""
+        from finitevolx._src.mask import Mask2D
+
+        all_dry = Mask2D.from_mask(np.zeros((grid2d.Ny, grid2d.Nx), dtype=bool))
+        diff = Difference2D(grid=grid2d, mask=all_dry)
         y = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
         psi = jnp.broadcast_to(y[:, None], (grid2d.Ny, grid2d.Nx))
-        mask_u = jnp.zeros((grid2d.Ny, grid2d.Nx))
-        u, _v = diff.grad_perp(psi, mask_u=mask_u)
+        u, _v = diff.grad_perp(psi)
         np.testing.assert_allclose(u, 0.0, atol=1e-12)
 
-    def test_mask_v_zeros_velocity(self, grid2d):
-        """mask_v zeroes v at masked points."""
-        diff = Difference2D(grid=grid2d)
+    def test_all_dry_mask_zeros_v(self, grid2d):
+        """An all-dry Mask2D zeroes both u and v — here we assert v."""
+        from finitevolx._src.mask import Mask2D
+
+        all_dry = Mask2D.from_mask(np.zeros((grid2d.Ny, grid2d.Nx), dtype=bool))
+        diff = Difference2D(grid=grid2d, mask=all_dry)
         x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
         psi = jnp.broadcast_to(x, (grid2d.Ny, grid2d.Nx))
-        mask_v = jnp.zeros((grid2d.Ny, grid2d.Nx))
-        _u, v = diff.grad_perp(psi, mask_v=mask_v)
+        _u, v = diff.grad_perp(psi)
         np.testing.assert_allclose(v, 0.0, atol=1e-12)
+
+    def test_mask_none_matches_unmasked(self, grid2d):
+        """mask=None path produces identical (u, v) to the no-mask default."""
+        diff_none = Difference2D(grid=grid2d, mask=None)
+        diff_default = Difference2D(grid=grid2d)
+        y = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
+        psi = jnp.broadcast_to(y[:, None], (grid2d.Ny, grid2d.Nx))
+        u1, v1 = diff_none.grad_perp(psi)
+        u2, v2 = diff_default.grad_perp(psi)
+        np.testing.assert_array_equal(u1, u2)
+        np.testing.assert_array_equal(v1, v2)
 
     def test_no_nan_output(self, grid2d):
         """grad_perp must not produce NaN for well-defined inputs."""
