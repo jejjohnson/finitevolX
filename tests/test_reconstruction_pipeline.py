@@ -923,15 +923,16 @@ class TestAdvectionStencilFallback:
         weno5 (the mask dispatch picks the max tier everywhere)."""
         Ny, Nx = 14, 14
         grid = CartesianGrid2D.from_interior(Nx - 2, Ny - 2, 1.0, 1.0)
-        adv = Advection2D(grid=grid)
+        adv_plain = Advection2D(grid=grid)
         # All-ocean mask: the adaptive dispatch should use weno5 everywhere.
         mask = Mask2D.from_dimensions(Ny, Nx)
+        adv_masked = Advection2D(grid=grid, mask=mask)
         h = self._make_staircase_field(Ny, Nx)
         u = jnp.ones((Ny, Nx))
         v = jnp.ones((Ny, Nx))
 
-        masked = adv(h, u, v, method="weno5", mask=mask)
-        plain = adv(h, u, v, method="weno5")
+        masked = adv_masked(h, u, v, method="weno5")
+        plain = adv_plain(h, u, v, method="weno5")
         # Deep interior cells should match (both use the full weno5 stencil).
         np.testing.assert_allclose(
             np.asarray(masked[4:-4, 4:-4]),
@@ -954,13 +955,14 @@ class TestAdvectionStencilFallback:
         mask = Mask2D.from_mask(h_mask)
 
         grid = CartesianGrid2D.from_interior(Nx - 2, Ny - 2, 1.0, 1.0)
-        adv = Advection2D(grid=grid)
+        adv_plain = Advection2D(grid=grid)
+        adv_masked = Advection2D(grid=grid, mask=mask)
         h = self._make_staircase_field(Ny, Nx)
         u = jnp.ones((Ny, Nx))
         v = jnp.ones((Ny, Nx))
 
-        masked = adv(h, u, v, method="weno5", mask=mask)
-        unmasked = adv(h, u, v, method="weno5")
+        masked = adv_masked(h, u, v, method="weno5")
+        unmasked = adv_plain(h, u, v, method="weno5")
 
         # At at least one coast cell (interior rows), the masked tendency
         # differs from the unmasked tendency: that's the fallback firing.
@@ -986,13 +988,14 @@ class TestAdvectionStencilFallback:
         mask = Mask2D.from_mask(h_mask)
 
         grid = CartesianGrid2D.from_interior(Nx - 2, Ny - 2, 1.0, 1.0)
-        adv = Advection2D(grid=grid)
+        adv_plain = Advection2D(grid=grid)
+        adv_masked = Advection2D(grid=grid, mask=mask)
         h = self._make_staircase_field(Ny, Nx)
         u = jnp.ones((Ny, Nx))
         v = jnp.ones((Ny, Nx))
 
-        masked = adv(h, u, v, method="van_leer", mask=mask)
-        unmasked = adv(h, u, v, method="van_leer")
+        masked = adv_masked(h, u, v, method="van_leer")
+        unmasked = adv_plain(h, u, v, method="van_leer")
 
         masks_x = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4))
         coast_x = np.asarray(masks_x[2])

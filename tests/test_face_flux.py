@@ -297,8 +297,8 @@ class TestMaskedFlux:
         u = 0.5 * jnp.ones((Ny, Nx)) * jnp.asarray(mask.u, dtype=float)
         v = 0.3 * jnp.ones((Ny, Nx)) * jnp.asarray(mask.v, dtype=float)
 
-        adv = Advection2D(grid)
-        tendency = adv(h, u, v, method="weno5", mask=mask)
+        adv = Advection2D(grid, mask=mask)
+        tendency = adv(h, u, v, method="weno5")
 
         fe, fn = uv_center_flux(h, u, v, grid, method="weno5", mask=mask)
         dx, dy = grid.dx, grid.dy

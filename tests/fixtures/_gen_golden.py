@@ -186,6 +186,28 @@ def _register_all() -> list[Entry]:
         _coriolis_entries(grid2d, grid3d, mask2d, mask3d, u2d, v2d, u3d, v3d)
     )
 
+    # ------------------------------------------------------------------
+    # Advection1D / Advection2D / Advection3D
+    # ------------------------------------------------------------------
+    entries.extend(
+        _advection_entries(
+            grid1d,
+            grid2d,
+            grid3d,
+            mask1d,
+            mask2d,
+            mask3d,
+            h1d,
+            u1d,
+            h2d,
+            u2d,
+            v2d,
+            h3d,
+            u3d,
+            v3d,
+        )
+    )
+
     return entries
 
 
@@ -746,6 +768,104 @@ def _spherical_entries(
             ("SphericalLaplacian3D", "__call__", "masked", lambda: sl3m(h3d)),
         ]
     )
+
+    return entries
+
+
+def _advection_entries(
+    grid1d,
+    grid2d,
+    grid3d,
+    mask1d,
+    mask2d,
+    mask3d,
+    h1d,
+    u1d,
+    h2d,
+    u2d,
+    v2d,
+    h3d,
+    u3d,
+    v3d,
+) -> list[Entry]:
+    """Register goldens for Advection1D / Advection2D / Advection3D.
+
+    Covers two representative methods per class:
+
+    * ``upwind1`` — the non-mask-dispatchable path (post-compute mask.h only).
+    * ``weno5`` — the mask-dispatchable path (adaptive tier selection +
+      post-compute mask.h).
+    """
+    from finitevolx._src.advection.advection import (
+        Advection1D,
+        Advection2D,
+        Advection3D,
+    )
+
+    entries: list[Entry] = []
+
+    # --- Advection1D --------------------------------------------------
+    a1 = Advection1D(grid=grid1d)
+    a1m = Advection1D(grid=grid1d, mask=mask1d)
+    for method in ("upwind1", "weno5"):
+        entries.append(
+            (
+                "Advection1D",
+                f"__call___{method}",
+                "unmasked",
+                (lambda m=method: a1(h1d, u1d, method=m)),
+            )
+        )
+        entries.append(
+            (
+                "Advection1D",
+                f"__call___{method}",
+                "masked",
+                (lambda m=method: a1m(h1d, u1d, method=m)),
+            )
+        )
+
+    # --- Advection2D --------------------------------------------------
+    a2 = Advection2D(grid=grid2d)
+    a2m = Advection2D(grid=grid2d, mask=mask2d)
+    for method in ("upwind1", "weno5"):
+        entries.append(
+            (
+                "Advection2D",
+                f"__call___{method}",
+                "unmasked",
+                (lambda m=method: a2(h2d, u2d, v2d, method=m)),
+            )
+        )
+        entries.append(
+            (
+                "Advection2D",
+                f"__call___{method}",
+                "masked",
+                (lambda m=method: a2m(h2d, u2d, v2d, method=m)),
+            )
+        )
+
+    # --- Advection3D --------------------------------------------------
+    a3 = Advection3D(grid=grid3d)
+    a3m = Advection3D(grid=grid3d, mask=mask3d)
+    for method in ("upwind1", "weno5"):
+        entries.append(
+            (
+                "Advection3D",
+                f"__call___{method}",
+                "unmasked",
+                (lambda m=method: a3(h3d, u3d, v3d, method=m)),
+            )
+        )
+        entries.append(
+            (
+                "Advection3D",
+                f"__call___{method}",
+                "masked",
+                (lambda m=method: a3m(h3d, u3d, v3d, method=m)),
+            )
+        )
 
     return entries
 
