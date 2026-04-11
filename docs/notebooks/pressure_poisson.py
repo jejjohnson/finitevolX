@@ -66,7 +66,7 @@ IMG_DIR.mkdir(parents=True, exist_ok=True)
 # %% [markdown]
 # ## 1. Grid Construction
 #
-# We build an `CartesianGrid2D` with a 2-cell ghost ring.  The interior has
+# We build a `CartesianGrid2D` with a 2-cell ghost ring.  The interior has
 # `nx × ny` T-points; the full array shape is `(ny+2) × (nx+2)`.
 
 # %%
