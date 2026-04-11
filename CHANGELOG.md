@@ -62,6 +62,14 @@ field stored column indices and `_yids` stored row indices.
   library.  Equivalent inline code is available in
   `docs/notebooks/demo_masks.py`.
 
+## [0.0.40](https://github.com/jejjohnson/finitevolX/compare/v0.0.39...v0.0.40) (2026-04-11)
+
+
+### Features
+
+* operator-attribute mask API (Mask1D/2D/3D class fields, [#209](https://github.com/jejjohnson/finitevolX/issues/209)) ([#211](https://github.com/jejjohnson/finitevolX/issues/211)) ([9f67b18](https://github.com/jejjohnson/finitevolX/commit/9f67b18ea75488aedb634fe510eb12d881385668))
+* **operators:** operator-attribute mask API ([#209](https://github.com/jejjohnson/finitevolX/issues/209)) ([9f67b18](https://github.com/jejjohnson/finitevolX/commit/9f67b18ea75488aedb634fe510eb12d881385668))
+
 ## [0.0.39](https://github.com/jejjohnson/finitevolX/compare/v0.0.38...v0.0.39) (2026-03-24)
 
 
