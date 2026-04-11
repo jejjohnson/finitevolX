@@ -51,10 +51,21 @@ For an all-ocean domain, use the shortcut:
 masks = Mask2D.from_dimensions(ny=12, nx=12)
 ```
 
-Or construct from an SSH field where NaN marks land:
+Or construct from any float field at a known grid position, where
+`NaN` marks dry cells:
 
 ```python
-masks = Mask2D.from_ssh(ssh_field)
+# From a field at cell centres (T-points): SSH, temperature, pressure, …
+masks = Mask2D.from_center(ssh_field)
+
+# From a field at u-faces, v-faces, or xy-corners.  Pass `mode=` to
+# choose the inversion strategy when the inverse mapping back to the
+# h-grid is non-unique:
+#   mode='permissive'  → h wet iff *any* surrounding face/corner wet
+#   mode='conservative' → h wet iff *all* surrounding face/corner wet
+masks = Mask2D.from_u_face(u_field, mode="permissive")
+masks = Mask2D.from_v_face(v_field, mode="permissive")
+masks = Mask2D.from_corner(vorticity_field, mode="conservative")
 ```
 
 ## Staggered variable locations

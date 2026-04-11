@@ -210,11 +210,11 @@ class TestConstruction:
     def test_from_dimensions_all_wet(self, all_ocean):
         assert bool(jnp.all(all_ocean.h))
 
-    def test_from_ssh_nan_is_land(self):
-        ssh = np.ones((6, 6), dtype=float)
-        ssh[0, :] = np.nan
-        ssh[:, 0] = np.nan
-        m = Mask2D.from_ssh(ssh)
+    def test_from_center_nan_is_land(self):
+        field = np.ones((6, 6), dtype=float)
+        field[0, :] = np.nan
+        field[:, 0] = np.nan
+        m = Mask2D.from_center(field)
         np.testing.assert_array_equal(np.asarray(m.h)[0, :], False)
         np.testing.assert_array_equal(np.asarray(m.h)[:, 0], False)
 
@@ -230,6 +230,82 @@ class TestConstruction:
 
         assert ACM is not None
         assert SC is not None
+
+
+# ── grid-position constructors (from_center / from_u_face / from_v_face / from_corner) ──
+
+
+class TestGridPositionConstructors:
+    """Tests for the new from_<position> constructors on Mask2D."""
+
+    def test_from_u_face_all_ocean_round_trip(self):
+        # For an all-wet h, forward-pooling and inverting via permissive
+        # mode should recover the all-wet mask exactly.
+        h = np.ones((6, 6), dtype=bool)
+        u_field = np.where(_pool_bool(h.astype(float), (2, 1), 3.0 / 4.0), 1.0, np.nan)
+        m = Mask2D.from_u_face(u_field, mode="permissive")
+        np.testing.assert_array_equal(np.asarray(m.h), h)
+
+    def test_from_u_face_subset_property(self):
+        # Inverse permissive yields h_inferred ⊆ true_h (the permissive
+        # inversion is the lower bound on the consistent h).  Round-trip
+        # is lossy at isolated wet cells with no axis-aligned neighbours.
+        rng = np.random.default_rng(0)
+        h = rng.random((8, 8)) > 0.3  # ~70% wet
+        u_field = np.where(_pool_bool(h.astype(float), (2, 1), 3.0 / 4.0), 1.0, np.nan)
+        m = Mask2D.from_u_face(u_field, mode="permissive")
+        h_inferred = np.asarray(m.h)
+        # h_inferred ⊆ h: no false-wet cells.
+        assert bool(np.all(h | ~h_inferred))
+
+    def test_from_u_face_conservative_subset_of_permissive(self):
+        # conservative h ⊆ permissive h for the same input.
+        rng = np.random.default_rng(1)
+        u_field = np.where(rng.random((8, 8)) > 0.3, 1.0, np.nan)
+        m_perm = Mask2D.from_u_face(u_field, mode="permissive")
+        m_cons = Mask2D.from_u_face(u_field, mode="conservative")
+        cons = np.asarray(m_cons.h)
+        perm = np.asarray(m_perm.h)
+        assert bool(np.all((~cons) | perm))
+
+    def test_from_v_face_all_ocean_round_trip(self):
+        h = np.ones((6, 6), dtype=bool)
+        v_field = np.where(_pool_bool(h.astype(float), (1, 2), 3.0 / 4.0), 1.0, np.nan)
+        m = Mask2D.from_v_face(v_field, mode="permissive")
+        np.testing.assert_array_equal(np.asarray(m.h), h)
+
+    def test_from_v_face_subset_property(self):
+        rng = np.random.default_rng(2)
+        h = rng.random((8, 8)) > 0.3
+        v_field = np.where(_pool_bool(h.astype(float), (1, 2), 3.0 / 4.0), 1.0, np.nan)
+        m = Mask2D.from_v_face(v_field, mode="permissive")
+        h_inferred = np.asarray(m.h)
+        assert bool(np.all(h | ~h_inferred))
+
+    def test_from_corner_all_ocean_round_trip(self):
+        # All-wet corner field (no NaN) → all-wet h under permissive.
+        c_field = np.ones((6, 6), dtype=float)
+        m = Mask2D.from_corner(c_field, mode="permissive")
+        assert bool(np.all(np.asarray(m.h)))
+
+    def test_from_corner_all_dry(self):
+        # All-NaN corners → all-dry h.
+        c_field = np.full((6, 6), np.nan, dtype=float)
+        m = Mask2D.from_corner(c_field, mode="conservative")
+        assert bool(np.all(~np.asarray(m.h)))
+
+    def test_invalid_mode_raises(self):
+        field = np.ones((6, 6), dtype=float)
+        with pytest.raises(ValueError, match="mode must be"):
+            Mask2D.from_u_face(field, mode="bogus")
+
+    def test_from_center_matches_from_mask(self):
+        rng = np.random.default_rng(3)
+        h_bin = rng.random((6, 6)) > 0.3
+        field = np.where(h_bin, 1.0, np.nan)
+        m1 = Mask2D.from_center(field)
+        m2 = Mask2D.from_mask(h_bin)
+        np.testing.assert_array_equal(np.asarray(m1.h), np.asarray(m2.h))
 
 
 # ── staggered mask properties ─────────────────────────────────────────────────
@@ -838,11 +914,10 @@ class TestMask1D:
         masks = all_ocean_1d.get_adaptive_masks(stencil_sizes=(2, 4))
         assert set(masks.keys()) == {2, 4}
 
-    def test_from_ssh(self):
-        ssh = np.array([1.0, 2.0, np.nan, 3.0, 4.0])
-        m = Mask1D.from_mask(np.isfinite(ssh))
-        # Compare against from_ssh
-        m2 = Mask1D.from_ssh(ssh)
+    def test_from_center(self):
+        field = np.array([1.0, 2.0, np.nan, 3.0, 4.0])
+        m = Mask1D.from_mask(np.isfinite(field))
+        m2 = Mask1D.from_center(field)
         np.testing.assert_array_equal(np.asarray(m.h), np.asarray(m2.h))
 
 

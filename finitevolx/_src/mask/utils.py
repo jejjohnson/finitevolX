@@ -57,6 +57,89 @@ def _pool_bool(
     return total / float(np.prod(kernel)) > threshold
 
 
+def _h_from_pooled(
+    pooled_mask: np.ndarray,
+    kernel: tuple[int, ...],
+    mode: str = "permissive",
+) -> np.ndarray:
+    """Inverse of :func:`_pool_bool` for binary inputs.
+
+    Given a same-shape staggered mask that was forward-pooled with the
+    given ``kernel``, infer an underlying h-grid (cell-centre) mask.  The
+    inverse is non-unique, so the result depends on ``mode``:
+
+    * ``'permissive'``  — h is wet iff *any* contributing pooled cell is
+      wet (logical OR over the kernel footprint).  Yields the largest
+      h-mask compatible with the staggered cells that are wet.
+    * ``'conservative'`` — h is wet iff *all* contributing pooled cells
+      are wet (logical AND over the kernel footprint).  Yields the
+      smallest h-mask whose every wet h-cell is surrounded by wet
+      staggered cells on all sides.
+
+    For each axis where ``kernel[a] == k``, ``h[..., j, ...]`` is
+    constrained by ``pooled[..., j, ...], pooled[..., j+1, ...], ...,
+    pooled[..., j+k-1, ...]``.  Indices beyond ``N-1`` are padded with
+    the identity element of the mode (``False`` for ``permissive``/OR,
+    ``True`` for ``conservative``/AND), so out-of-bounds entries do not
+    affect the result.
+
+    Parameters
+    ----------
+    pooled_mask : np.ndarray
+        Boolean staggered mask (e.g. u, v, w, xy_corner).  Same shape
+        as the desired h-mask.
+    kernel : tuple of int
+        Per-axis forward-pool kernel (the same tuple that was passed to
+        :func:`_pool_bool` to derive ``pooled_mask`` from h).
+    mode : {'permissive', 'conservative'}
+        Inversion strategy when the inverse is ambiguous.
+
+    Returns
+    -------
+    np.ndarray
+        Inferred h-mask, same shape and dtype (bool) as ``pooled_mask``.
+    """
+    if mode not in ("permissive", "conservative"):
+        raise ValueError(f"mode must be 'permissive' or 'conservative', got {mode!r}")
+    if len(kernel) != pooled_mask.ndim:
+        raise ValueError(
+            f"kernel length {len(kernel)} does not match pooled_mask.ndim "
+            f"{pooled_mask.ndim}"
+        )
+
+    pooled_b = np.asarray(pooled_mask, dtype=bool)
+    ndim = pooled_b.ndim
+
+    if mode == "permissive":
+        result = np.zeros(pooled_b.shape, dtype=bool)
+        identity = False  # OR identity: x OR False = x
+    else:
+        result = np.ones(pooled_b.shape, dtype=bool)
+        identity = True  # AND identity: x AND True = x
+
+    for offsets in itertools.product(*(range(k) for k in kernel)):
+        # Build pooled[..., j+offsets[a], ...] for each axis, padding
+        # the trailing side with the mode's identity element so that
+        # out-of-bounds entries are non-constraining.
+        shifted = pooled_b
+        for axis, off in enumerate(offsets):
+            if off == 0:
+                continue
+            sl = [slice(None)] * ndim
+            sl[axis] = slice(off, None)
+            front = shifted[tuple(sl)]
+            pad_width = [(0, 0)] * ndim
+            pad_width[axis] = (0, off)
+            shifted = np.pad(front, pad_width, constant_values=identity)
+
+        if mode == "permissive":
+            result = result | shifted
+        else:
+            result = result & shifted
+
+    return result
+
+
 def _dilate(mask: np.ndarray) -> np.ndarray:
     """Binary dilation by 1 cell with an n-D cross structuring element.
 

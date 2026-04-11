@@ -38,6 +38,7 @@ from finitevolx._src.mask.base import (
 )
 from finitevolx._src.mask.utils import (
     _dilate,
+    _h_from_pooled,
     _make_sponge,
     _pool_bool,
 )
@@ -62,6 +63,10 @@ class Mask1D(eqx.Module):
     Construct via one of the factory class-methods:
 
     * :meth:`from_mask`       — from a binary h-grid mask array.
+    * :meth:`from_center`     — from a float field at cell centres
+      (NaN = dry).
+    * :meth:`from_u_face`     — from a float field at u-faces, with a
+      ``mode=`` choice of inversion strategy.
     * :meth:`from_dimensions` — all-ocean domain of given size.
 
     Parameters
@@ -223,17 +228,21 @@ class Mask1D(eqx.Module):
         )
 
     @classmethod
-    def from_ssh(
+    def from_center(
         cls,
-        ssh: Float[Array, "Nx"],
+        field: Float[Array, "Nx"],
         sponge_width: int | None = None,
     ) -> Mask1D:
-        """Construct from a sea-surface-height field (NaN marks land).
+        """Construct from a field at cell centres (T-points).
+
+        ``NaN`` values are treated as dry; finite values as wet.  This
+        is the natural constructor for any tracer-like quantity (SSH,
+        temperature, salinity, pressure, …) that lives at cell centres.
 
         Parameters
         ----------
-        ssh : array-like [Nx]
-            SSH field; cells with ``NaN`` are treated as land.
+        field : array-like [Nx]
+            Float field at cell centres; ``NaN`` marks dry cells.
         sponge_width : int, optional
             Sponge layer width.  See :meth:`from_mask`.
 
@@ -241,8 +250,39 @@ class Mask1D(eqx.Module):
         -------
         Mask1D
         """
-        ssh_np = np.asarray(ssh)
-        h_mask = np.isfinite(ssh_np)
+        h_mask = np.isfinite(np.asarray(field))
+        return cls.from_mask(h_mask, sponge_width=sponge_width)
+
+    @classmethod
+    def from_u_face(
+        cls,
+        field: Float[Array, "Nx"],
+        mode: str = "permissive",
+        sponge_width: int | None = None,
+    ) -> Mask1D:
+        """Construct from a field at u-faces, deriving the h-grid mask.
+
+        ``NaN`` values are treated as dry u-faces.  The h-grid mask is
+        then inferred via :func:`_h_from_pooled` with kernel ``(2,)``.
+
+        Parameters
+        ----------
+        field : array-like [Nx]
+            Float field at u-faces; ``NaN`` marks dry faces.
+        mode : {'permissive', 'conservative'}
+            Inversion strategy.  ``'permissive'`` (default) marks an
+            h-cell wet if *any* of its two adjacent u-faces is wet
+            (logical OR).  ``'conservative'`` requires *all* adjacent
+            u-faces to be wet (logical AND).
+        sponge_width : int, optional
+            Sponge layer width.  See :meth:`from_mask`.
+
+        Returns
+        -------
+        Mask1D
+        """
+        u_mask = np.isfinite(np.asarray(field))
+        h_mask = _h_from_pooled(u_mask, kernel=(2,), mode=mode)
         return cls.from_mask(h_mask, sponge_width=sponge_width)
 
     @classmethod
@@ -285,7 +325,14 @@ class Mask2D(eqx.Module):
     Construct via one of the factory class-methods:
 
     * :meth:`from_mask`       — from a binary h-grid mask array.
-    * :meth:`from_ssh`        — from an SSH field (NaN = land).
+    * :meth:`from_center`     — from a float field at cell centres
+      (NaN = dry).
+    * :meth:`from_u_face`     — from a float field at u-faces, with a
+      ``mode=`` choice of inversion strategy.
+    * :meth:`from_v_face`     — from a float field at v-faces, with a
+      ``mode=`` choice of inversion strategy.
+    * :meth:`from_corner`     — from a float field at xy-corners
+      (vertices), with a ``mode=`` choice of inversion strategy.
     * :meth:`from_dimensions` — all-ocean domain of given size.
 
     Parameters
@@ -612,18 +659,22 @@ class Mask2D(eqx.Module):
         )
 
     @classmethod
-    def from_ssh(
+    def from_center(
         cls,
-        ssh: Float[Array, "Ny Nx"],
+        field: Float[Array, "Ny Nx"],
         sponge_width: int | None = None,
         k_bottom: Array | None = None,
     ) -> Mask2D:
-        """Construct from a sea-surface-height field (NaN marks land).
+        """Construct from a field at cell centres (T-points).
+
+        ``NaN`` values are treated as dry; finite values as wet.  This
+        is the natural constructor for any tracer-like quantity (SSH,
+        temperature, salinity, pressure, …) that lives at cell centres.
 
         Parameters
         ----------
-        ssh : array-like [Ny, Nx]
-            SSH field; cells with ``NaN`` are treated as land.
+        field : array-like [Ny, Nx]
+            Float field at cell centres; ``NaN`` marks dry cells.
         sponge_width : int, optional
             Sponge layer width.  See :meth:`from_mask`.
         k_bottom : array-like, optional
@@ -633,8 +684,111 @@ class Mask2D(eqx.Module):
         -------
         Mask2D
         """
-        ssh_np = np.asarray(ssh)
-        h_mask = np.isfinite(ssh_np)
+        h_mask = np.isfinite(np.asarray(field))
+        return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
+
+    @classmethod
+    def from_u_face(
+        cls,
+        field: Float[Array, "Ny Nx"],
+        mode: str = "permissive",
+        sponge_width: int | None = None,
+        k_bottom: Array | None = None,
+    ) -> Mask2D:
+        """Construct from a field at u-faces, deriving the h-grid mask.
+
+        ``NaN`` values are treated as dry u-faces.  The h-grid mask is
+        then inferred via :func:`_h_from_pooled` with kernel ``(2, 1)``
+        and the requested ``mode``; the remaining staggered masks are
+        produced by :meth:`from_mask`.
+
+        Parameters
+        ----------
+        field : array-like [Ny, Nx]
+            Float field at u-faces; ``NaN`` marks dry faces.
+        mode : {'permissive', 'conservative'}
+            Inversion strategy.  See :meth:`Mask1D.from_u_face` for
+            details.
+        sponge_width : int, optional
+            Sponge layer width.  See :meth:`from_mask`.
+        k_bottom : array-like, optional
+            Sea-floor indices.  See :meth:`from_mask`.
+
+        Returns
+        -------
+        Mask2D
+        """
+        u_mask = np.isfinite(np.asarray(field))
+        h_mask = _h_from_pooled(u_mask, kernel=(2, 1), mode=mode)
+        return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
+
+    @classmethod
+    def from_v_face(
+        cls,
+        field: Float[Array, "Ny Nx"],
+        mode: str = "permissive",
+        sponge_width: int | None = None,
+        k_bottom: Array | None = None,
+    ) -> Mask2D:
+        """Construct from a field at v-faces, deriving the h-grid mask.
+
+        ``NaN`` values are treated as dry v-faces.  The h-grid mask is
+        then inferred via :func:`_h_from_pooled` with kernel ``(1, 2)``
+        and the requested ``mode``.
+
+        Parameters
+        ----------
+        field : array-like [Ny, Nx]
+            Float field at v-faces; ``NaN`` marks dry faces.
+        mode : {'permissive', 'conservative'}
+            Inversion strategy.  See :meth:`Mask1D.from_u_face` for
+            details.
+        sponge_width : int, optional
+            Sponge layer width.  See :meth:`from_mask`.
+        k_bottom : array-like, optional
+            Sea-floor indices.  See :meth:`from_mask`.
+
+        Returns
+        -------
+        Mask2D
+        """
+        v_mask = np.isfinite(np.asarray(field))
+        h_mask = _h_from_pooled(v_mask, kernel=(1, 2), mode=mode)
+        return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
+
+    @classmethod
+    def from_corner(
+        cls,
+        field: Float[Array, "Ny Nx"],
+        mode: str = "permissive",
+        sponge_width: int | None = None,
+        k_bottom: Array | None = None,
+    ) -> Mask2D:
+        """Construct from a field at xy-corners (vertices).
+
+        ``NaN`` values are treated as dry corners.  The h-grid mask is
+        then inferred via :func:`_h_from_pooled` with kernel ``(2, 2)``
+        and the requested ``mode``.  This is the natural constructor for
+        vertex-stored quantities such as relative vorticity.
+
+        Parameters
+        ----------
+        field : array-like [Ny, Nx]
+            Float field at xy-corners; ``NaN`` marks dry corners.
+        mode : {'permissive', 'conservative'}
+            Inversion strategy.  See :meth:`Mask1D.from_u_face` for
+            details.
+        sponge_width : int, optional
+            Sponge layer width.  See :meth:`from_mask`.
+        k_bottom : array-like, optional
+            Sea-floor indices.  See :meth:`from_mask`.
+
+        Returns
+        -------
+        Mask2D
+        """
+        c_mask = np.isfinite(np.asarray(field))
+        h_mask = _h_from_pooled(c_mask, kernel=(2, 2), mode=mode)
         return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
 
     @classmethod
@@ -677,8 +831,17 @@ class Mask3D(eqx.Module):
     Construct via one of the factory class-methods:
 
     * :meth:`from_mask`       — from a binary 3-D h-grid mask array.
+    * :meth:`from_center`     — from a float field at cell centres
+      (NaN = dry).
+    * :meth:`from_u_face`     — from a float field at u-faces, with a
+      ``mode=`` choice of inversion strategy.
+    * :meth:`from_v_face`     — from a float field at v-faces, with a
+      ``mode=`` choice of inversion strategy.
+    * :meth:`from_w_face`     — from a float field at w-faces (vertical
+      velocity), with a ``mode=`` choice of inversion strategy.
+    * :meth:`from_corner`     — from a float field at xy-corners
+      (vertices), with a ``mode=`` choice of inversion strategy.
     * :meth:`from_dimensions` — all-ocean domain of given size.
-    * :meth:`from_ssh`        — from an SSH field (NaN = land).
 
     Parameters
     ----------
@@ -974,29 +1137,168 @@ class Mask3D(eqx.Module):
         )
 
     @classmethod
-    def from_ssh(
+    def from_center(
         cls,
-        ssh: Float[Array, "Nz Ny Nx"],
+        field: Float[Array, "Nz Ny Nx"],
         sponge_width: int | None = None,
         k_bottom: Array | None = None,
     ) -> Mask3D:
-        """Construct from a 3-D SSH-like field (NaN marks land).
+        """Construct from a 3-D field at cell centres (T-points).
+
+        ``NaN`` values are treated as dry; finite values as wet.
 
         Parameters
         ----------
-        ssh : array-like [Nz, Ny, Nx]
-            Field with NaN at land cells.
+        field : array-like [Nz, Ny, Nx]
+            Float field at cell centres; ``NaN`` marks dry cells.
         sponge_width : int, optional
-            Sponge layer width.
+            Sponge layer width.  See :meth:`from_mask`.
         k_bottom : array-like [Ny, Nx], optional
-            Sea-floor indices.
+            Sea-floor indices.  See :meth:`from_mask`.
 
         Returns
         -------
         Mask3D
         """
-        ssh_np = np.asarray(ssh)
-        h_mask = np.isfinite(ssh_np)
+        h_mask = np.isfinite(np.asarray(field))
+        return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
+
+    @classmethod
+    def from_u_face(
+        cls,
+        field: Float[Array, "Nz Ny Nx"],
+        mode: str = "permissive",
+        sponge_width: int | None = None,
+        k_bottom: Array | None = None,
+    ) -> Mask3D:
+        """Construct from a 3-D field at u-faces, deriving the h-grid mask.
+
+        ``NaN`` values are treated as dry u-faces.  The h-grid mask is
+        then inferred via :func:`_h_from_pooled` with kernel
+        ``(1, 2, 1)`` and the requested ``mode``.
+
+        Parameters
+        ----------
+        field : array-like [Nz, Ny, Nx]
+            Float field at u-faces; ``NaN`` marks dry faces.
+        mode : {'permissive', 'conservative'}
+            Inversion strategy.  See :meth:`Mask1D.from_u_face` for
+            details.
+        sponge_width : int, optional
+            Sponge layer width.  See :meth:`from_mask`.
+        k_bottom : array-like [Ny, Nx], optional
+            Sea-floor indices.  See :meth:`from_mask`.
+
+        Returns
+        -------
+        Mask3D
+        """
+        u_mask = np.isfinite(np.asarray(field))
+        h_mask = _h_from_pooled(u_mask, kernel=(1, 2, 1), mode=mode)
+        return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
+
+    @classmethod
+    def from_v_face(
+        cls,
+        field: Float[Array, "Nz Ny Nx"],
+        mode: str = "permissive",
+        sponge_width: int | None = None,
+        k_bottom: Array | None = None,
+    ) -> Mask3D:
+        """Construct from a 3-D field at v-faces, deriving the h-grid mask.
+
+        ``NaN`` values are treated as dry v-faces.  The h-grid mask is
+        then inferred via :func:`_h_from_pooled` with kernel
+        ``(1, 1, 2)`` and the requested ``mode``.
+
+        Parameters
+        ----------
+        field : array-like [Nz, Ny, Nx]
+            Float field at v-faces; ``NaN`` marks dry faces.
+        mode : {'permissive', 'conservative'}
+            Inversion strategy.  See :meth:`Mask1D.from_u_face` for
+            details.
+        sponge_width : int, optional
+            Sponge layer width.  See :meth:`from_mask`.
+        k_bottom : array-like [Ny, Nx], optional
+            Sea-floor indices.  See :meth:`from_mask`.
+
+        Returns
+        -------
+        Mask3D
+        """
+        v_mask = np.isfinite(np.asarray(field))
+        h_mask = _h_from_pooled(v_mask, kernel=(1, 1, 2), mode=mode)
+        return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
+
+    @classmethod
+    def from_w_face(
+        cls,
+        field: Float[Array, "Nz Ny Nx"],
+        mode: str = "permissive",
+        sponge_width: int | None = None,
+        k_bottom: Array | None = None,
+    ) -> Mask3D:
+        """Construct from a 3-D field at w-faces, deriving the h-grid mask.
+
+        ``NaN`` values are treated as dry w-faces.  The h-grid mask is
+        then inferred via :func:`_h_from_pooled` with kernel
+        ``(2, 1, 1)`` and the requested ``mode``.  This is the natural
+        constructor for vertical-velocity fields stored at z-faces.
+
+        Parameters
+        ----------
+        field : array-like [Nz, Ny, Nx]
+            Float field at w-faces; ``NaN`` marks dry faces.
+        mode : {'permissive', 'conservative'}
+            Inversion strategy.  See :meth:`Mask1D.from_u_face` for
+            details.
+        sponge_width : int, optional
+            Sponge layer width.  See :meth:`from_mask`.
+        k_bottom : array-like [Ny, Nx], optional
+            Sea-floor indices.  See :meth:`from_mask`.
+
+        Returns
+        -------
+        Mask3D
+        """
+        w_mask = np.isfinite(np.asarray(field))
+        h_mask = _h_from_pooled(w_mask, kernel=(2, 1, 1), mode=mode)
+        return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
+
+    @classmethod
+    def from_corner(
+        cls,
+        field: Float[Array, "Nz Ny Nx"],
+        mode: str = "permissive",
+        sponge_width: int | None = None,
+        k_bottom: Array | None = None,
+    ) -> Mask3D:
+        """Construct from a 3-D field at xy-corners (vertices).
+
+        ``NaN`` values are treated as dry corners.  The h-grid mask is
+        then inferred via :func:`_h_from_pooled` with kernel
+        ``(1, 2, 2)`` and the requested ``mode``.  Corners in 3-D are
+        per-z-level (no z-staggering on corners).
+
+        Parameters
+        ----------
+        field : array-like [Nz, Ny, Nx]
+            Float field at xy-corners; ``NaN`` marks dry corners.
+        mode : {'permissive', 'conservative'}
+            Inversion strategy.  See :meth:`Mask1D.from_u_face` for
+            details.
+        sponge_width : int, optional
+            Sponge layer width.  See :meth:`from_mask`.
+        k_bottom : array-like [Ny, Nx], optional
+            Sea-floor indices.  See :meth:`from_mask`.
+
+        Returns
+        -------
+        Mask3D
+        """
+        c_mask = np.isfinite(np.asarray(field))
+        h_mask = _h_from_pooled(c_mask, kernel=(1, 2, 2), mode=mode)
         return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
 
     @classmethod
