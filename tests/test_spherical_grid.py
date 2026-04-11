@@ -1,20 +1,20 @@
-"""Tests for SphericalArakawaCGrid2D and SphericalArakawaCGrid3D."""
+"""Tests for SphericalGrid2D and SphericalGrid3D."""
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
-from finitevolx._src.grid.spherical_grid import (
-    SphericalArakawaCGrid2D,
-    SphericalArakawaCGrid3D,
+from finitevolx._src.grid.base import CurvilinearGrid2D, CurvilinearGrid3D
+from finitevolx._src.grid.spherical import (
+    SphericalGrid2D,
+    SphericalGrid3D,
 )
 
 
 @pytest.fixture
 def grid2d():
-    return SphericalArakawaCGrid2D.from_interior(
+    return SphericalGrid2D.from_interior(
         nx_interior=10,
         ny_interior=8,
         lon_range=(0.0, 360.0),
@@ -25,7 +25,7 @@ def grid2d():
 
 @pytest.fixture
 def grid3d():
-    return SphericalArakawaCGrid3D.from_interior(
+    return SphericalGrid3D.from_interior(
         nx_interior=10,
         ny_interior=8,
         nz_interior=4,
@@ -85,8 +85,8 @@ class TestSphericalArakawaCGrid2D:
             grid2d.lon_T[0, 0], lon_min - grid2d.dlon, atol=1e-12
         )
 
-    def test_isinstance_arakawa2d(self, grid2d):
-        assert isinstance(grid2d, ArakawaCGrid2D)
+    def test_isinstance_curvilinear2d(self, grid2d):
+        assert isinstance(grid2d, CurvilinearGrid2D)
 
     def test_jit_compatible(self, grid2d):
         result = jax.jit(lambda g: g.dx)(grid2d)
@@ -102,8 +102,8 @@ class TestSphericalArakawaCGrid3D:
     def test_dz(self, grid3d):
         np.testing.assert_allclose(grid3d.dz, 100.0 / 4, rtol=1e-10)
 
-    def test_isinstance_arakawa3d(self, grid3d):
-        assert isinstance(grid3d, ArakawaCGrid3D)
+    def test_isinstance_curvilinear3d(self, grid3d):
+        assert isinstance(grid3d, CurvilinearGrid3D)
 
     def test_cos_lat_are_2d(self, grid3d):
         assert grid3d.cos_lat_T.ndim == 2
@@ -111,7 +111,7 @@ class TestSphericalArakawaCGrid3D:
 
     def test_horizontal_grid(self, grid3d):
         h_grid = grid3d.horizontal_grid()
-        assert isinstance(h_grid, SphericalArakawaCGrid2D)
+        assert isinstance(h_grid, SphericalGrid2D)
         assert h_grid.Nx == grid3d.Nx
         assert h_grid.Ny == grid3d.Ny
         np.testing.assert_allclose(h_grid.dlon, grid3d.dlon, atol=0)

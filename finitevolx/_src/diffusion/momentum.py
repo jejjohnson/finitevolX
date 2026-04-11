@@ -25,7 +25,7 @@ from __future__ import annotations
 import equinox as eqx
 from jaxtyping import Array, Float
 
-from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators.difference import Difference2D
 from finitevolx._src.operators.interpolation import Interpolation2D
@@ -55,25 +55,25 @@ class MomentumAdvection2D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid2D
+    grid : CartesianGrid2D
         The underlying 2-D grid.
 
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from finitevolx import ArakawaCGrid2D, MomentumAdvection2D
-    >>> grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+    >>> from finitevolx import CartesianGrid2D, MomentumAdvection2D
+    >>> grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> madv = MomentumAdvection2D(grid=grid)
     >>> u = jnp.zeros((grid.Ny, grid.Nx))
     >>> v = jnp.zeros((grid.Ny, grid.Nx))
     >>> du, dv = madv(u, v)
     """
 
-    grid: ArakawaCGrid2D
+    grid: CartesianGrid2D
     diff: Difference2D
     interp: Interpolation2D
 
-    def __init__(self, grid: ArakawaCGrid2D) -> None:
+    def __init__(self, grid: CartesianGrid2D) -> None:
         self.grid = grid
         self.diff = Difference2D(grid=grid)
         self.interp = Interpolation2D(grid=grid)
@@ -211,24 +211,24 @@ class MomentumAdvection3D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid3D
+    grid : CartesianGrid3D
         The underlying 3-D grid.
 
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from finitevolx import ArakawaCGrid3D, MomentumAdvection3D
-    >>> grid = ArakawaCGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+    >>> from finitevolx import CartesianGrid3D, MomentumAdvection3D
+    >>> grid = CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
     >>> madv = MomentumAdvection3D(grid=grid)
     >>> u = jnp.zeros((grid.Nz, grid.Ny, grid.Nx))
     >>> v = jnp.zeros((grid.Nz, grid.Ny, grid.Nx))
     >>> du, dv = madv(u, v)
     """
 
-    grid: ArakawaCGrid3D
+    grid: CartesianGrid3D
     _madv2d: MomentumAdvection2D
 
-    def __init__(self, grid: ArakawaCGrid3D) -> None:
+    def __init__(self, grid: CartesianGrid3D) -> None:
         self.grid = grid
         self._madv2d = MomentumAdvection2D(grid=grid.horizontal_grid())
 

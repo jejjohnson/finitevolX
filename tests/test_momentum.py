@@ -10,17 +10,17 @@ import pytest
 jax.config.update("jax_enable_x64", True)
 
 from finitevolx._src.diffusion.momentum import MomentumAdvection2D, MomentumAdvection3D
-from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
 
 
 @pytest.fixture
 def grid2d():
-    return ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+    return CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
 
 
 @pytest.fixture
 def grid3d():
-    return ArakawaCGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+    return CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
 
 
 class TestMomentumAdvection2D:

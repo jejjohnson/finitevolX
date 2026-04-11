@@ -9,7 +9,7 @@ from __future__ import annotations
 import equinox as eqx
 from jaxtyping import Array, Float
 
-from finitevolx._src.grid.grid import ArakawaCGrid2D
+from finitevolx._src.grid.cartesian import CartesianGrid2D
 from finitevolx._src.operators.difference import Difference2D, _divergence_2d
 
 
@@ -67,14 +67,14 @@ class Divergence2D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid2D
+    grid : CartesianGrid2D
         The underlying 2-D grid.
 
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from finitevolx import ArakawaCGrid2D, Divergence2D
-    >>> grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+    >>> from finitevolx import CartesianGrid2D, Divergence2D
+    >>> grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> div_op = Divergence2D(grid=grid)
     >>> u = jnp.zeros((grid.Ny, grid.Nx))
     >>> v = jnp.zeros((grid.Ny, grid.Nx))
@@ -82,10 +82,10 @@ class Divergence2D(eqx.Module):
     >>> delta_bc = div_op.noflux(u, v)  # no-flux BC variant
     """
 
-    grid: ArakawaCGrid2D
+    grid: CartesianGrid2D
     diff: Difference2D
 
-    def __init__(self, grid: ArakawaCGrid2D) -> None:
+    def __init__(self, grid: CartesianGrid2D) -> None:
         self.grid = grid
         self.diff = Difference2D(grid=grid)
 

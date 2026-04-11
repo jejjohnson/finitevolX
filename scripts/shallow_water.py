@@ -50,7 +50,7 @@ import xarray as xr
 
 from finitevolx import (
     Advection2D,
-    ArakawaCGrid2D,
+    CartesianGrid2D,
     Difference2D,
     Interpolation2D,
     Vorticity2D,
@@ -223,7 +223,7 @@ class ShallowWaterConfig:
 
 
 def make_preprocessing_dataset(
-    config: ShallowWaterConfig, grid: ArakawaCGrid2D
+    config: ShallowWaterConfig, grid: CartesianGrid2D
 ) -> xr.Dataset:
     """Build the coordinate-aware fields for the nonlinear example.
 
@@ -231,7 +231,7 @@ def make_preprocessing_dataset(
     ----------
     config : ShallowWaterConfig
         Example configuration.
-    grid : ArakawaCGrid2D
+    grid : CartesianGrid2D
         Underlying Arakawa C-grid.
 
     Returns
@@ -314,7 +314,7 @@ def run_simulation(config: ShallowWaterConfig | None = None) -> xr.Dataset:
         dataset = run_simulation(ShallowWaterConfig(nx=24, ny=24, steps=160))
     """
     config = config or ShallowWaterConfig()
-    grid = ArakawaCGrid2D.from_interior(config.nx, config.ny, config.Lx, config.Ly)
+    grid = CartesianGrid2D.from_interior(config.nx, config.ny, config.Lx, config.Ly)
     diff = Difference2D(grid=grid)
     interp = Interpolation2D(grid=grid)
     adv = Advection2D(grid=grid)

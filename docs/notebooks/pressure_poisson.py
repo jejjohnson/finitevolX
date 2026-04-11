@@ -66,14 +66,14 @@ IMG_DIR.mkdir(parents=True, exist_ok=True)
 # %% [markdown]
 # ## 1. Grid Construction
 #
-# We build an `ArakawaCGrid2D` with a 2-cell ghost ring.  The interior has
+# We build a `CartesianGrid2D` with a 2-cell ghost ring.  The interior has
 # `nx × ny` T-points; the full array shape is `(ny+2) × (nx+2)`.
 
 # %%
 nx, ny = 64, 32
 Lx, Ly = 4e6, 2e6  # 4000 km × 2000 km basin
 
-grid = fvx.ArakawaCGrid2D.from_interior(nx, ny, Lx, Ly)
+grid = fvx.CartesianGrid2D.from_interior(nx, ny, Lx, Ly)
 dx, dy = grid.dx, grid.dy
 Ny, Nx = ny + 2, nx + 2
 
@@ -86,7 +86,7 @@ print(f"Full array shape: ({Ny}, {Nx})")
 # A small 8×4 grid shows how T, U, and V points are staggered.
 
 # %%
-grid_small = fvx.ArakawaCGrid2D.from_interior(8, 4, Lx, Ly)
+grid_small = fvx.CartesianGrid2D.from_interior(8, 4, Lx, Ly)
 dx_s, dy_s = grid_small.dx, grid_small.dy
 
 # T-points at cell centres

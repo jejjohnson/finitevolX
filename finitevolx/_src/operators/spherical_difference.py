@@ -22,9 +22,9 @@ from __future__ import annotations
 import equinox as eqx
 from jaxtyping import Array, Float
 
-from finitevolx._src.grid.spherical_grid import (
-    SphericalArakawaCGrid2D,
-    SphericalArakawaCGrid3D,
+from finitevolx._src.grid.spherical import (
+    SphericalGrid2D,
+    SphericalGrid3D,
 )
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators._utils import _safe_div_cos
@@ -41,11 +41,11 @@ class SphericalDifference2D(eqx.Module):
 
     Parameters
     ----------
-    grid : SphericalArakawaCGrid2D
+    grid : SphericalGrid2D
         The underlying 2-D spherical grid.
     """
 
-    grid: SphericalArakawaCGrid2D
+    grid: SphericalGrid2D
 
     # ------------------------------------------------------------------
     # Forward differences (centre/face → face/corner)
@@ -231,14 +231,14 @@ class SphericalDifference3D(eqx.Module):
 
     Parameters
     ----------
-    grid : SphericalArakawaCGrid3D
+    grid : SphericalGrid3D
         The underlying 3-D spherical grid.
     """
 
-    grid: SphericalArakawaCGrid3D
+    grid: SphericalGrid3D
     _diff2d: SphericalDifference2D
 
-    def __init__(self, grid: SphericalArakawaCGrid3D):
+    def __init__(self, grid: SphericalGrid3D):
         self.grid = grid
         self._diff2d = SphericalDifference2D(grid=grid.horizontal_grid())
 

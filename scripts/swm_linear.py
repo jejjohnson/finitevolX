@@ -47,7 +47,7 @@ import numpy as np
 import xarray as xr
 
 from finitevolx import (
-    ArakawaCGrid2D,
+    CartesianGrid2D,
     Difference2D,
     Interpolation2D,
     Vorticity2D,
@@ -132,7 +132,7 @@ class LinearShallowWaterConfig:
 
 
 def make_preprocessing_dataset(
-    config: LinearShallowWaterConfig, grid: ArakawaCGrid2D
+    config: LinearShallowWaterConfig, grid: CartesianGrid2D
 ) -> xr.Dataset:
     """Build the coordinate-aware forcing and initial-condition fields.
 
@@ -140,7 +140,7 @@ def make_preprocessing_dataset(
     ----------
     config : LinearShallowWaterConfig
         Example configuration.
-    grid : ArakawaCGrid2D
+    grid : CartesianGrid2D
         C-grid associated with the simulation.
 
     Returns
@@ -153,7 +153,7 @@ def make_preprocessing_dataset(
     --------
     Generate preprocessing fields for the default setup::
 
-        grid = ArakawaCGrid2D.from_interior(config.nx, config.ny, config.Lx, config.Ly)
+        grid = CartesianGrid2D.from_interior(config.nx, config.ny, config.Lx, config.Ly)
         forcing = make_preprocessing_dataset(config, grid)
 
     Inspect the forcing pattern as an ``xarray`` object::
@@ -338,7 +338,7 @@ def run_simulation(config: LinearShallowWaterConfig | None = None) -> xr.Dataset
         dataset = run_simulation(LinearShallowWaterConfig(nx=24, ny=24, steps=120))
     """
     config = config or LinearShallowWaterConfig()
-    grid = ArakawaCGrid2D.from_interior(config.nx, config.ny, config.Lx, config.Ly)
+    grid = CartesianGrid2D.from_interior(config.nx, config.ny, config.Lx, config.Ly)
     diff = Difference2D(grid=grid)
     interp = Interpolation2D(grid=grid)
     vort = Vorticity2D(grid=grid)

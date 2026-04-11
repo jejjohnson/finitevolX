@@ -60,7 +60,7 @@ import numpy as np
 
 jax.config.update("jax_enable_x64", True)
 
-from finitevolx import ArakawaCGrid2D, ArakawaCGridMask
+from finitevolx import CartesianGrid2D, ArakawaCGridMask
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "demo_masks"
 IMG_DIR.mkdir(parents=True, exist_ok=True)
@@ -363,7 +363,7 @@ print(
 
 # %%
 # Demonstrate with a grid + masks for a small basin
-grid = ArakawaCGrid2D.from_interior(8, 8, Lx=8e4, Ly=8e4)
+grid = CartesianGrid2D.from_interior(8, 8, Lx=8e4, Ly=8e4)
 masks = ArakawaCGridMask.from_dimensions(ny=grid.Ny, nx=grid.Nx)
 print(f"Grid: {grid.Ny}x{grid.Nx} (8 interior + 2 ghost = 10 per side)")
 print(f"  dx = {grid.dx:.0f} m, dy = {grid.dy:.0f} m")

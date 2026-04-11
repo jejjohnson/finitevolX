@@ -40,7 +40,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 import numpy as np
 
-from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
 
 # ---------------------------------------------------------------------------
 # Internal helpers — grid hierarchy construction (numpy, offline)

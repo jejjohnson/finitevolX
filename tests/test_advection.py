@@ -6,23 +6,27 @@ import numpy as np
 import pytest
 
 from finitevolx._src.advection.advection import Advection1D, Advection2D, Advection3D
-from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
-from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.grid.cartesian import (
+    CartesianGrid1D,
+    CartesianGrid2D,
+    CartesianGrid3D,
+)
+from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
 
 
 @pytest.fixture
 def grid1d():
-    return ArakawaCGrid1D.from_interior(8, 1.0)
+    return CartesianGrid1D.from_interior(8, 1.0)
 
 
 @pytest.fixture
 def grid2d():
-    return ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+    return CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
 
 
 @pytest.fixture
 def grid3d():
-    return ArakawaCGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+    return CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
 
 
 class TestAdvection1D:
@@ -58,7 +62,7 @@ class TestAdvection1D:
             assert result.shape == (grid1d.Nx,)
 
     def test_weno_constant_zero_tendency(self):
-        grid = ArakawaCGrid1D.from_interior(16, 1.0)
+        grid = CartesianGrid1D.from_interior(16, 1.0)
         adv = Advection1D(grid=grid)
         h = jnp.ones(grid.Nx)
         u = jnp.ones(grid.Nx)
@@ -137,7 +141,7 @@ class TestAdvection2D:
             assert result.shape == (grid2d.Ny, grid2d.Nx)
 
     def test_weno_constant_zero_tendency(self):
-        grid = ArakawaCGrid2D.from_interior(16, 16, 1.0, 1.0)
+        grid = CartesianGrid2D.from_interior(16, 16, 1.0, 1.0)
         adv = Advection2D(grid=grid)
         h = jnp.ones((grid.Ny, grid.Nx))
         u = jnp.ones((grid.Ny, grid.Nx))
@@ -246,7 +250,7 @@ class TestAdvection3D:
             assert result.shape == (grid3d.Nz, grid3d.Ny, grid3d.Nx)
 
     def test_weno_constant_zero_tendency(self):
-        grid = ArakawaCGrid3D.from_interior(16, 16, 4, 1.0, 1.0, 1.0)
+        grid = CartesianGrid3D.from_interior(16, 16, 4, 1.0, 1.0, 1.0)
         adv = Advection3D(grid=grid)
         h = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
         u = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
@@ -275,7 +279,7 @@ class TestAdvection2DMask:
 
     @pytest.fixture
     def grid(self):
-        return ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+        return CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
 
     @pytest.fixture
     def all_ocean(self):
@@ -364,7 +368,7 @@ class TestAdvection3DMask:
 
     @pytest.fixture
     def grid(self):
-        return ArakawaCGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+        return CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
 
     @pytest.fixture
     def all_ocean(self):
@@ -411,7 +415,7 @@ class TestAdvection3DMask:
         h_mask = _np.ones((8, 8), dtype=bool)
         h_mask[:, 3:5] = False
         coastal = ArakawaCGridMask.from_mask(h_mask)
-        grid = ArakawaCGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+        grid = CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
         adv = Advection3D(grid=grid)
         h = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
         u = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
@@ -437,7 +441,7 @@ class TestAdvection2DRotationStability:
         omega = 2 * jnp.pi
         dx = Lx / nx
         dy = Ly / ny
-        grid = ArakawaCGrid2D(
+        grid = CartesianGrid2D(
             Nx=nx + 2 * ng, Ny=ny + 2 * ng, Lx=Lx, Ly=Ly, dx=dx, dy=dy
         )
         # Staggered coordinates
@@ -516,7 +520,7 @@ class TestNegativeFlowExactness:
         ["upwind1", "weno3", "weno5", "weno7", "weno9", "minmod", "van_leer"],
     )
     def test_constant_negative_flow_zero_tendency(self, method):
-        grid = ArakawaCGrid1D.from_interior(24, 1.0)
+        grid = CartesianGrid1D.from_interior(24, 1.0)
         adv = Advection1D(grid=grid)
         h = jnp.ones(grid.Nx)
         u = -jnp.ones(grid.Nx)
@@ -529,7 +533,7 @@ class TestNegativeFlowExactness:
         ["upwind1", "weno3", "weno5", "weno7", "weno9", "minmod", "van_leer"],
     )
     def test_constant_negative_flow_2d(self, method):
-        grid = ArakawaCGrid2D.from_interior(16, 16, 1.0, 1.0)
+        grid = CartesianGrid2D.from_interior(16, 16, 1.0, 1.0)
         adv = Advection2D(grid=grid)
         h = jnp.ones((grid.Ny, grid.Nx))
         u = -jnp.ones((grid.Ny, grid.Nx))
@@ -556,7 +560,7 @@ class TestNegativeFlowConvergence:
         ng = 4
         Lx = 1.0
         dx = Lx / n_interior
-        grid = ArakawaCGrid1D(Nx=n_interior + 2 * ng, Lx=Lx, dx=dx)
+        grid = CartesianGrid1D(Nx=n_interior + 2 * ng, Lx=Lx, dx=dx)
 
         x = (jnp.arange(grid.Nx) - ng + 0.5) * dx
         q0 = jnp.sin(2 * jnp.pi * x)
@@ -628,7 +632,7 @@ class TestAdvectionConservation:
         n = 64
         Lx = 1.0
         dx = Lx / n
-        grid = ArakawaCGrid1D(Nx=n + 2 * ng, Lx=Lx, dx=dx)
+        grid = CartesianGrid1D(Nx=n + 2 * ng, Lx=Lx, dx=dx)
 
         x = (jnp.arange(grid.Nx) - ng + 0.5) * dx
         r = jnp.abs(x - 0.5)

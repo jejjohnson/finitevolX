@@ -25,8 +25,8 @@ from __future__ import annotations
 import equinox as eqx
 from jaxtyping import Array, Float
 
-from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
-from finitevolx._src.grid.grid import ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
+from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators.interpolation import Interpolation2D
 
@@ -45,14 +45,14 @@ class Coriolis2D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid2D
+    grid : CartesianGrid2D
         The underlying 2-D grid.
 
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from finitevolx import ArakawaCGrid2D, Coriolis2D
-    >>> grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+    >>> from finitevolx import CartesianGrid2D, Coriolis2D
+    >>> grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> cor = Coriolis2D(grid=grid)
     >>> u = jnp.zeros((grid.Ny, grid.Nx))
     >>> v = jnp.ones((grid.Ny, grid.Nx))
@@ -60,10 +60,10 @@ class Coriolis2D(eqx.Module):
     >>> du_cor, dv_cor = cor(u, v, f)
     """
 
-    grid: ArakawaCGrid2D
+    grid: CartesianGrid2D
     interp: Interpolation2D
 
-    def __init__(self, grid: ArakawaCGrid2D) -> None:
+    def __init__(self, grid: CartesianGrid2D) -> None:
         self.grid = grid
         self.interp = Interpolation2D(grid=grid)
 
@@ -130,14 +130,14 @@ class Coriolis3D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid3D
+    grid : CartesianGrid3D
         The underlying 3-D grid.
 
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from finitevolx import ArakawaCGrid3D, Coriolis3D
-    >>> grid = ArakawaCGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+    >>> from finitevolx import CartesianGrid3D, Coriolis3D
+    >>> grid = CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
     >>> cor = Coriolis3D(grid=grid)
     >>> u = jnp.zeros((grid.Nz, grid.Ny, grid.Nx))
     >>> v = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
@@ -145,10 +145,10 @@ class Coriolis3D(eqx.Module):
     >>> du_cor, dv_cor = cor(u, v, f)
     """
 
-    grid: ArakawaCGrid3D
+    grid: CartesianGrid3D
     _cor2d: Coriolis2D
 
-    def __init__(self, grid: ArakawaCGrid3D) -> None:
+    def __init__(self, grid: CartesianGrid3D) -> None:
         self.grid = grid
         self._cor2d = Coriolis2D(grid=grid.horizontal_grid())
 

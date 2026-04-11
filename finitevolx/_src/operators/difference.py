@@ -19,7 +19,11 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.grid.cartesian import (
+    CartesianGrid1D,
+    CartesianGrid2D,
+    CartesianGrid3D,
+)
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.stencils import (
     diff_x_bwd,
@@ -74,11 +78,11 @@ class Difference1D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid1D
+    grid : CartesianGrid1D
         The underlying 1-D grid.
     """
 
-    grid: ArakawaCGrid1D
+    grid: CartesianGrid1D
 
     def diff_x_T_to_U(self, h: Float[Array, "Nx"]) -> Float[Array, "Nx"]:
         """Forward difference in x: T-point -> U-point.
@@ -140,11 +144,11 @@ class Difference2D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid2D
+    grid : CartesianGrid2D
         The underlying 2-D grid.
     """
 
-    grid: ArakawaCGrid2D
+    grid: CartesianGrid2D
 
     # ------------------------------------------------------------------
     # Forward differences
@@ -420,8 +424,8 @@ class Difference2D(eqx.Module):
 
         Examples
         --------
-        >>> from finitevolx import ArakawaCGrid2D, Difference2D
-        >>> grid = ArakawaCGrid2D.from_interior(8, 8, 1e3, 1e3)
+        >>> from finitevolx import CartesianGrid2D, Difference2D
+        >>> grid = CartesianGrid2D.from_interior(8, 8, 1e3, 1e3)
         >>> diff = Difference2D(grid=grid)
         >>> psi = jnp.ones((grid.Ny, grid.Nx))
         >>> u, v = diff.grad_perp(psi)
@@ -456,11 +460,11 @@ class Difference3D(eqx.Module):
 
     Parameters
     ----------
-    grid : ArakawaCGrid3D
+    grid : CartesianGrid3D
         The underlying 3-D grid.
     """
 
-    grid: ArakawaCGrid3D
+    grid: CartesianGrid3D
 
     def diff_x_T_to_U(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Forward x-difference over all z-levels: T -> U.

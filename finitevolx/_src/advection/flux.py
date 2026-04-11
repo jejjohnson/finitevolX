@@ -10,9 +10,13 @@ reconstructions.
 Typical usage::
 
     from finitevolx import ArakawaCGridMask, upwind_flux
-    from finitevolx import Reconstruction2D, ArakawaCGrid2D
+    from finitevolx import Reconstruction2D, CartesianGrid2D
 
-    grid = ArakawaCGrid2D.from_interior(Ny, Nx, dy, dx)
+    nx_interior = 128
+    ny_interior = 64
+    Lx = 1.0
+    Ly = 1.0
+    grid = CartesianGrid2D.from_interior(nx_interior, ny_interior, Lx, Ly)
     recon = Reconstruction2D(grid=grid)
     mask = ArakawaCGridMask.from_mask(h_mask)
 
@@ -108,13 +112,13 @@ def upwind_flux(
     >>> import jax.numpy as jnp
     >>> import numpy as np
     >>> from finitevolx import (
-    ...     ArakawaCGrid2D,
+    ...     CartesianGrid2D,
     ...     ArakawaCGridMask,
     ...     Reconstruction2D,
     ...     upwind_flux,
     ... )
     >>> Ny, Nx = 10, 10
-    >>> grid = ArakawaCGrid2D.from_interior(Ny - 2, Nx - 2, 1.0, 1.0)
+    >>> grid = CartesianGrid2D.from_interior(Ny - 2, Nx - 2, 1.0, 1.0)
     >>> recon = Reconstruction2D(grid=grid)
     >>> mask = ArakawaCGridMask.from_dimensions(Ny, Nx)
     >>> mask_hier = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4, 6))

@@ -14,7 +14,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D
+from finitevolx._src.grid.cartesian import CartesianGrid1D, CartesianGrid2D
 from finitevolx._src.operators.difference import Difference1D, Difference2D
 
 jax.config.update("jax_enable_x64", True)
@@ -47,7 +47,7 @@ class TestConvergence1D:
         """
         c = 3.0
         for n in [16, 32]:
-            grid = ArakawaCGrid1D.from_interior(n, 1.0)
+            grid = CartesianGrid1D.from_interior(n, 1.0)
             diff = Difference1D(grid=grid)
             x = jnp.arange(grid.Nx, dtype=float) * grid.dx
             h = c * x
@@ -57,7 +57,7 @@ class TestConvergence1D:
     def test_laplacian_convergence_quadratic(self):
         """Laplacian of h=x^2 is exactly 2 at any resolution (exact for quadratics)."""
         for n in [16, 32, 64]:
-            grid = ArakawaCGrid1D.from_interior(n, 1.0)
+            grid = CartesianGrid1D.from_interior(n, 1.0)
             diff = Difference1D(grid=grid)
             x = jnp.arange(grid.Nx, dtype=float) * grid.dx
             h = x**2
@@ -74,7 +74,7 @@ class TestConvergence1D:
 
         errors = []
         for n in [16, 32]:
-            grid = ArakawaCGrid1D.from_interior(n, L)
+            grid = CartesianGrid1D.from_interior(n, L)
             diff = Difference1D(grid=grid)
             x = (jnp.arange(grid.Nx, dtype=float) + 0.5) * grid.dx
             h = jnp.sin(k * x)
@@ -101,7 +101,7 @@ class TestConvergence2D:
         """For linear h=c*x the forward x-difference is exact for any N."""
         c = 2.5
         for n in [8, 16]:
-            grid = ArakawaCGrid2D.from_interior(n, n, 1.0, 1.0)
+            grid = CartesianGrid2D.from_interior(n, n, 1.0, 1.0)
             diff = Difference2D(grid=grid)
             x = jnp.arange(grid.Nx, dtype=float) * grid.dx
             h = jnp.broadcast_to(c * x, (grid.Ny, grid.Nx))
@@ -111,7 +111,7 @@ class TestConvergence2D:
     def test_diff_y_T_to_V_convergence_linear_exact(self):
         c = 1.7
         for n in [8, 16]:
-            grid = ArakawaCGrid2D.from_interior(n, n, 1.0, 1.0)
+            grid = CartesianGrid2D.from_interior(n, n, 1.0, 1.0)
             diff = Difference2D(grid=grid)
             y = jnp.arange(grid.Ny, dtype=float) * grid.dy
             h = jnp.broadcast_to(c * y[:, None], (grid.Ny, grid.Nx))
@@ -121,7 +121,7 @@ class TestConvergence2D:
     def test_laplacian_convergence_quadratic_exact(self):
         """Laplacian of h = x^2 + y^2 is exactly 4 at any resolution."""
         for n in [8, 16, 32]:
-            grid = ArakawaCGrid2D.from_interior(n, n, 1.0, 1.0)
+            grid = CartesianGrid2D.from_interior(n, n, 1.0, 1.0)
             diff = Difference2D(grid=grid)
             x = jnp.arange(grid.Nx, dtype=float) * grid.dx
             y = jnp.arange(grid.Ny, dtype=float) * grid.dy
@@ -140,7 +140,7 @@ class TestConvergence2D:
 
         errors = []
         for n in [16, 32]:
-            grid = ArakawaCGrid2D.from_interior(n, n, L, L)
+            grid = CartesianGrid2D.from_interior(n, n, L, L)
             diff = Difference2D(grid=grid)
             x = (jnp.arange(grid.Nx, dtype=float) + 0.5) * grid.dx
             y = (jnp.arange(grid.Ny, dtype=float) + 0.5) * grid.dy
@@ -159,7 +159,7 @@ class TestConvergence2D:
         """For u=c*x, v=c*y divergence = 2c exactly at any N."""
         c = 2.0
         for n in [8, 16]:
-            grid = ArakawaCGrid2D.from_interior(n, n, 1.0, 1.0)
+            grid = CartesianGrid2D.from_interior(n, n, 1.0, 1.0)
             diff = Difference2D(grid=grid)
             x = jnp.arange(grid.Nx, dtype=float) * grid.dx
             y = jnp.arange(grid.Ny, dtype=float) * grid.dy
@@ -172,7 +172,7 @@ class TestConvergence2D:
         """For solid-body rotation u=-c*y, v=c*x, curl = 2c exactly at any N."""
         c = 1.5
         for n in [8, 16]:
-            grid = ArakawaCGrid2D.from_interior(n, n, 1.0, 1.0)
+            grid = CartesianGrid2D.from_interior(n, n, 1.0, 1.0)
             diff = Difference2D(grid=grid)
             x = jnp.arange(grid.Nx, dtype=float) * grid.dx
             y = jnp.arange(grid.Ny, dtype=float) * grid.dy
@@ -195,7 +195,7 @@ class TestConvergence2D:
 
         errors = []
         for n in [16, 32]:
-            grid = ArakawaCGrid2D.from_interior(n, n, L, L)
+            grid = CartesianGrid2D.from_interior(n, n, L, L)
             diff = Difference2D(grid=grid)
             x = (jnp.arange(grid.Nx, dtype=float) + 0.5) * grid.dx
             h = jnp.broadcast_to(jnp.sin(k * x), (grid.Ny, grid.Nx))

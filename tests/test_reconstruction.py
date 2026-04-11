@@ -9,23 +9,27 @@ from finitevolx._src.advection.reconstruction import (
     Reconstruction2D,
     Reconstruction3D,
 )
-from finitevolx._src.grid.cgrid_mask import ArakawaCGridMask
-from finitevolx._src.grid.grid import ArakawaCGrid1D, ArakawaCGrid2D, ArakawaCGrid3D
+from finitevolx._src.grid.cartesian import (
+    CartesianGrid1D,
+    CartesianGrid2D,
+    CartesianGrid3D,
+)
+from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
 
 
 @pytest.fixture
 def grid1d():
-    return ArakawaCGrid1D.from_interior(8, 1.0)
+    return CartesianGrid1D.from_interior(8, 1.0)
 
 
 @pytest.fixture
 def grid2d():
-    return ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+    return CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
 
 
 @pytest.fixture
 def grid3d():
-    return ArakawaCGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+    return CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
 
 
 class TestReconstruction1D:
@@ -245,7 +249,7 @@ class TestReconstruction1D:
             np.testing.assert_allclose(result[1:-1], 6.0 * sign, rtol=1e-5)
 
     def test_weno7_linear_field_large_grid(self):
-        grid = ArakawaCGrid1D.from_interior(12, 1.0)
+        grid = CartesianGrid1D.from_interior(12, 1.0)
         recon = Reconstruction1D(grid=grid)
         h = jnp.arange(grid.Nx, dtype=float)
         u = jnp.ones(grid.Nx)
@@ -254,7 +258,7 @@ class TestReconstruction1D:
         np.testing.assert_allclose(result[3:-3], expected[2:-2], rtol=1e-5)
 
     def test_weno9_linear_field_large_grid(self):
-        grid = ArakawaCGrid1D.from_interior(14, 1.0)
+        grid = CartesianGrid1D.from_interior(14, 1.0)
         recon = Reconstruction1D(grid=grid)
         h = jnp.arange(grid.Nx, dtype=float)
         u = jnp.ones(grid.Nx)
@@ -517,7 +521,7 @@ class TestReconstruction2D:
         [("weno7_x", 3), ("weno9_x", 4)],
     )
     def test_higher_order_weno_x_linear_ramp_is_centered(self, method_name, depth):
-        grid = ArakawaCGrid2D.from_interior(12, 12, 1.0, 1.0)
+        grid = CartesianGrid2D.from_interior(12, 12, 1.0, 1.0)
         recon = Reconstruction2D(grid=grid)
         x_idx = jnp.arange(grid.Nx, dtype=float)
         h = jnp.broadcast_to(x_idx, (grid.Ny, grid.Nx))
@@ -531,7 +535,7 @@ class TestReconstruction2D:
         [("weno7_y", 3), ("weno9_y", 4)],
     )
     def test_higher_order_weno_y_linear_ramp_is_centered(self, method_name, depth):
-        grid = ArakawaCGrid2D.from_interior(12, 12, 1.0, 1.0)
+        grid = CartesianGrid2D.from_interior(12, 12, 1.0, 1.0)
         recon = Reconstruction2D(grid=grid)
         y_idx = jnp.arange(grid.Ny, dtype=float)
         h = jnp.broadcast_to(y_idx[:, None], (grid.Ny, grid.Nx))
@@ -697,7 +701,7 @@ class TestReconstruction3D:
         [("weno7_x", 3), ("weno9_x", 4)],
     )
     def test_higher_order_weno_x_linear_ramp_is_centered(self, method_name, depth):
-        grid = ArakawaCGrid3D.from_interior(12, 12, 4, 1.0, 1.0, 1.0)
+        grid = CartesianGrid3D.from_interior(12, 12, 4, 1.0, 1.0, 1.0)
         recon = Reconstruction3D(grid=grid)
         x_idx = jnp.arange(grid.Nx, dtype=float)
         h = jnp.broadcast_to(x_idx[None, None, :], (grid.Nz, grid.Ny, grid.Nx))
@@ -715,7 +719,7 @@ class TestReconstruction3D:
         [("weno7_y", 3), ("weno9_y", 4)],
     )
     def test_higher_order_weno_y_linear_ramp_is_centered(self, method_name, depth):
-        grid = ArakawaCGrid3D.from_interior(12, 12, 4, 1.0, 1.0, 1.0)
+        grid = CartesianGrid3D.from_interior(12, 12, 4, 1.0, 1.0, 1.0)
         recon = Reconstruction3D(grid=grid)
         y_idx = jnp.arange(grid.Ny, dtype=float)
         h = jnp.broadcast_to(y_idx[None, :, None], (grid.Nz, grid.Ny, grid.Nx))
@@ -841,7 +845,7 @@ class TestReconstruction2DMasked:
         values from the unmasked WENO-5 for both flow signs, confirming that stencil
         fallback is actually being applied near the coastline.
         """
-        grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+        grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
         recon = Reconstruction2D(grid=grid)
 
         # Non-constant field varying in x so different stencils produce distinct values.
@@ -931,7 +935,7 @@ class TestReconstruction2DMasked:
         np.testing.assert_allclose(result[1:-1, 1:-1], -9.0, rtol=1e-5)
 
     def test_wenoz5_y_masked_coastal_fallback(self, coastal_mask_2d):
-        grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+        grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
         recon = Reconstruction2D(grid=grid)
         h = jnp.ones((grid.Ny, grid.Nx))
         v = jnp.ones((grid.Ny, grid.Nx))
@@ -986,7 +990,7 @@ class TestReconstruction2DMasked:
 
     def test_tvd_x_masked_coastal_fallback(self, coastal_mask_2d):
         """Near-land cells fall back to upwind1 for TVD masked."""
-        grid = ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
+        grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
         recon = Reconstruction2D(grid=grid)
         x_indices = jnp.arange(grid.Nx, dtype=float)
         h = jnp.broadcast_to(x_indices, (grid.Ny, grid.Nx))
