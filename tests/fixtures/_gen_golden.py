@@ -109,10 +109,6 @@ def _register_all() -> list[Entry]:
     u3d = make_u_field_3d()
     v3d = make_v_field_3d()
 
-    # Touch q2d so the linter doesn't complain about unused locals until
-    # later commits wire in operators that consume X-point fields.
-    _ = q2d
-
     # ------------------------------------------------------------------
     # Difference1D / 2D / 3D
     # ------------------------------------------------------------------
@@ -133,6 +129,41 @@ def _register_all() -> list[Entry]:
             u3d,
             v3d,
         )
+    )
+
+    # ------------------------------------------------------------------
+    # Interpolation1D / 2D / 3D
+    # ------------------------------------------------------------------
+    entries.extend(
+        _interpolation_entries(
+            grid1d,
+            grid2d,
+            grid3d,
+            mask1d,
+            mask2d,
+            mask3d,
+            h1d,
+            u1d,
+            h2d,
+            u2d,
+            v2d,
+            q2d,
+            h3d,
+            u3d,
+            v3d,
+        )
+    )
+
+    # ------------------------------------------------------------------
+    # Divergence2D
+    # ------------------------------------------------------------------
+    entries.extend(_divergence_entries(grid2d, mask2d, u2d, v2d))
+
+    # ------------------------------------------------------------------
+    # Vorticity2D / Vorticity3D
+    # ------------------------------------------------------------------
+    entries.extend(
+        _vorticity_entries(grid2d, grid3d, mask2d, mask3d, h2d, u2d, v2d, q2d, u3d, v3d)
     )
 
     return entries
@@ -264,6 +295,225 @@ def _difference_entries(
     )
     entries.append(
         ("Difference3D", "divergence", "masked", lambda: d3m.divergence(u3d, v3d))
+    )
+
+    return entries
+
+
+def _interpolation_entries(
+    grid1d,
+    grid2d,
+    grid3d,
+    mask1d,
+    mask2d,
+    mask3d,
+    h1d,
+    u1d,
+    h2d,
+    u2d,
+    v2d,
+    q2d,
+    h3d,
+    u3d,
+    v3d,
+) -> list[Entry]:
+    """Register goldens for Interpolation1D / 2D / 3D."""
+    from finitevolx._src.operators.interpolation import (
+        Interpolation1D,
+        Interpolation2D,
+        Interpolation3D,
+    )
+
+    entries: list[Entry] = []
+
+    # --- Interpolation1D ----------------------------------------------
+    i1 = Interpolation1D(grid=grid1d)
+    i1m = Interpolation1D(grid=grid1d, mask=mask1d)
+    for method, arg in (("T_to_U", h1d), ("U_to_T", u1d)):
+        entries.append(
+            (
+                "Interpolation1D",
+                method,
+                "unmasked",
+                (lambda m=method, a=arg: getattr(i1, m)(a)),
+            )
+        )
+        entries.append(
+            (
+                "Interpolation1D",
+                method,
+                "masked",
+                (lambda m=method, a=arg: getattr(i1m, m)(a)),
+            )
+        )
+
+    # --- Interpolation2D ----------------------------------------------
+    i2 = Interpolation2D(grid=grid2d)
+    i2m = Interpolation2D(grid=grid2d, mask=mask2d)
+    i2_specs = (
+        ("T_to_U", h2d),
+        ("T_to_V", h2d),
+        ("T_to_X", h2d),
+        ("X_to_U", q2d),
+        ("X_to_V", q2d),
+        ("U_to_T", u2d),
+        ("V_to_T", v2d),
+        ("X_to_T", q2d),
+        ("U_to_X", u2d),
+        ("V_to_X", v2d),
+        ("U_to_V", u2d),
+        ("V_to_U", v2d),
+    )
+    for method, arg in i2_specs:
+        entries.append(
+            (
+                "Interpolation2D",
+                method,
+                "unmasked",
+                (lambda m=method, a=arg: getattr(i2, m)(a)),
+            )
+        )
+        entries.append(
+            (
+                "Interpolation2D",
+                method,
+                "masked",
+                (lambda m=method, a=arg: getattr(i2m, m)(a)),
+            )
+        )
+
+    # --- Interpolation3D ----------------------------------------------
+    i3 = Interpolation3D(grid=grid3d)
+    i3m = Interpolation3D(grid=grid3d, mask=mask3d)
+    i3_specs = (("T_to_U", h3d), ("T_to_V", h3d), ("U_to_T", u3d), ("V_to_T", v3d))
+    for method, arg in i3_specs:
+        entries.append(
+            (
+                "Interpolation3D",
+                method,
+                "unmasked",
+                (lambda m=method, a=arg: getattr(i3, m)(a)),
+            )
+        )
+        entries.append(
+            (
+                "Interpolation3D",
+                method,
+                "masked",
+                (lambda m=method, a=arg: getattr(i3m, m)(a)),
+            )
+        )
+
+    return entries
+
+
+def _divergence_entries(grid2d, mask2d, u2d, v2d) -> list[Entry]:
+    """Register goldens for Divergence2D (call + noflux)."""
+    from finitevolx._src.operators.divergence import Divergence2D
+
+    div = Divergence2D(grid=grid2d)
+    divm = Divergence2D(grid=grid2d, mask=mask2d)
+
+    return [
+        ("Divergence2D", "__call__", "unmasked", lambda: div(u2d, v2d)),
+        ("Divergence2D", "__call__", "masked", lambda: divm(u2d, v2d)),
+        ("Divergence2D", "noflux", "unmasked", lambda: div.noflux(u2d, v2d)),
+        ("Divergence2D", "noflux", "masked", lambda: divm.noflux(u2d, v2d)),
+    ]
+
+
+def _vorticity_entries(
+    grid2d, grid3d, mask2d, mask3d, h2d, u2d, v2d, q2d, u3d, v3d
+) -> list[Entry]:
+    """Register goldens for Vorticity2D and Vorticity3D."""
+    from finitevolx._src.operators.vorticity import Vorticity2D, Vorticity3D
+    from tests.fixtures.inputs import make_f_field_2d
+
+    f2d = make_f_field_2d()
+
+    v2 = Vorticity2D(grid=grid2d)
+    v2m = Vorticity2D(grid=grid2d, mask=mask2d)
+
+    entries: list[Entry] = [
+        (
+            "Vorticity2D",
+            "relative_vorticity",
+            "unmasked",
+            lambda: v2.relative_vorticity(u2d, v2d),
+        ),
+        (
+            "Vorticity2D",
+            "relative_vorticity",
+            "masked",
+            lambda: v2m.relative_vorticity(u2d, v2d),
+        ),
+        (
+            "Vorticity2D",
+            "potential_vorticity",
+            "unmasked",
+            lambda: v2.potential_vorticity(u2d, v2d, h2d, f2d),
+        ),
+        (
+            "Vorticity2D",
+            "potential_vorticity",
+            "masked",
+            lambda: v2m.potential_vorticity(u2d, v2d, h2d, f2d),
+        ),
+        (
+            "Vorticity2D",
+            "pv_flux_energy_conserving",
+            "unmasked",
+            lambda: v2.pv_flux_energy_conserving(q2d, u2d, v2d),
+        ),
+        (
+            "Vorticity2D",
+            "pv_flux_energy_conserving",
+            "masked",
+            lambda: v2m.pv_flux_energy_conserving(q2d, u2d, v2d),
+        ),
+        (
+            "Vorticity2D",
+            "pv_flux_enstrophy_conserving",
+            "unmasked",
+            lambda: v2.pv_flux_enstrophy_conserving(q2d, u2d, v2d),
+        ),
+        (
+            "Vorticity2D",
+            "pv_flux_enstrophy_conserving",
+            "masked",
+            lambda: v2m.pv_flux_enstrophy_conserving(q2d, u2d, v2d),
+        ),
+        (
+            "Vorticity2D",
+            "pv_flux_arakawa_lamb",
+            "unmasked",
+            lambda: v2.pv_flux_arakawa_lamb(q2d, u2d, v2d),
+        ),
+        (
+            "Vorticity2D",
+            "pv_flux_arakawa_lamb",
+            "masked",
+            lambda: v2m.pv_flux_arakawa_lamb(q2d, u2d, v2d),
+        ),
+    ]
+
+    v3 = Vorticity3D(grid=grid3d)
+    v3m = Vorticity3D(grid=grid3d, mask=mask3d)
+    entries.extend(
+        [
+            (
+                "Vorticity3D",
+                "relative_vorticity",
+                "unmasked",
+                lambda: v3.relative_vorticity(u3d, v3d),
+            ),
+            (
+                "Vorticity3D",
+                "relative_vorticity",
+                "masked",
+                lambda: v3m.relative_vorticity(u3d, v3d),
+            ),
+        ]
     )
 
     return entries

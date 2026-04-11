@@ -10,6 +10,7 @@ import equinox as eqx
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.cartesian import CartesianGrid2D
+from finitevolx._src.mask import Mask2D
 from finitevolx._src.operators.difference import Difference2D, _divergence_2d
 
 
@@ -69,6 +70,11 @@ class Divergence2D(eqx.Module):
     ----------
     grid : CartesianGrid2D
         The underlying 2-D grid.
+    mask : Mask2D or None, optional
+        Optional land/ocean mask.  When provided, the internal
+        ``Difference2D`` is constructed with the same mask, so the
+        divergence output is already zeroed at dry T-cells via
+        ``* mask.h`` (applied inside :meth:`Difference2D.divergence`).
 
     Examples
     --------
@@ -83,11 +89,17 @@ class Divergence2D(eqx.Module):
     """
 
     grid: CartesianGrid2D
+    mask: Mask2D | None
     diff: Difference2D
 
-    def __init__(self, grid: CartesianGrid2D) -> None:
+    def __init__(
+        self,
+        grid: CartesianGrid2D,
+        mask: Mask2D | None = None,
+    ) -> None:
         self.grid = grid
-        self.diff = Difference2D(grid=grid)
+        self.mask = mask
+        self.diff = Difference2D(grid=grid, mask=mask)
 
     def __call__(
         self,
@@ -109,7 +121,9 @@ class Divergence2D(eqx.Module):
         Returns
         -------
         Float[Array, "Ny Nx"]
-            Divergence at T-points.
+            Divergence at T-points.  When ``self.mask`` is set, the
+            output is zeroed at dry T-cells via ``* mask.h`` (applied
+            inside ``self.diff.divergence``).
         """
         return self.diff.divergence(u, v)
 
