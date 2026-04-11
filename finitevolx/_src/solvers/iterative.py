@@ -22,7 +22,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 import lineax as lx
 
-from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask
+from finitevolx._src.mask import Mask2D
 
 # ---------------------------------------------------------------------------
 # Convergence diagnostics
@@ -143,7 +143,7 @@ def solve_cg(
 
 def masked_laplacian(
     psi: Float[Array, "Ny Nx"],
-    mask: Float[Array, "Ny Nx"] | ArakawaCGridMask,
+    mask: Float[Array, "Ny Nx"] | Mask2D,
     dx: float,
     dy: float,
     lambda_: float = 0.0,
@@ -161,9 +161,9 @@ def masked_laplacian(
     ----------
     psi : Float[Array, "Ny Nx"]
         Field to which the operator is applied.
-    mask : Float[Array, "Ny Nx"] or ArakawaCGridMask
+    mask : Float[Array, "Ny Nx"] or Mask2D
         Binary mask: 1 inside the physical domain, 0 outside (land/exterior).
-        When an :class:`ArakawaCGridMask` is passed, the ``psi`` staggering
+        When an :class:`Mask2D` is passed, the ``psi`` staggering
         mask is used (all four surrounding h-cells must be wet).
     dx : float
         Grid spacing in x.
@@ -177,8 +177,8 @@ def masked_laplacian(
     Float[Array, "Ny Nx"]
         Result of (∇² − λ)·(ψ·mask), zeroed outside the mask.
     """
-    if isinstance(mask, ArakawaCGridMask):
-        mask_arr = mask.psi.astype(psi.dtype)
+    if isinstance(mask, Mask2D):
+        mask_arr = mask.xy_corner_strict.astype(psi.dtype)
     else:
         mask_arr = mask
     psi_m = psi * mask_arr  # enforce zero outside domain

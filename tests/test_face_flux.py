@@ -18,8 +18,8 @@ import pytest
 
 from finitevolx import (
     Advection2D,
-    ArakawaCGridMask,
     CartesianGrid2D,
+    Mask2D,
     uv_center_flux,
     uv_node_flux,
 )
@@ -277,7 +277,7 @@ class TestMaskedFlux:
         grid = CartesianGrid2D.from_interior(Nx - 2, Ny - 2, 1.0, 1.0)
         h_mask = np.ones((Ny, Nx), dtype=bool)
         h_mask[6:10, 6:10] = False  # island
-        mask = ArakawaCGridMask.from_mask(h_mask)
+        mask = Mask2D.from_mask(h_mask)
         return grid, mask, Ny, Nx
 
     @pytest.mark.parametrize("method", ["weno3", "weno5", "wenoz5", "minmod"])

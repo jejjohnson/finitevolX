@@ -56,10 +56,10 @@ solver = fvx.build_multigrid_solver(mask, dx, dy, lambda_=10.0)
 u = solver(rhs * jnp.array(mask))  # zero RHS outside domain
 ```
 
-### With ArakawaCGridMask
+### With Mask2D
 
 ```python
-cgrid_mask = fvx.ArakawaCGridMask.from_mask(ocean_mask)
+cgrid_mask = fvx.Mask2D.from_mask(ocean_mask)
 solver = fvx.build_multigrid_solver(cgrid_mask, dx, dy, lambda_=10.0)
 ```
 

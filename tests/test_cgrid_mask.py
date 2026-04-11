@@ -1,16 +1,22 @@
-"""Tests for ArakawaCGridMask and StencilCapability."""
+"""Tests for Mask1D / Mask2D / Mask3D and StencilCapability1D / 2D / 3D."""
 
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.mask.cgrid_mask import (
-    ArakawaCGridMask,
-    StencilCapability,
-    _count_contiguous,
-    _dilate2d,
-    _make_sponge,
-    _pool2d_bool,
+from finitevolx._src.mask import (
+    Mask1D,
+    Mask2D,
+    Mask3D,
+    StencilCapability1D,
+    StencilCapability2D,
+    StencilCapability3D,
+)
+from finitevolx._src.mask.utils import (
+    count_contiguous,
+    dilate_mask,
+    make_sponge,
+    pool_bool,
 )
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
@@ -45,32 +51,32 @@ def island_mask():
 
 @pytest.fixture
 def all_ocean():
-    return ArakawaCGridMask.from_dimensions(8, 8)
+    return Mask2D.from_dimensions(8, 8)
 
 
 @pytest.fixture
 def rect_cgrid(rect_mask):
-    return ArakawaCGridMask.from_mask(rect_mask)
+    return Mask2D.from_mask(rect_mask)
 
 
 @pytest.fixture
 def island_cgrid(island_mask):
-    return ArakawaCGridMask.from_mask(island_mask)
+    return Mask2D.from_mask(island_mask)
 
 
-# ── _pool2d_bool ──────────────────────────────────────────────────────────────
+# ── pool_bool ────────────────────────────────────────────────────────────────
 
 
-class TestPool2dBool:
+class TestPoolBool:
     def test_output_shape(self):
         h = np.ones((6, 8), dtype=np.float32)
-        out = _pool2d_bool(h, 2, 1, 0.5)
+        out = pool_bool(h, (2, 1), 0.5)
         assert out.shape == (6, 8)
 
     def test_all_ones_kernel_2x1(self):
         # All-ones → mean = 1.0 for j≥1, but j=0 has h[j-1,i]=0 (padding)
         h = np.ones((5, 5), dtype=np.float32)
-        out = _pool2d_bool(h, 2, 1, 0.75)
+        out = pool_bool(h, (2, 1), 0.75)
         # Row 0: (h[0]+0)/2 = 0.5, not > 0.75
         np.testing.assert_array_equal(out[0, :], False)
         np.testing.assert_array_equal(out[1:, :], True)
@@ -78,7 +84,7 @@ class TestPool2dBool:
     def test_all_ones_kernel_2x2(self):
         # psi-style: needs all 4 → row 0 or col 0 is zero-padded → False
         h = np.ones((5, 5), dtype=np.float32)
-        out = _pool2d_bool(h, 2, 2, 7.0 / 8.0)
+        out = pool_bool(h, (2, 2), 7.0 / 8.0)
         np.testing.assert_array_equal(out[0, :], False)
         np.testing.assert_array_equal(out[:, 0], False)
         np.testing.assert_array_equal(out[1:, 1:], True)
@@ -87,7 +93,7 @@ class TestPool2dBool:
         # w-style: needs ≥1 of 4 → isolated wet cell still passes
         h = np.zeros((4, 4), dtype=np.float32)
         h[2, 2] = 1.0
-        out = _pool2d_bool(h, 2, 2, 1.0 / 8.0)
+        out = pool_bool(h, (2, 2), 1.0 / 8.0)
         # Cells (2,2), (2,3), (3,2), (3,3) can "see" h[2,2] → True
         assert out[2, 2]
         assert out[2, 3]
@@ -95,14 +101,14 @@ class TestPool2dBool:
         assert out[3, 3]
 
 
-# ── _dilate2d ─────────────────────────────────────────────────────────────────
+# ── dilate_mask ───────────────────────────────────────────────────────────────────
 
 
-class TestDilate2d:
+class TestDilate:
     def test_single_cell_4_connectivity(self):
         mask = np.zeros((5, 5), dtype=bool)
         mask[2, 2] = True
-        dilated = _dilate2d(mask)
+        dilated = dilate_mask(mask)
         # Centre plus 4 neighbours
         assert dilated[2, 2]
         assert dilated[1, 2]
@@ -116,72 +122,72 @@ class TestDilate2d:
     def test_no_wrap_around(self):
         mask = np.zeros((6, 6), dtype=bool)
         mask[0, 0] = True
-        dilated = _dilate2d(mask)
+        dilated = dilate_mask(mask)
         assert not dilated[0, 5]
         assert not dilated[5, 0]
 
 
-# ── _count_contiguous ─────────────────────────────────────────────────────────
+# ── count_contiguous ─────────────────────────────────────────────────────────
 
 
 class TestCountContiguous:
     def test_x_forward(self):
         # h = [1, 1, 0, 1, 1, 1]  →  x_pos = [2, 1, 0, 3, 2, 1]
         h = np.array([[True, True, False, True, True, True]])
-        result = _count_contiguous(h, axis=1, forward=True)
+        result = count_contiguous(h, axis=1, forward=True)
         np.testing.assert_array_equal(result[0], [2, 1, 0, 3, 2, 1])
 
     def test_x_backward(self):
         # h = [1, 1, 0, 1, 1, 1]  →  x_neg = [1, 2, 0, 1, 2, 3]
         h = np.array([[True, True, False, True, True, True]])
-        result = _count_contiguous(h, axis=1, forward=False)
+        result = count_contiguous(h, axis=1, forward=False)
         np.testing.assert_array_equal(result[0], [1, 2, 0, 1, 2, 3])
 
     def test_y_forward(self):
         # column [T, T, F, T, T, T]^T  →  y_pos = [2, 1, 0, 3, 2, 1]^T
         h = np.array([[True], [True], [False], [True], [True], [True]])
-        result = _count_contiguous(h, axis=0, forward=True)
+        result = count_contiguous(h, axis=0, forward=True)
         np.testing.assert_array_equal(result[:, 0], [2, 1, 0, 3, 2, 1])
 
     def test_dry_cell_is_zero(self):
         h = np.array([[True, False, True]])
-        assert _count_contiguous(h, axis=1, forward=True)[0, 1] == 0
-        assert _count_contiguous(h, axis=1, forward=False)[0, 1] == 0
+        assert count_contiguous(h, axis=1, forward=True)[0, 1] == 0
+        assert count_contiguous(h, axis=1, forward=False)[0, 1] == 0
 
 
-# ── _make_sponge ──────────────────────────────────────────────────────────────
+# ── make_sponge ──────────────────────────────────────────────────────────────
 
 
 class TestMakeSponge:
     def test_shape(self):
-        s = _make_sponge(10, 12, 3)
+        s = make_sponge((10, 12), 3)
         assert s.shape == (10, 12)
 
     def test_walls_are_zero(self):
-        s = _make_sponge(10, 10, 3)
+        s = make_sponge((10, 10), 3)
         np.testing.assert_array_equal(s[0, :], 0.0)
         np.testing.assert_array_equal(s[-1, :], 0.0)
         np.testing.assert_array_equal(s[:, 0], 0.0)
         np.testing.assert_array_equal(s[:, -1], 0.0)
 
     def test_interior_is_one(self):
-        s = _make_sponge(20, 20, 4)
+        s = make_sponge((20, 20), 4)
         np.testing.assert_allclose(s[10, 10], 1.0)
 
 
-# ── StencilCapability ─────────────────────────────────────────────────────────
+# ── StencilCapability2D ─────────────────────────────────────────────────────────
 
 
 class TestStencilCapability:
     def test_shape(self, rect_mask):
-        sc = StencilCapability.from_mask(rect_mask)
+        sc = StencilCapability2D.from_mask(rect_mask)
         assert sc.x_pos.shape == rect_mask.shape
         assert sc.x_neg.shape == rect_mask.shape
         assert sc.y_pos.shape == rect_mask.shape
         assert sc.y_neg.shape == rect_mask.shape
 
     def test_dry_cells_are_zero(self, rect_mask):
-        sc = StencilCapability.from_mask(rect_mask)
+        sc = StencilCapability2D.from_mask(rect_mask)
         land = ~rect_mask
         np.testing.assert_array_equal(np.asarray(sc.x_pos)[land], 0)
         np.testing.assert_array_equal(np.asarray(sc.x_neg)[land], 0)
@@ -192,36 +198,131 @@ class TestStencilCapability:
         assert bool(jnp.all(sc.x_neg >= 1))
 
 
-# ── ArakawaCGridMask construction ─────────────────────────────────────────────
+# ── Mask2D construction ─────────────────────────────────────────────
 
 
 class TestConstruction:
     def test_from_mask_shapes(self, rect_cgrid, rect_mask):
         m = rect_cgrid
-        for arr in (m.h, m.u, m.v, m.w, m.psi):
+        for arr in (m.h, m.u, m.v, m.xy_corner, m.xy_corner_strict):
             assert arr.shape == rect_mask.shape
 
     def test_from_dimensions_all_wet(self, all_ocean):
         assert bool(jnp.all(all_ocean.h))
 
-    def test_from_ssh_nan_is_land(self):
-        ssh = np.ones((6, 6), dtype=float)
-        ssh[0, :] = np.nan
-        ssh[:, 0] = np.nan
-        m = ArakawaCGridMask.from_ssh(ssh)
+    def test_from_center_nan_is_land(self):
+        field = np.ones((6, 6), dtype=float)
+        field[0, :] = np.nan
+        field[:, 0] = np.nan
+        m = Mask2D.from_center(field)
         np.testing.assert_array_equal(np.asarray(m.h)[0, :], False)
         np.testing.assert_array_equal(np.asarray(m.h)[:, 0], False)
 
     def test_inverted_masks(self, rect_cgrid):
         m = rect_cgrid
         np.testing.assert_array_equal(np.asarray(m.h & m.not_h), False)
-        np.testing.assert_array_equal(np.asarray(m.psi & m.not_psi), False)
+        np.testing.assert_array_equal(
+            np.asarray(m.xy_corner_strict & m.not_xy_corner_strict), False
+        )
 
     def test_top_level_import(self):
-        from finitevolx import ArakawaCGridMask as ACM, StencilCapability as SC
+        from finitevolx import Mask2D as ACM, StencilCapability2D as SC
 
         assert ACM is not None
         assert SC is not None
+
+
+# ── grid-position constructors (from_center / from_u_face / from_v_face / from_corner) ──
+
+
+class TestGridPositionConstructors:
+    """Tests for the new from_<position> constructors on Mask2D."""
+
+    def test_from_u_face_all_ocean_round_trip(self):
+        # For an all-wet h, forward-pooling (trailing direction = grid's
+        # positive half-step convention) and inverting via permissive
+        # mode should recover the all-wet mask exactly.
+        h = np.ones((6, 6), dtype=bool)
+        u_field = np.where(
+            pool_bool(h.astype(float), (1, 2), 3.0 / 4.0, direction="trailing"),
+            1.0,
+            np.nan,
+        )
+        m = Mask2D.from_u_face(u_field, mode="permissive")
+        np.testing.assert_array_equal(np.asarray(m.h), h)
+
+    def test_from_u_face_subset_property(self):
+        # Inverse permissive yields h_inferred ⊆ true_h (the permissive
+        # inversion is the lower bound on the consistent h).  Round-trip
+        # is lossy at isolated wet cells with no axis-aligned neighbours.
+        rng = np.random.default_rng(0)
+        h = rng.random((8, 8)) > 0.3  # ~70% wet
+        u_field = np.where(
+            pool_bool(h.astype(float), (1, 2), 3.0 / 4.0, direction="trailing"),
+            1.0,
+            np.nan,
+        )
+        m = Mask2D.from_u_face(u_field, mode="permissive")
+        h_inferred = np.asarray(m.h)
+        # h_inferred ⊆ h: no false-wet cells.
+        assert bool(np.all(h | ~h_inferred))
+
+    def test_from_u_face_conservative_subset_of_permissive(self):
+        # conservative h ⊆ permissive h for the same input.
+        rng = np.random.default_rng(1)
+        u_field = np.where(rng.random((8, 8)) > 0.3, 1.0, np.nan)
+        m_perm = Mask2D.from_u_face(u_field, mode="permissive")
+        m_cons = Mask2D.from_u_face(u_field, mode="conservative")
+        cons = np.asarray(m_cons.h)
+        perm = np.asarray(m_perm.h)
+        assert bool(np.all((~cons) | perm))
+
+    def test_from_v_face_all_ocean_round_trip(self):
+        h = np.ones((6, 6), dtype=bool)
+        v_field = np.where(
+            pool_bool(h.astype(float), (2, 1), 3.0 / 4.0, direction="trailing"),
+            1.0,
+            np.nan,
+        )
+        m = Mask2D.from_v_face(v_field, mode="permissive")
+        np.testing.assert_array_equal(np.asarray(m.h), h)
+
+    def test_from_v_face_subset_property(self):
+        rng = np.random.default_rng(2)
+        h = rng.random((8, 8)) > 0.3
+        v_field = np.where(
+            pool_bool(h.astype(float), (2, 1), 3.0 / 4.0, direction="trailing"),
+            1.0,
+            np.nan,
+        )
+        m = Mask2D.from_v_face(v_field, mode="permissive")
+        h_inferred = np.asarray(m.h)
+        assert bool(np.all(h | ~h_inferred))
+
+    def test_from_corner_all_ocean_round_trip(self):
+        # All-wet corner field (no NaN) → all-wet h under permissive.
+        c_field = np.ones((6, 6), dtype=float)
+        m = Mask2D.from_corner(c_field, mode="permissive")
+        assert bool(np.all(np.asarray(m.h)))
+
+    def test_from_corner_all_dry(self):
+        # All-NaN corners → all-dry h.
+        c_field = np.full((6, 6), np.nan, dtype=float)
+        m = Mask2D.from_corner(c_field, mode="conservative")
+        assert bool(np.all(~np.asarray(m.h)))
+
+    def test_invalid_mode_raises(self):
+        field = np.ones((6, 6), dtype=float)
+        with pytest.raises(ValueError, match="mode must be"):
+            Mask2D.from_u_face(field, mode="bogus")
+
+    def test_from_center_matches_from_mask(self):
+        rng = np.random.default_rng(3)
+        h_bin = rng.random((6, 6)) > 0.3
+        field = np.where(h_bin, 1.0, np.nan)
+        m1 = Mask2D.from_center(field)
+        m2 = Mask2D.from_mask(h_bin)
+        np.testing.assert_array_equal(np.asarray(m1.h), np.asarray(m2.h))
 
 
 # ── staggered mask properties ─────────────────────────────────────────────────
@@ -231,27 +332,36 @@ class TestStaggeredMasks:
     def test_psi_subset_of_w(self, rect_cgrid):
         m = rect_cgrid
         # psi (strict) ⊆ w (lenient)
-        assert bool(jnp.all(jnp.where(m.psi, m.w, True)))
+        assert bool(jnp.all(jnp.where(m.xy_corner_strict, m.xy_corner, True)))
 
-    def test_u_requires_both_y_neighbours(self):
-        # u[j, i] needs h[j, i] and h[j-1, i] both wet
-        # With h[0, :] = False, u[1, :] must be False
+    def test_u_requires_both_x_neighbours(self):
+        # u[j, i] (east face) needs h[j, i] and h[j, i+1] both wet.
+        # With h[:, 0] = False, u[:, Nx-1] must be False (trailing pad
+        # treats h[:, Nx] as 0) and u[:, 0] is also False because h[:, 0]
+        # is land.  Interior columns are wet.
         mask = np.ones((6, 6), dtype=bool)
-        mask[0, :] = False
-        m = ArakawaCGridMask.from_mask(mask)
-        np.testing.assert_array_equal(np.asarray(m.u)[1, :], False)
-        np.testing.assert_array_equal(np.asarray(m.u)[2, :], True)
+        mask[:, 0] = False
+        m = Mask2D.from_mask(mask)
+        # u[:, 0] = h[:, 0] AND h[:, 1] = F AND T = F
+        np.testing.assert_array_equal(np.asarray(m.u)[:, 0], False)
+        # u[:, 1] = h[:, 1] AND h[:, 2] = T AND T = T
+        np.testing.assert_array_equal(np.asarray(m.u)[:, 1], True)
+        # u[:, Nx-1] = h[:, Nx-1] AND pad-zero = F (trailing-pad boundary)
+        np.testing.assert_array_equal(np.asarray(m.u)[:, -1], False)
 
     def test_psi_strict_threshold(self):
-        # Remove one h-cell → psi for all four surrounding corners must be False
+        # Remove one h-cell → xy_corner_strict for all four surrounding
+        # corners must be False.  Under the trailing-pad (positive
+        # half-step) convention, xy_corner_strict[j, i] uses h[j..j+1,
+        # i..i+1], so dropping h[2, 2] flips xy_corner_strict at indices
+        # (1, 1), (1, 2), (2, 1), (2, 2).
         mask = np.ones((5, 5), dtype=bool)
         mask[2, 2] = False
-        m = ArakawaCGridMask.from_mask(mask)
-        # psi[2, 2] uses h[1,1], h[1,2], h[2,1], h[2,2] → h[2,2]=False → False
-        assert not bool(m.psi[2, 2])
-        assert not bool(m.psi[2, 3])
-        assert not bool(m.psi[3, 2])
-        assert not bool(m.psi[3, 3])
+        m = Mask2D.from_mask(mask)
+        assert not bool(m.xy_corner_strict[1, 1])
+        assert not bool(m.xy_corner_strict[1, 2])
+        assert not bool(m.xy_corner_strict[2, 1])
+        assert not bool(m.xy_corner_strict[2, 2])
 
 
 # ── vorticity boundary classification ────────────────────────────────────────
@@ -260,18 +370,18 @@ class TestStaggeredMasks:
 class TestVorticityBoundary:
     def test_w_valid_subset_of_w(self, rect_cgrid):
         m = rect_cgrid
-        assert bool(jnp.all(jnp.where(m.w_valid, m.w, True)))
+        assert bool(jnp.all(jnp.where(m.xy_corner_valid, m.xy_corner, True)))
 
     def test_boundary_types_cover_all_wet_w(self, rect_cgrid):
         m = rect_cgrid
-        covered = m.w_valid | m.w_vertical_bound | m.w_horizontal_bound
-        assert bool(jnp.all(jnp.where(m.w, covered, True)))
+        covered = m.xy_corner_valid | m.xy_corner_y_wall | m.xy_corner_x_wall
+        assert bool(jnp.all(jnp.where(m.xy_corner, covered, True)))
 
     def test_cornerout_is_intersection(self, rect_cgrid):
         m = rect_cgrid
-        expected = m.w_vertical_bound & m.w_horizontal_bound
+        expected = m.xy_corner_y_wall & m.xy_corner_x_wall
         np.testing.assert_array_equal(
-            np.asarray(m.w_cornerout_bound), np.asarray(expected)
+            np.asarray(m.xy_corner_convex), np.asarray(expected)
         )
 
 
@@ -281,20 +391,22 @@ class TestVorticityBoundary:
 class TestIrregularBoundary:
     def test_dtype_int32(self, rect_cgrid):
         m = rect_cgrid
-        assert m.psi_irrbound_xids.dtype == jnp.int32
-        assert m.psi_irrbound_yids.dtype == jnp.int32
+        assert m.xy_corner_strict_irrbound_cols.dtype == jnp.int32
+        assert m.xy_corner_strict_irrbound_rows.dtype == jnp.int32
 
     def test_paired_lengths(self, rect_cgrid):
         m = rect_cgrid
-        assert len(m.psi_irrbound_xids) == len(m.psi_irrbound_yids)
+        assert len(m.xy_corner_strict_irrbound_cols) == len(
+            m.xy_corner_strict_irrbound_rows
+        )
 
     def test_within_interior_bounds(self, rect_cgrid):
         m = rect_cgrid
         Ny, Nx = m.h.shape
-        assert bool(jnp.all(m.psi_irrbound_yids >= 1))
-        assert bool(jnp.all(m.psi_irrbound_yids < Ny - 1))
-        assert bool(jnp.all(m.psi_irrbound_xids >= 1))
-        assert bool(jnp.all(m.psi_irrbound_xids < Nx - 1))
+        assert bool(jnp.all(m.xy_corner_strict_irrbound_rows >= 1))
+        assert bool(jnp.all(m.xy_corner_strict_irrbound_rows < Ny - 1))
+        assert bool(jnp.all(m.xy_corner_strict_irrbound_cols >= 1))
+        assert bool(jnp.all(m.xy_corner_strict_irrbound_cols < Nx - 1))
 
 
 # ── land / coast classification ───────────────────────────────────────────────
@@ -355,12 +467,12 @@ class TestSponge:
         np.testing.assert_allclose(np.asarray(rect_cgrid.sponge), 1.0)
 
     def test_walls_are_zero(self, rect_mask):
-        m = ArakawaCGridMask.from_mask(rect_mask, sponge_width=2)
+        m = Mask2D.from_mask(rect_mask, sponge_width=2)
         np.testing.assert_array_equal(np.asarray(m.sponge)[0, :], 0.0)
         np.testing.assert_array_equal(np.asarray(m.sponge)[:, 0], 0.0)
 
     def test_shape(self, rect_mask):
-        m = ArakawaCGridMask.from_mask(rect_mask, sponge_width=3)
+        m = Mask2D.from_mask(rect_mask, sponge_width=3)
         assert m.sponge.shape == rect_mask.shape
 
 
@@ -379,7 +491,7 @@ class TestAdaptiveMasks:
         assert bool(np.all(total <= 1))
 
     def test_large_domain_large_stencil(self):
-        m = ArakawaCGridMask.from_dimensions(20, 20)
+        m = Mask2D.from_dimensions(20, 20)
         masks = m.get_adaptive_masks(direction="x", source="h")
         # Centre cell has ≥10 wet cells in each direction → stencil 10
         assert bool(masks[10][10, 10])
@@ -399,7 +511,7 @@ class TestAdaptiveMasks:
         mask[-1, :] = False
         mask[:, 0] = False
         mask[:, -1] = False
-        m = ArakawaCGridMask.from_mask(mask)
+        m = Mask2D.from_mask(mask)
         masks = m.get_adaptive_masks(direction="x", source="h")
         assert bool(masks[2][5, 1])
         assert not bool(masks[4][5, 1])
@@ -415,12 +527,13 @@ class TestAdaptiveMasks:
 #     |           |
 #     w-----v-----w
 #
-# Convention:
-#   h[j, i]   — cell centre
-#   u[j, i]   — interface between h[j-1, i] and h[j, i]  (y-face)
-#   v[j, i]   — interface between h[j, i-1] and h[j, i]  (x-face)
-#   w[j, i]   — SW corner of h[j, i], uses h[j-1:j+1, i-1:i+1]
-#   psi[j, i] — strict version of w (all 4 h-cells must be wet)
+# Convention (trailing-pad / positive half-step, matching grid module):
+#   h[j, i]                cell centre
+#   u[j, i]                east face = interface between h[j, i] and h[j, i+1]
+#   v[j, i]                north face = interface between h[j, i] and h[j+1, i]
+#   xy_corner[j, i]        NE corner of h[j, i]; lenient kernel uses
+#                          h[j..j+1, i..i+1]
+#   xy_corner_strict[j, i] strict version (all 4 h-cells must be wet)
 
 
 class TestStaggeredMaskGeometry:
@@ -431,99 +544,103 @@ class TestStaggeredMaskGeometry:
         """6×6 basin: land border, 4×4 ocean interior."""
         h = np.ones((6, 6), dtype=bool)
         h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
-        return h, ArakawaCGridMask.from_mask(h)
+        return h, Mask2D.from_mask(h)
 
-    # ── u mask: interface between h[j-1,i] and h[j,i] ────────────────
+    # ── u mask: east face = interface between h[j, i] and h[j, i+1] ──
 
     def test_u_wet_when_both_h_neighbours_wet(self, basin6):
         _, m = basin6
         u = np.asarray(m.u)
-        # u[2,2]: between h[1,2] (wet) and h[2,2] (wet) → wet
+        # u[2,2] = h[2,2] (wet) AND h[2,3] (wet) → wet
         assert u[2, 2]
 
-    def test_u_dry_when_h_below_is_land(self, basin6):
+    def test_u_dry_when_h_right_is_land(self, basin6):
         _, m = basin6
         u = np.asarray(m.u)
-        # u[1,2]: between h[0,2] (land) and h[1,2] (wet) → dry
-        assert not u[1, 2]
+        # u[2,4] = h[2,4] (wet) AND h[2,5] (land border) → dry
+        assert not u[2, 4]
 
-    def test_u_dry_when_h_above_is_land(self, basin6):
+    def test_u_dry_when_h_left_is_land(self, basin6):
         _, m = basin6
         u = np.asarray(m.u)
-        # u[5,2]: between h[4,2] (wet) and h[5,2] (land) → dry
-        assert not u[5, 2]
+        # u[2,0] = h[2,0] (land border) AND h[2,1] (wet) → dry
+        assert not u[2, 0]
 
-    def test_u_dry_at_row_0_padding(self, basin6):
+    def test_u_dry_at_last_col_padding(self, basin6):
         _, m = basin6
         u = np.asarray(m.u)
-        # u[0,i]: between padded zero and h[0,i] → always dry
-        np.testing.assert_array_equal(u[0, :], False)
+        # u[j, Nx-1]: trailing-pad zero in the i+1 slot → always dry
+        np.testing.assert_array_equal(u[:, -1], False)
 
-    # ── v mask: interface between h[j,i-1] and h[j,i] ────────────────
+    # ── v mask: north face = interface between h[j, i] and h[j+1, i] ──
 
     def test_v_wet_when_both_h_neighbours_wet(self, basin6):
         _, m = basin6
         v = np.asarray(m.v)
-        # v[2,2]: between h[2,1] (wet) and h[2,2] (wet) → wet
+        # v[2,2] = h[2,2] (wet) AND h[3,2] (wet) → wet
         assert v[2, 2]
 
-    def test_v_dry_when_h_left_is_land(self, basin6):
+    def test_v_dry_when_h_above_is_land(self, basin6):
         _, m = basin6
         v = np.asarray(m.v)
-        # v[2,1]: between h[2,0] (land) and h[2,1] (wet) → dry
-        assert not v[2, 1]
+        # v[4,2] = h[4,2] (wet) AND h[5,2] (land border) → dry
+        assert not v[4, 2]
 
-    def test_v_dry_at_col_0_padding(self, basin6):
+    def test_v_dry_at_last_row_padding(self, basin6):
         _, m = basin6
         v = np.asarray(m.v)
-        # v[j,0]: between padded zero and h[j,0] → always dry
-        np.testing.assert_array_equal(v[:, 0], False)
+        # v[Ny-1, i]: trailing-pad zero in the j+1 slot → always dry
+        np.testing.assert_array_equal(v[-1, :], False)
 
-    # ── w mask (lenient): at least 1 of 4 SW-corner h-cells wet ──────
+    # ── xy_corner (lenient): at least 1 of 4 NE-corner h-cells wet ───
 
-    def test_w_wet_near_single_wet_cell(self):
+    def test_xy_corner_wet_near_single_wet_cell(self):
         h = np.zeros((4, 4), dtype=bool)
-        h[1, 1] = True  # single wet cell
-        m = ArakawaCGridMask.from_mask(h)
-        w = np.asarray(m.w)
-        # w at corners of h[1,1]: (1,1), (1,2), (2,1), (2,2)
-        assert w[1, 1]
-        assert w[1, 2]
-        assert w[2, 1]
-        assert w[2, 2]
+        h[2, 2] = True  # single wet cell
+        m = Mask2D.from_mask(h)
+        xy = np.asarray(m.xy_corner)
+        # Under trailing pad, xy_corner[j, i] uses h[j..j+1, i..i+1].
+        # h[2,2] appears in xy_corner[(j,i)] for (j,i) in (1,1), (1,2),
+        # (2,1), (2,2).
+        assert xy[1, 1]
+        assert xy[1, 2]
+        assert xy[2, 1]
+        assert xy[2, 2]
 
-    def test_w_dry_far_from_wet_cells(self):
+    def test_xy_corner_dry_far_from_wet_cells(self):
         h = np.zeros((6, 6), dtype=bool)
         h[1, 1] = True
-        m = ArakawaCGridMask.from_mask(h)
-        w = np.asarray(m.w)
-        # w[4,4]: SW corner uses h[3,3], h[3,4], h[4,3], h[4,4] — all dry
-        assert not w[4, 4]
+        m = Mask2D.from_mask(h)
+        xy = np.asarray(m.xy_corner)
+        # xy_corner[3,3]: uses h[3..4, 3..4] — all dry
+        assert not xy[3, 3]
 
-    # ── psi mask (strict): all 4 SW-corner h-cells wet ────────────────
+    # ── xy_corner_strict (strict): all 4 NE-corner h-cells wet ───────
 
     def test_psi_wet_interior(self, basin6):
         _, m = basin6
-        psi = np.asarray(m.psi)
-        # psi[2,2]: uses h[1,1], h[1,2], h[2,1], h[2,2] — all wet
+        psi = np.asarray(m.xy_corner_strict)
+        # psi[2,2] = h[2..3, 2..3] all wet (interior)
         assert psi[2, 2]
 
     def test_psi_dry_at_land_boundary(self, basin6):
         _, m = basin6
-        psi = np.asarray(m.psi)
-        # psi[1,2]: uses h[0,1] (land) → dry
-        assert not psi[1, 2]
+        psi = np.asarray(m.xy_corner_strict)
+        # psi[4,2] = h[4..5, 2..3] → h[5,*] is land border → dry
+        assert not psi[4, 2]
 
 
 class TestVorticityBoundaryGeometry:
     """Verify vorticity boundary classification at specific grid points.
 
-    For w[j,i] at the SW corner of cell (j,i), the 4 adjacent velocity
-    faces are:
-      - u[j, i]   (east)   — y-face between h[j-1,i] and h[j,i]
-      - u[j, i-1] (west)   — y-face between h[j-1,i-1] and h[j,i-1]
-      - v[j, i]   (north)  — x-face between h[j,i-1] and h[j,i]
-      - v[j-1, i] (south)  — x-face between h[j-1,i-1] and h[j-1,i]
+    Under the trailing-pad (positive half-step) convention,
+    ``xy_corner[j, i]`` sits at the NE corner of ``h[j, i]``, and the
+    4 incident velocity faces are:
+
+      - ``u[j, i]``   (east face of h[j, i])   — south of the corner
+      - ``u[j+1, i]`` (east face of h[j+1, i]) — north of the corner
+      - ``v[j, i]``   (north face of h[j, i])  — west of the corner
+      - ``v[j, i+1]`` (north face of h[j, i+1]) — east of the corner
     """
 
     @pytest.fixture
@@ -531,102 +648,92 @@ class TestVorticityBoundaryGeometry:
         """8×8 basin: land border, 6×6 ocean interior."""
         h = np.ones((8, 8), dtype=bool)
         h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
-        return ArakawaCGridMask.from_mask(h)
+        return Mask2D.from_mask(h)
 
     @pytest.fixture
     def channel8(self):
         """8×8 zonal channel: walls at j=0 and j=7, open in x."""
         h = np.ones((8, 8), dtype=bool)
         h[0, :] = h[-1, :] = False
-        return ArakawaCGridMask.from_mask(h)
+        return Mask2D.from_mask(h)
 
-    # ── w_valid: all 4 adjacent velocity faces wet ────────────────────
+    # ── xy_corner_valid: all 4 adjacent velocity faces wet ────────────────────
 
     def test_w_valid_deep_interior(self, basin8):
         m = basin8
-        # w[4,4] is deep interior — all 4 adjacent faces should be wet
-        assert bool(m.w_valid[4, 4])
+        # xy_corner[3, 3] is deep interior — all 4 adjacent faces wet.
+        assert bool(m.xy_corner_valid[3, 3])
 
     def test_w_valid_not_at_boundary(self, basin8):
         m = basin8
-        # w[1,2] is near the bottom wall — u[1,2] is dry → not valid
-        assert not bool(m.w_valid[1, 2])
+        # xy_corner[0, 3] sits at NE corner of h[0, 3] = (0.5, 3.5),
+        # touching the south wall.  u[0, 3] = h[0,3] AND h[0,4] = F → dry
+        # so xy_corner_valid[0, 3] is False.
+        assert not bool(m.xy_corner_valid[0, 3])
 
     def test_w_valid_checks_correct_four_faces(self):
-        """Build a domain where only the correct adjacency passes."""
-        # 5x5, all ocean except h[2,2] = land.
-        # This makes specific u/v faces dry, testing that w_valid checks
-        # the right 4 faces (not shifted ones).
+        """Verify that xy_corner_valid checks the correct 4 adjacent faces."""
+        # 5x5, all ocean except h[2, 2] = land.
         h = np.ones((5, 5), dtype=bool)
         h[2, 2] = False
-        m = ArakawaCGridMask.from_mask(h)
-        va = np.asarray(m.w_valid)
+        m = Mask2D.from_mask(h)
+        va = np.asarray(m.xy_corner_valid)
 
-        # w[3,3]: SW corner of cell (3,3). Adjacent faces:
-        #   u[3,3] = mean(h[2,3], h[3,3]) = mean(1,1) → wet
-        #   u[3,2] = mean(h[2,2], h[3,2]) = mean(0,1) → dry!
-        #   v[3,3] = mean(h[3,2], h[3,3]) = mean(1,1) → wet
-        #   v[2,3] = mean(h[2,2], h[2,3]) = mean(0,1) → dry!
-        assert not va[3, 3], "w[3,3] should NOT be valid (u[3,2] and v[2,3] dry)"
+        # Under trailing convention, xy_corner[j, i] is the NE corner of
+        # h[j, i] and uses h[j..j+1, i..i+1].  The dry h[2, 2] makes the
+        # 4 corners that touch it dry: (1, 1), (1, 2), (2, 1), (2, 2).
+        # Verify each corner is invalid because at least one adjacent
+        # face is dry.
+        for j, i in [(1, 1), (1, 2), (2, 1), (2, 2)]:
+            assert not va[j, i], f"xy_corner_valid[{j}, {i}] should be False"
 
-        # w[2,2]: Adjacent faces:
-        #   u[2,2] = mean(h[1,2], h[2,2]) = mean(1,0) → dry!
-        #   u[2,1] = mean(h[1,1], h[2,1]) = mean(1,1) → wet
-        #   v[2,2] = mean(h[2,1], h[2,2]) = mean(1,0) → dry!
-        #   v[1,2] = mean(h[1,1], h[1,2]) = mean(1,1) → wet
-        assert not va[2, 2], "w[2,2] should NOT be valid (u[2,2] and v[2,2] dry)"
+        # A corner well away from the dry cell — uses h[3..4, 0..1] —
+        # all wet → all 4 adjacent faces wet → valid.
+        assert va[3, 0], "xy_corner_valid[3, 0] should be True"
 
-        # w[2,4]: far from the hole. Adjacent faces:
-        #   u[2,4] = mean(h[1,4], h[2,4]) = mean(1,1) → wet
-        #   u[2,3] = mean(h[1,3], h[2,3]) = mean(1,1) → wet
-        #   v[2,4] = mean(h[2,3], h[2,4]) = mean(1,1) → wet
-        #   v[1,4] = mean(h[1,3], h[1,4]) = mean(1,1) → wet
-        assert va[2, 4], "w[2,4] should be valid (all 4 faces wet)"
-
-    def test_w_valid_would_fail_with_wrong_adjacency(self):
-        """Regression: the old code checked u[j+1,i] and v[j,i+1].
-
-        This test passes with correct adjacency but would fail with the
-        old (wrong) shifts.
+    def test_w_valid_uses_correct_adjacency(self):
+        """The 4 incident faces of xy_corner[j, i] are u[j..j+1, i] and
+        v[j, i..i+1] under the trailing-pad convention.
         """
         # 5x5 all-ocean, then kill one cell to create a single-face gap.
         h = np.ones((5, 5), dtype=bool)
-        h[3, 1] = False  # makes u[3,1] dry and u[4,1] dry, v[3,1] dry, v[3,2] dry
-        m = ArakawaCGridMask.from_mask(h)
-        va = np.asarray(m.w_valid)
+        h[2, 1] = False  # affects u[1, 1], u[2, 1], v[2, 0], v[2, 1]
+        m = Mask2D.from_mask(h)
+        va = np.asarray(m.xy_corner_valid)
         u = np.asarray(m.u)
         v = np.asarray(m.v)
 
-        # w[3,2]: adjacent faces are u[3,2], u[3,1], v[3,2], v[2,2]
-        #   u[3,2] = mean(h[2,2], h[3,2]) → wet
-        #   u[3,1] = mean(h[2,1], h[3,1]) = mean(1,0) → dry!
-        #   v[3,2] = mean(h[3,1], h[3,2]) = mean(0,1) → dry!
-        #   v[2,2] = mean(h[2,1], h[2,2]) → wet
-        assert not va[3, 2], "u[3,1] and v[3,2] are dry"
-
-        # Old code would have checked u[4,2] and v[3,3] instead,
-        # both of which are wet — wrongly declaring this point valid.
-        assert u[4, 2], "u[4,2] is wet (old code checked this)"
-        assert v[3, 3], "v[3,3] is wet (old code checked this)"
+        # xy_corner[1, 0] is at NE corner of h[1, 0] = (1.5, 0.5).
+        # Adjacent faces under new convention:
+        #   u[1, 0] = h[1, 0] AND h[1, 1] → wet
+        #   u[2, 0] = h[2, 0] AND h[2, 1] = T AND F → DRY
+        #   v[1, 0] = h[1, 0] AND h[2, 0] → wet
+        #   v[1, 1] = h[1, 1] AND h[2, 1] = T AND F → DRY
+        assert not va[1, 0], "xy_corner_valid[1, 0] should be False"
+        # Spot-check the face values to lock in the convention.
+        assert u[1, 0]
+        assert not u[2, 0]
+        assert v[1, 0]
+        assert not v[1, 1]
 
     # ── channel: horizontal walls only ────────────────────────────────
 
     def test_channel_interior_is_valid(self, channel8):
         m = channel8
-        # w[4,4] is in the interior of a channel → should be valid
-        # (checking i≥2 to avoid left-padding artifacts)
-        assert bool(m.w_valid[4, 4])
+        # xy_corner[3, 4] is in the interior of the channel → valid.
+        assert bool(m.xy_corner_valid[3, 4])
 
     def test_channel_near_wall_not_valid(self, channel8):
         m = channel8
-        # w[1,4] is near the bottom wall (j=0 is land)
-        # u[1,4] = mean(h[0,4], h[1,4]) = mean(0,1) → dry
-        assert not bool(m.w_valid[1, 4])
+        # xy_corner[0, 4] sits at (0.5, 4.5), touching the south wall.
+        # u[0, 4] = h[0, 4] AND h[0, 5] = F → dry → not valid.
+        assert not bool(m.xy_corner_valid[0, 4])
 
     def test_channel_horizontal_bound_near_wall(self, channel8):
         m = channel8
-        # w[1,4]: u[1,4] is dry → horizontal boundary
-        assert bool(m.w_horizontal_bound[1, 4])
+        # xy_corner[0, 4]: v[0, 4] = h[0, 4] AND h[1, 4] = F AND T = F → dry
+        # → x-wall (horizontal wall classification).
+        assert bool(m.xy_corner_x_wall[0, 4])
 
 
 class TestIrregularBoundaryGeometry:
@@ -637,10 +744,10 @@ class TestIrregularBoundaryGeometry:
         h = np.ones((10, 10), dtype=bool)
         h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
         h[4:7, 4:7] = False
-        m = ArakawaCGridMask.from_mask(h)
-        psi = np.asarray(m.psi)
-        yids = np.asarray(m.psi_irrbound_yids)
-        xids = np.asarray(m.psi_irrbound_xids)
+        m = Mask2D.from_mask(h)
+        psi = np.asarray(m.xy_corner_strict)
+        yids = np.asarray(m.xy_corner_strict_irrbound_rows)
+        xids = np.asarray(m.xy_corner_strict_irrbound_cols)
         for y, x in zip(yids, xids, strict=True):
             assert not psi[y, x], f"psi[{y},{x}] should be dry"
 
@@ -649,10 +756,10 @@ class TestIrregularBoundaryGeometry:
         h = np.ones((10, 10), dtype=bool)
         h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
         h[4:7, 4:7] = False
-        m = ArakawaCGridMask.from_mask(h)
-        psi = np.asarray(m.psi)
-        yids = np.asarray(m.psi_irrbound_yids)
-        xids = np.asarray(m.psi_irrbound_xids)
+        m = Mask2D.from_mask(h)
+        psi = np.asarray(m.xy_corner_strict)
+        yids = np.asarray(m.xy_corner_strict_irrbound_rows)
+        xids = np.asarray(m.xy_corner_strict_irrbound_cols)
         Ny, Nx = psi.shape
         for y, x in zip(yids, xids, strict=True):
             patch = psi[
@@ -665,10 +772,10 @@ class TestIrregularBoundaryGeometry:
         """Irregular boundary cells are in [1:-1, 1:-1], not on the edge."""
         h = np.ones((10, 10), dtype=bool)
         h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
-        m = ArakawaCGridMask.from_mask(h)
+        m = Mask2D.from_mask(h)
         Ny, Nx = h.shape
-        yids = np.asarray(m.psi_irrbound_yids)
-        xids = np.asarray(m.psi_irrbound_xids)
+        yids = np.asarray(m.xy_corner_strict_irrbound_rows)
+        xids = np.asarray(m.xy_corner_strict_irrbound_cols)
         assert np.all(yids >= 1) and np.all(yids < Ny - 1)
         assert np.all(xids >= 1) and np.all(xids < Nx - 1)
 
@@ -680,39 +787,337 @@ class TestClassificationGeometry:
         """Coast cells must be wet and have ≥1 land 4-neighbour."""
         h = np.ones((10, 10), dtype=bool)
         h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
-        m = ArakawaCGridMask.from_mask(h)
+        m = Mask2D.from_mask(h)
         cls = np.asarray(m.classification)
         coast = cls == 1
         # Every coast cell must be wet
         assert np.all(h[coast])
         # Every coast cell must touch land (4-connected)
         land = ~h
-        dilated_land = _dilate2d(land)
+        dilated_land = dilate_mask(land)
         assert np.all(dilated_land[coast])
 
     def test_near_coast_not_adjacent_to_land(self):
         """Near-coast cells must NOT directly touch land."""
         h = np.ones((20, 20), dtype=bool)
         h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
-        m = ArakawaCGridMask.from_mask(h)
+        m = Mask2D.from_mask(h)
         cls = np.asarray(m.classification)
         near_coast = cls == 2
         land = ~h
-        dilated_land = _dilate2d(land)
+        dilated_land = dilate_mask(land)
         # Near-coast should NOT be in the first dilation ring
-        assert not np.any(near_coast & dilated_land & ~_dilate2d(dilated_land))
+        assert not np.any(near_coast & dilated_land & ~dilate_mask(dilated_land))
         # But should be in the second ring
-        dilated_land_2 = _dilate2d(dilated_land)
+        dilated_land_2 = dilate_mask(dilated_land)
         assert np.all(dilated_land_2[near_coast])
 
     def test_open_ocean_far_from_land(self):
         """Open-ocean cells must be >2 hops from any land cell."""
         h = np.ones((20, 20), dtype=bool)
         h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
-        m = ArakawaCGridMask.from_mask(h)
+        m = Mask2D.from_mask(h)
         cls = np.asarray(m.classification)
         ocean = cls == 3
         land = ~h
-        dilated_2 = _dilate2d(_dilate2d(land))
+        dilated_2 = dilate_mask(dilate_mask(land))
         # Open ocean must NOT overlap with 2-dilation of land
         assert not np.any(ocean & dilated_2)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Mask1D
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def mask1d_basin():
+    """16-cell 1-D domain with a 1-cell land border on each end."""
+    h = np.ones(16, dtype=bool)
+    h[0] = h[-1] = False
+    return h
+
+
+@pytest.fixture
+def all_ocean_1d():
+    return Mask1D.from_dimensions(8)
+
+
+class TestMask1D:
+    def test_from_dimensions_shape(self):
+        m = Mask1D.from_dimensions(10)
+        assert m.h.shape == (10,)
+        assert m.u.shape == (10,)
+        assert bool(jnp.all(m.h))
+
+    def test_from_mask_shape(self, mask1d_basin):
+        m = Mask1D.from_mask(mask1d_basin)
+        assert m.h.shape == (16,)
+        assert m.u.shape == (16,)
+
+    def test_from_mask_h_preserved(self, mask1d_basin):
+        m = Mask1D.from_mask(mask1d_basin)
+        np.testing.assert_array_equal(np.asarray(m.h), mask1d_basin)
+
+    def test_u_face_lookahead(self, mask1d_basin):
+        # u[i] needs h[i] AND h[i+1] both wet (kernel (2,) trailing-pad,
+        # matching the grid's positive-half-step convention).
+        m = Mask1D.from_mask(mask1d_basin)
+        u = np.asarray(m.u)
+        # u[0] needs h[0]=F AND h[1]=T → False
+        assert not u[0]
+        # u[1] needs h[1]=T AND h[2]=T → True
+        assert u[1]
+        # u[14] needs h[14]=T AND h[15]=F → False
+        assert not u[14]
+        # u[15] is padded with 0 in i+1 → False (trailing-pad boundary)
+        assert not u[15]
+
+    def test_not_h_is_inverse(self, mask1d_basin):
+        m = Mask1D.from_mask(mask1d_basin)
+        np.testing.assert_array_equal(np.asarray(m.not_h), ~mask1d_basin)
+
+    def test_classification_levels(self, mask1d_basin):
+        m = Mask1D.from_mask(mask1d_basin)
+        c = np.asarray(m.classification)
+        # Endpoints are land
+        assert c[0] == 0 and c[-1] == 0
+        # Cells immediately adjacent to land are coast
+        assert c[1] == 1 and c[-2] == 1
+        # Next ring is near-coast
+        assert c[2] == 2 and c[-3] == 2
+        # Deep interior is open ocean
+        assert c[8] == 3
+
+    def test_classification_indicators(self, mask1d_basin):
+        m = Mask1D.from_mask(mask1d_basin)
+        np.testing.assert_array_equal(m.ind_land, np.asarray(m.classification == 0))
+        np.testing.assert_array_equal(m.ind_coast, np.asarray(m.classification == 1))
+        np.testing.assert_array_equal(
+            m.ind_near_coast, np.asarray(m.classification == 2)
+        )
+        np.testing.assert_array_equal(m.ind_ocean, np.asarray(m.classification == 3))
+
+    def test_ind_boundary(self, all_ocean_1d):
+        b = np.asarray(all_ocean_1d.ind_boundary)
+        assert b[0] and b[-1]
+        assert not np.any(b[1:-1])
+
+    def test_stencil_capability_is_1d(self, all_ocean_1d):
+        sc = all_ocean_1d.stencil_capability
+        assert isinstance(sc, StencilCapability1D)
+        assert sc.x_pos.shape == (8,)
+        assert sc.x_neg.shape == (8,)
+
+    def test_stencil_capability_all_ocean(self, all_ocean_1d):
+        # In an all-ocean 1-D domain of length 8: x_pos[0]=8, x_neg[0]=1
+        sc = all_ocean_1d.stencil_capability
+        np.testing.assert_array_equal(np.asarray(sc.x_pos), [8, 7, 6, 5, 4, 3, 2, 1])
+        np.testing.assert_array_equal(np.asarray(sc.x_neg), [1, 2, 3, 4, 5, 6, 7, 8])
+
+    def test_sponge_default_all_ones(self, all_ocean_1d):
+        np.testing.assert_array_equal(np.asarray(all_ocean_1d.sponge), 1.0)
+
+    def test_sponge_with_width(self):
+        m = Mask1D.from_mask(np.ones(16, dtype=bool), sponge_width=3)
+        s = np.asarray(m.sponge)
+        # Endpoints are zero
+        assert s[0] == 0.0 and s[-1] == 0.0
+        # Interior is 1.0
+        assert s[8] == 1.0
+
+    def test_get_adaptive_masks_all_ocean(self, all_ocean_1d):
+        masks = all_ocean_1d.get_adaptive_masks(stencil_sizes=(2, 4, 6))
+        # Mutually exclusive
+        sum_mask = sum(np.asarray(m).astype(int) for m in masks.values())
+        assert np.all(sum_mask <= 1)
+
+    def test_get_adaptive_masks_keys(self, all_ocean_1d):
+        masks = all_ocean_1d.get_adaptive_masks(stencil_sizes=(2, 4))
+        assert set(masks.keys()) == {2, 4}
+
+    def test_from_center(self):
+        field = np.array([1.0, 2.0, np.nan, 3.0, 4.0])
+        m = Mask1D.from_mask(np.isfinite(field))
+        m2 = Mask1D.from_center(field)
+        np.testing.assert_array_equal(np.asarray(m.h), np.asarray(m2.h))
+
+
+class TestStencilCapability1D:
+    def test_from_mask(self):
+        h = np.array([True, True, False, True, True, True])
+        sc = StencilCapability1D.from_mask(h)
+        np.testing.assert_array_equal(np.asarray(sc.x_pos), [2, 1, 0, 3, 2, 1])
+        np.testing.assert_array_equal(np.asarray(sc.x_neg), [1, 2, 0, 1, 2, 3])
+
+    def test_all_ocean(self):
+        h = np.ones(5, dtype=bool)
+        sc = StencilCapability1D.from_mask(h)
+        np.testing.assert_array_equal(np.asarray(sc.x_pos), [5, 4, 3, 2, 1])
+        np.testing.assert_array_equal(np.asarray(sc.x_neg), [1, 2, 3, 4, 5])
+
+    def test_all_land(self):
+        h = np.zeros(5, dtype=bool)
+        sc = StencilCapability1D.from_mask(h)
+        np.testing.assert_array_equal(np.asarray(sc.x_pos), [0, 0, 0, 0, 0])
+        np.testing.assert_array_equal(np.asarray(sc.x_neg), [0, 0, 0, 0, 0])
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Mask3D
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def all_ocean_3d():
+    return Mask3D.from_dimensions(4, 6, 8)
+
+
+@pytest.fixture
+def mask3d_with_island():
+    """6×8×8 domain with a 1-cell ghost border and a single dry interior cell."""
+    h = np.ones((6, 8, 8), dtype=bool)
+    h[0, :, :] = h[-1, :, :] = False
+    h[:, 0, :] = h[:, -1, :] = False
+    h[:, :, 0] = h[:, :, -1] = False
+    h[3, 4, 4] = False  # interior island
+    return h
+
+
+class TestMask3D:
+    def test_from_dimensions_shape(self, all_ocean_3d):
+        m = all_ocean_3d
+        assert m.h.shape == (4, 6, 8)
+        assert m.u.shape == (4, 6, 8)
+        assert m.v.shape == (4, 6, 8)
+        assert m.w.shape == (4, 6, 8)
+        assert m.xy_corner.shape == (4, 6, 8)
+        assert m.xy_corner_strict.shape == (4, 6, 8)
+
+    def test_classification_shape(self, all_ocean_3d):
+        assert all_ocean_3d.classification.shape == (4, 6, 8)
+
+    def test_sponge_is_2d(self, all_ocean_3d):
+        # 2-D horizontal sponge that broadcasts over z
+        assert all_ocean_3d.sponge.shape == (6, 8)
+
+    def test_sponge_with_width_is_2d(self):
+        m = Mask3D.from_dimensions(4, 10, 12, sponge_width=3)
+        assert m.sponge.shape == (10, 12)
+        s = np.asarray(m.sponge)
+        assert s[0, 0] == 0.0  # corner
+        assert s[5, 6] == 1.0  # interior
+
+    def test_stencil_capability_is_3d(self, all_ocean_3d):
+        sc = all_ocean_3d.stencil_capability
+        assert isinstance(sc, StencilCapability3D)
+        # All six counts should have the full 3-D shape
+        for fld in ("x_pos", "x_neg", "y_pos", "y_neg", "z_pos", "z_neg"):
+            assert getattr(sc, fld).shape == (4, 6, 8)
+
+    def test_stencil_capability_z_direction(self, all_ocean_3d):
+        # All-ocean domain: z_pos at k=0 should equal Nz (here 4)
+        sc = all_ocean_3d.stencil_capability
+        np.testing.assert_array_equal(np.asarray(sc.z_pos[0, 3, 4]), 4)
+        np.testing.assert_array_equal(np.asarray(sc.z_neg[3, 3, 4]), 4)
+
+    def test_w_face_lookup(self, mask3d_with_island):
+        m = Mask3D.from_mask(mask3d_with_island)
+        # w[k, j, i] needs h[k, j, i] AND h[k-1, j, i] both wet
+        # The interior island at (3, 4, 4) makes:
+        #   w[3, 4, 4] = h[3, 4, 4] AND h[2, 4, 4] = F AND T → False
+        #   w[4, 4, 4] = h[4, 4, 4] AND h[3, 4, 4] = T AND F → False
+        w = np.asarray(m.w)
+        assert not w[3, 4, 4]
+        assert not w[4, 4, 4]
+        # Cells away from the island have both z-neighbours wet
+        assert w[3, 1, 1]
+
+    def test_island_classification(self, mask3d_with_island):
+        m = Mask3D.from_mask(mask3d_with_island)
+        c = np.asarray(m.classification)
+        # The dry cell is land
+        assert c[3, 4, 4] == 0
+        # Direct neighbours (in any of 6 directions) are coast
+        assert c[3, 3, 4] == 1  # y-neighbour
+        assert c[3, 4, 3] == 1  # x-neighbour
+        assert c[2, 4, 4] == 1  # z-neighbour
+        assert c[4, 4, 4] == 1  # z-neighbour
+        # A cell ≥2 cells from any land (ghost or island) is near-coast or ocean
+        # (2, 3, 3) is min-distance 2 from k=0 ghost; ≥3 from x/y ghosts; 3 from island
+        assert c[2, 3, 3] in (2, 3)
+
+    def test_classification_indicators(self, mask3d_with_island):
+        m = Mask3D.from_mask(mask3d_with_island)
+        np.testing.assert_array_equal(m.ind_land, np.asarray(m.classification == 0))
+        np.testing.assert_array_equal(m.ind_coast, np.asarray(m.classification == 1))
+        np.testing.assert_array_equal(m.ind_ocean, np.asarray(m.classification == 3))
+
+    def test_ind_boundary_covers_all_six_faces(self, all_ocean_3d):
+        b = np.asarray(all_ocean_3d.ind_boundary)
+        # All six faces are boundary
+        assert np.all(b[0, :, :])
+        assert np.all(b[-1, :, :])
+        assert np.all(b[:, 0, :])
+        assert np.all(b[:, -1, :])
+        assert np.all(b[:, :, 0])
+        assert np.all(b[:, :, -1])
+        # Interior is not boundary
+        assert not np.any(b[1:-1, 1:-1, 1:-1])
+
+    def test_irrbound_indices_have_three_components(self, mask3d_with_island):
+        m = Mask3D.from_mask(mask3d_with_island)
+        # All three index arrays must have the same length
+        n = len(m.xy_corner_strict_irrbound_layers)
+        assert len(m.xy_corner_strict_irrbound_rows) == n
+        assert len(m.xy_corner_strict_irrbound_cols) == n
+
+    def test_get_adaptive_masks_x(self, all_ocean_3d):
+        masks = all_ocean_3d.get_adaptive_masks(direction="x", stencil_sizes=(2, 4))
+        assert set(masks.keys()) == {2, 4}
+        sum_mask = sum(np.asarray(m).astype(int) for m in masks.values())
+        assert np.all(sum_mask <= 1)
+
+    def test_get_adaptive_masks_z(self, all_ocean_3d):
+        masks = all_ocean_3d.get_adaptive_masks(direction="z", stencil_sizes=(2, 4))
+        assert set(masks.keys()) == {2, 4}
+
+    def test_get_adaptive_masks_invalid_direction(self, all_ocean_3d):
+        with pytest.raises(ValueError, match="direction must be"):
+            all_ocean_3d.get_adaptive_masks(direction="q")
+
+    def test_k_bottom_optional(self, all_ocean_3d):
+        assert all_ocean_3d.k_bottom is None
+
+    def test_k_bottom_supplied(self):
+        kb = np.full((6, 8), 3, dtype=np.int32)
+        m = Mask3D.from_mask(np.ones((4, 6, 8), dtype=bool), k_bottom=kb)
+        assert m.k_bottom is not None
+        np.testing.assert_array_equal(np.asarray(m.k_bottom), 3)
+
+
+class TestStencilCapability3D:
+    def test_from_mask_all_ocean(self):
+        h = np.ones((3, 4, 5), dtype=bool)
+        sc = StencilCapability3D.from_mask(h)
+        # Top-left corner: x_pos = Nx, y_pos = Ny, z_pos = Nz
+        assert int(sc.x_pos[0, 0, 0]) == 5
+        assert int(sc.y_pos[0, 0, 0]) == 4
+        assert int(sc.z_pos[0, 0, 0]) == 3
+
+    def test_from_mask_with_dry_cell(self):
+        h = np.ones((3, 3, 3), dtype=bool)
+        h[1, 1, 1] = False
+        sc = StencilCapability3D.from_mask(h)
+        assert int(sc.x_pos[1, 1, 1]) == 0
+        assert int(sc.y_pos[1, 1, 1]) == 0
+        assert int(sc.z_pos[1, 1, 1]) == 0
+
+    def test_all_six_directions(self):
+        h = np.ones((3, 3, 3), dtype=bool)
+        sc = StencilCapability3D.from_mask(h)
+        for fld in ("x_pos", "x_neg", "y_pos", "y_neg", "z_pos", "z_neg"):
+            arr = np.asarray(getattr(sc, fld))
+            assert arr.shape == (3, 3, 3)
+            # Every cell should have a positive count (it's all-ocean)
+            assert np.all(arr >= 1)

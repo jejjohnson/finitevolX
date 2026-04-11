@@ -14,9 +14,71 @@ departure from many textbook implementations is that **every array has the
 same total shape `[Ny, Nx]`**, including one ring of ghost cells on each
 side.  There are no separate `[Ny, Nx+1]` or `[Nx-1, Ny-1]` arrays.
 
-This same-size convention simplifies JAX JIT compilation (all shapes are
-statically known from the grid parameters alone) and enables clean,
-uniform ghost-cell handling.
+---
+
+## Why same-shape storage?
+
+The textbook way to discretise a staggered grid is to give each variable the
+exact array shape it needs.  For an `Nx × Ny` grid of cell centres `T`, this
+typically means:
+
+```
+T : [Ny,     Nx    ]    cell centres        — Nx*Ny    values
+U : [Ny,     Nx + 1]    east faces          — Nx+1 columns
+V : [Ny + 1, Nx    ]    north faces         — Ny+1 rows
+X : [Ny + 1, Nx + 1]    NE corners          — both sides extended
+```
+
+Each array is exactly the right size, and `U[j, i]` lives at the east face
+of `T[j, i]` for `i ∈ [0, Nx-1]`, with `U[j, Nx]` being the rightmost
+boundary face.  This is a perfectly defensible convention — and it's what
+many production ocean models use.
+
+`finitevolX` makes a different choice: **every staggered field has the same
+shape `[Ny, Nx]` as `T`, with a one-cell ghost ring on each side.**  The
+physical interior occupies `[1:-1, 1:-1]`; the outer ring carries
+boundary-condition data set by the caller.  Under this convention,
+`U[j, i]` still lives at the east face of `T[j, i]`, but now the index
+`i = Nx-1` falls in the ghost ring instead of being an extra "boundary
+face" slot.
+
+The advantages of same-shape storage compound across the rest of the
+library:
+
+1. **Static shapes for JAX JIT.**  Every array has the same shape, derived
+   from a single `(Ny, Nx)` pair on the `Grid` object.  JIT-compiled
+   kernels have one statically known shape for every field, no special
+   cases for U/V/X.
+
+2. **Free broadcasting in field arithmetic.**  Expressions like
+   `h * u**2 + v**2 - p` just work — no reshaping, no padding, no
+   `jnp.pad` shims.  This is especially useful for diagnostics
+   (kinetic energy, Bernoulli potential, vorticity) that mix all four
+   point types.
+
+3. **Uniform `vmap` semantics.**  When a 2D operator is vectorised over a
+   batch axis (multilayer ensembles, ensemble Kalman filters,
+   parameter sweeps), every input has the same leading shape.  No
+   "this one is `Nx+1`-wide and the others are `Nx`" gotchas.
+
+4. **One ghost-cell convention to learn.**  All four point types share
+   the same `[1:-1, 1:-1]` interior slice.  Boundary conditions are
+   applied uniformly: write into the ghost ring, then call the operator.
+   You never have to remember "U has an extra east column but V has an
+   extra north row."
+
+5. **Clean composition of stencils.**  A finite-difference operator
+   reads `arr[1:-1, 2:]` and `arr[1:-1, 1:-1]`, writes the result to
+   `out[1:-1, 1:-1]`, and leaves the ghost ring at zero.  Every shifted
+   slice has the same `(Ny-2, Nx-2)` shape because the ghost ring
+   absorbs the edge — a single-step shift never reads outside the array
+   bounds.
+
+The cost is that you have to internalise one fixed convention: **index
+`0` and index `N-1` along each axis are ghost; real data lives at
+`[1:-1]`**.  Once that's in muscle memory, the rest of the library is
+remarkably uniform — the same slicing patterns appear in every operator
+in this document.
 
 ---
 
@@ -125,6 +187,98 @@ depending on direction:
 initialised value (typically zero).  Callers are responsible for filling
 ghosts via boundary-condition helpers (`pad_interior`, `enforce_periodic`,
 `BoundaryConditionSet`, etc.) before the next operator call.
+
+---
+
+## Vertical staggering in 3D
+
+In 3D the horizontal staggering repeats **at each z-level**.  Every
+`[k, :, :]` slab looks exactly like the 2D picture above:
+
+```
+T[k, j, i]  cell centre  at ( k,    j,    i    )
+U[k, j, i]  east face    at ( k,    j,    i+½  )
+V[k, j, i]  north face   at ( k,    j+½,  i    )
+X[k, j, i]  NE corner    at ( k,    j+½,  i+½  )
+```
+
+All of these are `[Nz, Ny, Nx]`, still same-shape, and the horizontal
+operators in `Difference3D` / `Interpolation3D` / `Vorticity3D` simply
+apply the corresponding 2D stencil at each fixed `k`.  The vertical
+ghost convention mirrors the horizontal: `k = 0` and `k = Nz - 1` are
+top/bottom ghost shells, and the physical interior is
+`k = 1 … Nz - 2` (see [Multilayer vs. 3D](multilayer_vs_3d.md) for the
+distinction with multilayer/baroclinic models).
+
+The interesting question is what to do about the **vertical interfaces**
+— the faces between `T[k, j, i]` and `T[k+1, j, i]`, where vertical
+velocity `w` lives.  There are two viable conventions, and `finitevolX`
+currently uses *both* depending on the subsystem.
+
+### Convention A — same-shape `[Nz, Ny, Nx]` (preferred)
+
+Apply the same trick as the horizontal: store w-faces at `[Nz, Ny, Nx]`
+under a positive-half-step rule:
+
+```
+w[k, j, i]  at ( k+½,  j,  i )    ← top face of T[k, j, i]
+```
+
+`w[k]` is then the top face of cell `k` (equivalently the bottom face of
+cell `k+1`).  Both physical vertical boundaries — the sea floor at the
+bottom and the sea surface at the top — are absorbed into the ghost
+shells, just like the horizontal walls.  An interior cell `T[k, j, i]`
+has two adjacent w-faces: `w[k, j, i]` above and `w[k-1, j, i]` below.
+
+This is what **`Mask3D.w`** uses, and it composes cleanly with the rest
+of the 3D mask machinery: `mask.h`, `mask.u`, `mask.v`, `mask.w`, and
+`mask.xy_corner` all share the same `[Nz, Ny, Nx]` shape, so any field
+arithmetic broadcasts without reshaping.
+
+### Convention B — separate `[Nz+1, Ny, Nx]` array
+
+Store w-faces in a *longer* array, one extra index in z:
+
+```
+w[0,    :, :]    sea floor             ← bottommost physical interface
+w[1,    :, :]    interface between T[0] and T[1]
+...
+w[Nz,   :, :]    sea surface           ← topmost physical interface
+```
+
+Under this convention every physical interface is explicitly indexable.
+Every cell `T[k]` has two adjacent faces: `w[k]` below and `w[k+1]`
+above.  Boundary values can be set directly — `w[0] = 0` for a rigid
+bottom, `w[Nz] = ∂η/∂t` for a free surface.
+
+This is what **`vertical_velocity`** in
+[`finitevolx._src.operators.diagnostics`](api/diagnostics.md) uses,
+because it integrates the horizontal divergence from bottom to top
+(`w[k+1] = w[k] − div_h[k] · dz`) and benefits from having `w[0] = 0` as
+an explicit initial condition.
+
+### Tradeoffs
+
+| Property | Convention A — `[Nz, Ny, Nx]` | Convention B — `[Nz+1, Ny, Nx]` |
+|---|---|---|
+| Broadcasts with `h` / `u` / `v` | ✅ | ❌ |
+| Consistent with horizontal staggering | ✅ | ❌ |
+| `vmap` over z-levels across fields | ✅ | ❌ (shape mismatch) |
+| Number of data-layout categories to learn | 1 | 2 |
+| Explicit bottom boundary index | ❌ (in ghost shell) | ✅ (`w[0]`) |
+| Explicit top boundary index | ❌ (in ghost shell) | ✅ (`w[Nz]`) |
+| Clean free-surface / rigid-lid BC application | Awkward | Natural |
+
+In practice convention **A** wins on code hygiene (uniform shapes,
+broadcasting, vmap, fewer special cases), but convention **B** wins on
+"naturalness" for the one operation that genuinely needs both vertical
+boundaries as first-class indices: `vertical_velocity`.
+
+The intent of `finitevolX` going forward is to standardise on **convention
+A** so that every staggered field — horizontal *and* vertical — has the
+same `[Nz, Ny, Nx]` shape and the same ghost-cell semantics.  See
+[issue #210](https://github.com/jejjohnson/finitevolX/issues/210) for the
+tracking issue and the planned refactor of `vertical_velocity`.
 
 ---
 

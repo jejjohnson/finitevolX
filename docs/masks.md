@@ -1,6 +1,6 @@
 # Arakawa C-Grid Masks
 
-`ArakawaCGridMask` builds all staggered masks from a single cell-centre
+`Mask2D` builds all staggered masks from a single cell-centre
 wet/dry field, following the Arakawa & Lamb (1977) grid layout:
 
 ```
@@ -16,12 +16,20 @@ u     h     u
 w-----v-----w..   > x
 ```
 
-| Point     | Location                  | Variable                         |
-|-----------|---------------------------|----------------------------------|
-| **h**     | cell centre               | tracers, height, pressure        |
-| **u**     | y-face (east/west)        | zonal velocity                   |
-| **v**     | x-face (north/south)      | meridional velocity              |
-| **w/psi** | SW corner                 | vorticity, streamfunction        |
+| Point                | Location                  | Variable                         |
+|----------------------|---------------------------|----------------------------------|
+| **h**                | cell centre               | tracers, height, pressure        |
+| **u**                | east face                 | zonal velocity                   |
+| **v**                | north face                | meridional velocity              |
+| **xy_corner**        | NE corner (lenient)       | vorticity                        |
+| **xy_corner_strict** | NE corner (strict)        | streamfunction                   |
+
+All staggered points use the *same-index, positive half-step* convention:
+``u[j, i]`` is the east face of ``h[j, i]``, ``v[j, i]`` is the north face,
+and ``xy_corner[j, i]`` is the NE corner — matching ``CartesianGrid2D``.
+See [the Arakawa C-grid discretization notes](cgrid_discretization.md) for
+the underlying convention and a comparison with negative half-step
+alternatives.
 
 ## Creating masks
 
@@ -30,7 +38,7 @@ The factory method derives everything else:
 
 ```python
 import numpy as np
-from finitevolx import ArakawaCGridMask
+from finitevolx import Mask2D
 
 # Rectangular basin with land boundaries
 n = 10
@@ -41,19 +49,30 @@ h_mask[:, 0] = h_mask[:, -1] = False
 # With an island
 h_mask[4:7, 4:7] = False
 
-masks = ArakawaCGridMask.from_mask(h_mask)
+masks = Mask2D.from_mask(h_mask)
 ```
 
 For an all-ocean domain, use the shortcut:
 
 ```python
-masks = ArakawaCGridMask.from_dimensions(ny=12, nx=12)
+masks = Mask2D.from_dimensions(ny=12, nx=12)
 ```
 
-Or construct from an SSH field where NaN marks land:
+Or construct from any float field at a known grid position, where
+`NaN` marks dry cells:
 
 ```python
-masks = ArakawaCGridMask.from_ssh(ssh_field)
+# From a field at cell centres (T-points): SSH, temperature, pressure, …
+masks = Mask2D.from_center(ssh_field)
+
+# From a field at u-faces, v-faces, or xy-corners.  Pass `mode=` to
+# choose the inversion strategy when the inverse mapping back to the
+# h-grid is non-unique:
+#   mode='permissive'  → h wet iff *any* surrounding face/corner wet
+#   mode='conservative' → h wet iff *all* surrounding face/corner wet
+masks = Mask2D.from_u_face(u_field, mode="permissive")
+masks = Mask2D.from_v_face(v_field, mode="permissive")
+masks = Mask2D.from_corner(vorticity_field, mode="conservative")
 ```
 
 ## Staggered variable locations
@@ -101,18 +120,18 @@ The mask includes a 4-level classification (0 = land, 1 = coast,
 
 ## Vorticity boundary classification
 
-At vorticity (w) points, cells are classified based on their relationship
+At xy-corner points, cells are classified based on their relationship
 to adjacent velocity faces:
 
-- **w_valid** — interior: all 4 adjacent velocity faces are wet
-- **w_vertical_bound** — on a vertical (y-direction) boundary
-- **w_horizontal_bound** — on a horizontal (x-direction) boundary
-- **w_cornerout_bound** — at convex corners (both boundary types)
+- **xy_corner_valid** — interior: all 4 adjacent velocity faces are wet
+- **xy_corner_y_wall** — on a vertical (y-direction) boundary
+- **xy_corner_x_wall** — on a horizontal (x-direction) boundary
+- **xy_corner_convex** — at convex corners (both boundary types)
 
 ## Stencil capability and adaptive WENO
 
 Each cell stores how many contiguous wet neighbours it has in each
-direction via `StencilCapability`. This drives adaptive stencil
+direction via `StencilCapability2D`. This drives adaptive stencil
 selection for WENO reconstruction near coastlines:
 
 ```python

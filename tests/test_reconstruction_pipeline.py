@@ -15,7 +15,10 @@ import numpy as np
 import pytest
 
 from finitevolx import (
-    ArakawaCGridMask,
+    Advection2D,
+    CartesianGrid2D,
+    Mask2D,
+    Reconstruction2D,
     linear_2pts,
     linear_3pts_left,
     linear_3pts_right,
@@ -28,6 +31,7 @@ from finitevolx import (
     upwind_1pt,
     upwind_3pt,
     upwind_5pt,
+    upwind_flux,
 )
 
 jax.config.update("jax_enable_x64", True)
@@ -574,7 +578,7 @@ class TestReconstructValidation:
 
 
 class TestDistboundAccessors:
-    """Test the distbound1/2/3plus properties on ArakawaCGridMask."""
+    """Test the ind_coast/2/3plus properties on Mask2D."""
 
     @pytest.fixture()
     def island_mask(self):
@@ -583,17 +587,17 @@ class TestDistboundAccessors:
         h = np.ones((Ny, Nx), dtype=bool)
         # Create island
         h[6:10, 6:10] = False
-        return ArakawaCGridMask.from_mask(h)
+        return Mask2D.from_mask(h)
 
     @pytest.fixture()
     def all_ocean(self):
-        return ArakawaCGridMask.from_dimensions(10, 10)
+        return Mask2D.from_dimensions(10, 10)
 
     def test_distbound_mutual_exclusion(self, island_mask):
-        """distbound1, distbound2, distbound3plus are mutually exclusive on wet cells."""
-        d1 = island_mask.distbound1
-        d2 = island_mask.distbound2
-        d3 = island_mask.distbound3plus
+        """ind_coast, ind_near_coast, ind_ocean are mutually exclusive on wet cells."""
+        d1 = island_mask.ind_coast
+        d2 = island_mask.ind_near_coast
+        d3 = island_mask.ind_ocean
 
         # No cell should be in more than one category
         overlap_12 = jnp.sum(d1 & d2)
@@ -604,33 +608,33 @@ class TestDistboundAccessors:
         assert int(overlap_23) == 0
 
     def test_distbound_covers_all_wet(self, island_mask):
-        """distbound1 + distbound2 + distbound3plus covers all wet cells."""
-        d1 = island_mask.distbound1
-        d2 = island_mask.distbound2
-        d3 = island_mask.distbound3plus
+        """ind_coast + ind_near_coast + ind_ocean covers all wet cells."""
+        d1 = island_mask.ind_coast
+        d2 = island_mask.ind_near_coast
+        d3 = island_mask.ind_ocean
         wet = island_mask.h
 
         covered = d1 | d2 | d3
         np.testing.assert_array_equal(covered, wet)
 
     def test_distbound_aliases_classification(self, island_mask):
-        """distbound accessors should be consistent with ind_coast etc."""
-        np.testing.assert_array_equal(island_mask.distbound1, island_mask.ind_coast)
-        np.testing.assert_array_equal(
-            island_mask.distbound2, island_mask.ind_near_coast
-        )
-        np.testing.assert_array_equal(island_mask.distbound3plus, island_mask.ind_ocean)
+        """ind_* boolean accessors are consistent with the underlying classification field."""
+        cls_ = island_mask.classification
+        np.testing.assert_array_equal(island_mask.ind_land, cls_ == 0)
+        np.testing.assert_array_equal(island_mask.ind_coast, cls_ == 1)
+        np.testing.assert_array_equal(island_mask.ind_near_coast, cls_ == 2)
+        np.testing.assert_array_equal(island_mask.ind_ocean, cls_ == 3)
 
     def test_all_ocean_domain(self, all_ocean):
         """All-ocean domain: no coast/near-coast, all cells are ocean."""
-        assert int(jnp.sum(all_ocean.distbound1)) == 0
-        assert int(jnp.sum(all_ocean.distbound2)) == 0
-        # All wet cells should be distbound3plus
-        assert int(jnp.sum(all_ocean.distbound3plus)) == int(jnp.sum(all_ocean.h))
+        assert int(jnp.sum(all_ocean.ind_coast)) == 0
+        assert int(jnp.sum(all_ocean.ind_near_coast)) == 0
+        # All wet cells should be ind_ocean
+        assert int(jnp.sum(all_ocean.ind_ocean)) == int(jnp.sum(all_ocean.h))
 
     def test_island_has_coast_ring(self, island_mask):
         """Island mask should have coast cells surrounding the island."""
-        d1 = island_mask.distbound1
+        d1 = island_mask.ind_coast
         # Coast ring is cells adjacent to the 4x4 island
         assert int(jnp.sum(d1)) > 0
         # Coast cells should be near the island (rows 5-10, cols 5-10 area)
@@ -639,7 +643,7 @@ class TestDistboundAccessors:
 
     def test_stencil_blending_formula(self, island_mask):
         """The distbound masks work for the documented blending formula:
-        flux = flux_1pt * distbound1 + flux_3pt * distbound2 + flux_5pt * distbound3plus
+        flux = flux_1pt * ind_coast + flux_3pt * ind_near_coast + flux_5pt * ind_ocean
         """
         Ny, Nx = island_mask.h.shape
         # Create dummy flux fields
@@ -648,19 +652,19 @@ class TestDistboundAccessors:
         flux_5pt = jnp.ones((Ny, Nx)) * 5.0
 
         blended = (
-            flux_1pt * island_mask.distbound1
-            + flux_3pt * island_mask.distbound2
-            + flux_5pt * island_mask.distbound3plus
+            flux_1pt * island_mask.ind_coast
+            + flux_3pt * island_mask.ind_near_coast
+            + flux_5pt * island_mask.ind_ocean
         )
 
         # At coast cells, value should be 1.0
-        coast_vals = blended[island_mask.distbound1]
+        coast_vals = blended[island_mask.ind_coast]
         np.testing.assert_allclose(coast_vals, 1.0)
         # At near-coast, 3.0
-        near_coast_vals = blended[island_mask.distbound2]
+        near_coast_vals = blended[island_mask.ind_near_coast]
         np.testing.assert_allclose(near_coast_vals, 3.0)
         # At ocean, 5.0
-        ocean_vals = blended[island_mask.distbound3plus]
+        ocean_vals = blended[island_mask.ind_ocean]
         np.testing.assert_allclose(ocean_vals, 5.0)
 
 
@@ -672,9 +676,9 @@ class TestDistboundPhysics:
         Ny, Nx = 20, 20
         h = np.ones((Ny, Nx), dtype=bool)
         h[8:12, 8:12] = False  # island
-        mask = ArakawaCGridMask.from_mask(h)
+        mask = Mask2D.from_mask(h)
 
-        coast = np.array(mask.distbound1)
+        coast = np.array(mask.ind_coast)
         land = np.array(mask.ind_land)
 
         for j in range(Ny):
@@ -695,13 +699,13 @@ class TestDistboundPhysics:
                     )
 
     def test_near_coast_not_adjacent_to_land(self):
-        """Near-coast cells (distbound2) should NOT be directly adjacent to land."""
+        """Near-coast cells (ind_near_coast) should NOT be directly adjacent to land."""
         Ny, Nx = 20, 20
         h = np.ones((Ny, Nx), dtype=bool)
         h[8:12, 8:12] = False
-        mask = ArakawaCGridMask.from_mask(h)
+        mask = Mask2D.from_mask(h)
 
-        near_coast = np.array(mask.distbound2)
+        near_coast = np.array(mask.ind_near_coast)
         land = np.array(mask.ind_land)
 
         for j in range(Ny):
@@ -719,3 +723,437 @@ class TestDistboundPhysics:
                     assert not any(neighbours), (
                         f"Near-coast cell ({j},{i}) should not be adjacent to land"
                     )
+
+
+# ===========================================================================
+# Stencil capability blending — tests that exercise the actual adaptive
+# stencil masks (built from StencilCapability) together with the distbound
+# classification, across every stencil size that Advection2D supports.
+# ===========================================================================
+
+
+class TestStencilCapabilityTiers:
+    """Verify ``get_adaptive_masks`` tiers match the stencil hierarchy.
+
+    These tests use the *actual* stencil-capability machinery rather than
+    the distbound classification, covering the stencil sizes that
+    ``Advection2D`` supports via ``upwind_flux`` dispatch:
+
+    * weno3 / TVD limiters: ``(2, 4)``
+    * weno5 / wenoz5:       ``(2, 4, 6)``
+    """
+
+    def test_weno5_tiers_on_1row_coast(self):
+        """In a 1×N row with land borders, the (2, 4, 6) tiers stratify
+        exactly by distance-from-land along the row:
+
+        * index 1 / -2: adjacent to land → masks[2]
+        * index 2 / -3: 2 away from land → masks[4]
+        * indices 3..-4: interior        → masks[6]
+        """
+        h = np.zeros((1, 12), dtype=bool)
+        h[0, 1:-1] = True  # 10 wet cells with land at both ends
+        m = Mask2D.from_mask(h)
+        masks_x = m.get_adaptive_masks(direction="x", stencil_sizes=(2, 4, 6))
+
+        masks2 = np.asarray(masks_x[2])[0]
+        masks4 = np.asarray(masks_x[4])[0]
+        masks6 = np.asarray(masks_x[6])[0]
+
+        # Adjacent-to-land → upwind1 tier
+        assert masks2[1] and masks2[10]
+        # 2 away from land → weno3 tier
+        assert masks4[2] and masks4[9]
+        # Interior → weno5 tier
+        for i in range(3, 9):
+            assert masks6[i], f"expected masks[6] True at index {i}"
+
+    def test_weno3_tiers_on_1row_coast(self):
+        """weno3/TVD uses (2, 4); any cell ≥2 away from land should be
+        at the max tier since there's no bigger stencil to fall to."""
+        h = np.zeros((1, 10), dtype=bool)
+        h[0, 1:-1] = True  # 8 wet cells
+        m = Mask2D.from_mask(h)
+        masks_x = m.get_adaptive_masks(direction="x", stencil_sizes=(2, 4))
+
+        masks2 = np.asarray(masks_x[2])[0]
+        masks4 = np.asarray(masks_x[4])[0]
+
+        # Adjacent-to-land → upwind1 tier
+        assert masks2[1] and masks2[8]
+        # Everything else (indices 2..7) → weno3 tier
+        for i in range(2, 8):
+            assert masks4[i], f"expected masks[4] True at index {i}"
+
+    def test_mutually_exclusive_tiers(self):
+        """A cell is assigned to exactly one tier (at most)."""
+        rng = np.random.default_rng(42)
+        h = rng.random((8, 12)) > 0.25  # sparse land
+        m = Mask2D.from_mask(h)
+        for direction in ("x", "y"):
+            masks = m.get_adaptive_masks(direction=direction, stencil_sizes=(2, 4, 6))
+            total = sum(np.asarray(mm).astype(int) for mm in masks.values())
+            assert np.all(total <= 1), (
+                f"direction={direction}: some cell is in multiple tiers"
+            )
+
+    def test_tier_union_subset_of_wet(self):
+        """The union of all tiers is a subset of the wet cells: no dry
+        cell can be at any tier."""
+        h = np.ones((6, 10), dtype=bool)
+        h[2:4, 4:6] = False  # interior land patch
+        m = Mask2D.from_mask(h)
+        masks_x = m.get_adaptive_masks(direction="x", stencil_sizes=(2, 4, 6))
+        union = np.zeros_like(np.asarray(h))
+        for mm in masks_x.values():
+            union = union | np.asarray(mm)
+        # Every tier cell must also be wet.
+        assert bool(np.all((~union) | h))
+
+    def test_directional_independence(self):
+        """x- and y- tiers are independent: a cell can use a large
+        x-stencil (open in x) but a small y-stencil (blocked in y)."""
+        # 6x10 zonal channel: walls at j=0 and j=-1, open in x.
+        h = np.ones((6, 10), dtype=bool)
+        h[0, :] = h[-1, :] = False
+        m = Mask2D.from_mask(h)
+        masks_x = m.get_adaptive_masks(direction="x", stencil_sizes=(2, 4, 6))
+        masks_y = m.get_adaptive_masks(direction="y", stencil_sizes=(2, 4, 6))
+
+        # Row 1 (just above the south wall) and row 4 (just below the north
+        # wall) are adjacent to land in y → y masks[2] is True there.
+        assert bool(np.all(np.asarray(masks_y[2])[1, :]))
+        assert bool(np.all(np.asarray(masks_y[2])[4, :]))
+        # Deep interior of those rows in x is far from any land in x →
+        # x masks[6] True (except the 2 cells nearest the x boundaries).
+        for i in range(3, 7):
+            assert bool(np.asarray(masks_x[6])[1, i])
+            assert bool(np.asarray(masks_x[6])[4, i])
+
+
+class TestStencilCapabilityDistboundCorrespondence:
+    """Correspondence between ``get_adaptive_masks`` and distbound
+    classification (``ind_coast``, ``ind_near_coast``, ``ind_ocean``).
+
+    The two systems agree *exactly* in the axis-aligned 1-D case (a land
+    border along the axis of interest).  In 2-D they can diverge because
+    the distbound classification uses an n-D cross-shaped dilation while
+    the adaptive masks are directional.
+    """
+
+    def test_axis_aligned_1row_correspondence(self):
+        """In a 1-row domain with land borders, ind_coast matches
+        masks[2], ind_near_coast matches masks[4], ind_ocean matches
+        masks[6]."""
+        h = np.zeros((1, 12), dtype=bool)
+        h[0, 1:-1] = True
+        m = Mask2D.from_mask(h)
+        masks_x = m.get_adaptive_masks(direction="x", stencil_sizes=(2, 4, 6))
+
+        np.testing.assert_array_equal(np.asarray(m.ind_coast), np.asarray(masks_x[2]))
+        np.testing.assert_array_equal(
+            np.asarray(m.ind_near_coast), np.asarray(masks_x[4])
+        )
+        np.testing.assert_array_equal(np.asarray(m.ind_ocean), np.asarray(masks_x[6]))
+
+    def test_zonal_channel_y_direction_correspondence(self):
+        """In a 6×10 zonal channel (walls at j=0 and j=-1), the
+        y-direction adaptive masks match the distbound tiers exactly
+        because the only land is in the y direction."""
+        h = np.ones((6, 10), dtype=bool)
+        h[0, :] = h[-1, :] = False
+        m = Mask2D.from_mask(h)
+        masks_y = m.get_adaptive_masks(direction="y", stencil_sizes=(2, 4, 6))
+
+        np.testing.assert_array_equal(np.asarray(m.ind_coast), np.asarray(masks_y[2]))
+        np.testing.assert_array_equal(
+            np.asarray(m.ind_near_coast), np.asarray(masks_y[4])
+        )
+        np.testing.assert_array_equal(np.asarray(m.ind_ocean), np.asarray(masks_y[6]))
+
+    def test_diagonal_land_divergence(self):
+        """A cell adjacent to land *only* in the x-direction is
+        classified as ``ind_coast`` (cross-shaped dilation sees the land),
+        but its y-direction stencil is unaffected so y-masks[6] can
+        still be True at that cell."""
+        # 10x10 with a narrow north-south land column at i=5.
+        h = np.ones((10, 10), dtype=bool)
+        h[:, 5] = False
+        m = Mask2D.from_mask(h)
+        masks_y = m.get_adaptive_masks(direction="y", stencil_sizes=(2, 4, 6))
+
+        # Cell (4, 4) is adjacent to land at (4, 5) in x → ind_coast.
+        assert bool(m.ind_coast[4, 4])
+        # But in the y direction, cells j=4 in column i=4 are surrounded
+        # by wet cells → y masks[6] True (far enough from the y-boundaries).
+        assert bool(np.asarray(masks_y[6])[4, 4])
+        # And the y-direction adaptive-masks for that cell are NOT at
+        # the smallest tier.
+        assert not bool(np.asarray(masks_y[2])[4, 4])
+
+
+class TestAdvectionStencilFallback:
+    """End-to-end: verify that ``Advection2D`` with a mask falls back to
+    the correct narrower stencil at coast cells.
+
+    Strategy: for a straight coast (land column), compute the advective
+    tendency with a large-stencil method (e.g. weno5) + mask, then
+    compare at each tier cell against the *unmasked* result of the
+    corresponding narrower method (upwind1 / weno3 / weno5).
+    """
+
+    @pytest.fixture
+    def linear_field(self):
+        """Linear tracer h[j, i] = 1 + i — smooth in x, constant in y.
+        For constant positive velocity u, weno5 / weno3 / upwind1 all
+        give the same answer on a *smooth* field (exact for linear data),
+        so the adaptive-stencil fallback is transparent.  We use a
+        staircase field instead to make the tiers distinguishable."""
+        return None  # Unused — kept for API symmetry with future fixtures.
+
+    def _make_staircase_field(self, Ny: int, Nx: int) -> jnp.ndarray:
+        """Discrete staircase: h[j, i] = i % 2.  This sharp pattern is
+        handled differently by upwind1 (piecewise constant), weno3,
+        and weno5 — so the resulting fluxes should differ by tier."""
+        idx = jnp.arange(Nx)[None, :]
+        return jnp.broadcast_to((idx % 2).astype(jnp.float64), (Ny, Nx))
+
+    def test_weno5_masked_matches_unmasked_far_from_coast(self):
+        """Away from any coast, weno5 + mask should equal unmasked
+        weno5 (the mask dispatch picks the max tier everywhere)."""
+        Ny, Nx = 14, 14
+        grid = CartesianGrid2D.from_interior(Nx - 2, Ny - 2, 1.0, 1.0)
+        adv = Advection2D(grid=grid)
+        # All-ocean mask: the adaptive dispatch should use weno5 everywhere.
+        mask = Mask2D.from_dimensions(Ny, Nx)
+        h = self._make_staircase_field(Ny, Nx)
+        u = jnp.ones((Ny, Nx))
+        v = jnp.ones((Ny, Nx))
+
+        masked = adv(h, u, v, method="weno5", mask=mask)
+        plain = adv(h, u, v, method="weno5")
+        # Deep interior cells should match (both use the full weno5 stencil).
+        np.testing.assert_allclose(
+            np.asarray(masked[4:-4, 4:-4]),
+            np.asarray(plain[4:-4, 4:-4]),
+            rtol=1e-10,
+        )
+
+    def test_weno5_masked_differs_from_unmasked_at_coast(self):
+        """At cells with ``masks[2]`` True (adjacent to land in the
+        stencil direction), the adaptive weno5 tendency should differ
+        from the *unmasked* weno5 tendency, because ``upwind_flux``
+        falls back to a narrower stencil.  We verify the fallback is
+        *happening* at the tendency level; the exact per-tier match is
+        tested face-by-face in :class:`TestUpwindFluxFallbackExplicit`.
+        """
+        # Build a domain with a land column so there's a coast in x.
+        Ny, Nx = 14, 14
+        h_mask = np.ones((Ny, Nx), dtype=bool)
+        h_mask[:, 6] = False
+        mask = Mask2D.from_mask(h_mask)
+
+        grid = CartesianGrid2D.from_interior(Nx - 2, Ny - 2, 1.0, 1.0)
+        adv = Advection2D(grid=grid)
+        h = self._make_staircase_field(Ny, Nx)
+        u = jnp.ones((Ny, Nx))
+        v = jnp.ones((Ny, Nx))
+
+        masked = adv(h, u, v, method="weno5", mask=mask)
+        unmasked = adv(h, u, v, method="weno5")
+
+        # At at least one coast cell (interior rows), the masked tendency
+        # differs from the unmasked tendency: that's the fallback firing.
+        masks_x = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4, 6))
+        coast_x = np.asarray(masks_x[2])
+        coast_mask = np.zeros_like(coast_x)
+        coast_mask[3:-3, :] = coast_x[3:-3, :]  # interior rows only
+        diff = np.abs(np.asarray(masked) - np.asarray(unmasked))
+        assert np.any(diff[coast_mask] > 1e-10), (
+            "expected adaptive dispatch to differ from unmasked at coast cells"
+        )
+        # No NaNs / infs anywhere — fallback produced finite output.
+        assert bool(np.all(np.isfinite(masked)))
+
+    def test_tvd_masked_differs_from_unmasked_at_coast(self):
+        """TVD limiters dispatch through ``(2, 4)``.  Verify the
+        fallback fires at coast cells: the masked van_leer tendency
+        differs from the unmasked van_leer tendency at ``masks[2]``
+        cells."""
+        Ny, Nx = 12, 12
+        h_mask = np.ones((Ny, Nx), dtype=bool)
+        h_mask[:, 5] = False
+        mask = Mask2D.from_mask(h_mask)
+
+        grid = CartesianGrid2D.from_interior(Nx - 2, Ny - 2, 1.0, 1.0)
+        adv = Advection2D(grid=grid)
+        h = self._make_staircase_field(Ny, Nx)
+        u = jnp.ones((Ny, Nx))
+        v = jnp.ones((Ny, Nx))
+
+        masked = adv(h, u, v, method="van_leer", mask=mask)
+        unmasked = adv(h, u, v, method="van_leer")
+
+        masks_x = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4))
+        coast_x = np.asarray(masks_x[2])
+        coast_mask = np.zeros_like(coast_x)
+        coast_mask[3:-3, :] = coast_x[3:-3, :]
+        diff = np.abs(np.asarray(masked) - np.asarray(unmasked))
+        assert np.any(diff[coast_mask] > 1e-10), (
+            "expected van_leer adaptive dispatch to differ from unmasked at coast"
+        )
+        assert bool(np.all(np.isfinite(masked)))
+
+
+class TestUpwindFluxFallbackExplicit:
+    """Direct tests of ``upwind_flux`` (the low-level blending function)
+    against hand-picked stencil-hierarchy dicts, bypassing the
+    ``Advection2D`` dispatch.  These exercise the blending formula
+    ``F = sum_s M_s(i_up) * F_s`` for each supported advection stencil
+    hierarchy: ``(2,)``, ``(2, 4)``, ``(2, 4, 6)``."""
+
+    @pytest.fixture
+    def coast_grid_and_mask(self):
+        """14×14 grid with a land column at i=7."""
+        Ny, Nx = 14, 14
+        grid = CartesianGrid2D.from_interior(Nx - 2, Ny - 2, 1.0, 1.0)
+        h_mask = np.ones((Ny, Nx), dtype=bool)
+        h_mask[:, 7] = False
+        mask = Mask2D.from_mask(h_mask)
+        return grid, mask
+
+    def test_single_stencil_hierarchy_equals_unmasked(self, coast_grid_and_mask):
+        """If the hierarchy has a single stencil size, ``upwind_flux``
+        should reduce to calling that stencil's reconstruction directly
+        (modulo cells where even that stencil isn't supported — those
+        become zero)."""
+        grid, mask = coast_grid_and_mask
+        recon = Reconstruction2D(grid=grid)
+        Ny, Nx = grid.Ny, grid.Nx
+        q = jnp.asarray(np.arange(Ny * Nx, dtype=float).reshape(Ny, Nx))
+        u_vel = jnp.ones((Ny, Nx))
+
+        mask_hier = mask.get_adaptive_masks(direction="x", stencil_sizes=(2,))
+        rec_funcs = {2: recon.upwind1_x}
+        blended = upwind_flux(
+            q, u_vel, dim=1, rec_funcs=rec_funcs, mask_hierarchy=mask_hier
+        )
+        direct = recon.upwind1_x(q, u_vel)
+
+        # Wherever masks[2] is True, blended should equal direct.
+        keep = np.asarray(mask_hier[2])
+        np.testing.assert_allclose(
+            np.asarray(blended[keep]),
+            np.asarray(direct[keep]),
+            rtol=1e-12,
+        )
+
+    def test_three_stencil_hierarchy_blends_correctly(self, coast_grid_and_mask):
+        """With the weno5 hierarchy ``(2, 4, 6)``, every wet face-flux
+        should be one of: upwind1 (at coast), weno3 (at near-coast),
+        weno5 (deep interior), or zero (if even stencil 2 isn't
+        supported — e.g. at the land column's east face)."""
+        grid, mask = coast_grid_and_mask
+        recon = Reconstruction2D(grid=grid)
+        Ny, Nx = grid.Ny, grid.Nx
+        q = jnp.asarray(np.sin(np.arange(Ny * Nx, dtype=float).reshape(Ny, Nx)))
+        u_vel = jnp.ones((Ny, Nx))
+
+        mask_hier = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4, 6))
+        rec_funcs = {
+            2: recon.upwind1_x,
+            4: recon.weno3_x,
+            6: recon.weno5_x,
+        }
+        blended = upwind_flux(
+            q, u_vel, dim=1, rec_funcs=rec_funcs, mask_hierarchy=mask_hier
+        )
+        f_upwind1 = recon.upwind1_x(q, u_vel)
+        f_weno3 = recon.weno3_x(q, u_vel)
+        f_weno5 = recon.weno5_x(q, u_vel)
+
+        m2 = np.asarray(mask_hier[2])
+        m4 = np.asarray(mask_hier[4])
+        m6 = np.asarray(mask_hier[6])
+
+        # At masks[2] cells the blended flux equals upwind1.
+        np.testing.assert_allclose(
+            np.asarray(blended[m2]), np.asarray(f_upwind1[m2]), rtol=1e-12
+        )
+        # At masks[4] cells the blended flux equals weno3.
+        np.testing.assert_allclose(
+            np.asarray(blended[m4]), np.asarray(f_weno3[m4]), rtol=1e-12
+        )
+        # At masks[6] cells the blended flux equals weno5.
+        np.testing.assert_allclose(
+            np.asarray(blended[m6]), np.asarray(f_weno5[m6]), rtol=1e-12
+        )
+        # At cells that are *not* in any tier (dry or boundary), the
+        # blended flux is zero because none of the tier masks contribute.
+        none_tier = ~(m2 | m4 | m6)
+        np.testing.assert_allclose(np.asarray(blended[none_tier]), 0.0, atol=1e-12)
+
+    def test_wenoz5_hierarchy_blends_correctly(self, coast_grid_and_mask):
+        """Same test for the ``wenoz5`` hierarchy ``(upwind1, wenoz3,
+        wenoz5)``."""
+        grid, mask = coast_grid_and_mask
+        recon = Reconstruction2D(grid=grid)
+        Ny, Nx = grid.Ny, grid.Nx
+        q = jnp.asarray(np.cos(np.arange(Ny * Nx, dtype=float).reshape(Ny, Nx)))
+        u_vel = jnp.ones((Ny, Nx))
+
+        mask_hier = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4, 6))
+        rec_funcs = {
+            2: recon.upwind1_x,
+            4: recon.wenoz3_x,
+            6: recon.wenoz5_x,
+        }
+        blended = upwind_flux(
+            q, u_vel, dim=1, rec_funcs=rec_funcs, mask_hierarchy=mask_hier
+        )
+        f_upwind1 = recon.upwind1_x(q, u_vel)
+        f_wenoz3 = recon.wenoz3_x(q, u_vel)
+        f_wenoz5 = recon.wenoz5_x(q, u_vel)
+
+        m2 = np.asarray(mask_hier[2])
+        m4 = np.asarray(mask_hier[4])
+        m6 = np.asarray(mask_hier[6])
+
+        np.testing.assert_allclose(
+            np.asarray(blended[m2]), np.asarray(f_upwind1[m2]), rtol=1e-12
+        )
+        np.testing.assert_allclose(
+            np.asarray(blended[m4]), np.asarray(f_wenoz3[m4]), rtol=1e-12
+        )
+        np.testing.assert_allclose(
+            np.asarray(blended[m6]), np.asarray(f_wenoz5[m6]), rtol=1e-12
+        )
+
+    def test_tvd_hierarchy_blends_correctly(self, coast_grid_and_mask):
+        """TVD flux-limiter hierarchy ``(upwind1, tvd_van_leer)``."""
+        grid, mask = coast_grid_and_mask
+        recon = Reconstruction2D(grid=grid)
+        Ny, Nx = grid.Ny, grid.Nx
+        q = jnp.asarray(np.sin(np.arange(Ny * Nx, dtype=float).reshape(Ny, Nx)))
+        u_vel = jnp.ones((Ny, Nx))
+
+        mask_hier = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4))
+        rec_funcs = {
+            2: recon.upwind1_x,
+            4: lambda q_, u_: recon.tvd_x(q_, u_, limiter="van_leer"),
+        }
+        blended = upwind_flux(
+            q, u_vel, dim=1, rec_funcs=rec_funcs, mask_hierarchy=mask_hier
+        )
+        f_upwind1 = recon.upwind1_x(q, u_vel)
+        f_tvd = recon.tvd_x(q, u_vel, limiter="van_leer")
+
+        m2 = np.asarray(mask_hier[2])
+        m4 = np.asarray(mask_hier[4])
+
+        np.testing.assert_allclose(
+            np.asarray(blended[m2]), np.asarray(f_upwind1[m2]), rtol=1e-12
+        )
+        np.testing.assert_allclose(
+            np.asarray(blended[m4]), np.asarray(f_tvd[m4]), rtol=1e-12
+        )

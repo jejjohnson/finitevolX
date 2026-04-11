@@ -193,13 +193,13 @@ solver = fvx.build_capacitance_solver(
 )
 ```
 
-### Using with ArakawaCGridMask
+### Using with Mask2D
 
 When you have a `CGridMask`, pass it directly — the solver extracts the
 `psi` staggering mask and precomputed boundary indices automatically:
 
 ```python
-cgrid_mask = fvx.ArakawaCGridMask.from_mask(ocean_mask)
+cgrid_mask = fvx.Mask2D.from_mask(ocean_mask)
 solver = fvx.build_capacitance_solver(
     cgrid_mask, dx, dy, lambda_=-1.0, base_bc="fft"
 )

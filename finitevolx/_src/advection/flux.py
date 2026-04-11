@@ -9,16 +9,12 @@ reconstructions.
 
 Typical usage::
 
-    from finitevolx import ArakawaCGridMask, upwind_flux
+    from finitevolx import Mask2D, upwind_flux
     from finitevolx import Reconstruction2D, CartesianGrid2D
 
-    nx_interior = 128
-    ny_interior = 64
-    Lx = 1.0
-    Ly = 1.0
     grid = CartesianGrid2D.from_interior(nx_interior, ny_interior, Lx, Ly)
     recon = Reconstruction2D(grid=grid)
-    mask = ArakawaCGridMask.from_mask(h_mask)
+    mask = Mask2D.from_mask(h_mask)
 
     mask_hier = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4, 6))
     rec_funcs = {2: recon.upwind1_x, 4: recon.weno3_x, 6: recon.weno5_x}
@@ -77,7 +73,7 @@ def upwind_flux(
         (e.g. ``recon.upwind1_x``, ``recon.weno3_x``, ``recon.weno5_x``).
     mask_hierarchy : dict[int, Bool[Array, "Ny Nx"]]
         Mutually-exclusive cell-centred boolean masks produced by
-        :meth:`~finitevolx.ArakawaCGridMask.get_adaptive_masks`, keyed by
+        :meth:`~finitevolx.Mask2D.get_adaptive_masks`, keyed by
         the same stencil sizes as *rec_funcs*.  At each interior cell
         exactly one mask is ``True``; land cells and cells where even the
         smallest stencil cannot be supported are ``False`` in every mask.
@@ -113,14 +109,14 @@ def upwind_flux(
     >>> import numpy as np
     >>> from finitevolx import (
     ...     CartesianGrid2D,
-    ...     ArakawaCGridMask,
+    ...     Mask2D,
     ...     Reconstruction2D,
     ...     upwind_flux,
     ... )
     >>> Ny, Nx = 10, 10
     >>> grid = CartesianGrid2D.from_interior(Ny - 2, Nx - 2, 1.0, 1.0)
     >>> recon = Reconstruction2D(grid=grid)
-    >>> mask = ArakawaCGridMask.from_dimensions(Ny, Nx)
+    >>> mask = Mask2D.from_dimensions(Ny, Nx)
     >>> mask_hier = mask.get_adaptive_masks(direction="x", stencil_sizes=(2, 4, 6))
     >>> rec_funcs = {2: recon.upwind1_x, 4: recon.weno3_x, 6: recon.weno5_x}
     >>> q = jnp.ones((Ny, Nx))

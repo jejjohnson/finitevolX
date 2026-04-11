@@ -86,7 +86,14 @@ from finitevolx._src.grid.spherical import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
-from finitevolx._src.mask.cgrid_mask import ArakawaCGridMask, StencilCapability
+from finitevolx._src.mask import (
+    Mask1D,
+    Mask2D,
+    Mask3D,
+    StencilCapability1D,
+    StencilCapability2D,
+    StencilCapability3D,
+)
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.coriolis import Coriolis2D, Coriolis3D
 from finitevolx._src.operators.diagnostics import (
@@ -382,7 +389,9 @@ __all__ = [
     "SphericalGrid2D",
     "SphericalGrid3D",
     # Mask
-    "ArakawaCGridMask",
+    "Mask1D",
+    "Mask2D",
+    "Mask3D",
     # Boundary condition sets and 1D BCs
     "BoundaryConditionSet",
     "Dirichlet1D",
@@ -463,7 +472,9 @@ __all__ = [
     "superbee",
     "van_leer",
     # Masks
-    "StencilCapability",
+    "StencilCapability1D",
+    "StencilCapability2D",
+    "StencilCapability3D",
     # Diagnostics
     "available_potential_energy",
     "bernoulli_potential",

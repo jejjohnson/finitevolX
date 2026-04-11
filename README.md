@@ -56,7 +56,7 @@ state_next = fvx.heun_step(tendency_fn, state, dt)
 | Component | Description |
 |-----------|-------------|
 | `ArakawaCGrid1D/2D/3D` | Staggered C-grid containers with T, U, V, X point locations |
-| `ArakawaCGridMask` | Land/ocean masks with automatic staggered derivation (h, u, v, psi) |
+| `Mask1D/2D/3D` | Land/ocean masks with automatic staggered derivation (h, u, v, w, xy_corner, xy_corner_strict) |
 | Boundary classification | 4-level land/coast/near-coast/ocean + vorticity boundary categories |
 | Stencil capability | Adaptive WENO stencil dispatch at irregular coastlines |
 | `SphericalArakawaCGrid2D/3D` | Spherical coordinate grids |
@@ -171,7 +171,7 @@ The `docs/notebooks/` directory contains pedagogical Jupytext notebooks that bui
 
 | Notebook | Description | Key APIs |
 |----------|-------------|----------|
-| [Masks](docs/notebooks/demo_masks.py) | C-grid mask construction, staggered derivation, boundary classification | `ArakawaCGridMask` |
+| [Masks](docs/notebooks/demo_masks.py) | C-grid mask construction, staggered derivation, boundary classification | `Mask2D` |
 | [Elliptic Solvers](docs/notebooks/demo_solvers.py) | Spectral, capacitance, CG, multigrid on 4 geometries + inhomogeneous BCs | `solve_helmholtz_dst`, `build_capacitance_solver`, `solve_cg`, `build_multigrid_solver` |
 | [Pressure Poisson](docs/notebooks/pressure_poisson.py) | Divergence-free projection on the C-grid, DST-I vs DST-II | `Divergence2D`, `Difference2D`, `solve_poisson_dst` |
 | [Streamfunction Inversion](docs/notebooks/streamfunction_inversion.py) | X-point vs T-point placement, velocity recovery, convergence | `streamfunction_from_vorticity`, `solve_poisson_dst2` |
