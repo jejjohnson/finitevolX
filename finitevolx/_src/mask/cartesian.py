@@ -72,9 +72,14 @@ class Mask1D(eqx.Module):
     Parameters
     ----------
     h : Bool[Array, "Nx"]
-        Cell-centre wet mask.
+        Wet mask at cell centres (T-points).  ``True`` = wet / ocean,
+        ``False`` = dry / land.  This is the canonical mask that the
+        other staggered masks are derived from.
     u : Bool[Array, "Nx"]
-        x-face wet mask  [kernel (2,) from h, threshold 3/4].
+        Wet mask at x-faces (the boundaries between adjacent cell
+        centres).  An x-face is wet iff *both* of its adjacent cell
+        centres are wet — i.e. flow through the face is physically
+        meaningful.
     not_h, not_u : Bool[Array, "Nx"]
         Logical inverses of the corresponding masks.
     classification : Int[Array, "Nx"]
@@ -188,6 +193,21 @@ class Mask1D(eqx.Module):
         Returns
         -------
         Mask1D
+
+        Notes
+        -----
+        The staggered u-face mask is derived from ``mask_hgrid`` via
+        :func:`pool_bool` with the following kernel/threshold pair:
+
+        ====== ========= =========  ====================================
+        Mask   Kernel    Threshold  Semantics
+        ====== ========= =========  ====================================
+        ``u``  ``(2,)``  ``3/4``    both adjacent h-cells wet (strict)
+        ====== ========= =========  ====================================
+
+        The land/coast classification uses two successive
+        :func:`dilate_mask` passes on ``~mask_hgrid``; the stencil
+        capability is built via :meth:`StencilCapability1D.from_mask`.
         """
         h_np = np.asarray(mask_hgrid, dtype=bool)
         (Nx,) = h_np.shape
@@ -344,17 +364,28 @@ class Mask2D(eqx.Module):
     Parameters
     ----------
     h : Bool[Array, "Ny Nx"]
-        Cell-centre (tracer) wet mask.
+        Wet mask at cell centres (T-points), where tracer-like quantities
+        (temperature, salinity, SSH, pressure) live.  ``True`` = wet /
+        ocean, ``False`` = dry / land.  This is the canonical mask that
+        the other staggered masks are derived from.
     u : Bool[Array, "Ny Nx"]
-        y-face wet mask  [kernel (2,1) from h, threshold 3/4].
+        Wet mask at y-faces (the south/north boundaries of each cell).
+        A y-face is wet iff *both* of its meridionally adjacent cell
+        centres are wet — i.e. flow through the face is physically
+        meaningful.
     v : Bool[Array, "Ny Nx"]
-        x-face wet mask  [kernel (1,2) from h, threshold 3/4].
+        Wet mask at x-faces (the west/east boundaries of each cell).
+        An x-face is wet iff *both* of its zonally adjacent cell centres
+        are wet.
     xy_corner : Bool[Array, "Ny Nx"]
-        xy-corner wet mask, lenient (≥1 of 4 surrounding h-cells wet)
-        [kernel (2,2) from h, threshold 1/8].
+        Lenient wet mask at xy-corners (vertices).  ``True`` wherever
+        *at least one* of the four surrounding cell centres is wet —
+        useful for detecting any ocean presence at a corner.
     xy_corner_strict : Bool[Array, "Ny Nx"]
-        xy-corner wet mask, strict (all 4 surrounding h-cells wet)
-        [kernel (2,2) from h, threshold 7/8].
+        Strict wet mask at xy-corners (vertices).  ``True`` only where
+        *all four* surrounding cell centres are wet — useful for
+        quantities (e.g. relative vorticity) that require the full
+        4-point horizontal stencil to be inside the fluid.
     not_h, not_u, not_v, not_xy_corner, not_xy_corner_strict : Bool[Array, "Ny Nx"]
         Logical inverses of the corresponding masks.
     xy_corner_y_wall : Bool[Array, "Ny Nx"]
@@ -568,6 +599,24 @@ class Mask2D(eqx.Module):
         Returns
         -------
         Mask2D
+
+        Notes
+        -----
+        The four staggered masks are derived from ``mask_hgrid`` via
+        :func:`pool_bool` with the following kernel/threshold pairs:
+
+        ==================== ========== =========  ===============================
+        Mask                 Kernel     Threshold  Semantics
+        ==================== ========== =========  ===============================
+        ``u``                ``(2, 1)`` ``3/4``    both y-adjacent h-cells wet
+        ``v``                ``(1, 2)`` ``3/4``    both x-adjacent h-cells wet
+        ``xy_corner``        ``(2, 2)`` ``1/8``    ≥ 1 of 4 surrounding h-cells wet
+        ``xy_corner_strict`` ``(2, 2)`` ``7/8``    all 4 surrounding h-cells wet
+        ==================== ========== =========  ===============================
+
+        The land/coast classification uses two successive
+        :func:`dilate_mask` passes on ``~mask_hgrid``; the stencil
+        capability is built via :meth:`StencilCapability2D.from_mask`.
         """
         h_np = np.asarray(mask_hgrid, dtype=bool)
         Ny, Nx = h_np.shape
@@ -856,22 +905,36 @@ class Mask3D(eqx.Module):
     Parameters
     ----------
     h : Bool[Array, "Nz Ny Nx"]
-        Cell-centre (tracer) wet mask.
+        Wet mask at cell centres (T-points), where tracer-like quantities
+        (temperature, salinity, pressure) live.  ``True`` = wet / ocean,
+        ``False`` = dry / land.  This is the canonical mask that the
+        other staggered masks are derived from.
     u : Bool[Array, "Nz Ny Nx"]
-        y-face wet mask  [kernel (1,2,1) from h, threshold 3/4].
+        Wet mask at y-faces (the south/north boundaries of each cell).
+        A y-face is wet iff *both* of its meridionally adjacent cell
+        centres at the same z-level are wet.
     v : Bool[Array, "Nz Ny Nx"]
-        x-face wet mask  [kernel (1,1,2) from h, threshold 3/4].
+        Wet mask at x-faces (the west/east boundaries of each cell).
+        An x-face is wet iff *both* of its zonally adjacent cell centres
+        at the same z-level are wet.
     w : Bool[Array, "Nz Ny Nx"]
-        z-face wet mask  [kernel (2,1,1) from h, threshold 3/4].
-        Stored at the same shape as ``h`` (no extra Nz+1 layer); ``w[k]``
-        is the bottom face of cell ``(k, j, i)``, computed from
-        ``(h[k] + h[k-1]) / 2``.
+        Wet mask at z-faces (the bottom/top boundaries of each cell).
+        A z-face is wet iff *both* of its vertically adjacent cell
+        centres at the same horizontal position are wet.  ``w[k, j, i]``
+        is the *bottom* face of cell ``(k, j, i)``; stored at the same
+        shape as ``h`` (no extra ``Nz+1`` layer — the topmost surface
+        face is implicit).
     xy_corner : Bool[Array, "Nz Ny Nx"]
-        xy-corner wet mask, lenient (≥1 of 4 surrounding h-cells wet
-        at the same z-level)  [kernel (1,2,2), threshold 1/8].
+        Lenient wet mask at xy-corners (vertices), per z-level.
+        ``True`` wherever *at least one* of the four surrounding cell
+        centres at the same z-level is wet — useful for detecting any
+        ocean presence at a corner.
     xy_corner_strict : Bool[Array, "Nz Ny Nx"]
-        xy-corner wet mask, strict (all 4 surrounding h-cells wet)
-        [kernel (1,2,2), threshold 7/8].
+        Strict wet mask at xy-corners (vertices), per z-level.
+        ``True`` only where *all four* surrounding cell centres at the
+        same z-level are wet — useful for quantities (e.g. relative
+        vorticity) that require the full 4-point horizontal stencil to
+        be inside the fluid.
     not_h, not_u, not_v, not_w, not_xy_corner, not_xy_corner_strict :
         Bool[Array, "Nz Ny Nx"]
         Logical inverses of the corresponding masks.
@@ -1049,6 +1112,26 @@ class Mask3D(eqx.Module):
         Returns
         -------
         Mask3D
+
+        Notes
+        -----
+        The five staggered masks are derived from ``mask_hgrid`` via
+        :func:`pool_bool` with the following kernel/threshold pairs:
+
+        ==================== ============= =========  ====================================
+        Mask                 Kernel        Threshold  Semantics
+        ==================== ============= =========  ====================================
+        ``u``                ``(1, 2, 1)`` ``3/4``    both y-adjacent h-cells wet
+        ``v``                ``(1, 1, 2)`` ``3/4``    both x-adjacent h-cells wet
+        ``w``                ``(2, 1, 1)`` ``3/4``    both z-adjacent h-cells wet
+        ``xy_corner``        ``(1, 2, 2)`` ``1/8``    ≥ 1 of 4 horizontal h-cells wet
+        ``xy_corner_strict`` ``(1, 2, 2)`` ``7/8``    all 4 horizontal h-cells wet
+        ==================== ============= =========  ====================================
+
+        The land/coast classification uses two successive
+        :func:`dilate_mask` passes on ``~mask_hgrid`` with a 6-connected
+        cross structuring element; the stencil capability is built via
+        :meth:`StencilCapability3D.from_mask`.
         """
         h_np = np.asarray(mask_hgrid, dtype=bool)
         Nz, Ny, Nx = h_np.shape
