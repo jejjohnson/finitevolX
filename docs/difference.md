@@ -189,9 +189,9 @@ z-level.  Array shapes are `[Nz, Ny, Nx]` and only the interior
 
 ```python
 import jax.numpy as jnp
-from finitevolx import ArakawaCGrid2D, Difference2D
+from finitevolx import CartesianGrid2D, Difference2D
 
-grid = ArakawaCGrid2D.from_interior(ny=64, nx=64, Ly=1e6, Lx=1e6)
+grid = CartesianGrid2D.from_interior(ny=64, nx=64, Ly=1e6, Lx=1e6)
 diff = Difference2D(grid=grid)
 
 h  = jnp.ones((grid.Ny, grid.Nx))  # T-point field

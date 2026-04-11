@@ -53,9 +53,9 @@ exactly zero for any velocity field derived from a streamfunction via
 ### Usage
 
 ```python
-from finitevolx import ArakawaCGrid2D, Divergence2D, divergence_2d
+from finitevolx import CartesianGrid2D, Divergence2D, divergence_2d
 
-grid = ArakawaCGrid2D.from_interior(64, 64, 1e6, 1e6)
+grid = CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 
 # Class-based
 div_op = Divergence2D(grid=grid)
@@ -108,9 +108,9 @@ non-divergent flow.
 ### Usage
 
 ```python
-from finitevolx import ArakawaCGrid2D, Vorticity2D
+from finitevolx import CartesianGrid2D, Vorticity2D
 
-grid = ArakawaCGrid2D.from_interior(64, 64, 1e6, 1e6)
+grid = CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 vort = Vorticity2D(grid=grid)
 
 # Relative vorticity at X-points
@@ -237,9 +237,9 @@ vice versa.  This is the standard C-grid Coriolis discretisation from Sadourny
 ### Usage
 
 ```python
-from finitevolx import ArakawaCGrid2D, Coriolis2D
+from finitevolx import CartesianGrid2D, Coriolis2D
 
-grid = ArakawaCGrid2D.from_interior(64, 64, 1e6, 1e6)
+grid = CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 cor = Coriolis2D(grid=grid)
 
 # f at T-points
@@ -292,9 +292,9 @@ the vorticity-flux product is evaluated.  Three schemes are available:
 ### Usage
 
 ```python
-from finitevolx import ArakawaCGrid2D, MomentumAdvection2D
+from finitevolx import CartesianGrid2D, MomentumAdvection2D
 
-grid = ArakawaCGrid2D.from_interior(64, 64, 1e6, 1e6)
+grid = CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 
 # Energy-conserving (default)
 madv = MomentumAdvection2D(grid=grid)
@@ -337,9 +337,9 @@ The three terms are:
 
 ```python
 from finitevolx import arakawa_jacobian
-from finitevolx import ArakawaCGrid2D
+from finitevolx import CartesianGrid2D
 
-grid = ArakawaCGrid2D.from_interior(64, 64, 1e6, 1e6)
+grid = CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 
 # QG vorticity advection: J(psi, q)
 # psi, q have shape [Ny, Nx] with one ghost cell on each side

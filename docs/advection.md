@@ -196,9 +196,9 @@ The 1-D operator writes to `[2:-2]`.
 
 ```python
 import jax.numpy as jnp
-from finitevolx import ArakawaCGrid2D, Advection2D, Mask2D
+from finitevolx import CartesianGrid2D, Advection2D, Mask2D
 
-grid = ArakawaCGrid2D.from_interior(64, 64, 1e6, 1e6)
+grid = CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 
 # Construct once; the operator is method-agnostic.
 adv = Advection2D(grid=grid)
@@ -215,9 +215,13 @@ dq_dt = adv(q, u, v)
 dq_dt_tvd = adv(q, u, v, method="van_leer")
 dq_dt_weno = adv(q, u, v, method="weno5")
 
-# With mask-aware adaptive stencil dispatch
+# With mask-aware adaptive stencil dispatch.  The mask is a class
+# attribute: construct a second operator instance with `mask=`.  The
+# adaptive stencil hierarchy is pre-built once in `__init__` and
+# reused on every call — see `docs/masks.md` for the full pattern.
 mask = Mask2D.from_mask(ocean_mask)
-dq_dt_masked = adv(q, u, v, method="weno5", mask=mask)
+adv_masked = Advection2D(grid=grid, mask=mask)
+dq_dt_masked = adv_masked(q, u, v, method="weno5")
 # shape [Ny, Nx], non-zero only in [2:-2, 2:-2]
 ```
 

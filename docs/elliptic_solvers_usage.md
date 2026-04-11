@@ -17,7 +17,7 @@ import finitevolx as fvx
 jax.config.update("jax_enable_x64", True)
 
 # 1. Set up a grid
-grid = fvx.ArakawaCGrid2D.from_interior(64, 64, 1e5, 1e5)
+grid = fvx.CartesianGrid2D.from_interior(64, 64, 1e5, 1e5)
 dx, dy = grid.dx[0], grid.dy[0]
 
 # 2. Create a vorticity field

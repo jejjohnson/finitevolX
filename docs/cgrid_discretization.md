@@ -285,10 +285,10 @@ tracking issue and the planned refactor of `vertical_velocity`.
 ## Creating a Grid
 
 ```python
-from finitevolx import ArakawaCGrid2D
+from finitevolx import CartesianGrid2D
 
 # 64 physical cells in each direction; 66×66 total array shape
-grid = ArakawaCGrid2D.from_interior(nx_interior=64, ny_interior=64,
+grid = CartesianGrid2D.from_interior(nx_interior=64, ny_interior=64,
                                      Lx=1.0, Ly=1.0)
 # grid.Nx == 66, grid.Ny == 66
 # grid.dx == 1/64, grid.dy == 1/64
@@ -502,12 +502,12 @@ A typical shallow-water advection step uses all four co-location points:
 
 ```python
 from finitevolx import (
-    ArakawaCGrid2D, Difference2D, Interpolation2D, Vorticity2D,
+    CartesianGrid2D, Difference2D, Interpolation2D, Vorticity2D,
     enforce_periodic,
 )
 import jax.numpy as jnp
 
-grid  = ArakawaCGrid2D.from_interior(64, 64, 1.0, 1.0)
+grid  = CartesianGrid2D.from_interior(64, 64, 1.0, 1.0)
 diff  = Difference2D(grid=grid)
 interp = Interpolation2D(grid=grid)
 vort  = Vorticity2D(grid=grid)
