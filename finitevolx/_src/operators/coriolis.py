@@ -26,7 +26,7 @@ import equinox as eqx
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
-from finitevolx._src.mask import Mask2D
+from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators.interpolation import Interpolation2D
 
@@ -47,6 +47,11 @@ class Coriolis2D(eqx.Module):
     ----------
     grid : CartesianGrid2D
         The underlying 2-D grid.
+    mask : Mask2D or None, optional
+        Optional land/ocean mask.  When provided, the ``__call__``
+        output is post-multiplied by ``mask.u`` / ``mask.v`` on the
+        two velocity components.  ``None`` (default) leaves the
+        output untouched.
 
     Examples
     --------
@@ -61,10 +66,16 @@ class Coriolis2D(eqx.Module):
     """
 
     grid: CartesianGrid2D
+    mask: Mask2D | None
     interp: Interpolation2D
 
-    def __init__(self, grid: CartesianGrid2D) -> None:
+    def __init__(
+        self,
+        grid: CartesianGrid2D,
+        mask: Mask2D | None = None,
+    ) -> None:
         self.grid = grid
+        self.mask = mask
         self.interp = Interpolation2D(grid=grid)
 
     def __call__(
@@ -72,7 +83,6 @@ class Coriolis2D(eqx.Module):
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
         f: Float[Array, "Ny Nx"],
-        mask: Mask2D | None = None,
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
         """Coriolis tendencies (du_cor, dv_cor).
 
@@ -87,15 +97,15 @@ class Coriolis2D(eqx.Module):
             y-velocity at V-points (north faces).
         f : Float[Array, "Ny Nx"]
             Coriolis parameter at T-points.
-        mask : Mask2D or None
-            Optional land/ocean mask.  If provided, ``du_cor`` is multiplied
-            by ``mask.u`` and ``dv_cor`` by ``mask.v``.
 
         Returns
         -------
         tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]
             ``(du_cor, dv_cor)`` — Coriolis tendencies at U-points and
-            V-points respectively, both zero in the ghost ring.
+            V-points respectively, both zero in the ghost ring.  When
+            ``self.mask`` is set, ``du_cor`` is zeroed at dry U-faces
+            via ``* mask.u`` and ``dv_cor`` at dry V-faces via
+            ``* mask.v``.
         """
         # Interpolate f from T-points to velocity points
         # f_on_u[j, i+1/2] = 1/2 * (f[j, i] + f[j, i+1])
@@ -114,9 +124,9 @@ class Coriolis2D(eqx.Module):
         # dv_cor[j+1/2, i] = -f_on_v * u_on_v
         dv_cor = interior(-f_on_v[1:-1, 1:-1] * u_on_v[1:-1, 1:-1], v)
 
-        if mask is not None:
-            du_cor = du_cor * mask.u
-            dv_cor = dv_cor * mask.v
+        if self.mask is not None:
+            du_cor = du_cor * self.mask.u
+            dv_cor = dv_cor * self.mask.v
 
         return du_cor, dv_cor
 
@@ -132,6 +142,18 @@ class Coriolis3D(eqx.Module):
     ----------
     grid : CartesianGrid3D
         The underlying 3-D grid.
+    mask : Mask3D or None, optional
+        Optional land/ocean mask.  Pattern A (post-compute) — the
+        inner :class:`Coriolis2D` is constructed ``mask=None`` and
+        the 3-D result is post-multiplied by ``mask.u`` / ``mask.v``
+        after the vmap.
+
+        Takes a :class:`Mask3D` (not ``Mask2D``): even though ``f``
+        is 2-D and depth-independent, the velocity mask is natively
+        3-D on the Arakawa C-grid, and using ``Mask3D`` keeps the
+        3-D operator suite type-uniform per #209.  Issue #209's Q4
+        locked this in for Advection3D and this commit extends the
+        same decision to Coriolis3D.
 
     Examples
     --------
@@ -146,10 +168,17 @@ class Coriolis3D(eqx.Module):
     """
 
     grid: CartesianGrid3D
+    mask: Mask3D | None
     _cor2d: Coriolis2D
 
-    def __init__(self, grid: CartesianGrid3D) -> None:
+    def __init__(
+        self,
+        grid: CartesianGrid3D,
+        mask: Mask3D | None = None,
+    ) -> None:
         self.grid = grid
+        self.mask = mask
+        # Pattern A: inner 2-D op is mask-free; the 3-D wrapper owns the mask.
         self._cor2d = Coriolis2D(grid=grid.horizontal_grid())
 
     def __call__(
@@ -157,7 +186,6 @@ class Coriolis3D(eqx.Module):
         u: Float[Array, "Nz Ny Nx"],
         v: Float[Array, "Nz Ny Nx"],
         f: Float[Array, "Ny Nx"],
-        mask: Mask2D | None = None,
     ) -> tuple[Float[Array, "Nz Ny Nx"], Float[Array, "Nz Ny Nx"]]:
         """Coriolis tendencies over all z-levels.
 
@@ -172,15 +200,14 @@ class Coriolis3D(eqx.Module):
             y-velocity at V-points.
         f : Float[Array, "Ny Nx"]
             Coriolis parameter at T-points (depth-independent).
-        mask : Mask2D or None
-            Optional land/ocean mask.  If provided, ``du_cor`` is multiplied
-            by ``mask.u`` and ``dv_cor`` by ``mask.v``.
 
         Returns
         -------
         tuple[Float[Array, "Nz Ny Nx"], Float[Array, "Nz Ny Nx"]]
             ``(du_cor, dv_cor)`` — Coriolis tendencies at U-points and
-            V-points, both zero in the ghost ring.
+            V-points, both zero in the ghost ring.  When ``self.mask``
+            is set, ``du_cor`` is zeroed at dry U-faces via
+            ``* mask.u`` and ``dv_cor`` at dry V-faces via ``* mask.v``.
         """
         # Vmap the 2D Coriolis operator over z-levels.
         # f is 2D (depth-independent) and broadcast to each z-slice.
@@ -192,8 +219,8 @@ class Coriolis3D(eqx.Module):
         du_cor = zero_z_ghosts(du_cor)
         dv_cor = zero_z_ghosts(dv_cor)
 
-        if mask is not None:
-            du_cor = du_cor * mask.u
-            dv_cor = dv_cor * mask.v
+        if self.mask is not None:
+            du_cor = du_cor * self.mask.u
+            dv_cor = dv_cor * self.mask.v
 
         return du_cor, dv_cor

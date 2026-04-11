@@ -308,14 +308,16 @@ q0 = jnp.where(
 # %% [markdown]
 # ### Run three experiments
 #
-# 1. **Masked WENO5** — the correct approach.  Pass `mask=mask` so the
-#    operator automatically cascades near coasts.
+# 1. **Masked WENO5** — the correct approach.  Construct a second
+#    ``Advection2D`` instance with ``mask=mask`` so the operator
+#    automatically cascades near coasts.
 # 2. **Unmasked WENO5** — what happens if you *forget* the mask.  The
 #    stencil reads land cells (zeros) as real data.
 # 3. **Upwind1** — the safe but diffusive baseline.
 
 # %%
-advect = fvx.Advection2D(grid)
+advect_unmasked = fvx.Advection2D(grid)
+advect_masked = fvx.Advection2D(grid, mask=mask)
 
 cfl = 0.4
 u_max = float(jnp.max(jnp.abs(u_field)))
@@ -328,23 +330,23 @@ dt = T_final / nsteps
 print(f"dt = {dt:.4e}, nsteps = {nsteps}, T = {T_final}")
 
 experiments = {
-    "WENO5 + mask": {"method": "weno5", "mask": mask},
-    "WENO5 (no mask)": {"method": "weno5", "mask": None},
-    "upwind1": {"method": "upwind1", "mask": None},
+    "WENO5 + mask": {"method": "weno5", "op": advect_masked},
+    "WENO5 (no mask)": {"method": "weno5", "op": advect_unmasked},
+    "upwind1": {"method": "upwind1", "op": advect_unmasked},
 }
 
 results = {}
 for name, cfg in experiments.items():
 
-    def make_rhs(method, msk):
+    def make_rhs(method, op):
         def rhs(q):
             # Zero out land cells each stage — keeps the solution clean.
             q = q * ocean_jnp
-            return advect(q, u_field, v_field, method=method, mask=msk)
+            return op(q, u_field, v_field, method=method)
 
         return rhs
 
-    rhs_fn = jax.jit(make_rhs(cfg["method"], cfg["mask"]))
+    rhs_fn = jax.jit(make_rhs(cfg["method"], cfg["op"]))
     q = q0.copy()
 
     for _step in range(nsteps):
@@ -406,9 +408,11 @@ fig.savefig(IMG_DIR / "comparison.png", dpi=150, bbox_inches="tight")
 # after each stage:
 #
 # ```python
+# advect_masked = fvx.Advection2D(grid, mask=mask)
+#
 # def rhs(q):
 #     q = q * ocean_jnp       # ← clean up land before reconstruction
-#     return advect(q, u, v, method='weno5', mask=mask)
+#     return advect_masked(q, u, v, method='weno5')
 #
 # for _ in range(nsteps):
 #     q = fvx.rk3_ssp_step(q, rhs, dt)
@@ -436,8 +440,9 @@ fig.savefig(IMG_DIR / "comparison.png", dpi=150, bbox_inches="tight")
 # mask.get_adaptive_masks(direction='x', stencil_sizes=(2, 4, 6))
 # ```
 #
-# When you call `Advection2D(q, u, v, method='weno5', mask=mask)`, this
-# is handled automatically — the operator selects `(2, 4, 6)` for WENO5.
+# When you construct `Advection2D(grid, mask=mask)`, this is handled
+# automatically — the operator pre-builds `(2, 4, 6)` at `__init__`
+# time and narrows it at dispatch for whichever method you request.
 #
 # ### Tip 4: Inspect stencil assignment before running
 #

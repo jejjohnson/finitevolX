@@ -18,7 +18,7 @@ import finitevolx as fvx
 jax.config.update("jax_enable_x64", True)
 
 # 1. Define your spatial RHS (any JAX pytree in, same pytree out)
-grid = fvx.ArakawaCGrid2D.from_interior(64, 64, 1e4, 1e4)
+grid = fvx.CartesianGrid2D.from_interior(64, 64, 1e4, 1e4)
 
 def rhs(state):
     """Right-hand side: returns tendency with same pytree structure."""

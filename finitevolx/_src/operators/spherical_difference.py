@@ -26,6 +26,7 @@ from finitevolx._src.grid.spherical import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
+from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators._utils import _safe_div_cos
 from finitevolx._src.operators.stencils import (
@@ -43,9 +44,25 @@ class SphericalDifference2D(eqx.Module):
     ----------
     grid : SphericalGrid2D
         The underlying 2-D spherical grid.
+    mask : Mask2D or None, optional
+        Optional land/ocean mask.  When provided, every method
+        post-multiplies its output by the mask field matching its
+        output stagger:
+
+        * T-output → ``mask.h`` (``diff_lon_U_to_T``, ``diff_lat_V_to_T``,
+          ``diff2_lon``, ``laplacian_merid``)
+        * U-output → ``mask.u`` (``diff_lon_T_to_U``)
+        * V-output → ``mask.v`` (``diff_lat_T_to_V``)
+        * X-output → ``mask.xy_corner_strict`` (``diff_lon_V_to_X``,
+          ``diff_lat_U_to_X``)
+
+        Per #209 Q2, spherical 2-D operators take a Cartesian ``Mask2D``
+        rather than a dedicated ``SphericalMask2D`` — the mask geometry
+        is coordinate-agnostic at the post-compute-multiply layer.
     """
 
     grid: SphericalGrid2D
+    mask: Mask2D | None = None
 
     # ------------------------------------------------------------------
     # Forward differences (centre/face → face/corner)
@@ -55,78 +72,46 @@ class SphericalDifference2D(eqx.Module):
         """Zonal derivative T → U on a sphere.
 
         dh/dx[j, i+½] = (h[j, i+1] − h[j, i]) / (R · cos(lat_U) · dlon)
-
-        Parameters
-        ----------
-        h : Float[Array, "Ny Nx"]
-            Scalar at T-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Zonal derivative at U-points.
         """
         raw = diff_x_fwd(h)
         cos_U = self.grid.cos_lat_U[1:-1, 1:-1]
         out = interior(_safe_div_cos(raw, cos_U, self.grid.R * self.grid.dlon), h)
+        if self.mask is not None:
+            out = out * self.mask.u
         return out
 
     def diff_lat_T_to_V(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """Meridional derivative T → V on a sphere.
 
         dh/dy[j+½, i] = (h[j+1, i] − h[j, i]) / (R · dlat)
-
-        Parameters
-        ----------
-        h : Float[Array, "Ny Nx"]
-            Scalar at T-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Meridional derivative at V-points.
         """
         raw = diff_y_fwd(h)
         out = interior(raw / (self.grid.R * self.grid.dlat), h)
+        if self.mask is not None:
+            out = out * self.mask.v
         return out
 
     def diff_lon_V_to_X(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """Zonal derivative V → X (corner) on a sphere.
 
         dv/dx[j+½, i+½] = (v[j+½, i+1] − v[j+½, i]) / (R · cos(lat_X) · dlon)
-
-        Parameters
-        ----------
-        v : Float[Array, "Ny Nx"]
-            Velocity at V-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Zonal derivative at X-points.
         """
         raw = diff_x_fwd(v)
         cos_X = self.grid.cos_lat_X[1:-1, 1:-1]
         out = interior(_safe_div_cos(raw, cos_X, self.grid.R * self.grid.dlon), v)
+        if self.mask is not None:
+            out = out * self.mask.xy_corner_strict
         return out
 
     def diff_lat_U_to_X(self, u: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """Meridional derivative U → X (corner) on a sphere.
 
         du/dy[j+½, i+½] = (u[j+1, i+½] − u[j, i+½]) / (R · dlat)
-
-        Parameters
-        ----------
-        u : Float[Array, "Ny Nx"]
-            Velocity at U-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Meridional derivative at X-points.
         """
         raw = diff_y_fwd(u)
         out = interior(raw / (self.grid.R * self.grid.dlat), u)
+        if self.mask is not None:
+            out = out * self.mask.xy_corner_strict
         return out
 
     # ------------------------------------------------------------------
@@ -137,39 +122,23 @@ class SphericalDifference2D(eqx.Module):
         """Backward zonal derivative U → T on a sphere.
 
         du/dx[j, i] = (u[j, i+½] − u[j, i−½]) / (R · cos(lat_T) · dlon)
-
-        Parameters
-        ----------
-        u : Float[Array, "Ny Nx"]
-            Velocity at U-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Zonal derivative at T-points.
         """
         raw = diff_x_bwd(u)
         cos_T = self.grid.cos_lat_T[1:-1, 1:-1]
         out = interior(_safe_div_cos(raw, cos_T, self.grid.R * self.grid.dlon), u)
+        if self.mask is not None:
+            out = out * self.mask.h
         return out
 
     def diff_lat_V_to_T(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """Backward meridional derivative V → T on a sphere.
 
         dv/dy[j, i] = (v[j+½, i] − v[j−½, i]) / (R · dlat)
-
-        Parameters
-        ----------
-        v : Float[Array, "Ny Nx"]
-            Velocity at V-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Meridional derivative at T-points.
         """
         raw = diff_y_bwd(v)
         out = interior(raw / (self.grid.R * self.grid.dlat), v)
+        if self.mask is not None:
+            out = out * self.mask.h
         return out
 
     # ------------------------------------------------------------------
@@ -180,36 +149,18 @@ class SphericalDifference2D(eqx.Module):
         """Second zonal derivative at T-points on a sphere.
 
         d²h/dx² = 1/(R² cos²φ) · (h[j,i+1] − 2h[j,i] + h[j,i−1]) / dlon²
-
-        Parameters
-        ----------
-        h : Float[Array, "Ny Nx"]
-            Scalar at T-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Second zonal derivative at T-points.
         """
         cos_T = self.grid.cos_lat_T[1:-1, 1:-1]
         d2h = (diff_x_fwd(h) - diff_x_bwd(h)) / self.grid.dlon**2
         out = interior(_safe_div_cos(d2h, cos_T, self.grid.R**2 * cos_T), h)
+        if self.mask is not None:
+            out = out * self.mask.h
         return out
 
     def laplacian_merid(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """Meridional term of the spherical Laplacian at T-points.
 
         1/(R² cosφ) · d/dφ(cosφ · dh/dφ)
-
-        Parameters
-        ----------
-        h : Float[Array, "Ny Nx"]
-            Scalar at T-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Meridional Laplacian term at T-points.
         """
         cos_T = self.grid.cos_lat_T[1:-1, 1:-1]
         dlat = self.grid.dlat
@@ -221,6 +172,8 @@ class SphericalDifference2D(eqx.Module):
         cos_S = 0.5 * (cos_T + self.grid.cos_lat_T[:-2, 1:-1])
         d_cos_dh = (cos_N * dh_N - cos_S * dh_S) / dlat
         out = interior(_safe_div_cos(d_cos_dh, cos_T, self.grid.R**2), h)
+        if self.mask is not None:
+            out = out * self.mask.h
         return out
 
 
@@ -233,43 +186,89 @@ class SphericalDifference3D(eqx.Module):
     ----------
     grid : SphericalGrid3D
         The underlying 3-D spherical grid.
+    mask : Mask3D or None, optional
+        Optional land/ocean mask.  Pattern A (post-compute) — the inner
+        :class:`SphericalDifference2D` is built ``mask=None`` and the
+        3-D result is post-multiplied by the mask field matching each
+        method's output stagger:
+
+        * T-output → ``mask.h`` (``diff_lon_U_to_T``, ``diff_lat_V_to_T``,
+          ``diff2_lon``, ``laplacian_merid``)
+        * U-output → ``mask.u`` (``diff_lon_T_to_U``)
+        * V-output → ``mask.v`` (``diff_lat_T_to_V``)
+        * X-output → ``mask.xy_corner_strict`` (``diff_lon_V_to_X``,
+          ``diff_lat_U_to_X``)
+
+        Per #209 Q3, the 3-D class takes the Cartesian ``Mask3D``
+        rather than a dedicated ``SphericalMask3D``.
     """
 
     grid: SphericalGrid3D
+    mask: Mask3D | None
     _diff2d: SphericalDifference2D
 
-    def __init__(self, grid: SphericalGrid3D):
+    def __init__(
+        self,
+        grid: SphericalGrid3D,
+        mask: Mask3D | None = None,
+    ) -> None:
         self.grid = grid
+        self.mask = mask
+        # Pattern A: inner 2-D op is mask-free; the 3-D wrapper owns the mask.
         self._diff2d = SphericalDifference2D(grid=grid.horizontal_grid())
 
     def diff_lon_T_to_U(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Zonal derivative T → U over all z-levels."""
-        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lon_T_to_U)(h))
+        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lon_T_to_U)(h))
+        if self.mask is not None:
+            out = out * self.mask.u
+        return out
 
     def diff_lat_T_to_V(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Meridional derivative T → V over all z-levels."""
-        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lat_T_to_V)(h))
+        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lat_T_to_V)(h))
+        if self.mask is not None:
+            out = out * self.mask.v
+        return out
 
     def diff_lon_V_to_X(self, v: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Zonal derivative V → X over all z-levels."""
-        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lon_V_to_X)(v))
+        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lon_V_to_X)(v))
+        if self.mask is not None:
+            out = out * self.mask.xy_corner_strict
+        return out
 
     def diff_lat_U_to_X(self, u: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Meridional derivative U → X over all z-levels."""
-        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lat_U_to_X)(u))
+        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lat_U_to_X)(u))
+        if self.mask is not None:
+            out = out * self.mask.xy_corner_strict
+        return out
 
     def diff_lon_U_to_T(self, u: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Backward zonal derivative U → T over all z-levels."""
-        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lon_U_to_T)(u))
+        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lon_U_to_T)(u))
+        if self.mask is not None:
+            out = out * self.mask.h
+        return out
 
     def diff_lat_V_to_T(self, v: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Backward meridional derivative V → T over all z-levels."""
-        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lat_V_to_T)(v))
+        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lat_V_to_T)(v))
+        if self.mask is not None:
+            out = out * self.mask.h
+        return out
 
     def diff2_lon(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Second zonal derivative at T-points over all z-levels."""
-        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff2_lon)(h))
+        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff2_lon)(h))
+        if self.mask is not None:
+            out = out * self.mask.h
+        return out
 
     def laplacian_merid(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Meridional Laplacian term at T-points over all z-levels."""
-        return zero_z_ghosts(eqx.filter_vmap(self._diff2d.laplacian_merid)(h))
+        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.laplacian_merid)(h))
+        if self.mask is not None:
+            out = out * self.mask.h
+        return out

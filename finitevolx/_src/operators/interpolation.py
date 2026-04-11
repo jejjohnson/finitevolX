@@ -21,6 +21,7 @@ from finitevolx._src.grid.base import (
     CurvilinearGrid2D,
     CurvilinearGrid3D,
 )
+from finitevolx._src.mask import Mask1D, Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.stencils import (
     avg_x_bwd,
@@ -47,9 +48,15 @@ class Interpolation1D(eqx.Module):
     ----------
     grid : CurvilinearGrid1D
         The underlying 1-D grid.
+    mask : Mask1D or None, optional
+        Optional land/ocean mask.  When provided, every method
+        post-multiplies its output by the mask field matching the
+        output stagger (``mask.h`` for T-output, ``mask.u`` for
+        U-output).  ``None`` (default) leaves outputs untouched.
     """
 
     grid: CurvilinearGrid1D
+    mask: Mask1D | None = None
 
     def T_to_U(self, h: Float[Array, "Nx"]) -> Float[Array, "Nx"]:
         """Interpolate T-point -> U-point (east face).
@@ -64,9 +71,12 @@ class Interpolation1D(eqx.Module):
         Returns
         -------
         Float[Array, "Nx"]
-            Scalar interpolated to U-points.
+            Scalar interpolated to U-points.  When ``self.mask`` is
+            set, the output is zeroed at dry U-faces via ``* mask.u``.
         """
         out = interior(avg_x_fwd_1d(h), h)
+        if self.mask is not None:
+            out = out * self.mask.u
         return out
 
     def U_to_T(self, u: Float[Array, "Nx"]) -> Float[Array, "Nx"]:
@@ -82,9 +92,12 @@ class Interpolation1D(eqx.Module):
         Returns
         -------
         Float[Array, "Nx"]
-            Velocity interpolated to T-points.
+            Velocity interpolated to T-points.  When ``self.mask`` is
+            set, the output is zeroed at dry T-cells via ``* mask.h``.
         """
         out = interior(avg_x_bwd_1d(u), u)
+        if self.mask is not None:
+            out = out * self.mask.h
         return out
 
 
@@ -95,9 +108,28 @@ class Interpolation2D(eqx.Module):
     ----------
     grid : CurvilinearGrid2D
         The underlying 2-D grid.
+    mask : Mask2D or None, optional
+        Optional land/ocean mask.  When provided, every method
+        post-multiplies its output by the mask field matching its
+        output stagger:
+
+        * T-output → ``mask.h`` (U_to_T, V_to_T, X_to_T)
+        * U-output → ``mask.u`` (T_to_U, X_to_U, V_to_U)
+        * V-output → ``mask.v`` (T_to_V, X_to_V, U_to_V)
+        * X-output → ``mask.xy_corner_strict`` (T_to_X, U_to_X, V_to_X)
+
+        **Cross-face methods (U_to_V, V_to_U, U_to_X, V_to_X, X_to_U,
+        X_to_V):** the post-compute multiply zeros the *dry* output
+        cells, but wet output cells that read across a coast still
+        contain contributions from the input field at the dry input
+        cells (``u[dry]`` / ``v[dry]`` / ``q[dry]`` — whatever the
+        caller stored there).  This is the accepted convention — see
+        ``tests/test_interpolation_masks.py::TestCrossFaceAudit`` for
+        the pinned semantic.
     """
 
     grid: CurvilinearGrid2D
+    mask: Mask2D | None = None
 
     # ------------------------------------------------------------------
     # T-point -> faces / corners
@@ -107,54 +139,30 @@ class Interpolation2D(eqx.Module):
         """T-point -> U-point (east face), x-average.
 
         h_on_u[j, i+1/2] = 1/2 * (h[j, i] + h[j, i+1])
-
-        Parameters
-        ----------
-        h : Float[Array, "Ny Nx"]
-            Scalar at T-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Scalar interpolated to U-points.
         """
         out = interior(avg_x_fwd(h), h)
+        if self.mask is not None:
+            out = out * self.mask.u
         return out
 
     def T_to_V(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """T-point -> V-point (north face), y-average.
 
         h_on_v[j+1/2, i] = 1/2 * (h[j, i] + h[j+1, i])
-
-        Parameters
-        ----------
-        h : Float[Array, "Ny Nx"]
-            Scalar at T-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Scalar interpolated to V-points.
         """
         out = interior(avg_y_fwd(h), h)
+        if self.mask is not None:
+            out = out * self.mask.v
         return out
 
     def T_to_X(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """T-point -> X-point (NE corner), bilinear average.
 
         h_on_q[j+1/2, i+1/2] = 1/4 * (h[j,i] + h[j,i+1] + h[j+1,i] + h[j+1,i+1])
-
-        Parameters
-        ----------
-        h : Float[Array, "Ny Nx"]
-            Scalar at T-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Scalar interpolated to X-points (corners).
         """
         out = interior(avg_xy_fwd(h), h)
+        if self.mask is not None:
+            out = out * self.mask.xy_corner_strict
         return out
 
     # ------------------------------------------------------------------
@@ -165,36 +173,20 @@ class Interpolation2D(eqx.Module):
         """X-point (corner) -> U-point (east face), y-average.
 
         q_on_u[j, i+1/2] = 1/2 * (q[j+1/2, i+1/2] + q[j-1/2, i+1/2])
-
-        Parameters
-        ----------
-        q : Float[Array, "Ny Nx"]
-            Scalar at X-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Scalar interpolated to U-points.
         """
         out = interior(avg_y_bwd(q), q)
+        if self.mask is not None:
+            out = out * self.mask.u
         return out
 
     def X_to_V(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """X-point (corner) -> V-point (north face), x-average.
 
         q_on_v[j+1/2, i] = 1/2 * (q[j+1/2, i+1/2] + q[j+1/2, i-1/2])
-
-        Parameters
-        ----------
-        q : Float[Array, "Ny Nx"]
-            Scalar at X-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Scalar interpolated to V-points.
         """
         out = interior(avg_x_bwd(q), q)
+        if self.mask is not None:
+            out = out * self.mask.v
         return out
 
     # ------------------------------------------------------------------
@@ -205,36 +197,20 @@ class Interpolation2D(eqx.Module):
         """U-point -> T-point, x-average.
 
         u_on_h[j, i] = 1/2 * (u[j, i+1/2] + u[j, i-1/2])
-
-        Parameters
-        ----------
-        u : Float[Array, "Ny Nx"]
-            Velocity at U-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Velocity interpolated to T-points.
         """
         out = interior(avg_x_bwd(u), u)
+        if self.mask is not None:
+            out = out * self.mask.h
         return out
 
     def V_to_T(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """V-point -> T-point, y-average.
 
         v_on_h[j, i] = 1/2 * (v[j+1/2, i] + v[j-1/2, i])
-
-        Parameters
-        ----------
-        v : Float[Array, "Ny Nx"]
-            Velocity at V-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Velocity interpolated to T-points.
         """
         out = interior(avg_y_bwd(v), v)
+        if self.mask is not None:
+            out = out * self.mask.h
         return out
 
     def X_to_T(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -242,18 +218,10 @@ class Interpolation2D(eqx.Module):
 
         q_on_h[j, i] = 1/4 * (q[j+1/2,i+1/2] + q[j-1/2,i+1/2]
                              + q[j+1/2,i-1/2] + q[j-1/2,i-1/2])
-
-        Parameters
-        ----------
-        q : Float[Array, "Ny Nx"]
-            Scalar at X-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Scalar interpolated to T-points.
         """
         out = interior(avg_xy_bwd(q), q)
+        if self.mask is not None:
+            out = out * self.mask.h
         return out
 
     # ------------------------------------------------------------------
@@ -264,36 +232,20 @@ class Interpolation2D(eqx.Module):
         """U-point -> X-point (corner), y-average.
 
         u_on_q[j+1/2, i+1/2] = 1/2 * (u[j, i+1/2] + u[j+1, i+1/2])
-
-        Parameters
-        ----------
-        u : Float[Array, "Ny Nx"]
-            Velocity at U-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Velocity interpolated to X-points.
         """
         out = interior(avg_y_fwd(u), u)
+        if self.mask is not None:
+            out = out * self.mask.xy_corner_strict
         return out
 
     def V_to_X(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """V-point -> X-point (corner), x-average.
 
         v_on_q[j+1/2, i+1/2] = 1/2 * (v[j+1/2, i] + v[j+1/2, i+1])
-
-        Parameters
-        ----------
-        v : Float[Array, "Ny Nx"]
-            Velocity at V-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Velocity interpolated to X-points.
         """
         out = interior(avg_x_fwd(v), v)
+        if self.mask is not None:
+            out = out * self.mask.xy_corner_strict
         return out
 
     # ------------------------------------------------------------------
@@ -305,18 +257,10 @@ class Interpolation2D(eqx.Module):
 
         u_on_v[j+1/2, i] = 1/4 * (u[j,   i+1/2] + u[j+1, i+1/2]
                                  + u[j,   i-1/2] + u[j+1, i-1/2])
-
-        Parameters
-        ----------
-        u : Float[Array, "Ny Nx"]
-            Velocity at U-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Velocity interpolated to V-points.
         """
         out = interior(avg_xbwd_yfwd(u), u)
+        if self.mask is not None:
+            out = out * self.mask.v
         return out
 
     def V_to_U(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -324,18 +268,10 @@ class Interpolation2D(eqx.Module):
 
         v_on_u[j, i+1/2] = 1/4 * (v[j+1/2, i] + v[j-1/2, i]
                                  + v[j+1/2, i+1] + v[j-1/2, i+1])
-
-        Parameters
-        ----------
-        v : Float[Array, "Ny Nx"]
-            Velocity at V-points.
-
-        Returns
-        -------
-        Float[Array, "Ny Nx"]
-            Velocity interpolated to U-points.
         """
         out = interior(avg_xfwd_ybwd(v), v)
+        if self.mask is not None:
+            out = out * self.mask.u
         return out
 
 
@@ -349,9 +285,14 @@ class Interpolation3D(eqx.Module):
     ----------
     grid : CurvilinearGrid3D
         The underlying 3-D grid.
+    mask : Mask3D or None, optional
+        Optional land/ocean mask.  When provided, every method
+        post-multiplies its output by the mask field matching the
+        output stagger (``mask.h`` / ``mask.u`` / ``mask.v``).
     """
 
     grid: CurvilinearGrid3D
+    mask: Mask3D | None = None
 
     def T_to_U(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """T -> U (x-average) over all z-levels.
@@ -359,6 +300,8 @@ class Interpolation3D(eqx.Module):
         h_on_u[k, j, i+1/2] = 1/2 * (h[k, j, i] + h[k, j, i+1])
         """
         out = interior(avg_x_fwd_3d(h), h)
+        if self.mask is not None:
+            out = out * self.mask.u
         return out
 
     def T_to_V(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -367,6 +310,8 @@ class Interpolation3D(eqx.Module):
         h_on_v[k, j+1/2, i] = 1/2 * (h[k, j, i] + h[k, j+1, i])
         """
         out = interior(avg_y_fwd_3d(h), h)
+        if self.mask is not None:
+            out = out * self.mask.v
         return out
 
     def U_to_T(self, u: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -375,6 +320,8 @@ class Interpolation3D(eqx.Module):
         u_on_h[k, j, i] = 1/2 * (u[k, j, i+1/2] + u[k, j, i-1/2])
         """
         out = interior(avg_x_bwd_3d(u), u)
+        if self.mask is not None:
+            out = out * self.mask.h
         return out
 
     def V_to_T(self, v: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
@@ -383,4 +330,6 @@ class Interpolation3D(eqx.Module):
         v_on_h[k, j, i] = 1/2 * (v[k, j+1/2, i] + v[k, j-1/2, i])
         """
         out = interior(avg_y_bwd_3d(v), v)
+        if self.mask is not None:
+            out = out * self.mask.h
         return out

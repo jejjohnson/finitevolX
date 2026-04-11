@@ -10,7 +10,7 @@ from finitevolx._src.advection.advection import Advection2D, Advection3D
 from finitevolx._src.advection.flux import upwind_flux
 from finitevolx._src.advection.reconstruction import Reconstruction2D
 from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
-from finitevolx._src.mask import Mask2D
+from finitevolx._src.mask import Mask2D, Mask3D
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
 
@@ -375,19 +375,20 @@ class TestUpwindFluxConservation:
 
 
 class TestAdvection2DMasked:
-    """Verify Advection2D works with the mask parameter."""
+    """Verify Advection2D works with the mask class field."""
 
     def test_rectangular_weno5_matches_unmasked(self):
         """On a rectangular domain, masked weno5 should match unmasked."""
         Ny, Nx = 14, 14
         grid = CartesianGrid2D.from_interior(Ny - 2, Nx - 2, 1.0, 1.0)
         mask = Mask2D.from_dimensions(Ny, Nx)
-        adv = Advection2D(grid=grid)
+        adv_masked = Advection2D(grid=grid, mask=mask)
+        adv_plain = Advection2D(grid=grid)
         h = jnp.broadcast_to(jnp.arange(Nx, dtype=float), (Ny, Nx))
         u = jnp.ones((Ny, Nx))
         v = jnp.ones((Ny, Nx))
-        result_masked = adv(h, u, v, method="weno5", mask=mask)
-        result_plain = adv(h, u, v, method="weno5")
+        result_masked = adv_masked(h, u, v, method="weno5")
+        result_plain = adv_plain(h, u, v, method="weno5")
         # Deep interior should match (boundary cells may differ due to
         # mask-based stencil selection at the domain edge)
         np.testing.assert_allclose(
@@ -398,11 +399,11 @@ class TestAdvection2DMasked:
         Ny, Nx = 10, 10
         grid = CartesianGrid2D.from_interior(Ny - 2, Nx - 2, 1.0, 1.0)
         mask = Mask2D.from_dimensions(Ny, Nx)
-        adv = Advection2D(grid=grid)
+        adv = Advection2D(grid=grid, mask=mask)
         h = jnp.ones((Ny, Nx))
         u = jnp.ones((Ny, Nx))
         v = jnp.ones((Ny, Nx))
-        result = adv(h, u, v, method="weno3", mask=mask)
+        result = adv(h, u, v, method="weno3")
         assert result.shape == (Ny, Nx)
         assert jnp.all(jnp.isfinite(result)).item()
 
@@ -410,11 +411,11 @@ class TestAdvection2DMasked:
         Ny, Nx = 10, 10
         grid = CartesianGrid2D.from_interior(Ny - 2, Nx - 2, 1.0, 1.0)
         mask = Mask2D.from_dimensions(Ny, Nx)
-        adv = Advection2D(grid=grid)
+        adv = Advection2D(grid=grid, mask=mask)
         h = jnp.ones((Ny, Nx)) * 2.0
         u = jnp.ones((Ny, Nx))
         v = jnp.ones((Ny, Nx))
-        result = adv(h, u, v, method="minmod", mask=mask)
+        result = adv(h, u, v, method="minmod")
         assert result.shape == (Ny, Nx)
         assert jnp.all(jnp.isfinite(result)).item()
 
@@ -425,11 +426,11 @@ class TestAdvection2DMasked:
         h_mask[:, 4:6] = False
         mask = Mask2D.from_mask(h_mask)
         grid = CartesianGrid2D.from_interior(Ny - 2, Nx - 2, 1.0, 1.0)
-        adv = Advection2D(grid=grid)
+        adv = Advection2D(grid=grid, mask=mask)
         h = jnp.broadcast_to(jnp.arange(Nx, dtype=float), (Ny, Nx))
         u = jnp.ones((Ny, Nx))
         v = jnp.ones((Ny, Nx))
-        result = adv(h, u, v, method="weno5", mask=mask)
+        result = adv(h, u, v, method="weno5")
         assert jnp.all(jnp.isfinite(result)).item()
 
     def test_nan_on_land_does_not_corrupt(self):
@@ -440,14 +441,14 @@ class TestAdvection2DMasked:
         h_mask[:, -1] = False
         mask = Mask2D.from_mask(h_mask)
         grid = CartesianGrid2D.from_interior(Ny - 2, Nx - 2, 1.0, 1.0)
-        adv = Advection2D(grid=grid)
+        adv = Advection2D(grid=grid, mask=mask)
         h = jnp.ones((Ny, Nx))
         # Put NaN on land columns
         h = h.at[:, 0].set(jnp.nan)
         h = h.at[:, -1].set(jnp.nan)
         u = jnp.ones((Ny, Nx))
         v = jnp.ones((Ny, Nx))
-        result = adv(h, u, v, method="weno5", mask=mask)
+        result = adv(h, u, v, method="weno5")
         # Interior wet cells should be finite
         wet_interior = result[3:-3, 3:-3]
         assert jnp.all(jnp.isfinite(wet_interior)).item()
@@ -456,25 +457,29 @@ class TestAdvection2DMasked:
         """mask=None should produce identical results to no mask."""
         Ny, Nx = 10, 10
         grid = CartesianGrid2D.from_interior(Ny - 2, Nx - 2, 1.0, 1.0)
-        adv = Advection2D(grid=grid)
+        adv_default = Advection2D(grid=grid)
+        adv_none = Advection2D(grid=grid, mask=None)
         h = jnp.ones((Ny, Nx)) * 3.0
         u = jnp.ones((Ny, Nx))
         v = jnp.ones((Ny, Nx))
-        r1 = adv(h, u, v, method="weno5")
-        r2 = adv(h, u, v, method="weno5", mask=None)
+        r1 = adv_default(h, u, v, method="weno5")
+        r2 = adv_none(h, u, v, method="weno5")
         np.testing.assert_array_equal(r1, r2)
 
-    def test_non_dispatchable_method_ignores_mask(self):
-        """Methods like weno7 should ignore the mask and use unmasked path."""
+    def test_non_dispatchable_method_with_all_ocean_matches_unmasked(self):
+        """Methods like weno7 take the unmasked code path; for an all-ocean
+        mask the post-compute ``* mask.h`` is a no-op and the output must
+        bit-match the unmasked path."""
         Ny, Nx = 14, 14
         grid = CartesianGrid2D.from_interior(Ny - 2, Nx - 2, 1.0, 1.0)
         mask = Mask2D.from_dimensions(Ny, Nx)
-        adv = Advection2D(grid=grid)
+        adv_plain = Advection2D(grid=grid)
+        adv_masked = Advection2D(grid=grid, mask=mask)
         h = jnp.ones((Ny, Nx)) * 2.0
         u = jnp.ones((Ny, Nx))
         v = jnp.ones((Ny, Nx))
-        r1 = adv(h, u, v, method="weno7")
-        r2 = adv(h, u, v, method="weno7", mask=mask)
+        r1 = adv_plain(h, u, v, method="weno7")
+        r2 = adv_masked(h, u, v, method="weno7")
         np.testing.assert_array_equal(r1, r2)
 
 
@@ -482,68 +487,70 @@ class TestAdvection2DMasked:
 
 
 class TestAdvection3DMasked:
-    """Verify Advection3D works with the mask parameter."""
+    """Verify Advection3D works with the mask class field (Mask3D)."""
 
     def test_rectangular_weno3_runs(self):
         Nz, Ny, Nx = 3, 10, 10
         grid = CartesianGrid3D.from_interior(Nx - 2, Ny - 2, Nz - 2, 1.0, 1.0, 1.0)
-        mask = Mask2D.from_dimensions(Ny, Nx)
-        adv = Advection3D(grid=grid)
+        mask = Mask3D.from_dimensions(nz=Nz, ny=Ny, nx=Nx)
+        adv = Advection3D(grid=grid, mask=mask)
         h = jnp.ones((Nz, Ny, Nx))
         u = jnp.ones((Nz, Ny, Nx))
         v = jnp.ones((Nz, Ny, Nx))
-        result = adv(h, u, v, method="weno3", mask=mask)
+        result = adv(h, u, v, method="weno3")
         assert result.shape == (Nz, Ny, Nx)
         assert jnp.all(jnp.isfinite(result)).item()
 
     def test_rectangular_weno5_runs(self):
         Nz, Ny, Nx = 3, 14, 14
         grid = CartesianGrid3D.from_interior(Nx - 2, Ny - 2, Nz - 2, 1.0, 1.0, 1.0)
-        mask = Mask2D.from_dimensions(Ny, Nx)
-        adv = Advection3D(grid=grid)
+        mask = Mask3D.from_dimensions(nz=Nz, ny=Ny, nx=Nx)
+        adv = Advection3D(grid=grid, mask=mask)
         h = jnp.ones((Nz, Ny, Nx))
         u = jnp.ones((Nz, Ny, Nx))
         v = jnp.ones((Nz, Ny, Nx))
-        result = adv(h, u, v, method="weno5", mask=mask)
+        result = adv(h, u, v, method="weno5")
         assert result.shape == (Nz, Ny, Nx)
         assert jnp.all(jnp.isfinite(result)).item()
 
     def test_rectangular_tvd_runs(self):
         Nz, Ny, Nx = 3, 10, 10
         grid = CartesianGrid3D.from_interior(Nx - 2, Ny - 2, Nz - 2, 1.0, 1.0, 1.0)
-        mask = Mask2D.from_dimensions(Ny, Nx)
-        adv = Advection3D(grid=grid)
+        mask = Mask3D.from_dimensions(nz=Nz, ny=Ny, nx=Nx)
+        adv = Advection3D(grid=grid, mask=mask)
         h = jnp.ones((Nz, Ny, Nx)) * 2.0
         u = jnp.ones((Nz, Ny, Nx))
         v = jnp.ones((Nz, Ny, Nx))
-        result = adv(h, u, v, method="minmod", mask=mask)
+        result = adv(h, u, v, method="minmod")
         assert result.shape == (Nz, Ny, Nx)
         assert jnp.all(jnp.isfinite(result)).item()
 
     def test_coastal_fallback_finite(self):
         """3D masked domain with land barrier — result must be finite."""
         Nz, Ny, Nx = 3, 10, 10
-        h_mask = np.ones((Ny, Nx), dtype=bool)
-        h_mask[:, 4:6] = False
-        mask = Mask2D.from_mask(h_mask)
+        h_mask_2d = np.ones((Ny, Nx), dtype=bool)
+        h_mask_2d[:, 4:6] = False
+        h_mask_3d = np.broadcast_to(h_mask_2d, (Nz, Ny, Nx)).copy()
+        mask = Mask3D.from_mask(h_mask_3d)
         grid = CartesianGrid3D.from_interior(Nx - 2, Ny - 2, Nz - 2, 1.0, 1.0, 1.0)
-        adv = Advection3D(grid=grid)
+        adv = Advection3D(grid=grid, mask=mask)
         h = jnp.ones((Nz, Ny, Nx))
         u = jnp.ones((Nz, Ny, Nx))
         v = jnp.ones((Nz, Ny, Nx))
-        result = adv(h, u, v, method="weno5", mask=mask)
+        result = adv(h, u, v, method="weno5")
         assert jnp.all(jnp.isfinite(result)).item()
 
     def test_mask_none_is_noop(self):
         """mask=None should produce identical results to no mask."""
         Nz, Ny, Nx = 3, 10, 10
         grid = CartesianGrid3D.from_interior(Nx - 2, Ny - 2, Nz - 2, 1.0, 1.0, 1.0)
-        adv = Advection3D(grid=grid)
+        adv_default = Advection3D(grid=grid)
+        adv_none = Advection3D(grid=grid, mask=None)
         h = jnp.ones((Nz, Ny, Nx)) * 3.0
         u = jnp.ones((Nz, Ny, Nx))
         v = jnp.ones((Nz, Ny, Nx))
-        r1 = adv(h, u, v, method="weno5")
-        r2 = adv(h, u, v, method="weno5", mask=None)
+        r1 = adv_default(h, u, v, method="weno5")
+        r2 = adv_none(h, u, v, method="weno5")
         np.testing.assert_array_equal(r1, r2)
 
 

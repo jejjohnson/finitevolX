@@ -10,7 +10,7 @@ import pytest
 jax.config.update("jax_enable_x64", True)
 
 from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
-from finitevolx._src.mask import Mask2D
+from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators.coriolis import Coriolis2D, Coriolis3D
 
 
@@ -150,7 +150,6 @@ class TestCoriolis2D:
         land column except *at* column 5, where ``mask.v[:, 5] =
         h[:, 5] AND h[:+1, 5] = F``.
         """
-        cor = Coriolis2D(grid=grid2d)
         u = jnp.ones((grid2d.Ny, grid2d.Nx))
         v = jnp.ones((grid2d.Ny, grid2d.Nx))
         f = jnp.ones((grid2d.Ny, grid2d.Nx))
@@ -160,8 +159,10 @@ class TestCoriolis2D:
         h_mask[:, 5] = False
         mask = Mask2D.from_mask(h_mask)
 
-        du_masked, dv_masked = cor(u, v, f, mask=mask)
-        du_unmasked, _ = cor(u, v, f)
+        cor = Coriolis2D(grid=grid2d, mask=mask)
+        cor_unmasked = Coriolis2D(grid=grid2d)
+        du_masked, dv_masked = cor(u, v, f)
+        du_unmasked, _ = cor_unmasked(u, v, f)
 
         # mask.u (east face) is dry at columns 4 and 5: column 4's east
         # face borders the land column 5, and column 5's east face is land.
@@ -306,39 +307,48 @@ class TestCoriolis3D:
         assert dv_cor.shape == (grid3d.Nz, grid3d.Ny, grid3d.Nx)
 
     def test_mask_zeros_land_points_3d(self, grid3d):
-        """3-D mask broadcasts over z: dry face cells are zeroed at every level.
+        """3-D mask zeros dry face cells at every z-level.
 
         Under the trailing-pad (positive half-step) convention,
-        ``mask.u[j, i] = h[j, i] AND h[j, i+1]`` (the east face of T[j, i]),
-        so a land column at index 4 zeros ``mask.u[:, 3]`` (east face of
-        column 3 borders land) and ``mask.u[:, 4]`` (east face of column 4
-        is land).  After applying the mask, ``du_cor[:, :, 3]`` and
+        ``mask.u[k, j, i] = h[k, j, i] AND h[k, j, i+1]`` (the east
+        face of ``T[k, j, i]``), so a land column at ``i=4`` zeros
+        ``mask.u[:, :, 3]`` (east face of column 3 borders land) and
+        ``mask.u[:, :, 4]`` (east face of column 4 is itself land).
+        After applying the mask, ``du_cor[:, :, 3]`` and
         ``du_cor[:, :, 4]`` must be zero at all z-levels, while an
         adjacent wet column is left unchanged.
+
+        Uses ``Mask3D`` (not a broadcast 2-D mask) per #209 Q4 —
+        Coriolis3D was promoted to take ``Mask3D`` for type-uniformity
+        with the rest of the 3-D operator suite.
         """
-        cor = Coriolis3D(grid=grid3d)
         u = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         v = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         f = jnp.ones((grid3d.Ny, grid3d.Nx))
 
-        # Land column at index 4 of an (Ny, Nx) = (8, 8) h-mask.
-        h_mask = np.ones((grid3d.Ny, grid3d.Nx), dtype=bool)
-        h_mask[:, 4] = False
-        mask = Mask2D.from_mask(h_mask)
+        # Build a 3-D mask by broadcasting the horizontal mask over z:
+        # land column at i=4 at every z-level.
+        h_mask_2d = np.ones((grid3d.Ny, grid3d.Nx), dtype=bool)
+        h_mask_2d[:, 4] = False
+        h_mask_3d = np.broadcast_to(h_mask_2d, (grid3d.Nz, grid3d.Ny, grid3d.Nx)).copy()
+        mask = Mask3D.from_mask(h_mask_3d)
 
-        du_masked, dv_masked = cor(u, v, f, mask=mask)
-        du_unmasked, _ = cor(u, v, f)
+        cor = Coriolis3D(grid=grid3d, mask=mask)
+        cor_unmasked = Coriolis3D(grid=grid3d)
+        du_masked, dv_masked = cor(u, v, f)
+        du_unmasked, _ = cor_unmasked(u, v, f)
 
-        # mask.u (east face) is dry at columns 3 and 4: column 3's east
-        # face borders land column 4, and column 4's east face is land.
+        # mask.u (east face) is dry at columns 3 and 4 at every z-level.
         for col in (3, 4):
-            assert not bool(mask.u[3, col].item()), f"mask.u[:, {col}] should be dry"
+            assert not bool(mask.u[1, 3, col].item()), (
+                f"mask.u[:, :, {col}] should be dry"
+            )
             np.testing.assert_allclose(
                 np.asarray(du_masked[:, :, col]), 0.0, atol=1e-15
             )
 
         # mask.v (north face) is dry only at column 4 (the land column).
-        assert not bool(mask.v[3, 4].item()), "mask.v[:, 4] should be dry"
+        assert not bool(mask.v[1, 3, 4].item()), "mask.v[:, :, 4] should be dry"
         np.testing.assert_allclose(np.asarray(dv_masked[:, :, 4]), 0.0, atol=1e-15)
 
         # An interior column well away from land should match the unmasked result.

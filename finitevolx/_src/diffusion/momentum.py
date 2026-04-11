@@ -26,6 +26,7 @@ import equinox as eqx
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
+from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators.difference import Difference2D
 from finitevolx._src.operators.interpolation import Interpolation2D
@@ -57,6 +58,15 @@ class MomentumAdvection2D(eqx.Module):
     ----------
     grid : CartesianGrid2D
         The underlying 2-D grid.
+    mask : Mask2D or None, optional
+        Optional land/ocean mask.  Pass-down pattern — both the internal
+        ``Difference2D`` (for ``curl`` and the kinetic-energy gradients)
+        and ``Interpolation2D`` (for the vorticity-flux averages) are
+        constructed with the same mask, so every intermediate staggered
+        field already has the correct post-compute zero.  The final
+        tendencies are additionally post-multiplied by ``mask.u`` and
+        ``mask.v`` so dry U/V faces stay exactly zero.  ``None``
+        (default) matches the pre-existing unmasked behaviour bit for bit.
 
     Examples
     --------
@@ -70,13 +80,19 @@ class MomentumAdvection2D(eqx.Module):
     """
 
     grid: CartesianGrid2D
+    mask: Mask2D | None
     diff: Difference2D
     interp: Interpolation2D
 
-    def __init__(self, grid: CartesianGrid2D) -> None:
+    def __init__(
+        self,
+        grid: CartesianGrid2D,
+        mask: Mask2D | None = None,
+    ) -> None:
         self.grid = grid
-        self.diff = Difference2D(grid=grid)
-        self.interp = Interpolation2D(grid=grid)
+        self.mask = mask
+        self.diff = Difference2D(grid=grid, mask=mask)
+        self.interp = Interpolation2D(grid=grid, mask=mask)
 
     def _kinetic_energy_gradients(
         self,
@@ -192,6 +208,9 @@ class MomentumAdvection2D(eqx.Module):
         du_adv = interior(zv_u[2:-2, 2:-2] - dK_dx[2:-2, 2:-2], u, ghost=2)
         # dv_adv[j+1/2, i] = -(zeta*u)_v - dK/dy
         dv_adv = interior(-zu_v[2:-2, 2:-2] - dK_dy[2:-2, 2:-2], v, ghost=2)
+        if self.mask is not None:
+            du_adv = du_adv * self.mask.u
+            dv_adv = dv_adv * self.mask.v
         return du_adv, dv_adv
 
 
@@ -213,6 +232,12 @@ class MomentumAdvection3D(eqx.Module):
     ----------
     grid : CartesianGrid3D
         The underlying 3-D grid.
+    mask : Mask3D or None, optional
+        Optional 3-D land/ocean mask.  Pattern A (post-compute) — the
+        inner :class:`MomentumAdvection2D` is always constructed
+        ``mask=None`` and the vmap'd 3-D result is post-multiplied by
+        ``mask.u`` / ``mask.v`` so dry U/V faces stay exactly zero at
+        every z-level.
 
     Examples
     --------
@@ -226,10 +251,17 @@ class MomentumAdvection3D(eqx.Module):
     """
 
     grid: CartesianGrid3D
+    mask: Mask3D | None
     _madv2d: MomentumAdvection2D
 
-    def __init__(self, grid: CartesianGrid3D) -> None:
+    def __init__(
+        self,
+        grid: CartesianGrid3D,
+        mask: Mask3D | None = None,
+    ) -> None:
         self.grid = grid
+        self.mask = mask
+        # Pattern A: inner 2-D op is mask-free; the 3-D wrapper owns the mask.
         self._madv2d = MomentumAdvection2D(grid=grid.horizontal_grid())
 
     def __call__(
@@ -257,7 +289,9 @@ class MomentumAdvection3D(eqx.Module):
         -------
         tuple[Float[Array, "Nz Ny Nx"], Float[Array, "Nz Ny Nx"]]
             ``(du_adv, dv_adv)`` — tendencies at U-points and V-points,
-            both zero in the ghost ring.
+            both zero in the ghost ring.  When ``self.mask`` is set, the
+            outputs are additionally zeroed at dry U/V faces via
+            ``* mask.u`` / ``* mask.v``.
 
         Raises
         ------
@@ -271,4 +305,7 @@ class MomentumAdvection3D(eqx.Module):
         # Zero z-ghost slices.
         du_adv = zero_z_ghosts(du_adv)
         dv_adv = zero_z_ghosts(dv_adv)
+        if self.mask is not None:
+            du_adv = du_adv * self.mask.u
+            dv_adv = dv_adv * self.mask.v
         return du_adv, dv_adv

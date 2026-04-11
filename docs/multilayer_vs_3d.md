@@ -41,7 +41,7 @@ any overhead.  `finitevolX` exposes this pattern through the
 import jax.numpy as jnp
 import finitevolx as fvx
 
-grid = fvx.ArakawaCGrid2D.from_interior(64, 64, 1e4, 1e4)
+grid = fvx.CartesianGrid2D.from_interior(64, 64, 1e4, 1e4)
 diff2d = fvx.Difference2D(grid=grid)
 
 nl = 3                                     # number of layers
@@ -82,7 +82,7 @@ conditions before chaining operators.  Only the interior `k = 1 … Nz-2`
 layers are written by the stencil.
 
 ```python
-grid3d = fvx.ArakawaCGrid3D.from_interior(64, 64, 10, 1e4, 1e4, 50.0)
+grid3d = fvx.CartesianGrid3D.from_interior(64, 64, 10, 1e4, 1e4, 50.0)
 diff3d = fvx.Difference3D(grid=grid3d)
 
 # h has shape [Nz, Ny, Nx]; Nz = 12 total (10 interior + 2 ghost)
@@ -119,8 +119,8 @@ import jax.numpy as jnp
 import numpy as np
 import finitevolx as fvx
 
-grid2d = fvx.ArakawaCGrid2D.from_interior(8, 8, 1.0, 1.0)
-grid3d = fvx.ArakawaCGrid3D.from_interior(8, 8, 4, 1.0, 1.0, 1.0)
+grid2d = fvx.CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
+grid3d = fvx.CartesianGrid3D.from_interior(8, 8, 4, 1.0, 1.0, 1.0)
 
 diff2d = fvx.Difference2D(grid=grid2d)
 diff3d = fvx.Difference3D(grid=grid3d)

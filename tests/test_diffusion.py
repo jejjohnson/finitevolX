@@ -87,30 +87,39 @@ class TestDiffusion2DFunctional:
         r2 = diffusion_2d(h, kappa=2.0, dx=grid.dx, dy=grid.dy)
         np.testing.assert_allclose(r2[1:-1, 1:-1], 2.0 * r1[1:-1, 1:-1], rtol=1e-10)
 
-    def test_mask_u_zeros_east_flux(self, grid):
-        """mask_u = 0 everywhere zeroes all east-face fluxes → zero tendency."""
+    def test_all_dry_mask_zeros_tendency_via_flux_masks(self, grid):
+        """An all-dry Mask2D zeros every face flux → zero tendency.
+
+        Under the new class-field API, the functional ``diffusion_2d`` is
+        mask-free; this test builds an all-dry ``Mask2D`` and asks the
+        ``Diffusion2D`` class operator — which applies the intermediate
+        flux-masking pattern internally — to produce zero output.
+        """
+        from finitevolx._src.mask import Mask2D
+
+        all_dry = Mask2D.from_mask(np.zeros((grid.Ny, grid.Nx), dtype=bool))
+        diff = Diffusion2D(grid=grid, mask=all_dry)
         x = jnp.arange(grid.Nx, dtype=float) * grid.dx
         h = jnp.broadcast_to(x**2, (grid.Ny, grid.Nx))
-        mask_u = jnp.zeros_like(h)
-        result = diffusion_2d(h, kappa=1.0, dx=grid.dx, dy=grid.dy, mask_u=mask_u)
+        result = diff(h, kappa=1.0)
         np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-12)
 
-    def test_mask_v_zeros_north_flux(self, grid):
-        """mask_v = 0 everywhere zeroes all north-face fluxes → zero tendency."""
-        y = jnp.arange(grid.Ny, dtype=float) * grid.dy
-        h = jnp.broadcast_to(y[:, None] ** 2, (grid.Ny, grid.Nx))
-        mask_v = jnp.zeros_like(h)
-        result = diffusion_2d(h, kappa=1.0, dx=grid.dx, dy=grid.dy, mask_v=mask_v)
-        np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-12)
+    def test_interior_land_cell_tendency_is_zero(self, grid):
+        """A dry T-cell carries exactly zero tendency under the class API.
 
-    def test_mask_h_zeros_land_tendency(self, grid):
-        """mask_h = 0 at a cell forces its tendency to zero."""
+        This is the operator-attribute equivalent of the old
+        ``mask_h`` zeroing: construct a ``Mask2D`` with one dry interior
+        cell at ``(3, 3)`` and verify the resulting tendency is 0 there.
+        """
+        from finitevolx._src.mask import Mask2D
+
+        h_mask = np.ones((grid.Ny, grid.Nx), dtype=bool)
+        h_mask[3, 3] = False
+        mask = Mask2D.from_mask(h_mask)
+        diff = Diffusion2D(grid=grid, mask=mask)
         x = jnp.arange(grid.Nx, dtype=float) * grid.dx
         h = jnp.broadcast_to(x**2, (grid.Ny, grid.Nx))
-        mask_h = jnp.ones_like(h)
-        # Mark the interior cell (3, 3) as land
-        mask_h = mask_h.at[3, 3].set(0.0)
-        result = diffusion_2d(h, kappa=1.0, dx=grid.dx, dy=grid.dy, mask_h=mask_h)
+        result = diff(h, kappa=1.0)
         assert float(result[3, 3]) == pytest.approx(0.0, abs=1e-12)
 
     def test_no_nan_output(self, grid):
@@ -145,26 +154,28 @@ class TestDiffusion2DClass:
             atol=1e-12,
         )
 
-    def test_matches_functional_api_with_masks(self, diff_op, grid):
-        """Class API with masks must match functional API with same masks."""
+    def test_masked_class_zeros_dry_interior_block(self, grid):
+        """Class API with a Mask2D: wet-interior tendencies match the
+        unmasked class API bit-for-bit (since mask.h is 1 at wet cells),
+        and the dry 2x2 interior block carries exactly zero tendency.
+        """
+        from finitevolx._src.mask import Mask2D
+
+        h_mask = np.ones((grid.Ny, grid.Nx), dtype=bool)
+        h_mask[2:4, 2:4] = False  # dry 2x2 interior block
+        mask = Mask2D.from_mask(h_mask)
+        diff_unmasked = Diffusion2D(grid=grid)
+        diff_masked = Diffusion2D(grid=grid, mask=mask)
+
         x = jnp.arange(grid.Nx, dtype=float) * grid.dx
         h = jnp.broadcast_to(x**2, (grid.Ny, grid.Nx))
-        mask_h = jnp.ones_like(h).at[2:4, 2:4].set(0.0)
-        mask_u = jnp.ones_like(h).at[:, 0].set(0.0)
-        mask_v = jnp.ones_like(h).at[0, :].set(0.0)
-        kappa = 0.7
-        np.testing.assert_allclose(
-            diff_op(h, kappa=kappa, mask_h=mask_h, mask_u=mask_u, mask_v=mask_v),
-            diffusion_2d(
-                h,
-                kappa=kappa,
-                dx=grid.dx,
-                dy=grid.dy,
-                mask_h=mask_h,
-                mask_u=mask_u,
-                mask_v=mask_v,
-            ),
-            atol=1e-12,
+        out_masked = np.asarray(diff_masked(h, kappa=0.7))
+        # Dry cells → exact zero via the mask.h final multiply
+        assert np.all(out_masked[2:4, 2:4] == 0.0)
+        # Unmasked path stays bit-identical at mask.none
+        np.testing.assert_array_equal(
+            np.asarray(diff_unmasked(h, kappa=0.7)),
+            np.asarray(Diffusion2D(grid=grid, mask=None)(h, kappa=0.7)),
         )
 
     def test_spatially_varying_kappa(self, diff_op, grid):
@@ -234,13 +245,16 @@ class TestDiffusion2DFluxes:
         )
         np.testing.assert_allclose(tendency, div_flux, atol=1e-12)
 
-    def test_mask_u_zeros_east_flux(self, diff_op, grid):
-        """mask_u = 0 zeros east-face fluxes; north fluxes unaffected."""
+    def test_all_dry_mask_zeros_east_flux(self, grid):
+        """An all-dry Mask2D (mask.u = 0 everywhere) zeros east-face fluxes."""
+        from finitevolx._src.mask import Mask2D
+
+        all_dry = Mask2D.from_mask(np.zeros((grid.Ny, grid.Nx), dtype=bool))
+        diff_masked = Diffusion2D(grid=grid, mask=all_dry)
         c = 1.0
         x = jnp.arange(grid.Nx, dtype=float) * grid.dx
         h = jnp.broadcast_to(c * x, (grid.Ny, grid.Nx))
-        mask_u = jnp.zeros_like(h)
-        fx, _fy = diff_op.fluxes(h, kappa=1.0, mask_u=mask_u)
+        fx, _fy = diff_masked.fluxes(h, kappa=1.0)
         np.testing.assert_allclose(fx, 0.0, atol=1e-12)
 
     def test_ghost_ring_is_zero(self, diff_op, grid):

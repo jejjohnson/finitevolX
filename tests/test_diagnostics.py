@@ -549,32 +549,39 @@ class TestPotentialVorticity:
 
 
 class TestMaskSupport:
-    def test_kinetic_energy_mask(self, grid2d):
+    """The functional diagnostic helpers are mask-free per #209.
+
+    Callers apply masks at the call site:
+    ``ke_masked = kinetic_energy(u, v) * mask``
+    These tests pin that call-site convention.
+    """
+
+    def test_kinetic_energy_masked_at_call_site(self, grid2d):
         u = 3.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
         v = 3.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
         mask = jnp.zeros((grid2d.Ny, grid2d.Nx))
-        result = kinetic_energy(u, v, mask=mask)
+        result = kinetic_energy(u, v) * mask
         np.testing.assert_allclose(result, 0.0, atol=1e-10)
 
-    def test_kinetic_energy_mask_partial(self, grid2d):
+    def test_kinetic_energy_all_ones_mask_noop(self, grid2d):
         u = 3.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
         v = 3.0 * jnp.ones((grid2d.Ny, grid2d.Nx))
         mask = jnp.ones((grid2d.Ny, grid2d.Nx))
         result_nomask = kinetic_energy(u, v)
-        result_mask = kinetic_energy(u, v, mask=mask)
+        result_mask = kinetic_energy(u, v) * mask
         np.testing.assert_allclose(result_mask, result_nomask, atol=1e-10)
 
-    def test_enstrophy_mask(self):
+    def test_enstrophy_masked_at_call_site(self):
         omega = 4.0 * jnp.ones((10, 10))
         mask = jnp.zeros((10, 10))
-        result = enstrophy(omega, mask=mask)
+        result = enstrophy(omega) * mask
         np.testing.assert_allclose(result, 0.0, atol=1e-10)
 
-    def test_potential_enstrophy_mask(self):
+    def test_potential_enstrophy_masked_at_call_site(self):
         q = 2.0 * jnp.ones((10, 10))
         h = 3.0 * jnp.ones((10, 10))
         mask = jnp.zeros((10, 10))
-        result = potential_enstrophy(q, h, mask=mask)
+        result = potential_enstrophy(q, h) * mask
         np.testing.assert_allclose(result, 0.0, atol=1e-10)
 
 
