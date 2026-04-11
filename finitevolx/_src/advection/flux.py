@@ -12,7 +12,11 @@ Typical usage::
     from finitevolx import ArakawaCGridMask, upwind_flux
     from finitevolx import Reconstruction2D, CartesianGrid2D
 
-    grid = CartesianGrid2D.from_interior(Ny, Nx, dy, dx)
+    nx_interior = 128
+    ny_interior = 64
+    Lx = 1.0
+    Ly = 1.0
+    grid = CartesianGrid2D.from_interior(nx_interior, ny_interior, Lx, Ly)
     recon = Reconstruction2D(grid=grid)
     mask = ArakawaCGridMask.from_mask(h_mask)
 
