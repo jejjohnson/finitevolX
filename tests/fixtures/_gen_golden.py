@@ -208,6 +208,13 @@ def _register_all() -> list[Entry]:
         )
     )
 
+    # ------------------------------------------------------------------
+    # Diffusion2D/3D + BiharmonicDiffusion2D/3D + MomentumAdvection2D/3D
+    # ------------------------------------------------------------------
+    entries.extend(
+        _diffusion_entries(grid2d, grid3d, mask2d, mask3d, h2d, u2d, v2d, h3d, u3d, v3d)
+    )
+
     return entries
 
 
@@ -766,6 +773,94 @@ def _spherical_entries(
             ("SphericalLaplacian2D", "__call__", "masked", lambda: sl2m(h2d)),
             ("SphericalLaplacian3D", "__call__", "unmasked", lambda: sl3(h3d)),
             ("SphericalLaplacian3D", "__call__", "masked", lambda: sl3m(h3d)),
+        ]
+    )
+
+    return entries
+
+
+def _diffusion_entries(
+    grid2d, grid3d, mask2d, mask3d, h2d, u2d, v2d, h3d, u3d, v3d
+) -> list[Entry]:
+    """Register goldens for Diffusion2D/3D, BiharmonicDiffusion2D/3D,
+    and MomentumAdvection2D/3D."""
+    from finitevolx._src.diffusion.diffusion import (
+        BiharmonicDiffusion2D,
+        BiharmonicDiffusion3D,
+        Diffusion2D,
+        Diffusion3D,
+    )
+    from finitevolx._src.diffusion.momentum import (
+        MomentumAdvection2D,
+        MomentumAdvection3D,
+    )
+
+    entries: list[Entry] = []
+
+    # --- Diffusion2D / Diffusion3D -----------------------------------
+    d2 = Diffusion2D(grid=grid2d)
+    d2m = Diffusion2D(grid=grid2d, mask=mask2d)
+    d3 = Diffusion3D(grid=grid3d)
+    d3m = Diffusion3D(grid=grid3d, mask=mask3d)
+
+    entries.extend(
+        [
+            ("Diffusion2D", "__call__", "unmasked", lambda: d2(h2d, kappa=1.0)),
+            ("Diffusion2D", "__call__", "masked", lambda: d2m(h2d, kappa=1.0)),
+            ("Diffusion2D", "fluxes", "unmasked", lambda: d2.fluxes(h2d, kappa=1.0)),
+            ("Diffusion2D", "fluxes", "masked", lambda: d2m.fluxes(h2d, kappa=1.0)),
+            ("Diffusion3D", "__call__", "unmasked", lambda: d3(h3d, kappa=1.0)),
+            ("Diffusion3D", "__call__", "masked", lambda: d3m(h3d, kappa=1.0)),
+            ("Diffusion3D", "fluxes", "unmasked", lambda: d3.fluxes(h3d, kappa=1.0)),
+            ("Diffusion3D", "fluxes", "masked", lambda: d3m.fluxes(h3d, kappa=1.0)),
+        ]
+    )
+
+    # --- BiharmonicDiffusion2D / 3D ----------------------------------
+    b2 = BiharmonicDiffusion2D(grid=grid2d)
+    b2m = BiharmonicDiffusion2D(grid=grid2d, mask=mask2d)
+    b3 = BiharmonicDiffusion3D(grid=grid3d)
+    b3m = BiharmonicDiffusion3D(grid=grid3d, mask=mask3d)
+    entries.extend(
+        [
+            (
+                "BiharmonicDiffusion2D",
+                "__call__",
+                "unmasked",
+                lambda: b2(h2d, kappa=1e-3),
+            ),
+            (
+                "BiharmonicDiffusion2D",
+                "__call__",
+                "masked",
+                lambda: b2m(h2d, kappa=1e-3),
+            ),
+            (
+                "BiharmonicDiffusion3D",
+                "__call__",
+                "unmasked",
+                lambda: b3(h3d, kappa=1e-3),
+            ),
+            (
+                "BiharmonicDiffusion3D",
+                "__call__",
+                "masked",
+                lambda: b3m(h3d, kappa=1e-3),
+            ),
+        ]
+    )
+
+    # --- MomentumAdvection2D / 3D ------------------------------------
+    m2 = MomentumAdvection2D(grid=grid2d)
+    m2m = MomentumAdvection2D(grid=grid2d, mask=mask2d)
+    m3 = MomentumAdvection3D(grid=grid3d)
+    m3m = MomentumAdvection3D(grid=grid3d, mask=mask3d)
+    entries.extend(
+        [
+            ("MomentumAdvection2D", "__call__", "unmasked", lambda: m2(u2d, v2d)),
+            ("MomentumAdvection2D", "__call__", "masked", lambda: m2m(u2d, v2d)),
+            ("MomentumAdvection3D", "__call__", "unmasked", lambda: m3(u3d, v3d)),
+            ("MomentumAdvection3D", "__call__", "masked", lambda: m3m(u3d, v3d)),
         ]
     )
 

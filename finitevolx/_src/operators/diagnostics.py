@@ -35,7 +35,6 @@ from finitevolx._src.utils.constants import GRAVITY, OMEGA, R_EARTH
 def kinetic_energy(
     u: Float[Array, "Ny Nx"],
     v: Float[Array, "Ny Nx"],
-    mask: Float[Array, "Ny Nx"] | None = None,
 ) -> Float[Array, "Ny Nx"]:
     """Kinetic energy at T-points (cell centers) on an Arakawa C-grid.
 
@@ -48,11 +47,13 @@ def kinetic_energy(
         v²_on_T[j, i] = 0.5 * (v[j+1/2, i]² + v[j-1/2, i]²)
                        = 0.5 * (v[j, i]² + v[j-1, i]²)
 
+    This is a mask-free Layer-2 functional helper per #209.  For masked
+    kinetic energy, multiply the result by your T-point mask at the call
+    site: ``ke = kinetic_energy(u, v) * mask.h``.
+
     Args:
         u (Array): x-velocity at U-points (east faces), shape [Ny, Nx].
         v (Array): y-velocity at V-points (north faces), shape [Ny, Nx].
-        mask (Array | None): optional binary mask at T-points.  If provided,
-            KE is zeroed where mask is 0.
 
     Returns:
         ke (Array): kinetic energy at T-points, shape [Ny, Nx].
@@ -68,8 +69,6 @@ def kinetic_energy(
     u2_on_T = avg_x_bwd(u2)
     v2_on_T = avg_y_bwd(v2)
     ke_int = 0.5 * (u2_on_T + v2_on_T)
-    if mask is not None:
-        ke_int = ke_int * mask[1:-1, 1:-1]
     out = interior(ke_int, u_float)
     return out
 
@@ -308,40 +307,38 @@ def okubo_weiss(
 
 def enstrophy(
     omega: Float[Array, "Ny Nx"],
-    mask: Float[Array, "Ny Nx"] | None = None,
 ) -> Float[Array, "Ny Nx"]:
     """Enstrophy (pointwise).
 
     Z = 0.5 * omega^2
 
+    Mask-free Layer-2 functional helper per #209.  For masked enstrophy,
+    multiply the result by your mask at the call site:
+    ``z = enstrophy(omega) * mask.xy_corner_strict``.
+
     Parameters
     ----------
     omega : Float[Array, "Ny Nx"]
         Relative vorticity (typically at X-points).
-    mask : Float[Array, "Ny Nx"] | None, optional
-        Binary mask.  If provided, result is zeroed where mask is 0.
 
     Returns
     -------
     Float[Array, "Ny Nx"]
         Enstrophy at the same grid points as *omega*.
     """
-    out = 0.5 * omega**2
-    if mask is not None:
-        out = out * mask
-    return out
+    return 0.5 * omega**2
 
 
 def potential_enstrophy(
     q: Float[Array, "Ny Nx"],
     h: Float[Array, "Ny Nx"],
-    mask: Float[Array, "Ny Nx"] | None = None,
 ) -> Float[Array, "Ny Nx"]:
     """Potential enstrophy (pointwise).
 
     PE = 0.5 * q^2 * h
 
-    Inputs must live on the same grid points.
+    Inputs must live on the same grid points.  Mask-free Layer-2
+    functional helper per #209; apply masks at the call site.
 
     Parameters
     ----------
@@ -349,18 +346,13 @@ def potential_enstrophy(
         Potential vorticity.
     h : Float[Array, "Ny Nx"]
         Layer thickness (or depth).
-    mask : Float[Array, "Ny Nx"] | None, optional
-        Binary mask.  If provided, result is zeroed where mask is 0.
 
     Returns
     -------
     Float[Array, "Ny Nx"]
         Potential enstrophy.
     """
-    out = 0.5 * q**2 * h
-    if mask is not None:
-        out = out * mask
-    return out
+    return 0.5 * q**2 * h
 
 
 # ======================================================================

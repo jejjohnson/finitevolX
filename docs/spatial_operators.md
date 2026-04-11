@@ -188,22 +188,25 @@ natural no-flux BCs at irregular coastlines without any additional code.
 
 ```python
 from finitevolx import Diffusion2D, BiharmonicDiffusion2D, diffusion_2d
-from finitevolx import ArakawaCGrid2D
+from finitevolx import CartesianGrid2D
 
-grid = ArakawaCGrid2D.from_interior(64, 64, 1e6, 1e6)
+grid = CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 
-# Class-based harmonic diffusion
+# Class-based harmonic diffusion (unmasked)
 diff_op = Diffusion2D(grid=grid)
 dh_dt = diff_op(h, kappa=100.0)
 
-# With masking
-dh_dt = diff_op(h, kappa=100.0, mask_h=mask.h, mask_u=mask.u, mask_v=mask.v)
+# With masking — mask is a class field, not a per-call kwarg.
+# Diffusion applies the intermediate flux-masking pattern internally
+# (flux_x *= mask.u, flux_y *= mask.v, tendency *= mask.h).
+diff_op_masked = Diffusion2D(grid=grid, mask=mask)
+dh_dt = diff_op_masked(h, kappa=100.0)
 
 # Biharmonic (scale-selective)
 biharm_op = BiharmonicDiffusion2D(grid=grid)
 dh_dt = biharm_op(h, kappa=1e9)
 
-# Functional API (no grid object)
+# Functional API (no grid object, mask-free)
 dh_dt = diffusion_2d(h, kappa=100.0, dx=grid.dx, dy=grid.dy)
 ```
 
