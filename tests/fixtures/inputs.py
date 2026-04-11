@@ -34,6 +34,10 @@ from finitevolx._src.grid.cartesian import (
     CartesianGrid2D,
     CartesianGrid3D,
 )
+from finitevolx._src.grid.spherical import (
+    SphericalGrid2D,
+    SphericalGrid3D,
+)
 from finitevolx._src.mask import Mask1D, Mask2D, Mask3D
 
 # ----------------------------------------------------------------------
@@ -72,6 +76,36 @@ def make_grid_3d() -> CartesianGrid3D:
     """Canonical 6x18x18 (4x16x16 interior) 3-D Cartesian Arakawa C-grid."""
     return CartesianGrid3D.from_interior(
         NX_INTERIOR, NY_INTERIOR, NZ_INTERIOR, LX, LY, LZ
+    )
+
+
+# Spherical grids use a small (lon, lat) box centred on the equator so
+# the canonical fixtures stay safely away from the poles — cos(lat) ≈ 1
+# throughout, so the ``_safe_div_cos`` guard never fires on smooth
+# analytic inputs.
+_SPHERICAL_LON_RANGE = (-0.1, 0.1)  # radians (~11.5 degrees)
+_SPHERICAL_LAT_RANGE = (-0.1, 0.1)
+
+
+def make_spherical_grid_2d() -> SphericalGrid2D:
+    """Canonical 18x18 2-D spherical Arakawa C-grid (near-equator)."""
+    return SphericalGrid2D.from_interior(
+        nx_interior=NX_INTERIOR,
+        ny_interior=NY_INTERIOR,
+        lon_range=_SPHERICAL_LON_RANGE,
+        lat_range=_SPHERICAL_LAT_RANGE,
+    )
+
+
+def make_spherical_grid_3d() -> SphericalGrid3D:
+    """Canonical 6x18x18 3-D spherical Arakawa C-grid (near-equator)."""
+    return SphericalGrid3D.from_interior(
+        nx_interior=NX_INTERIOR,
+        ny_interior=NY_INTERIOR,
+        nz_interior=NZ_INTERIOR,
+        lon_range=_SPHERICAL_LON_RANGE,
+        lat_range=_SPHERICAL_LAT_RANGE,
+        Lz=LZ,
     )
 
 

@@ -66,6 +66,8 @@ from tests.fixtures.inputs import (
     make_mask_2d,
     make_mask_3d,
     make_q_field_2d,
+    make_spherical_grid_2d,
+    make_spherical_grid_3d,
     make_u_field_1d,
     make_u_field_2d,
     make_u_field_3d,
@@ -164,6 +166,17 @@ def _register_all() -> list[Entry]:
     # ------------------------------------------------------------------
     entries.extend(
         _vorticity_entries(grid2d, grid3d, mask2d, mask3d, h2d, u2d, v2d, q2d, u3d, v3d)
+    )
+
+    # ------------------------------------------------------------------
+    # Spherical family (Difference / Divergence / Vorticity / Laplacian)
+    # ------------------------------------------------------------------
+    sgrid2d = make_spherical_grid_2d()
+    sgrid3d = make_spherical_grid_3d()
+    entries.extend(
+        _spherical_entries(
+            sgrid2d, sgrid3d, mask2d, mask3d, h2d, u2d, v2d, q2d, h3d, u3d, v3d
+        )
     )
 
     return entries
@@ -513,6 +526,217 @@ def _vorticity_entries(
                 "masked",
                 lambda: v3m.relative_vorticity(u3d, v3d),
             ),
+        ]
+    )
+
+    return entries
+
+
+def _spherical_entries(
+    sgrid2d, sgrid3d, mask2d, mask3d, h2d, u2d, v2d, q2d, h3d, u3d, v3d
+) -> list[Entry]:
+    """Register goldens for the full Spherical operator family."""
+    from finitevolx._src.operators.spherical_compound import (
+        SphericalDivergence2D,
+        SphericalDivergence3D,
+        SphericalLaplacian2D,
+        SphericalLaplacian3D,
+        SphericalVorticity2D,
+        SphericalVorticity3D,
+    )
+    from finitevolx._src.operators.spherical_difference import (
+        SphericalDifference2D,
+        SphericalDifference3D,
+    )
+    from tests.fixtures.inputs import make_f_field_2d
+
+    f2d = make_f_field_2d()
+    entries: list[Entry] = []
+
+    # --- SphericalDifference2D ----------------------------------------
+    sd2 = SphericalDifference2D(grid=sgrid2d)
+    sd2m = SphericalDifference2D(grid=sgrid2d, mask=mask2d)
+    sd2_specs = (
+        ("diff_lon_T_to_U", h2d),
+        ("diff_lat_T_to_V", h2d),
+        ("diff_lon_V_to_X", v2d),
+        ("diff_lat_U_to_X", u2d),
+        ("diff_lon_U_to_T", u2d),
+        ("diff_lat_V_to_T", v2d),
+        ("diff2_lon", h2d),
+        ("laplacian_merid", h2d),
+    )
+    for method, arg in sd2_specs:
+        entries.append(
+            (
+                "SphericalDifference2D",
+                method,
+                "unmasked",
+                (lambda m=method, a=arg: getattr(sd2, m)(a)),
+            )
+        )
+        entries.append(
+            (
+                "SphericalDifference2D",
+                method,
+                "masked",
+                (lambda m=method, a=arg: getattr(sd2m, m)(a)),
+            )
+        )
+
+    # --- SphericalDifference3D ----------------------------------------
+    sd3 = SphericalDifference3D(grid=sgrid3d)
+    sd3m = SphericalDifference3D(grid=sgrid3d, mask=mask3d)
+    sd3_specs = (
+        ("diff_lon_T_to_U", h3d),
+        ("diff_lat_T_to_V", h3d),
+        ("diff_lon_V_to_X", v3d),
+        ("diff_lat_U_to_X", u3d),
+        ("diff_lon_U_to_T", u3d),
+        ("diff_lat_V_to_T", v3d),
+        ("diff2_lon", h3d),
+        ("laplacian_merid", h3d),
+    )
+    for method, arg in sd3_specs:
+        entries.append(
+            (
+                "SphericalDifference3D",
+                method,
+                "unmasked",
+                (lambda m=method, a=arg: getattr(sd3, m)(a)),
+            )
+        )
+        entries.append(
+            (
+                "SphericalDifference3D",
+                method,
+                "masked",
+                (lambda m=method, a=arg: getattr(sd3m, m)(a)),
+            )
+        )
+
+    # --- SphericalDivergence2D / 3D -----------------------------------
+    sdiv2 = SphericalDivergence2D(grid=sgrid2d)
+    sdiv2m = SphericalDivergence2D(grid=sgrid2d, mask=mask2d)
+    sdiv3 = SphericalDivergence3D(grid=sgrid3d)
+    sdiv3m = SphericalDivergence3D(grid=sgrid3d, mask=mask3d)
+    entries.extend(
+        [
+            (
+                "SphericalDivergence2D",
+                "__call__",
+                "unmasked",
+                lambda: sdiv2(u2d, v2d),
+            ),
+            ("SphericalDivergence2D", "__call__", "masked", lambda: sdiv2m(u2d, v2d)),
+            (
+                "SphericalDivergence3D",
+                "__call__",
+                "unmasked",
+                lambda: sdiv3(u3d, v3d),
+            ),
+            ("SphericalDivergence3D", "__call__", "masked", lambda: sdiv3m(u3d, v3d)),
+        ]
+    )
+
+    # --- SphericalVorticity2D / 3D ------------------------------------
+    sv2 = SphericalVorticity2D(grid=sgrid2d)
+    sv2m = SphericalVorticity2D(grid=sgrid2d, mask=mask2d)
+    entries.extend(
+        [
+            (
+                "SphericalVorticity2D",
+                "relative_vorticity",
+                "unmasked",
+                lambda: sv2.relative_vorticity(u2d, v2d),
+            ),
+            (
+                "SphericalVorticity2D",
+                "relative_vorticity",
+                "masked",
+                lambda: sv2m.relative_vorticity(u2d, v2d),
+            ),
+            (
+                "SphericalVorticity2D",
+                "potential_vorticity",
+                "unmasked",
+                lambda: sv2.potential_vorticity(u2d, v2d, h2d, f2d),
+            ),
+            (
+                "SphericalVorticity2D",
+                "potential_vorticity",
+                "masked",
+                lambda: sv2m.potential_vorticity(u2d, v2d, h2d, f2d),
+            ),
+            (
+                "SphericalVorticity2D",
+                "pv_flux_energy_conserving",
+                "unmasked",
+                lambda: sv2.pv_flux_energy_conserving(q2d, u2d, v2d),
+            ),
+            (
+                "SphericalVorticity2D",
+                "pv_flux_energy_conserving",
+                "masked",
+                lambda: sv2m.pv_flux_energy_conserving(q2d, u2d, v2d),
+            ),
+            (
+                "SphericalVorticity2D",
+                "pv_flux_enstrophy_conserving",
+                "unmasked",
+                lambda: sv2.pv_flux_enstrophy_conserving(q2d, u2d, v2d),
+            ),
+            (
+                "SphericalVorticity2D",
+                "pv_flux_enstrophy_conserving",
+                "masked",
+                lambda: sv2m.pv_flux_enstrophy_conserving(q2d, u2d, v2d),
+            ),
+            (
+                "SphericalVorticity2D",
+                "pv_flux_arakawa_lamb",
+                "unmasked",
+                lambda: sv2.pv_flux_arakawa_lamb(q2d, u2d, v2d),
+            ),
+            (
+                "SphericalVorticity2D",
+                "pv_flux_arakawa_lamb",
+                "masked",
+                lambda: sv2m.pv_flux_arakawa_lamb(q2d, u2d, v2d),
+            ),
+        ]
+    )
+
+    sv3 = SphericalVorticity3D(grid=sgrid3d)
+    sv3m = SphericalVorticity3D(grid=sgrid3d, mask=mask3d)
+    entries.extend(
+        [
+            (
+                "SphericalVorticity3D",
+                "relative_vorticity",
+                "unmasked",
+                lambda: sv3.relative_vorticity(u3d, v3d),
+            ),
+            (
+                "SphericalVorticity3D",
+                "relative_vorticity",
+                "masked",
+                lambda: sv3m.relative_vorticity(u3d, v3d),
+            ),
+        ]
+    )
+
+    # --- SphericalLaplacian2D / 3D ------------------------------------
+    sl2 = SphericalLaplacian2D(grid=sgrid2d)
+    sl2m = SphericalLaplacian2D(grid=sgrid2d, mask=mask2d)
+    sl3 = SphericalLaplacian3D(grid=sgrid3d)
+    sl3m = SphericalLaplacian3D(grid=sgrid3d, mask=mask3d)
+    entries.extend(
+        [
+            ("SphericalLaplacian2D", "__call__", "unmasked", lambda: sl2(h2d)),
+            ("SphericalLaplacian2D", "__call__", "masked", lambda: sl2m(h2d)),
+            ("SphericalLaplacian3D", "__call__", "unmasked", lambda: sl3(h3d)),
+            ("SphericalLaplacian3D", "__call__", "masked", lambda: sl3m(h3d)),
         ]
     )
 
