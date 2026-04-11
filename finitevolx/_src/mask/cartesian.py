@@ -37,10 +37,10 @@ from finitevolx._src.mask.base import (
     StencilCapability3D,
 )
 from finitevolx._src.mask.utils import (
-    _dilate,
-    _h_from_pooled,
-    _make_sponge,
-    _pool_bool,
+    dilate_mask,
+    h_from_pooled,
+    make_sponge,
+    pool_bool,
 )
 
 # jaxtyping dimension variable for irregular-boundary arrays (dynamic size)
@@ -194,14 +194,14 @@ class Mask1D(eqx.Module):
         hf = h_np.astype(np.float32)
 
         # Staggered u-face: kernel (2,) → (h[i] + h[i-1]) / 2 > 3/4
-        u_np = _pool_bool(hf, kernel=(2,), threshold=3.0 / 4.0)
+        u_np = pool_bool(hf, kernel=(2,), threshold=3.0 / 4.0)
 
         # ── land / coast classification ───────────────────────────────────
         # 0 = land, 1 = coast (ocean adj. to land), 2 = near-coast, 3 = ocean
         land = ~h_np
-        land_d1 = _dilate(land)
+        land_d1 = dilate_mask(land)
         coast = h_np & land_d1
-        land_d2 = _dilate(land_d1)
+        land_d2 = dilate_mask(land_d1)
         near_coast = h_np & land_d2 & ~coast
         open_ocean = h_np & ~land_d2
 
@@ -221,7 +221,7 @@ class Mask1D(eqx.Module):
                 raise ValueError(
                     f"sponge_width must be non-negative; got {sponge_width!r}"
                 )
-            sponge_np = _make_sponge((Nx,), sponge_width)
+            sponge_np = make_sponge((Nx,), sponge_width)
 
         return cls(
             h=jnp.asarray(h_np),
@@ -269,7 +269,7 @@ class Mask1D(eqx.Module):
         """Construct from a field at u-faces, deriving the h-grid mask.
 
         ``NaN`` values are treated as dry u-faces.  The h-grid mask is
-        then inferred via :func:`_h_from_pooled` with kernel ``(2,)``.
+        then inferred via :func:`h_from_pooled` with kernel ``(2,)``.
 
         Parameters
         ----------
@@ -288,7 +288,7 @@ class Mask1D(eqx.Module):
         Mask1D
         """
         u_mask = np.isfinite(np.asarray(field))
-        h_mask = _h_from_pooled(u_mask, kernel=(2,), mode=mode)
+        h_mask = h_from_pooled(u_mask, kernel=(2,), mode=mode)
         return cls.from_mask(h_mask, sponge_width=sponge_width)
 
     @classmethod
@@ -575,13 +575,13 @@ class Mask2D(eqx.Module):
 
         # ── staggered masks ───────────────────────────────────────────────
         # u[j, i] = (h[j, i] + h[j-1, i]) / 2 > 3/4  (y-direction)
-        u_np = _pool_bool(hf, kernel=(2, 1), threshold=3.0 / 4.0)
+        u_np = pool_bool(hf, kernel=(2, 1), threshold=3.0 / 4.0)
         # v[j, i] = (h[j, i] + h[j, i-1]) / 2 > 3/4  (x-direction)
-        v_np = _pool_bool(hf, kernel=(1, 2), threshold=3.0 / 4.0)
+        v_np = pool_bool(hf, kernel=(1, 2), threshold=3.0 / 4.0)
         # xy_corner[j, i]: at least 1 of 4 SW-corner h-cells wet  (lenient)
-        xy_corner_np = _pool_bool(hf, kernel=(2, 2), threshold=1.0 / 8.0)
+        xy_corner_np = pool_bool(hf, kernel=(2, 2), threshold=1.0 / 8.0)
         # xy_corner_strict[j, i]: all 4 SW-corner h-cells wet     (strict)
-        xy_corner_strict_np = _pool_bool(hf, kernel=(2, 2), threshold=7.0 / 8.0)
+        xy_corner_strict_np = pool_bool(hf, kernel=(2, 2), threshold=7.0 / 8.0)
 
         # ── corner boundary classification ────────────────────────────────
         # For xy_corner[j, i] at SW corner of h[j, i], the 4 adjacent
@@ -621,9 +621,9 @@ class Mask2D(eqx.Module):
         # ── land / coast classification ───────────────────────────────────
         # 0 = land, 1 = coast (ocean adj. to land), 2 = near-coast, 3 = ocean
         land = ~h_np
-        land_d1 = _dilate(land)
+        land_d1 = dilate_mask(land)
         coast = h_np & land_d1  # first ring of ocean
-        land_d2 = _dilate(land_d1)
+        land_d2 = dilate_mask(land_d1)
         near_coast = h_np & land_d2 & ~coast  # second ring
         open_ocean = h_np & ~land_d2  # interior ocean
 
@@ -643,7 +643,7 @@ class Mask2D(eqx.Module):
                 raise ValueError(
                     f"sponge_width must be non-negative; got {sponge_width!r}"
                 )
-            sponge_np = _make_sponge((Ny, Nx), sponge_width)
+            sponge_np = make_sponge((Ny, Nx), sponge_width)
 
         return cls(
             h=jnp.asarray(h_np),
@@ -708,7 +708,7 @@ class Mask2D(eqx.Module):
         """Construct from a field at u-faces, deriving the h-grid mask.
 
         ``NaN`` values are treated as dry u-faces.  The h-grid mask is
-        then inferred via :func:`_h_from_pooled` with kernel ``(2, 1)``
+        then inferred via :func:`h_from_pooled` with kernel ``(2, 1)``
         and the requested ``mode``; the remaining staggered masks are
         produced by :meth:`from_mask`.
 
@@ -729,7 +729,7 @@ class Mask2D(eqx.Module):
         Mask2D
         """
         u_mask = np.isfinite(np.asarray(field))
-        h_mask = _h_from_pooled(u_mask, kernel=(2, 1), mode=mode)
+        h_mask = h_from_pooled(u_mask, kernel=(2, 1), mode=mode)
         return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
 
     @classmethod
@@ -743,7 +743,7 @@ class Mask2D(eqx.Module):
         """Construct from a field at v-faces, deriving the h-grid mask.
 
         ``NaN`` values are treated as dry v-faces.  The h-grid mask is
-        then inferred via :func:`_h_from_pooled` with kernel ``(1, 2)``
+        then inferred via :func:`h_from_pooled` with kernel ``(1, 2)``
         and the requested ``mode``.
 
         Parameters
@@ -763,7 +763,7 @@ class Mask2D(eqx.Module):
         Mask2D
         """
         v_mask = np.isfinite(np.asarray(field))
-        h_mask = _h_from_pooled(v_mask, kernel=(1, 2), mode=mode)
+        h_mask = h_from_pooled(v_mask, kernel=(1, 2), mode=mode)
         return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
 
     @classmethod
@@ -777,7 +777,7 @@ class Mask2D(eqx.Module):
         """Construct from a field at xy-corners (vertices).
 
         ``NaN`` values are treated as dry corners.  The h-grid mask is
-        then inferred via :func:`_h_from_pooled` with kernel ``(2, 2)``
+        then inferred via :func:`h_from_pooled` with kernel ``(2, 2)``
         and the requested ``mode``.  This is the natural constructor for
         vertex-stored quantities such as relative vorticity.
 
@@ -798,7 +798,7 @@ class Mask2D(eqx.Module):
         Mask2D
         """
         c_mask = np.isfinite(np.asarray(field))
-        h_mask = _h_from_pooled(c_mask, kernel=(2, 2), mode=mode)
+        h_mask = h_from_pooled(c_mask, kernel=(2, 2), mode=mode)
         return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
 
     @classmethod
@@ -1056,15 +1056,15 @@ class Mask3D(eqx.Module):
 
         # ── staggered masks ───────────────────────────────────────────────
         # u[k, j, i] = (h[k, j, i] + h[k, j-1, i]) / 2 > 3/4   (y-face)
-        u_np = _pool_bool(hf, kernel=(1, 2, 1), threshold=3.0 / 4.0)
+        u_np = pool_bool(hf, kernel=(1, 2, 1), threshold=3.0 / 4.0)
         # v[k, j, i] = (h[k, j, i] + h[k, j, i-1]) / 2 > 3/4   (x-face)
-        v_np = _pool_bool(hf, kernel=(1, 1, 2), threshold=3.0 / 4.0)
+        v_np = pool_bool(hf, kernel=(1, 1, 2), threshold=3.0 / 4.0)
         # w[k, j, i] = (h[k, j, i] + h[k-1, j, i]) / 2 > 3/4   (z-face, NEW in 3-D)
-        w_np = _pool_bool(hf, kernel=(2, 1, 1), threshold=3.0 / 4.0)
+        w_np = pool_bool(hf, kernel=(2, 1, 1), threshold=3.0 / 4.0)
         # xy_corner[k, j, i]: at least 1 of 4 SW-corner h-cells wet (lenient)
-        xy_corner_np = _pool_bool(hf, kernel=(1, 2, 2), threshold=1.0 / 8.0)
+        xy_corner_np = pool_bool(hf, kernel=(1, 2, 2), threshold=1.0 / 8.0)
         # xy_corner_strict: all 4 SW-corner h-cells wet (strict)
-        xy_corner_strict_np = _pool_bool(hf, kernel=(1, 2, 2), threshold=7.0 / 8.0)
+        xy_corner_strict_np = pool_bool(hf, kernel=(1, 2, 2), threshold=7.0 / 8.0)
 
         # ── corner boundary classification (per z-level) ──────────────────
         u_west = np.pad(u_np[:, :, :-1], ((0, 0), (0, 0), (1, 0)))  # u[k,j,i-1]
@@ -1102,9 +1102,9 @@ class Mask3D(eqx.Module):
         # ── land / coast classification (3-D 6-connected dilation) ────────
         # 0 = land, 1 = coast (ocean adj. to land), 2 = near-coast, 3 = ocean
         land = ~h_np
-        land_d1 = _dilate(land)
+        land_d1 = dilate_mask(land)
         coast = h_np & land_d1
-        land_d2 = _dilate(land_d1)
+        land_d2 = dilate_mask(land_d1)
         near_coast = h_np & land_d2 & ~coast
         open_ocean = h_np & ~land_d2
 
@@ -1124,7 +1124,7 @@ class Mask3D(eqx.Module):
                 raise ValueError(
                     f"sponge_width must be non-negative; got {sponge_width!r}"
                 )
-            sponge_np = _make_sponge((Ny, Nx), sponge_width)
+            sponge_np = make_sponge((Ny, Nx), sponge_width)
 
         return cls(
             h=jnp.asarray(h_np),
@@ -1190,7 +1190,7 @@ class Mask3D(eqx.Module):
         """Construct from a 3-D field at u-faces, deriving the h-grid mask.
 
         ``NaN`` values are treated as dry u-faces.  The h-grid mask is
-        then inferred via :func:`_h_from_pooled` with kernel
+        then inferred via :func:`h_from_pooled` with kernel
         ``(1, 2, 1)`` and the requested ``mode``.
 
         Parameters
@@ -1210,7 +1210,7 @@ class Mask3D(eqx.Module):
         Mask3D
         """
         u_mask = np.isfinite(np.asarray(field))
-        h_mask = _h_from_pooled(u_mask, kernel=(1, 2, 1), mode=mode)
+        h_mask = h_from_pooled(u_mask, kernel=(1, 2, 1), mode=mode)
         return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
 
     @classmethod
@@ -1224,7 +1224,7 @@ class Mask3D(eqx.Module):
         """Construct from a 3-D field at v-faces, deriving the h-grid mask.
 
         ``NaN`` values are treated as dry v-faces.  The h-grid mask is
-        then inferred via :func:`_h_from_pooled` with kernel
+        then inferred via :func:`h_from_pooled` with kernel
         ``(1, 1, 2)`` and the requested ``mode``.
 
         Parameters
@@ -1244,7 +1244,7 @@ class Mask3D(eqx.Module):
         Mask3D
         """
         v_mask = np.isfinite(np.asarray(field))
-        h_mask = _h_from_pooled(v_mask, kernel=(1, 1, 2), mode=mode)
+        h_mask = h_from_pooled(v_mask, kernel=(1, 1, 2), mode=mode)
         return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
 
     @classmethod
@@ -1258,7 +1258,7 @@ class Mask3D(eqx.Module):
         """Construct from a 3-D field at w-faces, deriving the h-grid mask.
 
         ``NaN`` values are treated as dry w-faces.  The h-grid mask is
-        then inferred via :func:`_h_from_pooled` with kernel
+        then inferred via :func:`h_from_pooled` with kernel
         ``(2, 1, 1)`` and the requested ``mode``.  This is the natural
         constructor for vertical-velocity fields stored at z-faces.
 
@@ -1279,7 +1279,7 @@ class Mask3D(eqx.Module):
         Mask3D
         """
         w_mask = np.isfinite(np.asarray(field))
-        h_mask = _h_from_pooled(w_mask, kernel=(2, 1, 1), mode=mode)
+        h_mask = h_from_pooled(w_mask, kernel=(2, 1, 1), mode=mode)
         return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
 
     @classmethod
@@ -1293,7 +1293,7 @@ class Mask3D(eqx.Module):
         """Construct from a 3-D field at xy-corners (vertices).
 
         ``NaN`` values are treated as dry corners.  The h-grid mask is
-        then inferred via :func:`_h_from_pooled` with kernel
+        then inferred via :func:`h_from_pooled` with kernel
         ``(1, 2, 2)`` and the requested ``mode``.  Corners in 3-D are
         per-z-level (no z-staggering on corners).
 
@@ -1314,7 +1314,7 @@ class Mask3D(eqx.Module):
         Mask3D
         """
         c_mask = np.isfinite(np.asarray(field))
-        h_mask = _h_from_pooled(c_mask, kernel=(1, 2, 2), mode=mode)
+        h_mask = h_from_pooled(c_mask, kernel=(1, 2, 2), mode=mode)
         return cls.from_mask(h_mask, sponge_width=sponge_width, k_bottom=k_bottom)
 
     @classmethod

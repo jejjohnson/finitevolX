@@ -33,8 +33,9 @@ names but no import-path changes.
 - `StencilCapability` → split into `StencilCapability1D / 2D / 3D`.
 - `_src/mask/cgrid_mask.py` → split into `_src/mask/{base,cartesian}.py`
   with TODO stubs at `_src/mask/{spherical,cylindrical}.py`.
-- New `_src/mask/utils.py` with n-D-aware helper primitives
-  (`_pool_bool`, `_dilate`, `_count_contiguous`, `_make_sponge`).
+- New `_src/mask/utils.py` with public n-D-aware mask construction
+  primitives: `pool_bool`, `h_from_pooled`, `dilate_mask`,
+  `count_contiguous`, `make_sponge`.
 
 **Mask2D field renames** (frees up `w` for the 3-D vertical face mask):
 

@@ -13,10 +13,10 @@ from finitevolx._src.mask import (
     StencilCapability3D,
 )
 from finitevolx._src.mask.utils import (
-    _count_contiguous,
-    _dilate,
-    _make_sponge,
-    _pool_bool,
+    count_contiguous,
+    dilate_mask,
+    make_sponge,
+    pool_bool,
 )
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
@@ -64,19 +64,19 @@ def island_cgrid(island_mask):
     return Mask2D.from_mask(island_mask)
 
 
-# ── _pool_bool ────────────────────────────────────────────────────────────────
+# ── pool_bool ────────────────────────────────────────────────────────────────
 
 
 class TestPoolBool:
     def test_output_shape(self):
         h = np.ones((6, 8), dtype=np.float32)
-        out = _pool_bool(h, (2, 1), 0.5)
+        out = pool_bool(h, (2, 1), 0.5)
         assert out.shape == (6, 8)
 
     def test_all_ones_kernel_2x1(self):
         # All-ones → mean = 1.0 for j≥1, but j=0 has h[j-1,i]=0 (padding)
         h = np.ones((5, 5), dtype=np.float32)
-        out = _pool_bool(h, (2, 1), 0.75)
+        out = pool_bool(h, (2, 1), 0.75)
         # Row 0: (h[0]+0)/2 = 0.5, not > 0.75
         np.testing.assert_array_equal(out[0, :], False)
         np.testing.assert_array_equal(out[1:, :], True)
@@ -84,7 +84,7 @@ class TestPoolBool:
     def test_all_ones_kernel_2x2(self):
         # psi-style: needs all 4 → row 0 or col 0 is zero-padded → False
         h = np.ones((5, 5), dtype=np.float32)
-        out = _pool_bool(h, (2, 2), 7.0 / 8.0)
+        out = pool_bool(h, (2, 2), 7.0 / 8.0)
         np.testing.assert_array_equal(out[0, :], False)
         np.testing.assert_array_equal(out[:, 0], False)
         np.testing.assert_array_equal(out[1:, 1:], True)
@@ -93,7 +93,7 @@ class TestPoolBool:
         # w-style: needs ≥1 of 4 → isolated wet cell still passes
         h = np.zeros((4, 4), dtype=np.float32)
         h[2, 2] = 1.0
-        out = _pool_bool(h, (2, 2), 1.0 / 8.0)
+        out = pool_bool(h, (2, 2), 1.0 / 8.0)
         # Cells (2,2), (2,3), (3,2), (3,3) can "see" h[2,2] → True
         assert out[2, 2]
         assert out[2, 3]
@@ -101,14 +101,14 @@ class TestPoolBool:
         assert out[3, 3]
 
 
-# ── _dilate ───────────────────────────────────────────────────────────────────
+# ── dilate_mask ───────────────────────────────────────────────────────────────────
 
 
 class TestDilate:
     def test_single_cell_4_connectivity(self):
         mask = np.zeros((5, 5), dtype=bool)
         mask[2, 2] = True
-        dilated = _dilate(mask)
+        dilated = dilate_mask(mask)
         # Centre plus 4 neighbours
         assert dilated[2, 2]
         assert dilated[1, 2]
@@ -122,56 +122,56 @@ class TestDilate:
     def test_no_wrap_around(self):
         mask = np.zeros((6, 6), dtype=bool)
         mask[0, 0] = True
-        dilated = _dilate(mask)
+        dilated = dilate_mask(mask)
         assert not dilated[0, 5]
         assert not dilated[5, 0]
 
 
-# ── _count_contiguous ─────────────────────────────────────────────────────────
+# ── count_contiguous ─────────────────────────────────────────────────────────
 
 
 class TestCountContiguous:
     def test_x_forward(self):
         # h = [1, 1, 0, 1, 1, 1]  →  x_pos = [2, 1, 0, 3, 2, 1]
         h = np.array([[True, True, False, True, True, True]])
-        result = _count_contiguous(h, axis=1, forward=True)
+        result = count_contiguous(h, axis=1, forward=True)
         np.testing.assert_array_equal(result[0], [2, 1, 0, 3, 2, 1])
 
     def test_x_backward(self):
         # h = [1, 1, 0, 1, 1, 1]  →  x_neg = [1, 2, 0, 1, 2, 3]
         h = np.array([[True, True, False, True, True, True]])
-        result = _count_contiguous(h, axis=1, forward=False)
+        result = count_contiguous(h, axis=1, forward=False)
         np.testing.assert_array_equal(result[0], [1, 2, 0, 1, 2, 3])
 
     def test_y_forward(self):
         # column [T, T, F, T, T, T]^T  →  y_pos = [2, 1, 0, 3, 2, 1]^T
         h = np.array([[True], [True], [False], [True], [True], [True]])
-        result = _count_contiguous(h, axis=0, forward=True)
+        result = count_contiguous(h, axis=0, forward=True)
         np.testing.assert_array_equal(result[:, 0], [2, 1, 0, 3, 2, 1])
 
     def test_dry_cell_is_zero(self):
         h = np.array([[True, False, True]])
-        assert _count_contiguous(h, axis=1, forward=True)[0, 1] == 0
-        assert _count_contiguous(h, axis=1, forward=False)[0, 1] == 0
+        assert count_contiguous(h, axis=1, forward=True)[0, 1] == 0
+        assert count_contiguous(h, axis=1, forward=False)[0, 1] == 0
 
 
-# ── _make_sponge ──────────────────────────────────────────────────────────────
+# ── make_sponge ──────────────────────────────────────────────────────────────
 
 
 class TestMakeSponge:
     def test_shape(self):
-        s = _make_sponge((10, 12), 3)
+        s = make_sponge((10, 12), 3)
         assert s.shape == (10, 12)
 
     def test_walls_are_zero(self):
-        s = _make_sponge((10, 10), 3)
+        s = make_sponge((10, 10), 3)
         np.testing.assert_array_equal(s[0, :], 0.0)
         np.testing.assert_array_equal(s[-1, :], 0.0)
         np.testing.assert_array_equal(s[:, 0], 0.0)
         np.testing.assert_array_equal(s[:, -1], 0.0)
 
     def test_interior_is_one(self):
-        s = _make_sponge((20, 20), 4)
+        s = make_sponge((20, 20), 4)
         np.testing.assert_allclose(s[10, 10], 1.0)
 
 
@@ -242,7 +242,7 @@ class TestGridPositionConstructors:
         # For an all-wet h, forward-pooling and inverting via permissive
         # mode should recover the all-wet mask exactly.
         h = np.ones((6, 6), dtype=bool)
-        u_field = np.where(_pool_bool(h.astype(float), (2, 1), 3.0 / 4.0), 1.0, np.nan)
+        u_field = np.where(pool_bool(h.astype(float), (2, 1), 3.0 / 4.0), 1.0, np.nan)
         m = Mask2D.from_u_face(u_field, mode="permissive")
         np.testing.assert_array_equal(np.asarray(m.h), h)
 
@@ -252,7 +252,7 @@ class TestGridPositionConstructors:
         # is lossy at isolated wet cells with no axis-aligned neighbours.
         rng = np.random.default_rng(0)
         h = rng.random((8, 8)) > 0.3  # ~70% wet
-        u_field = np.where(_pool_bool(h.astype(float), (2, 1), 3.0 / 4.0), 1.0, np.nan)
+        u_field = np.where(pool_bool(h.astype(float), (2, 1), 3.0 / 4.0), 1.0, np.nan)
         m = Mask2D.from_u_face(u_field, mode="permissive")
         h_inferred = np.asarray(m.h)
         # h_inferred ⊆ h: no false-wet cells.
@@ -270,14 +270,14 @@ class TestGridPositionConstructors:
 
     def test_from_v_face_all_ocean_round_trip(self):
         h = np.ones((6, 6), dtype=bool)
-        v_field = np.where(_pool_bool(h.astype(float), (1, 2), 3.0 / 4.0), 1.0, np.nan)
+        v_field = np.where(pool_bool(h.astype(float), (1, 2), 3.0 / 4.0), 1.0, np.nan)
         m = Mask2D.from_v_face(v_field, mode="permissive")
         np.testing.assert_array_equal(np.asarray(m.h), h)
 
     def test_from_v_face_subset_property(self):
         rng = np.random.default_rng(2)
         h = rng.random((8, 8)) > 0.3
-        v_field = np.where(_pool_bool(h.astype(float), (1, 2), 3.0 / 4.0), 1.0, np.nan)
+        v_field = np.where(pool_bool(h.astype(float), (1, 2), 3.0 / 4.0), 1.0, np.nan)
         m = Mask2D.from_v_face(v_field, mode="permissive")
         h_inferred = np.asarray(m.h)
         assert bool(np.all(h | ~h_inferred))
@@ -773,7 +773,7 @@ class TestClassificationGeometry:
         assert np.all(h[coast])
         # Every coast cell must touch land (4-connected)
         land = ~h
-        dilated_land = _dilate(land)
+        dilated_land = dilate_mask(land)
         assert np.all(dilated_land[coast])
 
     def test_near_coast_not_adjacent_to_land(self):
@@ -784,11 +784,11 @@ class TestClassificationGeometry:
         cls = np.asarray(m.classification)
         near_coast = cls == 2
         land = ~h
-        dilated_land = _dilate(land)
+        dilated_land = dilate_mask(land)
         # Near-coast should NOT be in the first dilation ring
-        assert not np.any(near_coast & dilated_land & ~_dilate(dilated_land))
+        assert not np.any(near_coast & dilated_land & ~dilate_mask(dilated_land))
         # But should be in the second ring
-        dilated_land_2 = _dilate(dilated_land)
+        dilated_land_2 = dilate_mask(dilated_land)
         assert np.all(dilated_land_2[near_coast])
 
     def test_open_ocean_far_from_land(self):
@@ -799,7 +799,7 @@ class TestClassificationGeometry:
         cls = np.asarray(m.classification)
         ocean = cls == 3
         land = ~h
-        dilated_2 = _dilate(_dilate(land))
+        dilated_2 = dilate_mask(dilate_mask(land))
         # Open ocean must NOT overlap with 2-dilation of land
         assert not np.any(ocean & dilated_2)
 

@@ -18,7 +18,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Bool, Int
 import numpy as np
 
-from finitevolx._src.mask.utils import _count_contiguous
+from finitevolx._src.mask.utils import count_contiguous
 
 
 class StencilCapability1D(eqx.Module):
@@ -52,8 +52,8 @@ class StencilCapability1D(eqx.Module):
         """
         h_np = np.asarray(h, dtype=bool)
         return cls(
-            x_pos=jnp.asarray(_count_contiguous(h_np, axis=0, forward=True)),
-            x_neg=jnp.asarray(_count_contiguous(h_np, axis=0, forward=False)),
+            x_pos=jnp.asarray(count_contiguous(h_np, axis=0, forward=True)),
+            x_neg=jnp.asarray(count_contiguous(h_np, axis=0, forward=False)),
         )
 
 
@@ -98,10 +98,10 @@ class StencilCapability2D(eqx.Module):
         """
         h_np = np.asarray(h, dtype=bool)
         return cls(
-            x_pos=jnp.asarray(_count_contiguous(h_np, axis=1, forward=True)),
-            x_neg=jnp.asarray(_count_contiguous(h_np, axis=1, forward=False)),
-            y_pos=jnp.asarray(_count_contiguous(h_np, axis=0, forward=True)),
-            y_neg=jnp.asarray(_count_contiguous(h_np, axis=0, forward=False)),
+            x_pos=jnp.asarray(count_contiguous(h_np, axis=1, forward=True)),
+            x_neg=jnp.asarray(count_contiguous(h_np, axis=1, forward=False)),
+            y_pos=jnp.asarray(count_contiguous(h_np, axis=0, forward=True)),
+            y_neg=jnp.asarray(count_contiguous(h_np, axis=0, forward=False)),
         )
 
 
@@ -149,10 +149,10 @@ class StencilCapability3D(eqx.Module):
         """
         h_np = np.asarray(h, dtype=bool)
         return cls(
-            x_pos=jnp.asarray(_count_contiguous(h_np, axis=2, forward=True)),
-            x_neg=jnp.asarray(_count_contiguous(h_np, axis=2, forward=False)),
-            y_pos=jnp.asarray(_count_contiguous(h_np, axis=1, forward=True)),
-            y_neg=jnp.asarray(_count_contiguous(h_np, axis=1, forward=False)),
-            z_pos=jnp.asarray(_count_contiguous(h_np, axis=0, forward=True)),
-            z_neg=jnp.asarray(_count_contiguous(h_np, axis=0, forward=False)),
+            x_pos=jnp.asarray(count_contiguous(h_np, axis=2, forward=True)),
+            x_neg=jnp.asarray(count_contiguous(h_np, axis=2, forward=False)),
+            y_pos=jnp.asarray(count_contiguous(h_np, axis=1, forward=True)),
+            y_neg=jnp.asarray(count_contiguous(h_np, axis=1, forward=False)),
+            z_pos=jnp.asarray(count_contiguous(h_np, axis=0, forward=True)),
+            z_neg=jnp.asarray(count_contiguous(h_np, axis=0, forward=False)),
         )
