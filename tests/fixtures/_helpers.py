@@ -53,15 +53,30 @@ def assert_matches_golden(
     variant: str = "masked",
     *,
     rtol: float = 1e-12,
-    atol: float = 0.0,
+    atol: float = 1e-14,
 ) -> None:
     """Assert that an operator output matches its committed golden file.
 
     Single-output (``actual`` is an array) and multi-output (``actual``
-    is a tuple of arrays) operators are both supported.  The default
-    tolerances are exact: golden tests should be deterministic up to
-    floating-point reproducibility on a single machine.  Pass ``rtol``
-    or ``atol`` only if you have a documented reason for the loosening.
+    is a tuple of arrays) operators are both supported.
+
+    Default tolerances:
+
+    * ``rtol = 1e-12`` — catches drift at the 12th significant digit
+      for values of magnitude O(1).
+    * ``atol = 1e-14`` — slack for values near zero where ``rtol`` is
+      meaningless.  This is the practical limit of cross-platform
+      reproducibility: x64 (Linux runners, dev box) and arm64 (macOS
+      CI runners) reorder floating-point operations differently — FMA
+      availability, SIMD width, summation order — and the resulting
+      ULP-level noise at near-zero values would otherwise fail an
+      ``atol=0`` exact-match.  ``1e-14`` is two orders of magnitude
+      tighter than ``rtol`` and three orders looser than f64 machine
+      epsilon, so it catches genuine math drift while tolerating
+      reordering noise.
+
+    Pass ``rtol`` or ``atol`` explicitly only if a specific operator
+    needs a tighter or looser bound.
     """
     golden = load_golden(operator, method, variant)
     if isinstance(actual, tuple):
