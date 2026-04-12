@@ -1,458 +1,554 @@
-# Inhomogeneous Boundary Conditions in finitevolX: Future API Design
+# Unified Boundary Conditions in finitevolX: Design Document
 
-This document proposes a layered API for **inhomogeneous (non-zero) Dirichlet
-boundary conditions** on finitevolX's elliptic solvers, responding to
-[jejjohnson/finitevolX#186](https://github.com/jejjohnson/finitevolX/issues/186).
+This document proposes a **unified boundary condition system** for finitevolX
+that works across time-stepping, direct state application, and elliptic
+solvers — with first-class support for **known values** at any cell (outer
+boundaries, island coasts, and sparse interior observations).
+
+Responds to [jejjohnson/finitevolX#186](https://github.com/jejjohnson/finitevolX/issues/186).
 
 **Companion document:** [inhomogeneous_bcs_current.md](./inhomogeneous_bcs_current.md)
-describes the current state and the manual lifting trick.
+describes the current state and the manual lifting-trick workaround.
 
 ---
 
 ## 1. Goal
 
-Support solving $(A - \lambda)\psi = f$ with $\psi = g$ on the boundary
-($g \neq 0$), where:
+A unified boundary condition system for finitevolX that:
 
-- The solution is **JIT-compilable** and **vmap-compatible** (including
-  time-varying $g$).
-- It **composes with all four solver methods**: spectral, CG, capacitance,
-  and multigrid.
-- It causes **zero behavior change** for existing call sites that don't pass
-  boundary data.
-- It **bridges** the existing `Dirichlet1D` / `BoundaryConditionSet`
-  vocabulary from the time-stepping BC layer to the elliptic solver layer.
-
----
-
-## 2. Design Principles
-
-1. **Reuse, don't reinvent.**  The `Dirichlet1D`, `BoundaryConditionSet`, and
-   `masked_laplacian` APIs already exist.  The new code should call them,
-   not duplicate their logic.
-
-2. **The lifting trick is the implementation, not the API.**  Users should
-   never write `binary_dilation` or manually compute the corrected RHS.
-   That logic is encapsulated behind a single entry point.
-
-3. **JAX-native throughout.**  Replace the SciPy `binary_dilation` from the
-   demo notebook with a JAX-native one-cell dilation (XOR of mask shifts),
-   so the entire path is JIT-friendly without a NumPy round-trip.
-
-4. **One implementation, three layers of API.**  The lifting logic is written
-   once (Layer 1, a pure function).  Layers 2 and 3 are thin wrappers that
-   call Layer 1.
-
-5. **Additive, not breaking.**  All new parameters have default `None`, so
-   existing call sites remain unchanged.
+- **Works everywhere** — time-stepping (ghost-cell updates), direct state
+  application, and elliptic solvers, all through the same BC object.
+- **Carries domain geometry** — the `BoundaryConditionSet` owns a `Mask2D`,
+  so solvers don't need a separate mask argument.
+- **Supports known values at any cell** — outer boundaries, island coasts
+  (auto-derived from mask topology), and sparse interior observations
+  (user-supplied `known_mask`).
+- **Is JIT-compilable and vmap-compatible**, including time-varying known
+  values.
+- **Causes zero breakage** for existing call sites — all new fields default
+  to `None`.
 
 ---
 
-## 3. Recommended Design: Three Layers
+## 2. Unified BC and BCSet Design
 
-### Layer 1 -- Pure Function: `apply_inhomogeneous_bc`
+### 2.1 BC Atoms (unchanged)
 
-The foundation.  A composable pure function that performs the lifting trick
-and returns the corrected RHS + lift array.
+The existing 9 atom types in `bc_1d.py` remain as-is.  They are face-level
+building blocks with no mask awareness:
 
 ```python
-from finitevolx import apply_inhomogeneous_bc
+# These stay exactly the same
+Dirichlet1D(face="south", value=0.0)
+Neumann1D(face="west", value=0.0)
+Robin1D(face="north", alpha=1.0, beta=0.5, gamma=0.0)
+Periodic1D(face="east")
+# ... plus Outflow1D, Reflective1D, Sponge1D, Extrapolation1D, Slip1D
+```
 
-rhs_corrected, psi_lift = apply_inhomogeneous_bc(
-    rhs=rhs,
-    bc_values=g,          # (Ny, Nx) array; only dry-boundary values matter
-    mask=mask,            # (Ny, Nx) binary mask (1=wet, 0=dry)
-    dx=dx, dy=dy,
-    lambda_=0.0,
+No mask on individual atoms — they describe *what kind* of condition applies
+on a face, not *where* the domain is.
+
+### 2.2 BoundaryConditionSet (evolved)
+
+The existing `BoundaryConditionSet` (`bc_set.py`) gains three new optional
+fields:
+
+```python
+class BoundaryConditionSet(eqx.Module):
+    # --- Existing fields (unchanged) ---
+    south: BoundaryCondition1D | None = None
+    north: BoundaryCondition1D | None = None
+    west: BoundaryCondition1D | None = None
+    east: BoundaryCondition1D | None = None
+
+    # --- NEW fields ---
+    mask: Mask2D | Float[Array, "Ny Nx"] | None = None
+    known_values: Float[Array, "Ny Nx"] | None = None
+    known_mask: Bool[Array, "Ny Nx"] | None = None
+```
+
+All new fields default to `None`, so every existing call site continues to
+work unchanged.
+
+#### Mask ownership
+
+- The BCSet owns a `Mask2D` (or raw float array).
+- When a `Mask2D` is provided, each atom can extract the correct staggering
+  internally (h/u/v/q) — the atom knows its face, the `Mask2D` knows the
+  geometry.
+- Solver operators read the mask from the BCSet — the user doesn't pass it
+  separately.
+- `mask=None` for simple rectangular domains (backward compatible).
+
+#### Known values
+
+- `known_values`: `(Ny, Nx)` array of prescribed values.  Only cells
+  identified as "known" are read; values at other cells are ignored.
+- `known_mask`: `(Ny, Nx)` boolean array marking **explicit** known-value
+  locations (e.g., sparse observations at interior wet cells).
+- Both are optional.  When absent, behavior is identical to today.
+
+#### Auto-derive + merge
+
+The set of "known cells" is computed by combining two sources:
+
+```
+# 1. Auto-derive boundary cells from mask topology
+#    (outer boundary ring + island coast rings)
+boundary_cells = _dilate(wet_mask) & ~wet_mask
+
+# 2. Merge with explicit known_mask (sparse obs, etc.)
+if known_mask is not None:
+    all_known = boundary_cells | known_mask
+else:
+    all_known = boundary_cells
+```
+
+This handles three scenarios transparently:
+
+```
+Scenario 1: Simple basin         Scenario 2: Basin + island      Scenario 3: + sparse observations
+
+0 0 0 0 0 0 0 0                  0 0 0 0 0 0 0 0                 0 0 0 0 0 0 0 0
+0 . . . . . . 0                  0 . . . . . . 0                 0 . . . . . . 0
+0 . . . . . . 0                  0 . . 0 0 . . 0                 0 . . . . . . 0
+0 . . . . . . 0                  0 . . 0 0 . . 0                 0 . X . . X . 0
+0 . . . . . . 0                  0 . . . . . . 0                 0 . . . . . . 0
+0 . . . . . . 0                  0 . . . . . . 0                 0 . . . X . . 0
+0 0 0 0 0 0 0 0                  0 0 0 0 0 0 0 0                 0 0 0 0 0 0 0 0
+
+0 = land (dry)                   0 = land (dry + island)          X = observation (known interior)
+. = ocean (wet, solve here)      . = ocean (wet, solve here)      . = ocean (wet, solve here)
+
+known_mask: not needed           known_mask: not needed           known_mask: marks X cells
+Auto-derive finds outer ring     Auto-derive finds outer +        Auto-derive + merge with
+                                 island rings                     user-supplied known_mask
+```
+
+In all three cases, the solver:
+1. Identifies all known cells (boundary ring + explicit `known_mask`)
+2. Places `known_values` at those cells (the "lift")
+3. Shrinks the solve domain: `effective_solve_mask = wet & ~all_known`
+4. Corrects the RHS and solves the homogeneous problem on the reduced domain
+
+#### Unified interface
+
+```python
+bc = BoundaryConditionSet(
+    mask=cgrid_mask,
+    south=Dirichlet1D("south", value=0.0),
+    north=Dirichlet1D("north", value=0.1),
+    west=Neumann1D("west", value=0.0),
+    east=Dirichlet1D("east", value=0.05),
+    known_values=obs_field,       # optional: (Ny, Nx) prescribed values
+    known_mask=obs_locations,     # optional: (Ny, Nx) where obs apply
 )
 
-# Solve with ANY solver (spectral, CG, capacitance, multigrid)
+# Time-stepping: apply ghost cells as before
+state = bc(state, dx, dy)
+
+# Elliptic solver: mask + known values extracted from bc
+psi = fvx.streamfunction_from_vorticity(zeta, dx, dy, bc=bc)
+```
+
+#### Factory methods (extended)
+
+```python
+# Existing factories still work
+BoundaryConditionSet.periodic()
+BoundaryConditionSet.open()
+
+# New: closed basin with mask
+BoundaryConditionSet.closed(mask=cgrid_mask)
+# → Dirichlet(value=0) on all four faces, mask attached
+```
+
+### 2.3 FieldBCSet (minimal change)
+
+No structural change.  It dispatches per-field `BoundaryConditionSet` as
+before.  Each BCSet in the map can now carry its own mask + known values:
+
+```python
+field_bcs = FieldBCSet(
+    bc_map={
+        "psi": BoundaryConditionSet(mask=mask, south=..., known_values=obs_psi),
+        "eta": BoundaryConditionSet(mask=mask, south=..., known_values=obs_eta),
+    },
+)
+```
+
+---
+
+## 3. Design Principles
+
+1. **Unified vocabulary** — one BC object for time-stepping and solvers.
+   Users write `BoundaryConditionSet(...)` once and use it everywhere.
+
+2. **BCSet owns the mask** — solvers extract it from the BC object; users
+   don't pass the mask separately.
+
+3. **known_values generalizes boundary data** — outer boundary ring, island
+   coasts, and sparse interior observations all flow through the same
+   mechanism.
+
+4. **Auto-derive + merge** — boundary cells are computed from mask topology
+   (JAX-native dilation); merged with any explicit `known_mask`.
+
+5. **The lifting trick is the implementation, not the API** — users never
+   write `binary_dilation` or manually compute corrected RHS.
+
+6. **JAX-native throughout** — no SciPy in the hot path.  The dilation uses
+   `jnp.roll` + boolean OR (~4 rolls).
+
+7. **Additive, not breaking** — all new fields default to `None`.  Every
+   existing call site continues to work unchanged.
+
+---
+
+## 4. Solver Integration: Three Layers
+
+### Layer 1 — Pure Function: `apply_known_values`
+
+The foundation.  A composable pure function that performs the generalized
+lifting trick.  Accepts all parameters explicitly (maximum composability for
+power users who want to bring their own solver).
+
+```python
+from finitevolx import apply_known_values
+
+rhs_corrected, value_lift = apply_known_values(
+    rhs=rhs,
+    known_values=obs_field,     # (Ny, Nx) prescribed values
+    mask=mask,                  # (Ny, Nx) wet/dry mask
+    dx=dx, dy=dy,
+    lambda_=0.0,
+    known_mask=obs_locations,   # optional: explicit obs cells
+)
+
+# Solve with ANY solver
 psi_hom = my_solver(rhs_corrected)
 
 # Reconstruct
-psi = psi_lift + psi_hom
+psi = value_lift + psi_hom
 ```
 
 **What it does internally:**
 
 ```
-1. Compute dry boundary ring (JAX-native dilation):
+1. Auto-derive boundary ring from mask (JAX-native dilation):
    wet = mask > 0.5
-   dilated = wet | roll(wet, +1, axis=0) | roll(wet, -1, axis=0)
-                  | roll(wet, +1, axis=1) | roll(wet, -1, axis=1)
-   dry_boundary = dilated & ~wet
+   dilated = wet | roll(wet, +1, 0) | roll(wet, -1, 0)
+                  | roll(wet, +1, 1) | roll(wet, -1, 1)
+   boundary_cells = dilated & ~wet
 
-2. Build lift:
-   psi_lift = jnp.where(dry_boundary, bc_values, 0.0)
+2. Merge with explicit known_mask:
+   all_known = boundary_cells | known_mask   (if known_mask given)
+   all_known = boundary_cells                (otherwise)
 
-3. Correct RHS:
-   A_lift = masked_laplacian(psi_lift, mask, dx, dy, lambda_)
+3. Build lift:
+   value_lift = jnp.where(all_known, known_values, 0.0)
+
+4. Compute effective solve mask:
+   effective_solve_mask = wet & ~all_known
+
+5. Correct RHS:
+   A_lift = masked_laplacian(value_lift, effective_solve_mask, dx, dy, lambda_)
    rhs_corrected = rhs - A_lift
 
-4. Return (rhs_corrected, psi_lift)
+6. Return (rhs_corrected, value_lift)
 ```
-
-**Key design choices:**
-
-- Returns **both** `rhs_corrected` and `psi_lift` so the caller can
-  reconstruct the full solution.  Returning only the corrected RHS would
-  force users to recompute the lift to add it back.
-- Accepts a full `(Ny, Nx)` array for `bc_values`, not just boundary
-  slices.  Interior values are ignored (masked out by `dry_boundary`).
-  This is simpler and more flexible -- users can pass a full reanalysis
-  field without extracting boundary cells.
-- Uses `masked_laplacian` (`iterative.py:144-191`) for the
-  $A\psi_{\text{lift}}$ step.  No new operator.
-- The JAX-native dilation replaces `scipy.ndimage.binary_dilation`, making
-  the function JIT-compilable.  The mask is static (shape doesn't change),
-  so the dilation is cheap.
-
-**Proposed location:** `finitevolx/_src/solvers/inhomogeneous.py` (new file),
-re-exported from `finitevolx/_src/solvers/elliptic.py` and
-`finitevolx/__init__.py`.
 
 **Signature:**
 
 ```python
-def apply_inhomogeneous_bc(
+def apply_known_values(
     rhs: Float[Array, "Ny Nx"],
-    bc_values: Float[Array, "Ny Nx"],
+    known_values: Float[Array, "Ny Nx"],
     mask: Float[Array, "Ny Nx"] | Mask2D,
     dx: float,
     dy: float,
     lambda_: float = 0.0,
+    known_mask: Bool[Array, "Ny Nx"] | None = None,
 ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
-    """Correct RHS for inhomogeneous Dirichlet BCs via the lifting trick.
+    """Correct RHS for known values via the generalized lifting trick.
 
     Parameters
     ----------
     rhs : (Ny, Nx) array
-        Original right-hand side (should be zero at dry cells).
-    bc_values : (Ny, Nx) array
-        Prescribed boundary values.  Only values at dry cells adjacent
-        to the wet domain are used; interior values are ignored.
+        Original right-hand side.
+    known_values : (Ny, Nx) array
+        Prescribed values.  Only cells identified as "known" (boundary
+        ring from mask topology + explicit known_mask) are used.
     mask : (Ny, Nx) array or Mask2D
         Binary wet/dry mask (1=wet, 0=dry).
     dx, dy : float
         Grid spacings.
     lambda_ : float
         Helmholtz parameter.
+    known_mask : (Ny, Nx) bool array or None
+        Explicit known-value locations (e.g., sparse observations at
+        interior wet cells).  Merged with auto-derived boundary ring.
 
     Returns
     -------
     rhs_corrected : (Ny, Nx) array
-        Corrected RHS for the homogeneous problem.
-    psi_lift : (Ny, Nx) array
-        Lifting function -- add to homogeneous solution to get full solution.
+        Corrected RHS for the reduced homogeneous problem.
+    value_lift : (Ny, Nx) array
+        Lifting function — add to homogeneous solution to get full solution.
     """
 ```
 
+**Proposed location:** `finitevolx/_src/solvers/inhomogeneous.py` (new file),
+re-exported from `finitevolx/__init__.py`.
+
 ---
 
-### Layer 2 -- `bc_values=` kwarg on Convenience Wrappers
+### Layer 2 — Convenience Wrappers: `known_values` / `known_mask` kwargs
 
-The one-line API for common cases.  Adds an optional `bc_values` parameter to
-the existing `streamfunction_from_vorticity`, `pressure_from_divergence`, and
-`pv_inversion` wrappers.
+Adds optional parameters to the existing `streamfunction_from_vorticity`,
+`pressure_from_divergence`, and `pv_inversion` wrappers.
 
 ```python
 # Current API (unchanged, homogeneous only)
 psi = fvx.streamfunction_from_vorticity(zeta, dx, dy, bc="dst")
 
-# New: pass boundary values directly
+# New: pass known values directly
 psi = fvx.streamfunction_from_vorticity(
     zeta, dx, dy,
     bc="dst",
-    bc_values=g,       # NEW kwarg
-    mask=mask,         # required when bc_values is given
+    known_values=g,           # NEW
+    known_mask=obs_mask,      # NEW, optional
+    mask=mask,
 )
 
-# Same for pressure
+# Pressure
 p = fvx.pressure_from_divergence(
     div_u, dx, dy,
     bc="dct",
-    bc_values=p_boundary,
+    known_values=p_boundary,
     mask=mask,
 )
 
-# Same for PV inversion (per-layer broadcast)
+# PV inversion (per-layer broadcast)
 psi = fvx.pv_inversion(
     pv, dx, dy,
     lambda_=lambdas,
-    bc_values=psi_boundary,
+    known_values=psi_boundary,
     mask=mask,
 )
 ```
 
-**Internal flow when `bc_values` is not None:**
+**Internal flow when `known_values` is not None:**
 
 ```
-1. Call apply_inhomogeneous_bc(rhs, bc_values, mask, dx, dy, lambda_)
-      → (rhs_corrected, psi_lift)
-2. Dispatch rhs_corrected through existing _solve_dispatch(...)
+1. apply_known_values(rhs, known_values, mask, dx, dy, lambda_, known_mask)
+      → (rhs_corrected, value_lift)
+2. _solve_dispatch(rhs_corrected, ...) on effective_solve_mask
       → psi_hom
-3. Return psi_lift + psi_hom
+3. Return value_lift + psi_hom
 ```
 
-**When `bc_values is None`:** the wrapper takes the existing fast path.
-Zero behavior change for all current call sites.
+**When `known_values is None`:** existing fast path.  Zero behavior change.
 
-**Changes to `elliptic.py`:**
+**Multi-layer PV inversion:** the lift depends on `lambda_` (via
+`masked_laplacian`), so each layer gets its own corrected RHS.  The
+implementation vmaps `apply_known_values` alongside the solve, matching
+the existing vmap pattern in `elliptic.py:437-542`.
 
-- Add `bc_values: Float[Array, "Ny Nx"] | None = None` to the signature of
-  `streamfunction_from_vorticity`, `pressure_from_divergence`, and
-  `pv_inversion`.
-- Add `bc_values` to `_solve_dispatch` (or wrap the dispatch call).
-- For `pv_inversion` with array `lambda_`: the lift must be vmapped over
-  layers the same way the solve is vmapped today (`elliptic.py:437-542`).
-  Since the lift depends on `lambda_` (the Helmholtz parameter appears in
-  `masked_laplacian`), each layer gets its own corrected RHS.
+- `known_values` shape `(Ny, Nx)` → broadcast to all layers.
+- `known_values` shape `(nl, Ny, Nx)` → per-layer known values.
 
-**Spectral path on rectangular domains:**
-
-When the user passes `bc_values` with `method="spectral"` and no mask:
-
-- Synthesise a trivial all-wet mask whose dry-boundary ring is the outer
-  ghost frame.
-- Apply the standard lifting trick.
-- Pass the corrected RHS to the spectral solver (which still uses DST/DCT
-  internally and sees a homogeneous problem).
-
-Alternatively, the spectral path could use the already-exported
-`modify_rhs_2d` from `spectraldiffx` to encode the inhomogeneous data
-directly in the transform coefficients.  Both approaches are mathematically
-equivalent; the lifting trick via `masked_laplacian` is more uniform across
-solver methods.
+**Spectral path on rectangular domains:** when the user passes
+`known_values` with `method="spectral"` and no mask, synthesise a trivial
+all-wet mask whose dry-boundary ring is the outer ghost frame.
 
 ---
 
-### Layer 3 -- Bridge to the Existing BC Vocabulary
+### Layer 3 — BCSet Passthrough (unified)
 
-Accept a `BoundaryConditionSet` of `Dirichlet1D` atoms wherever `bc_values`
-is accepted, in addition to a raw array.
+The primary user-facing API.  Pass a `BoundaryConditionSet` directly to
+any solver — the mask, known values, and face BCs are all read from it.
 
 ```python
 from finitevolx import BoundaryConditionSet, Dirichlet1D
 
-# User already writes this for time-stepping:
 bc = BoundaryConditionSet(
-    south=Dirichlet1D(face="south", value=0.0),
-    north=Dirichlet1D(face="north", value=0.1),
-    west=Dirichlet1D(face="west",  value=0.05),
-    east=Dirichlet1D(face="east",  value=0.05),
+    mask=cgrid_mask,
+    south=Dirichlet1D("south", value=0.0),
+    north=Dirichlet1D("north", value=0.1),
+    west=Dirichlet1D("west", value=0.05),
+    east=Dirichlet1D("east", value=0.05),
+    known_values=obs_field,       # optional
+    known_mask=obs_locations,     # optional
 )
 
-# Now the SAME object can drive the elliptic solve:
-psi = fvx.streamfunction_from_vorticity(
-    zeta, dx, dy,
-    bc=bc,           # replaces both the string "dst" AND bc_values
-    mask=mask,
-)
+# One object drives everything:
+state = bc(state, dx, dy)                                     # time-stepping
+psi = fvx.streamfunction_from_vorticity(zeta, dx, dy, bc=bc)  # solver
+p = fvx.pressure_from_divergence(div_u, dx, dy, bc=bc)        # solver
 ```
 
-**Internal conversion:**
+**Internal conversion when `bc` is a `BoundaryConditionSet`:**
 
-When `bc` is a `BoundaryConditionSet` (instead of a string):
+1. Extract `mask` from `bc.mask`.
+2. If the BCSet has per-face `Dirichlet1D` atoms with non-zero values,
+   expand them into a `(Ny, Nx)` array (values at the ghost ring, zero in
+   the interior).
+3. Merge with `bc.known_values` / `bc.known_mask`.
+4. Determine the BC type for the spectral dispatch:
+   - All faces `Dirichlet1D` → `"dst"`
+   - All faces `Neumann1D` → `"dct"`
+   - All faces `Periodic1D` → `"fft"`
+5. Call Layer 1 (`apply_known_values`) with the merged data.
 
-1. Extract the per-face `Dirichlet1D.value` scalars (or 1-D arrays, for
-   spatially-varying data -- see "Future Extensions" below).
-2. Build a `(Ny, Nx)` array with the Dirichlet values at the ghost ring
-   and zero in the interior.
-3. Call Layer 1 (`apply_inhomogeneous_bc`) with this array.
+**Fast-path detection:** if all Dirichlet values are zero, no `known_values`,
+and no `known_mask` → take the existing spectral fast path (no mask needed).
 
-If all four values are zero, the wrapper recognises this as homogeneous
-Dirichlet and takes the fast spectral DST path (no mask needed).
-
-**Why this matters:**
-
-Users currently maintain two separate mental models -- `Dirichlet1D(value=g)`
-for time-stepping and `bc="dst"` for elliptic solves.  Layer 3 unifies them:
-one BC object, used everywhere.
-
-**Scope:**
-
-- **In scope for Layer 3:** `BoundaryConditionSet` containing `Dirichlet1D`
-  atoms (constant value per face).
-- **Out of scope:** `Neumann1D`, `Robin1D`, and spatially-varying per-face
-  values.  These require deeper changes (e.g. integrating with
-  `MixedBCHelmholtzSolver2D` from `spectraldiffx` for the spectral path,
-  or extending `masked_laplacian` for Neumann conditions at the mask edge).
-  Flagged as future work.
+**Why this matters:** users maintain one mental model.  The same
+`BoundaryConditionSet` they write for time-stepping drives the elliptic
+solve.  No more `Dirichlet1D(value=g)` for one system and `bc="dst"` for the
+other.
 
 ---
 
-## 4. Considered Alternatives
+## 5. Considered Alternatives
 
 ### Option B from issue #186: `InhomogeneousBCSolver` wrapper class
 
 ```python
-solver = InhomogeneousBCSolver(
-    base_solver=base_solver,
-    mask=mask, dx=dx, dy=dy, lambda_=0.0,
-)
-psi = solver(rhs, bc_values=g)
+solver = InhomogeneousBCSolver(base_solver=..., mask=mask, dx=dx, dy=dy)
+psi = solver(rhs, known_values=g)
 ```
 
-**Why not:** A class adds state (base solver, mask, grid params) without
-adding power.  The layered function + kwarg design covers every code path the
-class would, with less surface area and better composability (the pure
-function in Layer 1 works with any solver without wrapping it).
+**Why not:** a class adds state without adding power.  The layered function +
+BCSet passthrough covers every code path with less surface area and better
+composability.
 
-### Option D from issue #186: `DirichletBC` / `NeumannBC` value objects
+### Option D from issue #186: new `DirichletBC` / `NeumannBC` types
 
 ```python
 bc = DirichletBC(values=g, mask=mask)
-psi = fvx.streamfunction_from_vorticity(zeta, dx, dy, bc=bc)
 ```
 
-**Why not now:** This is essentially what Layer 3 does, but it invents a
-*new* BC type (`DirichletBC`) parallel to the existing `Dirichlet1D`.  Layer 3
-reuses the existing vocabulary instead.  If the library eventually needs
-`NeumannBC` / `RobinBC` for the solver layer, these can be introduced later
-with clear integration points (the `MixedBCHelmholtzSolver2D` from
-`spectraldiffx` for the spectral path, extended `masked_laplacian` for the
-CG path).
+**Why not:** invents a new BC type parallel to the existing `Dirichlet1D`.
+The revised design evolves the existing `BoundaryConditionSet` instead of
+creating a parallel hierarchy.
 
 ---
 
-## 5. Edge Cases and Decisions
+## 6. Edge Cases and Decisions
 
 ### Spectral solvers without a mask
 
-When `method="spectral"` and no mask is provided, but `bc_values` is given:
-
-- Synthesise a rectangular mask: all-wet interior, dry boundary ring.
-  This is just `mask[1:-1, 1:-1] = 1, mask[boundary] = 0` for an `(Ny, Nx)`
-  domain.
-- Apply the lifting trick normally.
-- Document that this adds a small overhead vs. the pure spectral path
-  (one extra Laplacian evaluation for the correction).
+When `method="spectral"` and no mask is provided, but `known_values` is
+given: synthesise a rectangular mask (all-wet interior, dry outer ring).
+Apply the lifting trick normally.
 
 ### Capacitance solver
 
-The lift trick is operator-agnostic.  The capacitance solver
-(`build_capacitance_solver`, `elliptic.py:146-183`) sees only the corrected
-RHS and solves the homogeneous problem as usual.  No changes needed.
+Operator-agnostic.  The capacitance solver sees only the corrected RHS and
+solves the homogeneous problem as usual.  No changes needed.
 
 ### Multigrid
 
 Same: only the RHS changes.  The V-cycle hierarchy is unaware of the lift.
-The multigrid operator (`multigrid.py:327-410`) already enforces zero BCs via
-its face coefficients; the corrected RHS accounts for the non-zero data.
 
-### Time-varying boundary values
+### Time-varying known values
 
 Because Layer 1 is a pure function, the correction is recomputed at every
-call inside a JIT-compiled timestep.  No caching or stale-state issues.  The
-JAX-native dilation is cheap (~4 rolls + OR), and `masked_laplacian` is a
-single 5-point stencil pass.
+call inside a JIT-compiled timestep.  No caching or stale-state issues.
+
+### Sparse observations as known values
+
+When `known_mask` marks interior wet cells, those cells are removed from the
+solve domain (`effective_solve_mask = wet & ~all_known`).  Their prescribed
+values feed into the stencil of neighboring "unknown" cells via the lift.
+Mathematically, this treats observations as additional Dirichlet constraints
+in the interior of the domain.
 
 ### Multi-layer PV inversion
 
-`pv_inversion` with array `lambda_` currently vmaps the solve over layers
-(`elliptic.py:437-542`).  The lift depends on `lambda_` (via
-`masked_laplacian`), so each layer gets its own `rhs_corrected` and
-`psi_lift`.  The implementation vmaps `apply_inhomogeneous_bc` over the layer
-axis alongside the solve, or pre-computes the per-layer lifts in a batched
-call.
-
-If `bc_values` has shape `(nl, Ny, Nx)`, each layer gets its own boundary
-data.  If `bc_values` has shape `(Ny, Nx)`, it is broadcast to all layers
-(common case: same boundary data for all vertical modes).
+The lift depends on `lambda_` (via `masked_laplacian`), so each layer gets
+its own `rhs_corrected` and `value_lift`.  `known_values` can be `(Ny, Nx)`
+(broadcast) or `(nl, Ny, Nx)` (per-layer).
 
 ### Sign of lambda
 
 Preserved by the existing `masked_laplacian` definition: it computes
 $(∇^2 - \lambda)\psi$, so both the RHS and the correction have consistent
-sign.  No special-casing needed.
+sign.
 
-### Homogeneous BC special case (g = 0)
+### Homogeneous special case (all known values = 0)
 
-When `bc_values` is all zeros (or `None`), the lift is zero, the RHS
-correction is zero, and the solver takes the fast path.  The design doc does
-not need a separate code path for this -- the math handles it naturally, and
-the overhead of the zero-lift check is negligible.
+The lift is zero, the RHS correction is zero, and the solver takes the fast
+path.  No separate code branch needed.
 
 ---
 
-## 6. Phasing
+## 7. Phasing
 
-### PR 1: Layer 1 -- `apply_inhomogeneous_bc`
+### PR 1: Evolve `BoundaryConditionSet` + `apply_known_values`
 
-**Scope:**
-
+- Add `mask`, `known_values`, `known_mask` fields to `BoundaryConditionSet`
+  (all default `None` — backward compatible).
 - New file `finitevolx/_src/solvers/inhomogeneous.py` with
-  `apply_inhomogeneous_bc`.
-- JAX-native dilation helper (private function in the same module).
+  `apply_known_values` pure function + JAX-native dilation helper.
 - Re-export from `finitevolx/__init__.py`.
-- Manufactured-solution test: $\psi_{\text{exact}} = \sin(\pi x)\sin(\pi y) +
-  0.1\sin(2\pi y)$ (second term doesn't vanish at boundaries).  Compute
-  $f = (A - \lambda)\psi_{\text{exact}}$, extract $g = \psi_{\text{exact}}\big|_{\text{boundary}}$,
-  solve, verify $\|\psi - \psi_{\text{exact}}\| < \epsilon$.
-- Consistency test: homogeneous BCs ($g = 0$) give the same result as the
-  current API.
-- Test with CG, capacitance, and spectral solver methods.
+- Tests:
+  - Manufactured solution: $\psi_{\text{exact}} = \sin(\pi x)\sin(\pi y) +
+    0.1\sin(2\pi y)$ with CG, capacitance, spectral.
+  - Consistency: `known_values=0` matches current homogeneous API.
+  - Island mask: verify auto-derive finds inner + outer boundary rings.
+  - Sparse obs: verify `known_mask` pins interior cells correctly.
 
-**Estimated size:** ~60 lines of implementation, ~120 lines of tests.
+### PR 2: Thread through convenience wrappers + BCSet passthrough
 
-### PR 2: Layer 2 -- `bc_values=` kwarg
-
-**Scope:**
-
-- Add `bc_values` parameter to `streamfunction_from_vorticity`,
-  `pressure_from_divergence`, and `pv_inversion`.
-- Thread it through `_solve_dispatch`.
+- Add `known_values` / `known_mask` kwargs to
+  `streamfunction_from_vorticity`, `pressure_from_divergence`, `pv_inversion`.
+- Accept `BoundaryConditionSet` as `bc=` parameter (Layer 3).
 - Multi-layer vmap integration for `pv_inversion`.
-- Auto-synthesise rectangular mask for spectral path when no mask given.
-- Tests for all three wrappers with `bc_values`.
+- Auto-synthesise rectangular mask for spectral path.
+- Tests for all three wrappers with known values and BCSet passthrough.
 
-**Estimated size:** ~80 lines of implementation changes, ~150 lines of tests.
+### PR 3: Documentation + notebook migration
 
-### PR 3: Layer 3 -- `BoundaryConditionSet` bridge
-
-**Scope:**
-
-- Accept `BoundaryConditionSet` in `bc=` parameter.
-- Extract per-face Dirichlet values, build `(Ny, Nx)` lift array.
-- Fast-path detection for all-zero homogeneous case.
-- Update `docs/notebooks/demo_solvers.py` Section 8 to use the new API
-  instead of the manual lifting trick.
+- Update `docs/notebooks/demo_solvers.py` Section 8 to use new API.
 - Documentation in elliptic solver guide.
-
-**Estimated size:** ~60 lines of implementation, ~80 lines of tests, ~100
-lines of doc updates.
+- Update `docs/boundary_conditions.md` with unified BCSet description.
 
 ---
 
-## 7. Acceptance Criteria
+## 8. Acceptance Criteria
 
-From issue #186, with additions:
+From issue #186, revised for the broader scope:
 
-- [ ] `apply_inhomogeneous_bc(rhs, bc_values, mask, dx, dy, lambda_)` implemented
-- [ ] Convenience wrappers accept `bc_values` parameter
-- [ ] `BoundaryConditionSet` of `Dirichlet1D` accepted as `bc=` on wrappers
+- [ ] `BoundaryConditionSet` gains `mask`, `known_values`, `known_mask` fields
+- [ ] `apply_known_values(rhs, known_values, mask, dx, dy, lambda_, known_mask)` implemented
+- [ ] Convenience wrappers accept `known_values` / `known_mask` parameters
+- [ ] `BoundaryConditionSet` accepted as `bc=` on all convenience wrappers
 - [ ] Works with all solver methods (spectral, CG, capacitance, multigrid)
 - [ ] Manufactured-solution test passes to solver tolerance
+- [ ] Island-mask test: auto-derive finds inner + outer boundary rings
+- [ ] Sparse-obs test: `known_mask` pins interior wet cells correctly
 - [ ] JIT-compatible for time-stepping applications
-- [ ] Multi-layer `pv_inversion` supports per-layer `bc_values`
+- [ ] Multi-layer `pv_inversion` supports per-layer `known_values`
+- [ ] JAX-native dilation (no SciPy dependency in the hot path)
 - [ ] Documentation in elliptic solver guide
 - [ ] Example in `demo_solvers` notebook updated to use new API
-- [ ] JAX-native dilation (no SciPy dependency in the hot path)
 
 ---
 
-## 8. Future Extensions (Out of Scope)
-
-These are explicitly **not** part of the initial implementation but have clear
-integration points:
+## 9. Future Extensions (Out of Scope)
 
 | Extension | Integration point |
 |-----------|-------------------|
-| **Spatially-varying per-face Dirichlet values** (1-D arrays instead of scalars on `Dirichlet1D`) | Layer 3 conversion: expand 1-D face arrays into `(Ny, Nx)` lift |
-| **Inhomogeneous Neumann** ($\partial\psi/\partial n = g$) | `modify_rhs_2d` from spectraldiffx (spectral path); extended `masked_laplacian` with ghost-cell injection (CG path) |
-| **Robin / mixed BCs on the solver** | `MixedBCHelmholtzSolver2D` from spectraldiffx (`spectral.py:19`); new Robin-aware operator for CG |
-| **Open-boundary conditions** (radiation, sponge) | Sponge1D / Robin1D already exist for time-stepping; solver integration requires absorbing-layer operator modifications |
-| **3-D support** | All existing spectral solvers have 3-D variants (`solve_helmholtz_dst1_3d`, etc.); the lifting trick generalises to 3-D with a 6-point dilation |
+| **Spatially-varying per-face Dirichlet** (1-D arrays on `Dirichlet1D`) | Layer 3 conversion: expand 1-D face arrays into `(Ny, Nx)` lift |
+| **Inhomogeneous Neumann** ($\partial\psi/\partial n = g$) | `modify_rhs_2d` from spectraldiffx (spectral path); extended `masked_laplacian` (CG path) |
+| **Robin / mixed BCs on the solver** | `MixedBCHelmholtzSolver2D` from spectraldiffx; new Robin-aware operator for CG |
+| **Open-boundary conditions** (radiation, sponge) | Sponge1D / Robin1D already exist for time-stepping; solver integration requires absorbing-layer operator |
+| **3-D support** | Lifting trick generalises to 3-D with a 6-point dilation; all spectral solvers have 3-D variants |
+| **Weighted observations** (soft constraints) | Penalty-method variant of the lifting trick: add `weight * (psi - obs)` to the operator instead of hard pinning |
 
 ---
 

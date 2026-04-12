@@ -358,7 +358,7 @@ At dry boundary cells: $\psi = g + 0$ (the prescribed data).
 | `Dirichlet1D(value=g)` | `bc_1d.py:68-93` | Already carries non-zero values; can be expanded from per-face to per-cell |
 | `BoundaryConditionSet` | `bc_set.py:11-66` | Natural container to pass 4-face Dirichlet data to a solver |
 | `masked_laplacian` | `iterative.py:144-191` | Step 3 of the lift already uses this; no new operator needed |
-| `_solve_dispatch` | `elliptic.py:253-273` | Central routing point; a `bc_values=` kwarg can be added here |
+| `_solve_dispatch` | `elliptic.py:253-273` | Central routing point; `known_values`/`known_mask` kwargs can be added here |
 | `modify_rhs_2d` | `spectral.py:49` (re-export) | Spectral-path inhomogeneous BCs; already available but unused |
 | `_inner_boundary_indices` | `tests/test_solver_wrappers.py:47-54` | SciPy-based helper for finding boundary ring; candidate for JAX-native port |
 | `pv_inversion` vmap logic | `elliptic.py:437-542` | Multi-layer batching that the lift must integrate with |
