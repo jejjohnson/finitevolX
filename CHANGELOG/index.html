@@ -1,0 +1,6244 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Finite volume operators for JAX on Arakawa C-grids">
+      
+      
+        <meta name="author" content="Juan Emmanuel Johnson, Takaya Uchida">
+      
+      
+      
+        <link rel="prev" href="../notebooks/qg_1p5_layer/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>Changelog - finitevolX</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#changelog" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="finitevolX" class="md-header__button md-logo" aria-label="finitevolX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            finitevolX
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Changelog
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jejjohnson/finitevolX" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/finitevolX
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../cgrid_discretization/" class="md-tabs__link">
+          
+  
+  
+  C-Grid Discretization
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../masks/" class="md-tabs__link">
+          
+  
+  
+  Masks
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../multilayer_vs_3d/" class="md-tabs__link">
+          
+  
+  
+  Vertical Structure
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../stencils/" class="md-tabs__link">
+          
+  
+  
+  Raw Stencils
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../difference/" class="md-tabs__link">
+          
+  
+  
+  Difference Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../interpolation/" class="md-tabs__link">
+          
+  
+  
+  Interpolation Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../advection/" class="md-tabs__link">
+          
+  
+  
+  Advection
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../boundary_conditions/" class="md-tabs__link">
+          
+  
+  
+  Boundary Conditions
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../spatial_operators/" class="md-tabs__link">
+          
+  
+  
+  Spatial Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../time_integration/" class="md-tabs__link">
+          
+  
+  
+  Time Integration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../elliptic_solvers/" class="md-tabs__link">
+          
+  
+  
+  Elliptic Solvers
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../multigrid_solver/" class="md-tabs__link">
+          
+  
+  
+  Multigrid Solver
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../solver_comparison/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Solver Comparison
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../examples/" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="finitevolX" class="md-nav__button md-logo" aria-label="finitevolX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    finitevolX
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jejjohnson/finitevolX" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/finitevolX
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C-Grid Discretization
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    C-Grid Discretization
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cgrid_discretization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/grids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Masks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Masks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vertical Structure
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Vertical Structure
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multilayer_vs_3d/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/vertical_modes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Raw Stencils
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Raw Stencils
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../stencils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/stencils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Difference Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Difference Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../difference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/difference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interpolation Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Interpolation Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advection
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advection
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/advection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/reconstruction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reconstruction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Boundary Conditions
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Boundary Conditions
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../boundary_conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/boundary_conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spatial Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Spatial Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spatial_operators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/divergence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Divergence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/vorticity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vorticity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/diffusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diffusion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/coriolis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coriolis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/momentum/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Momentum Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time Integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Time Integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../time_integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../time_integration_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/time_integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Elliptic Solvers
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Elliptic Solvers
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../elliptic_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../elliptic_solvers_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/elliptic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convenience Wrappers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/spectral_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/spectral_transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral Transforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/capacitance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacitance Method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/iterative/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Iterative Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multigrid Solver
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Multigrid Solver
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multigrid_solver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multigrid_solver_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/multigrid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solver_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Solver Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_15" >
+        
+          
+          <label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_15">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/demo_masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Masks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/demo_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Elliptic Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/pressure_poisson/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pressure Poisson
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/streamfunction_inversion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streamfunction Inversion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/helmholtz_screening/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Helmholtz Screening
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/advection_1d_schemes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1-D Advection Schemes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/advection_2d_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2-D Rotating Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/advection_2d_masked/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2-D Masked Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/swm_linear/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linear Shallow Water
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/shallow_water/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nonlinear Shallow Water
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/qg_1p5_layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.5-Layer QG
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unreleased
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Unreleased">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#breaking-changes-grid-and-mask-submodule-restructure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Breaking changes — grid and mask submodule restructure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0040-2026-04-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.40 (2026-04-11)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.40 (2026-04-11)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0039-2026-03-24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.39 (2026-03-24)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.39 (2026-03-24)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0038-2026-03-24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.38 (2026-03-24)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.38 (2026-03-24)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0037-2026-03-20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.37 (2026-03-20)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.37 (2026-03-20)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0036-2026-03-19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.36 (2026-03-19)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.36 (2026-03-19)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0035-2026-03-18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.35 (2026-03-18)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.35 (2026-03-18)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0034-2026-03-17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.34 (2026-03-17)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.34 (2026-03-17)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0033-2026-03-17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.33 (2026-03-17)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.33 (2026-03-17)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0032-2026-03-17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.32 (2026-03-17)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.32 (2026-03-17)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0031-2026-03-13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.31 (2026-03-13)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.31 (2026-03-13)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0030-2026-03-13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.30 (2026-03-13)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.30 (2026-03-13)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0029-2026-03-13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.29 (2026-03-13)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.29 (2026-03-13)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0028-2026-03-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.28 (2026-03-12)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.28 (2026-03-12)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0027-2026-03-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.27 (2026-03-12)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.27 (2026-03-12)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0026-2026-03-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.26 (2026-03-12)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.26 (2026-03-12)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0025-2026-03-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.25 (2026-03-12)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.25 (2026-03-12)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0024-2026-03-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.24 (2026-03-11)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.24 (2026-03-11)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0023-2026-03-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.23 (2026-03-11)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.23 (2026-03-11)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0022-2026-03-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.22 (2026-03-11)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.22 (2026-03-11)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0021-2026-03-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.21 (2026-03-11)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.21 (2026-03-11)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0020-2026-03-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.20 (2026-03-11)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.20 (2026-03-11)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0019-2026-03-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.19 (2026-03-11)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.19 (2026-03-11)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0018-2026-03-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.18 (2026-03-11)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.18 (2026-03-11)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0017-2026-03-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.17 (2026-03-10)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.17 (2026-03-10)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0016-2026-03-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.16 (2026-03-10)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.16 (2026-03-10)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0015-2026-03-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.15 (2026-03-10)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.15 (2026-03-10)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0014-2026-03-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.14 (2026-03-10)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.14 (2026-03-10)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0013-2026-03-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.13 (2026-03-08)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.13 (2026-03-08)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0012-2026-03-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.12 (2026-03-07)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.12 (2026-03-07)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0011-2026-03-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.11 (2026-03-07)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.11 (2026-03-07)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0010-2026-03-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.10 (2026-03-07)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.10 (2026-03-07)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#009-2026-03-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.9 (2026-03-07)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.9 (2026-03-07)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#008-2026-03-03" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.8 (2026-03-03)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.8 (2026-03-03)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_29" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#007-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.7 (2026-03-01)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.7 (2026-03-01)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#006-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.6 (2026-03-01)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.6 (2026-03-01)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#005-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.5 (2026-03-01)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.5 (2026-03-01)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#004-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.4 (2026-03-01)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.4 (2026-03-01)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#003-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.3 (2026-03-01)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.3 (2026-03-01)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_33" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#002-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.2 (2026-03-01)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.2 (2026-03-01)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_34" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changelog_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changelog
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unreleased
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Unreleased">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#breaking-changes-grid-and-mask-submodule-restructure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Breaking changes — grid and mask submodule restructure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0040-2026-04-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.40 (2026-04-11)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.40 (2026-04-11)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0039-2026-03-24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.39 (2026-03-24)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.39 (2026-03-24)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0038-2026-03-24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.38 (2026-03-24)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.38 (2026-03-24)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0037-2026-03-20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.37 (2026-03-20)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.37 (2026-03-20)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0036-2026-03-19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.36 (2026-03-19)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.36 (2026-03-19)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0035-2026-03-18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.35 (2026-03-18)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.35 (2026-03-18)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0034-2026-03-17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.34 (2026-03-17)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.34 (2026-03-17)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0033-2026-03-17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.33 (2026-03-17)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.33 (2026-03-17)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0032-2026-03-17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.32 (2026-03-17)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.32 (2026-03-17)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0031-2026-03-13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.31 (2026-03-13)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.31 (2026-03-13)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0030-2026-03-13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.30 (2026-03-13)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.30 (2026-03-13)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0029-2026-03-13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.29 (2026-03-13)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.29 (2026-03-13)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0028-2026-03-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.28 (2026-03-12)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.28 (2026-03-12)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0027-2026-03-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.27 (2026-03-12)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.27 (2026-03-12)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0026-2026-03-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.26 (2026-03-12)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.26 (2026-03-12)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0025-2026-03-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.25 (2026-03-12)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.25 (2026-03-12)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0024-2026-03-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.24 (2026-03-11)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.24 (2026-03-11)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0023-2026-03-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.23 (2026-03-11)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.23 (2026-03-11)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0022-2026-03-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.22 (2026-03-11)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.22 (2026-03-11)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0021-2026-03-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.21 (2026-03-11)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.21 (2026-03-11)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0020-2026-03-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.20 (2026-03-11)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.20 (2026-03-11)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0019-2026-03-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.19 (2026-03-11)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.19 (2026-03-11)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0018-2026-03-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.18 (2026-03-11)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.18 (2026-03-11)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0017-2026-03-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.17 (2026-03-10)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.17 (2026-03-10)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0016-2026-03-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.16 (2026-03-10)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.16 (2026-03-10)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0015-2026-03-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.15 (2026-03-10)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.15 (2026-03-10)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0014-2026-03-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.14 (2026-03-10)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.14 (2026-03-10)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0013-2026-03-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.13 (2026-03-08)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.13 (2026-03-08)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0012-2026-03-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.12 (2026-03-07)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.12 (2026-03-07)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0011-2026-03-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.11 (2026-03-07)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.11 (2026-03-07)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0010-2026-03-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.10 (2026-03-07)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.10 (2026-03-07)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#009-2026-03-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.9 (2026-03-07)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.9 (2026-03-07)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#008-2026-03-03" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.8 (2026-03-03)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.8 (2026-03-03)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_29" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#007-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.7 (2026-03-01)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.7 (2026-03-01)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#006-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.6 (2026-03-01)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.6 (2026-03-01)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#005-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.5 (2026-03-01)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.5 (2026-03-01)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#004-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.4 (2026-03-01)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.4 (2026-03-01)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#003-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.3 (2026-03-01)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.3 (2026-03-01)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_33" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#002-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.0.2 (2026-03-01)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.0.2 (2026-03-01)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bug-fixes_34" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug Fixes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changelog_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changelog
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="changelog">Changelog</h1>
+<h2 id="unreleased">Unreleased</h2>
+<h3 id="breaking-changes-grid-and-mask-submodule-restructure">Breaking changes — grid and mask submodule restructure</h3>
+<p>The internal <code>_src/grid/</code> and <code>_src/mask/</code> packages were reorganised
+to support a layered abstraction over coordinate systems and grid
+dimensions.  Public-API renames are listed below; users who imported
+through the top-level <code>finitevolx</code> namespace need to update class
+names but no import-path changes.</p>
+<p><strong>Grid module</strong> (<code>refactor: restructure into base / cartesian / spherical / cylindrical layout</code>)</p>
+<ul>
+<li><code>ArakawaCGrid1D / 2D / 3D</code> (the old concrete classes) → renamed to
+  <code>CartesianGrid1D / 2D / 3D</code>.</li>
+<li><code>SphericalArakawaCGrid2D / 3D</code> → renamed to <code>SphericalGrid2D / 3D</code>.
+  These are now siblings of <code>CartesianGrid*</code> under a common
+  <code>CurvilinearGrid*</code> base, <em>not</em> subclasses.</li>
+<li>The names <code>ArakawaCGrid1D / 2D / 3D</code> are reused as a new abstract
+  topology layer (just <code>Nx</code>, <code>Ny</code>, <code>Nz</code>).</li>
+<li>New abstract layer <code>CurvilinearGrid1D / 2D / 3D</code> adds the uniform
+  metric (<code>Lx</code>, <code>Ly</code>, <code>Lz</code>, <code>dx</code>, <code>dy</code>, <code>dz</code>).</li>
+<li>New <code>CylindricalGrid</code> stub (TODO).</li>
+<li>Path moves: <code>_src/grid/cgrid_mask.py</code> → <code>_src/mask/cgrid_mask.py</code>,
+  <code>_src/grid/constants.py</code> → <code>_src/utils/constants.py</code>.</li>
+</ul>
+<p><strong>Mask module</strong> (<code>refactor: split into base / cartesian / spherical / cylindrical</code>)</p>
+<ul>
+<li><code>ArakawaCGridMask</code> → renamed to <code>Mask2D</code>.</li>
+<li>New <code>Mask1D</code> and <code>Mask3D</code> concrete classes.  <code>Mask3D</code> includes a
+  full vertical face mask (<code>w</code>) — see below.</li>
+<li><code>StencilCapability</code> → split into <code>StencilCapability1D / 2D / 3D</code>.</li>
+<li><code>_src/mask/cgrid_mask.py</code> → split into <code>_src/mask/{base,cartesian}.py</code>
+  with TODO stubs at <code>_src/mask/{spherical,cylindrical}.py</code>.</li>
+<li>New <code>_src/mask/utils.py</code> with public n-D-aware mask construction
+  primitives: <code>pool_bool</code>, <code>h_from_pooled</code>, <code>dilate_mask</code>,
+  <code>count_contiguous</code>, <code>make_sponge</code>.</li>
+</ul>
+<p><strong>Mask2D field renames</strong> (frees up <code>w</code> for the 3-D vertical face mask):</p>
+<table>
+<thead>
+<tr>
+<th>Old name</th>
+<th>New name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>w</code></td>
+<td><code>xy_corner</code> (lenient)</td>
+</tr>
+<tr>
+<td><code>psi</code></td>
+<td><code>xy_corner_strict</code> (strict)</td>
+</tr>
+<tr>
+<td><code>not_w</code>, <code>not_psi</code></td>
+<td><code>not_xy_corner</code>, <code>not_xy_corner_strict</code></td>
+</tr>
+<tr>
+<td><code>w_valid</code></td>
+<td><code>xy_corner_valid</code></td>
+</tr>
+<tr>
+<td><code>w_vertical_bound</code></td>
+<td><code>xy_corner_y_wall</code></td>
+</tr>
+<tr>
+<td><code>w_horizontal_bound</code></td>
+<td><code>xy_corner_x_wall</code></td>
+</tr>
+<tr>
+<td><code>w_cornerout_bound</code></td>
+<td><code>xy_corner_convex</code></td>
+</tr>
+<tr>
+<td><code>psi_irrbound_xids</code></td>
+<td><code>xy_corner_strict_irrbound_cols</code></td>
+</tr>
+<tr>
+<td><code>psi_irrbound_yids</code></td>
+<td><code>xy_corner_strict_irrbound_rows</code></td>
+</tr>
+</tbody>
+</table>
+<p>The last pair also fixes a long-standing naming bug: the old <code>_xids</code>
+field stored column indices and <code>_yids</code> stored row indices.</p>
+<p><strong>Removed:</strong></p>
+<ul>
+<li><code>Mask2D.distbound1 / distbound2 / distbound3plus</code> properties — these
+  were exact aliases for <code>ind_coast / ind_near_coast / ind_ocean</code>.</li>
+<li><code>visualize_masks()</code> function — plotting code does not belong in the
+  library.  Equivalent inline code is available in
+  <code>docs/notebooks/demo_masks.py</code>.</li>
+</ul>
+<h2 id="0040-2026-04-11"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.39...v0.0.40">0.0.40</a> (2026-04-11)</h2>
+<h3 id="features">Features</h3>
+<ul>
+<li>operator-attribute mask API (Mask1D/2D/3D class fields, <a href="https://github.com/jejjohnson/finitevolX/issues/209">#209</a>) (<a href="https://github.com/jejjohnson/finitevolX/issues/211">#211</a>) (<a href="https://github.com/jejjohnson/finitevolX/commit/9f67b18ea75488aedb634fe510eb12d881385668">9f67b18</a>)</li>
+<li><strong>operators:</strong> operator-attribute mask API (<a href="https://github.com/jejjohnson/finitevolX/issues/209">#209</a>) (<a href="https://github.com/jejjohnson/finitevolX/commit/9f67b18ea75488aedb634fe510eb12d881385668">9f67b18</a>)</li>
+</ul>
+<h2 id="0039-2026-03-24"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.38...v0.0.39">0.0.39</a> (2026-03-24)</h2>
+<h3 id="features_1">Features</h3>
+<ul>
+<li>expose functional boundary helpers for wall, padding, and corners (<a href="https://github.com/jejjohnson/finitevolX/commit/19312bf3579cf50fbe1cced8ea70181490c7c796">19312bf</a>)</li>
+<li>expose functional boundary helpers for wall, padding, and corners (<a href="https://github.com/jejjohnson/finitevolX/issues/152">#152</a>) (<a href="https://github.com/jejjohnson/finitevolX/commit/0d7277ab2486a733bd486837c7bc8becb71d318d">0d7277a</a>)</li>
+<li>expose raw face fluxes as public functional API (<a href="https://github.com/jejjohnson/finitevolX/commit/6298323ee00ae440d420571d7340dae8ee3ed16c">6298323</a>)</li>
+<li>expose raw face fluxes as public functional API (<a href="https://github.com/jejjohnson/finitevolX/issues/143">#143</a>) (<a href="https://github.com/jejjohnson/finitevolX/commit/291be3b53d68c3523a76adbf80731b86a70b2566">291be3b</a>)</li>
+<li>expose reconstruction pipeline as public functional API (<a href="https://github.com/jejjohnson/finitevolX/commit/47748d49ed41e08e351b72854bf7248a4c3fc44b">47748d4</a>)</li>
+<li>expose reconstruction pipeline as public functional API (<a href="https://github.com/jejjohnson/finitevolX/issues/151">#151</a>) (<a href="https://github.com/jejjohnson/finitevolX/commit/945f15d3f118f4c67f78214e4a76020f4e0793f7">945f15d</a>)</li>
+</ul>
+<h3 id="bug-fixes">Bug Fixes</h3>
+<ul>
+<li>address PR <a href="https://github.com/jejjohnson/finitevolX/issues/197">#197</a> review comments (<a href="https://github.com/jejjohnson/finitevolX/commit/46890beb5a964857152a52a9bc759d6e86e7158d">46890be</a>)</li>
+<li>address PR <a href="https://github.com/jejjohnson/finitevolX/issues/198">#198</a> review comments (<a href="https://github.com/jejjohnson/finitevolX/commit/902c55dba4831e43145407febeee561124b1e9f3">902c55d</a>)</li>
+<li>address PR <a href="https://github.com/jejjohnson/finitevolX/issues/199">#199</a> review comments (<a href="https://github.com/jejjohnson/finitevolX/commit/8a632e69c573543c89ca87ec1f503c9577ba2b16">8a632e6</a>)</li>
+</ul>
+<h2 id="0038-2026-03-24"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.37...v0.0.38">0.0.38</a> (2026-03-24)</h2>
+<h3 id="features_2">Features</h3>
+<ul>
+<li>upgrade spectraldiffx dependency to &gt;=0.0.10 (<a href="https://github.com/jejjohnson/finitevolX/commit/af8c9a87764dcb2a1ef6d74793b328614034cbd1">af8c9a8</a>)</li>
+<li>upgrade spectraldiffx to &gt;=0.0.10 (<a href="https://github.com/jejjohnson/finitevolX/commit/336e7a2de1824c7ff32bd3c9ea1159c93f8aca6f">336e7a2</a>)</li>
+</ul>
+<h3 id="bug-fixes_1">Bug Fixes</h3>
+<ul>
+<li>address PR review comments (<a href="https://github.com/jejjohnson/finitevolX/commit/3871618625c562de099ed802903f143ecc81c28d">3871618</a>)</li>
+<li>address PR review comments on advection tests (<a href="https://github.com/jejjohnson/finitevolX/commit/8d873f3abe57d09ba0bff00edcaa6dfe3949092e">8d873f3</a>)</li>
+<li>nyström preconditioner false convergence with low rank (<a href="https://github.com/jejjohnson/finitevolX/issues/187">#187</a>) (<a href="https://github.com/jejjohnson/finitevolX/commit/91080d2f51ee9db985d4d9ccd806be4e3346b912">91080d2</a>)</li>
+<li>Nyström preconditioner full-rank correction for low-rank usage (<a href="https://github.com/jejjohnson/finitevolX/issues/187">#187</a>) (<a href="https://github.com/jejjohnson/finitevolX/commit/a0517eaaaef5340757ef7bf49b6ecb6be3d8f753">a0517ea</a>)</li>
+<li>use non-trivial mask in Nystrom masked-domain test (<a href="https://github.com/jejjohnson/finitevolX/commit/61b749f9720c2bf60df4abd6ef57de09486409b4">61b749f</a>)</li>
+<li>weno7/9 right-biased reconstruction for negative flow (<a href="https://github.com/jejjohnson/finitevolX/commit/c90694904b0b22363017e333cc5cc1297bdb15cb">c906949</a>)</li>
+<li>WENO7/9 right-biased reconstruction for negative flow (<a href="https://github.com/jejjohnson/finitevolX/commit/ad07fa6de967c3df76e053392038d9dcd6cdd0f5">ad07fa6</a>), closes <a href="https://github.com/jejjohnson/finitevolX/issues/191">#191</a></li>
+</ul>
+<h2 id="0037-2026-03-20"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.36...v0.0.37">0.0.37</a> (2026-03-20)</h2>
+<h3 id="features_3">Features</h3>
+<ul>
+<li><strong>docs:</strong> add three advection tutorial notebooks (<a href="https://github.com/jejjohnson/finitevolX/commit/1e122105361f1f3fd9fef39d62f73dd2e67bdfce">1e12210</a>)</li>
+</ul>
+<h3 id="bug-fixes_2">Bug Fixes</h3>
+<ul>
+<li>address PR <a href="https://github.com/jejjohnson/finitevolX/issues/184">#184</a> review comments (<a href="https://github.com/jejjohnson/finitevolX/commit/afe7428a03c6dda23ee79723703baf5fa9a2d5b5">afe7428</a>)</li>
+<li>address PR <a href="https://github.com/jejjohnson/finitevolX/issues/184">#184</a> review comments (round 2) (<a href="https://github.com/jejjohnson/finitevolX/commit/8eaa9045f7375022c08dfb3c108aa3341b2bbe2c">8eaa904</a>)</li>
+<li><strong>advection:</strong> correct right-biased WENO reconstruction for negative flow (<a href="https://github.com/jejjohnson/finitevolX/commit/db5b0792d97fc19ee379ebadc6b8f45ebbfb86eb">db5b079</a>)</li>
+<li><strong>docs:</strong> add notebook symlinks so mkdocs-jupyter can find them (<a href="https://github.com/jejjohnson/finitevolX/commit/5d9fecf3cfce2690a5451894a70372348bef671c">5d9fecf</a>)</li>
+<li><strong>docs:</strong> correct image paths — use ../../images/ for mkdocs-jupyter (<a href="https://github.com/jejjohnson/finitevolX/commit/ef0f18ba5cbe79c271c3fb6d2eab48d1f40ac590">ef0f18b</a>)</li>
+<li><strong>docs:</strong> embed all figures as markdown images for non-executed rendering (<a href="https://github.com/jejjohnson/finitevolX/commit/98c776b7535358bd6b7ff03594d5b558531687cb">98c776b</a>)</li>
+<li><strong>docs:</strong> enable MathJax rendering in mkdocs-jupyter notebooks (<a href="https://github.com/jejjohnson/finitevolX/commit/42cf22d0a145bb8524bee0b9d81d868dabd57864">42cf22d</a>)</li>
+<li><strong>docs:</strong> move notebooks to docs/ and embed figures for mkdocs rendering (<a href="https://github.com/jejjohnson/finitevolX/commit/81be84db436d91e0cb789cbcf208820a270baa72">81be84d</a>)</li>
+<li><strong>docs:</strong> remove restrictive MathJax class filter breaking notebook math (<a href="https://github.com/jejjohnson/finitevolX/commit/15492984edab8af18c990ab32379fb521b8f7fba">1549298</a>)</li>
+<li><strong>docs:</strong> use constrained_layout for masked advection plots (<a href="https://github.com/jejjohnson/finitevolX/commit/b91a05b549ece54a3442cee76cd4fec502656cfb">b91a05b</a>)</li>
+</ul>
+<h2 id="0036-2026-03-19"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.35...v0.0.36">0.0.36</a> (2026-03-19)</h2>
+<h3 id="bug-fixes_3">Bug Fixes</h3>
+<ul>
+<li>address PR review feedback (<a href="https://github.com/jejjohnson/finitevolX/commit/a7484b07178bf8e3347615ce88e0f6af67ad614b">a7484b0</a>)</li>
+<li>resolve docs build failure and reorganize API reference (<a href="https://github.com/jejjohnson/finitevolX/commit/0a015849855590c07f976ac51a4ec805cd3ffae5">0a01584</a>)</li>
+<li>resolve docs build failure from spectraldiffx re-exports (<a href="https://github.com/jejjohnson/finitevolX/commit/30969d4f1c858ef26f51c9e0c8dc3af7f2d235f4">30969d4</a>)</li>
+</ul>
+<h2 id="0035-2026-03-18"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.34...v0.0.35">0.0.35</a> (2026-03-18)</h2>
+<h3 id="features_4">Features</h3>
+<ul>
+<li>add spherical compound operators (divergence, vorticity, laplacian) (<a href="https://github.com/jejjohnson/finitevolX/commit/d96505f7b2d0a3d7b2984a4ec2d8168c96cdb5bc">d96505f</a>)</li>
+<li>add SphericalArakawaCGrid2D and SphericalArakawaCGrid3D (<a href="https://github.com/jejjohnson/finitevolX/commit/d66186ceac4f65345db3e40d43cec80eda6a7ec7">d66186c</a>)</li>
+<li>add SphericalDifference2D/3D and extract _safe_div_cos utility (<a href="https://github.com/jejjohnson/finitevolX/commit/0cb35a69bc66d5bd0227e7d58b2e530c176204e4">0cb35a6</a>)</li>
+<li>export spherical operators and fix CI issues (<a href="https://github.com/jejjohnson/finitevolX/commit/820f3e013923d37f5ef5c22938f95a1b880c5388">820f3e0</a>)</li>
+<li>introduce spherical Arakawa C-grid operators (<a href="https://github.com/jejjohnson/finitevolX/commit/d277ead0f163eaf84a2b1fd72d8ca4a22b2939f4">d277ead</a>)</li>
+</ul>
+<h3 id="bug-fixes_4">Bug Fixes</h3>
+<ul>
+<li>zero z-ghost slices in 3D spherical operators (<a href="https://github.com/jejjohnson/finitevolX/commit/bff01e96a3f37b5cadb1f979040905a62345d844">bff01e9</a>)</li>
+</ul>
+<h2 id="0034-2026-03-17"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.33...v0.0.34">0.0.34</a> (2026-03-17)</h2>
+<h3 id="bug-fixes_5">Bug Fixes</h3>
+<ul>
+<li>export interior() and fix 1D jaxtyping shape strings (<a href="https://github.com/jejjohnson/finitevolX/commit/06bdede936346e63eaff93a0a8f9382b65d5036f">06bdede</a>)</li>
+</ul>
+<h2 id="0033-2026-03-17"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.32...v0.0.33">0.0.33</a> (2026-03-17)</h2>
+<h3 id="bug-fixes_6">Bug Fixes</h3>
+<ul>
+<li>correct _interp_T_to_X stencil to match Interpolation2D.T_to_X (<a href="https://github.com/jejjohnson/finitevolX/commit/4852194d18e6e6be9874f4a06d10978383270b26">4852194</a>)</li>
+<li>remove unrelated files accidentally committed (<a href="https://github.com/jejjohnson/finitevolX/commit/116a640eb00fda1ae7949164fbbfe5b37d82042d">116a640</a>)</li>
+<li>zero z-ghost slices in Vorticity3D.relative_vorticity (<a href="https://github.com/jejjohnson/finitevolX/commit/f5a3d44515f975adbb6efcf72888e496d9d79183">f5a3d44</a>)</li>
+</ul>
+<h2 id="0032-2026-03-17"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.31...v0.0.32">0.0.32</a> (2026-03-17)</h2>
+<h3 id="features_5">Features</h3>
+<ul>
+<li>add QG/SWM convenience utilities (<a href="https://github.com/jejjohnson/finitevolX/commit/d7cf5bc87f654b25fdc93d584aa5fb1c6499277c">d7cf5bc</a>)</li>
+<li>add QG/SWM convenience utilities (closes <a href="https://github.com/jejjohnson/finitevolX/issues/153">#153</a>) (<a href="https://github.com/jejjohnson/finitevolX/commit/4c749ca822930af012230ccda84ffb1ca3240058">4c749ca</a>)</li>
+<li>add shallow-water PV from prognostic variables (<a href="https://github.com/jejjohnson/finitevolX/commit/db73d3ea7f2be1342c54611966ed4a7288b52aa7">db73d3e</a>)</li>
+</ul>
+<h3 id="bug-fixes_7">Bug Fixes</h3>
+<ul>
+<li>address PR review comments on docstrings (<a href="https://github.com/jejjohnson/finitevolX/commit/4e619b51189448abfb6878df6071a08d594b42ca">4e619b5</a>)</li>
+</ul>
+<h2 id="0031-2026-03-13"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.30...v0.0.31">0.0.31</a> (2026-03-13)</h2>
+<h3 id="bug-fixes_8">Bug Fixes</h3>
+<ul>
+<li>resolve ty 0.0.23 invalid-argument-type errors in upwind_flux callers (<a href="https://github.com/jejjohnson/finitevolX/commit/f94d0086e3ff8dde16816d0c4a8ed4303ad091b0">f94d008</a>)</li>
+</ul>
+<h2 id="0030-2026-03-13"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.29...v0.0.30">0.0.30</a> (2026-03-13)</h2>
+<h3 id="features_6">Features</h3>
+<ul>
+<li><strong>solvers:</strong> add geometric multigrid Helmholtz solver (<a href="https://github.com/jejjohnson/finitevolX/commit/f33c687e74f3392ce99f9374d34c67a0ec8f8d39">f33c687</a>), closes <a href="https://github.com/jejjohnson/finitevolX/issues/71">#71</a></li>
+</ul>
+<h3 id="bug-fixes_9">Bug Fixes</h3>
+<ul>
+<li><strong>docs:</strong> configure MathJax equation rendering with $ delimiters (<a href="https://github.com/jejjohnson/finitevolX/commit/51313c9dd4a844f62857dd46a159bf1b3f403e80">51313c9</a>)</li>
+<li><strong>solvers:</strong> add QR orthogonalization to Nyström preconditioner (<a href="https://github.com/jejjohnson/finitevolX/commit/981312dbc7854d33b4cd18136eaab5676035a897">981312d</a>)</li>
+<li><strong>solvers:</strong> address PR review comments on multigrid (<a href="https://github.com/jejjohnson/finitevolX/commit/c37166e34657b0aecac23c948c8e06890e3c213a">c37166e</a>)</li>
+</ul>
+<h2 id="0029-2026-03-13"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.28...v0.0.29">0.0.29</a> (2026-03-13)</h2>
+<h3 id="features_7">Features</h3>
+<ul>
+<li><strong>solvers:</strong> add convenience wrappers and refactor elliptic module (<a href="https://github.com/jejjohnson/finitevolX/commit/8b9d233003e3c2b87918916e0805bb994a274fc8">8b9d233</a>), closes <a href="https://github.com/jejjohnson/finitevolX/issues/87">#87</a></li>
+<li><strong>solvers:</strong> add elliptic solver wrappers and modularize solver package (<a href="https://github.com/jejjohnson/finitevolX/commit/78b0d4d4fe1ec7ad830d771bc9aea5a2563336f7">78b0d4d</a>)</li>
+<li><strong>solvers:</strong> add preconditioners module with spectral and Nyström methods (<a href="https://github.com/jejjohnson/finitevolX/commit/b1e60fbd1ad6b5e4613fdc092a827d963ce4b6e7">b1e60fb</a>)</li>
+</ul>
+<h3 id="bug-fixes_10">Bug Fixes</h3>
+<ul>
+<li><strong>solvers:</strong> address PR review comments on elliptic module (<a href="https://github.com/jejjohnson/finitevolX/commit/014bf95455bae9949d2a66cf55e917652c4ba35e">014bf95</a>)</li>
+<li><strong>solvers:</strong> make _spectral_solve vmap-safe by using Helmholtz dispatch unconditionally (<a href="https://github.com/jejjohnson/finitevolX/commit/a19f5ca00d68d98e3edfeb497ea643309d975ec7">a19f5ca</a>)</li>
+<li><strong>tests:</strong> make Nyström CG test robust to convergence edge cases (<a href="https://github.com/jejjohnson/finitevolX/commit/62f3f342f5f6e8e31de0d988f765d3ff81933889">62f3f34</a>)</li>
+</ul>
+<h2 id="0028-2026-03-12"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.27...v0.0.28">0.0.28</a> (2026-03-12)</h2>
+<h3 id="features_8">Features</h3>
+<ul>
+<li><strong>elliptic:</strong> make spectral Helmholtz solvers vmap-compatible (<a href="https://github.com/jejjohnson/finitevolX/commit/9b6d51db5193915123b23a131eb7c2cc7098b2db">9b6d51d</a>), closes <a href="https://github.com/jejjohnson/finitevolX/issues/86">#86</a></li>
+<li><strong>elliptic:</strong> make spectral solvers vmap-compatible (<a href="https://github.com/jejjohnson/finitevolX/commit/248ac5da988515b716c0411dae068f3e91ed9984">248ac5d</a>)</li>
+<li><strong>solvers:</strong> add tridiagonal (TDMA) solver (<a href="https://github.com/jejjohnson/finitevolX/commit/6d9e485e309761f67f76916e39f515132d9c121b">6d9e485</a>)</li>
+<li><strong>solvers:</strong> add tridiagonal (TDMA) solver wrapping lineax (<a href="https://github.com/jejjohnson/finitevolX/commit/1802ea6d1fab7f8828ed7c720b0bd9519caf48eb">1802ea6</a>), closes <a href="https://github.com/jejjohnson/finitevolX/issues/85">#85</a></li>
+</ul>
+<h3 id="bug-fixes_11">Bug Fixes</h3>
+<ul>
+<li><strong>elliptic:</strong> guard only (0,0) null mode, not full spectrum (<a href="https://github.com/jejjohnson/finitevolX/commit/3c9f24eec64769f329ca68dd0c174744d90e8901">3c9f24e</a>)</li>
+<li><strong>tridiagonal:</strong> document lineax throw=True error handling for singular systems (<a href="https://github.com/jejjohnson/finitevolX/commit/60a081439be07ae179be464d47a2ba5105bcb0cc">60a0814</a>)</li>
+</ul>
+<h2 id="0027-2026-03-12"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.26...v0.0.27">0.0.27</a> (2026-03-12)</h2>
+<h3 id="features_9">Features</h3>
+<ul>
+<li>add time integration module (Epic <a href="https://github.com/jejjohnson/finitevolX/issues/111">#111</a>) (<a href="https://github.com/jejjohnson/finitevolX/commit/443d57119294be8dac0ecb047a3cbdc1aa7e656a">443d571</a>)</li>
+<li><strong>timestepping:</strong> add diffrax Butcher tableau solvers and solve_ocean_pde (<a href="https://github.com/jejjohnson/finitevolX/commit/95657c66c542cea2815ad2a36bcbd58cd60907c2">95657c6</a>)</li>
+<li><strong>timestepping:</strong> add pure functional time integrators (<a href="https://github.com/jejjohnson/finitevolX/commit/c9c7c037a7b2edc2f20bf64e642a46b102533c78">c9c7c03</a>)</li>
+<li><strong>timestepping:</strong> export all time integration symbols from finitevolx (<a href="https://github.com/jejjohnson/finitevolX/commit/1ae8f0c45d52b7cccf4a3d95fc510973c137e735">1ae8f0c</a>)</li>
+</ul>
+<h3 id="bug-fixes_12">Bug Fixes</h3>
+<ul>
+<li>address PR review comments for time integration module (<a href="https://github.com/jejjohnson/finitevolX/commit/735a3b82c0aa05e694ee3e3516e34c1df28b6de3">735a3b8</a>)</li>
+<li><strong>timestepping:</strong> resolve ty type checker errors in diffrax solvers (<a href="https://github.com/jejjohnson/finitevolX/commit/d9c0c2d23e7c7f1a05b736fbfacb143f1685986c">d9c0c2d</a>)</li>
+</ul>
+<h2 id="0026-2026-03-12"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.25...v0.0.26">0.0.26</a> (2026-03-12)</h2>
+<h3 id="features_10">Features</h3>
+<ul>
+<li><strong>scripts:</strong> add eta output and spinup phase to QG model (<a href="https://github.com/jejjohnson/finitevolX/commit/ada93ea3b6bf18b8ba7b28c687a598305b63ef7a">ada93ea</a>)</li>
+</ul>
+<h3 id="bug-fixes_13">Bug Fixes</h3>
+<ul>
+<li>correct double-gyre script physics and BCs (<a href="https://github.com/jejjohnson/finitevolX/commit/0432d2a312f04cdc9c80a78a68a9bf8b5d1e7ce5">0432d2a</a>)</li>
+<li><strong>scripts:</strong> address PR review comments (<a href="https://github.com/jejjohnson/finitevolX/commit/24956332da6a0ca00f4d0aad73f98e8206d27f0e">2495633</a>)</li>
+<li><strong>scripts:</strong> correct wind sign and switch SWM to closed-basin BCs (<a href="https://github.com/jejjohnson/finitevolX/commit/d526fc2316a25c6908f2ade14ff91ba85697a945">d526fc2</a>)</li>
+</ul>
+<h2 id="0025-2026-03-12"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.24...v0.0.25">0.0.25</a> (2026-03-12)</h2>
+<h3 id="features_11">Features</h3>
+<ul>
+<li>add diagnostic and geographic operators (<a href="https://github.com/jejjohnson/finitevolX/commit/fe719388864e0ecd573832d49b2db440edafdd7d">fe71938</a>)</li>
+<li><strong>diagnostics:</strong> add strain, enstrophy, QG PV, and conservation operators (<a href="https://github.com/jejjohnson/finitevolX/commit/040079d02829fbbec6b73d657484ffdc16727f60">040079d</a>)</li>
+<li>export diagnostic and geographic operators from package (<a href="https://github.com/jejjohnson/finitevolX/commit/2b4f7af1d6d36641be8d2b557ed8e163d743dee3">2b4f7af</a>)</li>
+<li><strong>operators:</strong> add spherical geographic operators (<a href="https://github.com/jejjohnson/finitevolX/commit/83f6274a53ea148beaa540fefef44c5573a16e3c">83f6274</a>)</li>
+</ul>
+<h3 id="bug-fixes_14">Bug Fixes</h3>
+<ul>
+<li><strong>geographic:</strong> add pole guard and address PR review comments (<a href="https://github.com/jejjohnson/finitevolX/commit/77fdb10689db184efb2236f661bace4d44ca81f1">77fdb10</a>)</li>
+</ul>
+<h2 id="0024-2026-03-11"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.23...v0.0.24">0.0.24</a> (2026-03-11)</h2>
+<h3 id="bug-fixes_15">Bug Fixes</h3>
+<ul>
+<li><strong>masks:</strong> correct psi_irrbound index offset and x/y swap (<a href="https://github.com/jejjohnson/finitevolX/commit/add4d36cfd22404a7abb453c08cca9c458cb7727">add4d36</a>)</li>
+<li><strong>masks:</strong> correct vorticity boundary adjacency at w-points (<a href="https://github.com/jejjohnson/finitevolX/commit/648099f06e331cbfbbc6d6bb788c7d51ba42495c">648099f</a>)</li>
+<li><strong>notebooks:</strong> use correct from_interior API (Lx/Ly not dx/dy) (<a href="https://github.com/jejjohnson/finitevolX/commit/a158663d9851edcb93ef000fa6aa1bbe4cfb37f1">a158663</a>)</li>
+<li><strong>tests:</strong> replace ambiguous multiplication sign with ASCII x (<a href="https://github.com/jejjohnson/finitevolX/commit/84332db6dff25ce9283c9d6326dfdadb305b489a">84332db</a>)</li>
+</ul>
+<h2 id="0023-2026-03-11"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.22...v0.0.23">0.0.23</a> (2026-03-11)</h2>
+<h3 id="features_12">Features</h3>
+<ul>
+<li><strong>bc:</strong> add Robin and Extrapolation boundary conditions (<a href="https://github.com/jejjohnson/finitevolX/commit/9c1fec30650a200948c70a0169ccaffde01f24d6">9c1fec3</a>)</li>
+<li><strong>bc:</strong> add Robin and Extrapolation boundary conditions (<a href="https://github.com/jejjohnson/finitevolX/commit/36ea56353d12cd208bc2934cd50eadb74c664927">36ea563</a>)</li>
+</ul>
+<h2 id="0022-2026-03-11"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.21...v0.0.22">0.0.22</a> (2026-03-11)</h2>
+<h3 id="features_13">Features</h3>
+<ul>
+<li>add mask parameter to Advection2D and Advection3D (<a href="https://github.com/jejjohnson/finitevolX/commit/454506071816df1a79fc32793a9531a1daff4fdd">4545060</a>)</li>
+</ul>
+<h3 id="bug-fixes_16">Bug Fixes</h3>
+<ul>
+<li>add input validation and NaN-safe blending to upwind_flux (<a href="https://github.com/jejjohnson/finitevolX/commit/87357c422a6fe52ca739997240aecaf6c9718159">87357c4</a>)</li>
+</ul>
+<h2 id="0021-2026-03-11"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.20...v0.0.21">0.0.21</a> (2026-03-11)</h2>
+<h3 id="features_14">Features</h3>
+<ul>
+<li>add <code>multilayer()</code> vmap helper to lift 2D operators over layer/mode batch axis (<a href="https://github.com/jejjohnson/finitevolX/commit/0848cfddbea7627ecbc878a4d248657d647b846a">0848cfd</a>)</li>
+<li>add multilayer() vmap helper, tests, and docs page (<a href="https://github.com/jejjohnson/finitevolX/commit/e1f8c8bddbcc62d39116dffd8d3ea8226087cce2">e1f8c8b</a>)</li>
+</ul>
+<h3 id="bug-fixes_17">Bug Fixes</h3>
+<ul>
+<li>address review comments on multilayer helper (<a href="https://github.com/jejjohnson/finitevolX/commit/20bd2ba9f1ff1c5cb149be543bec1bcf75f620a0">20bd2ba</a>)</li>
+</ul>
+<h2 id="0020-2026-03-11"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.19...v0.0.20">0.0.20</a> (2026-03-11)</h2>
+<h3 id="features_15">Features</h3>
+<ul>
+<li>add biharmonic (∇⁴) diffusion operator for C-grid staggered models (<a href="https://github.com/jejjohnson/finitevolX/commit/80c22ad306e0a86ff4f21f32fcfaa1752b5410ee">80c22ad</a>)</li>
+<li>add Coriolis force operator for staggered C-grid models (<a href="https://github.com/jejjohnson/finitevolX/commit/9ce3f8d69ba5cafe20f2cbf71b9f5175f3c60f08">9ce3f8d</a>)</li>
+<li>add Coriolis force operator for staggered C-grid models (<a href="https://github.com/jejjohnson/finitevolX/commit/b0d70b6a0406faa61160325fed220fdcbcac918a">b0d70b6</a>)</li>
+<li>add harmonic and biharmonic (∇⁴) diffusion operators for C-grid staggered models (<a href="https://github.com/jejjohnson/finitevolX/commit/6a31f5da02d3d41d58e76f147590d50c39aa6074">6a31f5d</a>)</li>
+<li>add horizontal diffusion operator (flux-form) for C-grid staggered models (<a href="https://github.com/jejjohnson/finitevolX/commit/319ce69865ed97ae14e310aeac7cca7fc858b3a7">319ce69</a>)</li>
+<li>add horizontal diffusion operator (flux-form) for C-grid staggered models (<a href="https://github.com/jejjohnson/finitevolX/commit/44c063852372880e07f28804d4d47e5270771702">44c0638</a>)</li>
+<li>merge main (PR <a href="https://github.com/jejjohnson/finitevolX/issues/97">#97</a>) — reconcile with Diffusion2D/3D/diffusion_2d (<a href="https://github.com/jejjohnson/finitevolX/commit/1a3408d225223a13a2d2caa6a9b6174efb0dea3f">1a3408d</a>)</li>
+</ul>
+<h3 id="bug-fixes_18">Bug Fixes</h3>
+<ul>
+<li>address PR review comments on diffusion module (<a href="https://github.com/jejjohnson/finitevolX/commit/d8d9390425416c6faf6fd8291793d89e7864ccc8">d8d9390</a>)</li>
+<li>address PR review comments on diffusion operator (<a href="https://github.com/jejjohnson/finitevolX/commit/8442eadeabed36e7c0a0881b9af0a94e866090bb">8442ead</a>)</li>
+</ul>
+<h2 id="0019-2026-03-11"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.18...v0.0.19">0.0.19</a> (2026-03-11)</h2>
+<h3 id="features_16">Features</h3>
+<ul>
+<li>add Arakawa (1966) Jacobian operator for energy- and enstrophy-conserving advection (<a href="https://github.com/jejjohnson/finitevolX/commit/beb6e9a0dadfc7dee7ef96ffacb0010b50ee3e98">beb6e9a</a>)</li>
+<li>add Arakawa (1966) Jacobian operator for energy- and enstrophy-conserving advection (<a href="https://github.com/jejjohnson/finitevolX/commit/c7610f62a8562b2cd91e3ccfdf8d9c94906d071b">c7610f6</a>)</li>
+<li>add energy-conserving momentum advection operator for C-grid models (<a href="https://github.com/jejjohnson/finitevolX/commit/8ea2a21f639665025b78f91709689112103496c5">8ea2a21</a>)</li>
+<li>add energy-conserving momentum advection operator for C-grid models (<a href="https://github.com/jejjohnson/finitevolX/commit/db36273a49a36e931cf9e2c8bec5b1fb2ec6146f">db36273</a>)</li>
+<li>add multi-layer vertical coupling matrix and layer↔mode transforms (<a href="https://github.com/jejjohnson/finitevolX/commit/8cdafe9e05824a82265d4ab774217ea3b9f5e9b0">8cdafe9</a>)</li>
+<li>add vertical coupling matrix (A) and layer↔mode transforms (<a href="https://github.com/jejjohnson/finitevolX/commit/aa45bcce97e107aed545e171517efe365d82caec">aa45bcc</a>)</li>
+</ul>
+<h3 id="bug-fixes_19">Bug Fixes</h3>
+<ul>
+<li>address PR review - JAX-jittable vertical modes, fix annotations and docstring (<a href="https://github.com/jejjohnson/finitevolX/commit/8fbf23a4f389b6a9344985856d2f951a02395f2f">8fbf23a</a>)</li>
+<li>address PR review comments - fix jaxtyping shape annotation and test import path (<a href="https://github.com/jejjohnson/finitevolX/commit/3ed80778639f8793bb6824f6fb46d39e04791ee3">3ed8077</a>)</li>
+<li>resolve I001 import-sort error in tests and run ruff check on full repo (<a href="https://github.com/jejjohnson/finitevolX/commit/93169614b7061983c41bc38fa0bb49e0923405ea">9316961</a>)</li>
+<li>resolve ruff lint errors in test_momentum.py (<a href="https://github.com/jejjohnson/finitevolX/commit/6faa3a2f99976d203a96e18094703c6d3464800d">6faa3a2</a>)</li>
+<li>restrict momentum advection write region and enable x64 in tests (<a href="https://github.com/jejjohnson/finitevolX/commit/3686faee4debfddf08f7ec4fa1bf1890996d53fc">3686fae</a>)</li>
+</ul>
+<h2 id="0018-2026-03-11"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.17...v0.0.18">0.0.18</a> (2026-03-11)</h2>
+<h3 id="features_17">Features</h3>
+<ul>
+<li>add <code>grad_perp</code> operator to <code>Difference2D</code> for geostrophic velocity (<a href="https://github.com/jejjohnson/finitevolX/commit/09ecb964cba85ccb17bd5d38fa1b4be9778d1e91">09ecb96</a>)</li>
+<li>add grad_perp operator to Difference2D for geostrophic velocity (<a href="https://github.com/jejjohnson/finitevolX/commit/fad6966aad5272ecc85763443f54552be522a0cd">fad6966</a>)</li>
+<li>add Slip1D — free/no/partial-slip boundary condition for tangential velocity (<a href="https://github.com/jejjohnson/finitevolX/commit/591a5511b2300caffb36dbb2038ee912bf051950">591a551</a>)</li>
+<li>add SlipBC1D boundary condition for tangential velocity at solid walls (<a href="https://github.com/jejjohnson/finitevolX/commit/8e7a9fad52563a60f4cb960795e4c93b0d3e3e9b">8e7a9fa</a>)</li>
+<li>add standalone <code>Divergence2D</code> / <code>divergence_2d</code> operator (<a href="https://github.com/jejjohnson/finitevolX/commit/56e4f0f67e73029a50bd42a41a1a4b511105a825">56e4f0f</a>)</li>
+<li>add standalone Divergence2D / divergence_2d operator (<a href="https://github.com/jejjohnson/finitevolX/commit/522c98b798802b425a9f7b7068897a7edddf1a29">522c98b</a>)</li>
+</ul>
+<h3 id="bug-fixes_20">Bug Fixes</h3>
+<ul>
+<li>address PR review - noflux 4-wall BC, dtype promotion, transform coverage (<a href="https://github.com/jejjohnson/finitevolX/commit/940035b64ff262de1eeb073ecb9bf8c0edaceeb7">940035b</a>)</li>
+<li>use direct stencil in grad_perp to avoid ghost-cell contamination (<a href="https://github.com/jejjohnson/finitevolX/commit/1d80ccc6cd21803e3ac5e297058eb55eac3076cd">1d80ccc</a>)</li>
+</ul>
+<h2 id="0017-2026-03-10"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.16...v0.0.17">0.0.17</a> (2026-03-10)</h2>
+<h3 id="features_18">Features</h3>
+<ul>
+<li>add WENO7 and WENO9 advection schemes (<a href="https://github.com/jejjohnson/finitevolX/commit/6fd9ebc81ad46c720ffde40f85756f087d583d0b">6fd9ebc</a>)</li>
+</ul>
+<h2 id="0016-2026-03-10"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.15...v0.0.16">0.0.16</a> (2026-03-10)</h2>
+<h3 id="features_19">Features</h3>
+<ul>
+<li>replace static PNG comparison plots with animated GIFs (<a href="https://github.com/jejjohnson/finitevolX/commit/ebf4b188f6c0fb4fede0e6a92042ab704cd43f99">ebf4b18</a>)</li>
+<li>replace static PNG comparison plots with animated GIFs (<a href="https://github.com/jejjohnson/finitevolX/commit/9d813d1ccf640269762bf4cf5cd78927be917945">9d813d1</a>)</li>
+</ul>
+<h3 id="bug-fixes_21">Bug Fixes</h3>
+<ul>
+<li>address reviewer feedback on GIF animation changes (<a href="https://github.com/jejjohnson/finitevolX/commit/94ebc3657ddd1580f3f804ca9e671499de99e162">94ebc36</a>)</li>
+</ul>
+<h2 id="0015-2026-03-10"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.14...v0.0.15">0.0.15</a> (2026-03-10)</h2>
+<h3 id="features_20">Features</h3>
+<ul>
+<li>add TVD flux limiters, masked TVD schemes, and advection method support (<a href="https://github.com/jejjohnson/finitevolX/commit/863b3ace4622a010a6e6fc3f84716c1cae745470">863b3ac</a>)</li>
+<li>flux limiters and masked advection schemes (<a href="https://github.com/jejjohnson/finitevolX/commit/7fc7654a56437464c2efa4e865372e05d2de79ec">7fc7654</a>)</li>
+</ul>
+<h3 id="bug-fixes_22">Bug Fixes</h3>
+<ul>
+<li>correct inaccurate comment on TVD stencil size in tvd_x_masked (<a href="https://github.com/jejjohnson/finitevolX/commit/39db0c22dcab86696878f4006deee344c8975d99">39db0c2</a>)</li>
+<li>keep jaxtyping shape strings compatible with ruff and ty (<a href="https://github.com/jejjohnson/finitevolX/commit/263f49127b9ec57ed182519ac081f18c29a704f3">263f491</a>)</li>
+</ul>
+<h2 id="0014-2026-03-10"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.13...v0.0.14">0.0.14</a> (2026-03-10)</h2>
+<h3 id="bug-fixes_23">Bug Fixes</h3>
+<ul>
+<li>correct physical formulation in all three double-gyre example scripts (<a href="https://github.com/jejjohnson/finitevolX/commit/3bafe48e8f3ca2b92c425c012a3cc631498ef2b4">3bafe48</a>)</li>
+<li>correct QG 1.5-layer PV formulation, drag, beta term, and forcing amplitude (<a href="https://github.com/jejjohnson/finitevolX/commit/758c37773d3964311edfae8ed83d3116c03b8bb5">758c377</a>)</li>
+<li>correct wind sign, nonlinear SWM Bernoulli double-counting, and Coriolis staggering (<a href="https://github.com/jejjohnson/finitevolX/commit/4adb0eb5babf7cdb8fd0ab1749a95e3a97ef130d">4adb0eb</a>)</li>
+</ul>
+<h2 id="0013-2026-03-08"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.12...v0.0.13">0.0.13</a> (2026-03-08)</h2>
+<h3 id="bug-fixes_24">Bug Fixes</h3>
+<ul>
+<li>convert QG example from periodic beta-plane to closed-basin double-gyre (<a href="https://github.com/jejjohnson/finitevolX/commit/b132e8e0001ab6a111e8d86d6b735f26eb8e3a20">b132e8e</a>)</li>
+<li>convert QG example from periodic beta-plane to closed-basin double-gyre (<a href="https://github.com/jejjohnson/finitevolX/commit/10a253df437afbad5f9178e8bbbce82366301549">10a253d</a>)</li>
+</ul>
+<h2 id="0012-2026-03-07"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.11...v0.0.12">0.0.12</a> (2026-03-07)</h2>
+<h3 id="bug-fixes_25">Bug Fixes</h3>
+<ul>
+<li>address operator dtype and fixture review feedback (<a href="https://github.com/jejjohnson/finitevolX/commit/e2d6afc4c243ace9ec08584aca8b93c6344f9a4e">e2d6afc</a>)</li>
+<li>Advection3D ghost flux bug; add U/V/X ghost cell tests; update instructions and figures (<a href="https://github.com/jejjohnson/finitevolX/commit/a4ca4156e9a1ec42f8ed4e22a321b29747b927a7">a4ca415</a>)</li>
+<li>correct Arakawa C-grid operators, ghost-cell tests for all staggered types, and agent instructions (<a href="https://github.com/jejjohnson/finitevolX/commit/d0c3c8c03f3595fe1d9e5e224f43451d25416b2d">d0c3c8c</a>)</li>
+<li>correct operators, add non-constant tests, document C-grid discretization (<a href="https://github.com/jejjohnson/finitevolX/commit/5a1e8316ec6d73621e6e68be2f1173d01e7f658f">5a1e831</a>)</li>
+<li>rewrite kinetic_energy and bernoulli_potential for Arakawa C-grid same-size convention (<a href="https://github.com/jejjohnson/finitevolX/commit/06d8c9ae06a762d64801067f20abeced4a9faf46">06d8c9a</a>)</li>
+</ul>
+<h2 id="0011-2026-03-07"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.10...v0.0.11">0.0.11</a> (2026-03-07)</h2>
+<h3 id="features_21">Features</h3>
+<ul>
+<li>modernize double gyre example scripts (<a href="https://github.com/jejjohnson/finitevolX/commit/1189edefad59acd5319ce0aad7c796a4e9276240">1189ede</a>)</li>
+</ul>
+<h3 id="bug-fixes_26">Bug Fixes</h3>
+<ul>
+<li>address example script review feedback (<a href="https://github.com/jejjohnson/finitevolX/commit/c09953d518c4a4dc162008d8da2d8c9ba1a00352">c09953d</a>)</li>
+<li>tune double gyre example diagnostics (<a href="https://github.com/jejjohnson/finitevolX/commit/65c0fe6f1097c3ca4e314dd3c908367a5865487d">65c0fe6</a>)</li>
+<li>use corner-based qg geostrophic mapping (<a href="https://github.com/jejjohnson/finitevolX/commit/e6f995df79e3ac448ffe5ee4790129cff942583f">e6f995d</a>)</li>
+</ul>
+<h2 id="0010-2026-03-07"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.9...v0.0.10">0.0.10</a> (2026-03-07)</h2>
+<h3 id="features_22">Features</h3>
+<ul>
+<li>add per-side boundary condition API for 2D ghost-ring fields (<a href="https://github.com/jejjohnson/finitevolX/commit/928e0b525dcaeab5e5279677005f1f9922749381">928e0b5</a>)</li>
+</ul>
+<h3 id="bug-fixes_27">Bug Fixes</h3>
+<ul>
+<li>correct Neumann face signs and exports (<a href="https://github.com/jejjohnson/finitevolX/commit/b08cdfaaf72d2237e950a2e79f66d1decc5176f7">b08cdfa</a>)</li>
+</ul>
+<h2 id="009-2026-03-07"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.8...v0.0.9">0.0.9</a> (2026-03-07)</h2>
+<h3 id="features_23">Features</h3>
+<ul>
+<li>add capacitance matrix solver and preconditioned CG (<a href="https://github.com/jejjohnson/finitevolX/commit/3b96918d72e597dbf9a180ec169fd3701f13450e">3b96918</a>)</li>
+<li>add spectral transforms and core elliptic solvers (DST/DCT/FFT) (<a href="https://github.com/jejjohnson/finitevolX/commit/3674204cf9e4c8bf80de0f068551e1904974d7e0">3674204</a>)</li>
+<li>integrate JAX spectral transforms, elliptic solvers, capacitance matrix method, and lineax-based PCG into finitevolX (<a href="https://github.com/jejjohnson/finitevolX/commit/e8f0191a00b5725bf2234f518fb5bf2652c691b2">e8f0191</a>)</li>
+</ul>
+<h3 id="bug-fixes_28">Bug Fixes</h3>
+<ul>
+<li>handle lambda_=0 in solve_helmholtz_dct and solve_helmholtz_fft (<a href="https://github.com/jejjohnson/finitevolX/commit/72ec96be8bd6defba5ff6dcbedb7a20e1f15000d">72ec96b</a>)</li>
+<li>resolve ruff lint errors in test files (RUF059, RUF003) (<a href="https://github.com/jejjohnson/finitevolX/commit/cc9400a45b0700efd24bae7feb456883984ab5fc">cc9400a</a>)</li>
+</ul>
+<h2 id="008-2026-03-03"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.7...v0.0.8">0.0.8</a> (2026-03-03)</h2>
+<h3 id="features_24">Features</h3>
+<ul>
+<li>adopt pypackage_template standards and best practices (<a href="https://github.com/jejjohnson/finitevolX/commit/71afd3e3f40f2c06b9a23dce4863944f3e446b76">71afd3e</a>)</li>
+</ul>
+<h3 id="bug-fixes_29">Bug Fixes</h3>
+<ul>
+<li>correct API reference documentation to use actual exported functions (<a href="https://github.com/jejjohnson/finitevolX/commit/4dc1804668ff687e6b9457b0fe7c5d3503c37302">4dc1804</a>)</li>
+</ul>
+<h2 id="007-2026-03-01"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.6...v0.0.7">0.0.7</a> (2026-03-01)</h2>
+<h3 id="features_25">Features</h3>
+<ul>
+<li>add mask-aware reconstruction methods to Reconstruction2D and Reconstruction3D (<a href="https://github.com/jejjohnson/finitevolX/commit/35442d0583e7e8c9a8f91cb9e4cd02ada23227f1">35442d0</a>)</li>
+<li>add mask-aware WENO5/WENOZ5 reconstruction to Reconstruction2D and Reconstruction3D (<a href="https://github.com/jejjohnson/finitevolX/commit/ef39e9fba7129a883d9e41bb7e492c348e2445d7">ef39e9f</a>)</li>
+</ul>
+<h2 id="006-2026-03-01"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.5...v0.0.6">0.0.6</a> (2026-03-01)</h2>
+<h3 id="bug-fixes_30">Bug Fixes</h3>
+<ul>
+<li>move operator tests to tests/ directory per AGENTS.md (<a href="https://github.com/jejjohnson/finitevolX/commit/5b74582cd63a4dc7fb54ab022cc359553ec08ac6">5b74582</a>)</li>
+<li>use lazy import for finitediffx in operators.py (<a href="https://github.com/jejjohnson/finitevolX/commit/fe0b5f8b9482cec288696f43927ff315e0e92c9c">fe0b5f8</a>)</li>
+</ul>
+<h2 id="005-2026-03-01"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.4...v0.0.5">0.0.5</a> (2026-03-01)</h2>
+<h3 id="bug-fixes_31">Bug Fixes</h3>
+<ul>
+<li><strong>cgrid_mask:</strong> define Nirr type alias to resolve ty check error on Python 3.13 (<a href="https://github.com/jejjohnson/finitevolX/commit/caa558bb3628c64a1a8e77ee53756a92ce9c3a07">caa558b</a>)</li>
+</ul>
+<h2 id="004-2026-03-01"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.3...v0.0.4">0.0.4</a> (2026-03-01)</h2>
+<h3 id="features_26">Features</h3>
+<ul>
+<li>add unified <code>Mask2D</code>; remove legacy <code>MaskGrid</code>/<code>FaceMask</code>/<code>NodeMask</code>/<code>CenterMask</code> (<a href="https://github.com/jejjohnson/finitevolX/commit/d11b9951eaced1205c9a1de6fe6a8d4c5b515ac4">d11b995</a>)</li>
+</ul>
+<h3 id="bug-fixes_32">Bug Fixes</h3>
+<ul>
+<li>add missing quotes around Nirr in jaxtyping annotations (<a href="https://github.com/jejjohnson/finitevolX/commit/fdd4ef61d5463d81dec6a5862541166218f43614">fdd4ef6</a>)</li>
+</ul>
+<h2 id="003-2026-03-01"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.2...v0.0.3">0.0.3</a> (2026-03-01)</h2>
+<h3 id="bug-fixes_33">Bug Fixes</h3>
+<ul>
+<li>apply ruff format to reconstruction.py (<a href="https://github.com/jejjohnson/finitevolX/commit/560a76622522c72e92d69b68aa3cf884898264d7">560a766</a>)</li>
+</ul>
+<h2 id="002-2026-03-01"><a href="https://github.com/jejjohnson/finitevolX/compare/v0.0.1...v0.0.2">0.0.2</a> (2026-03-01)</h2>
+<h3 id="features_27">Features</h3>
+<ul>
+<li>composable arakawa c-grid operators, modernize packaging, and fix linting (<a href="https://github.com/jejjohnson/finitevolX/commit/3b3e94d7e038b42d4156f17835346750c4784d90">3b3e94d</a>)</li>
+</ul>
+<h3 id="bug-fixes_34">Bug Fixes</h3>
+<ul>
+<li>adjust advection write region to avoid ghost-ring fluxes, add upwind2/3 value tests (<a href="https://github.com/jejjohnson/finitevolX/commit/da4958a7790174ce0e9d67cc63fd8f0b68eef8cd">da4958a</a>)</li>
+<li>correct advection flux indexing and simplify upwind2 negative flow test (<a href="https://github.com/jejjohnson/finitevolX/commit/6bdc730898d3e1940fdf0d7ecdb076c93ad03b98">6bdc730</a>)</li>
+<li>correct upwind2/upwind3 boundary fallback in reconstruction methods (<a href="https://github.com/jejjohnson/finitevolX/commit/6da797196ee509535da39a7101b9e6a6346335a3">6da7971</a>)</li>
+<li>fix ty invalid-argument-type errors properly (<a href="https://github.com/jejjohnson/finitevolX/commit/79dd5fa0fccf73d1b649b9f2ce0c672e18b32a2a">79dd5fa</a>)</li>
+<li>rename param u-&gt;v in Difference3D.diff_y_V_to_T; fix grid docstring coordinates (<a href="https://github.com/jejjohnson/finitevolX/commit/ca05743308e8778c6e0632145026d8f7d5b80662">ca05743</a>)</li>
+<li>replace JAX array assertions with np.testing and handle division by zero in PV (<a href="https://github.com/jejjohnson/finitevolX/commit/83dcdd2841fd7106eb5de3833fb5a9ce21ba7765">83dcdd2</a>)</li>
+<li>resolve remaining ruff linting errors (unused vars, format strings) (<a href="https://github.com/jejjohnson/finitevolX/commit/6a710851ed93ec2e9aa8136f1bbcae937805ef5f">6a71085</a>)</li>
+<li>resolve ruff and ty linting issues, remove coverage constraints (<a href="https://github.com/jejjohnson/finitevolX/commit/e520f4f5cafb7b58372790f79a7ef84b3c497b7c">e520f4f</a>)</li>
+<li>suppress ty invalid-argument-type errors in pyproject.toml (<a href="https://github.com/jejjohnson/finitevolX/commit/cde1a5957652021c02e0bdb3a045673aeb57cd79">cde1a59</a>)</li>
+<li>suppress ty invalid-argument-type errors in pyproject.toml (<a href="https://github.com/jejjohnson/finitevolX/commit/84bfddb87660b84993c00e56a71ea81988ff48db">84bfddb</a>)</li>
+<li>widen step_size type in difference() and convert test arrays to jnp (<a href="https://github.com/jejjohnson/finitevolX/commit/ab38caabd3b0461ce0ee2f34eacda405f18f4d5f">ab38caa</a>)</li>
+</ul>
+<h2 id="changelog_1">Changelog</h2>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "content.code.copy", "content.code.annotate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
