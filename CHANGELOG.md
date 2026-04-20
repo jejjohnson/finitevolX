@@ -62,6 +62,14 @@ field stored column indices and `_yids` stored row indices.
   library.  Equivalent inline code is available in
   `docs/notebooks/demo_masks.py`.
 
+## [0.0.41](https://github.com/jejjohnson/finitevolX/compare/v0.0.40...v0.0.41) (2026-04-20)
+
+
+### Features
+
+* spherical diffusion and advection operators ([#165](https://github.com/jejjohnson/finitevolX/issues/165)) ([#216](https://github.com/jejjohnson/finitevolX/issues/216)) ([33fb9e7](https://github.com/jejjohnson/finitevolX/commit/33fb9e778c339e2fe2809479b97f5f38b18fe820))
+* spherical follow-ups — biharmonic, momentum advection, reductions ([#221](https://github.com/jejjohnson/finitevolX/issues/221)) ([f36ba97](https://github.com/jejjohnson/finitevolX/commit/f36ba97fc2d8246fee7ec2ce6e4b0f313ce54d64))
+
 ## [0.0.40](https://github.com/jejjohnson/finitevolX/compare/v0.0.39...v0.0.40) (2026-04-11)
 
 
