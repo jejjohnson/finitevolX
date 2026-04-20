@@ -31,10 +31,10 @@ from finitevolx._src.advection.weno import (
     weno_9pts as _weno9,
     weno_9pts_right as _weno9_right,
 )
-from finitevolx._src.grid.cartesian import (
-    CartesianGrid1D,
-    CartesianGrid2D,
-    CartesianGrid3D,
+from finitevolx._src.grid.base import (
+    ArakawaCGrid1D,
+    ArakawaCGrid2D,
+    ArakawaCGrid3D,
 )
 from finitevolx._src.mask import Mask2D
 from finitevolx._src.operators._ghost import interior
@@ -289,10 +289,13 @@ class Reconstruction1D(eqx.Module):
 
     Parameters
     ----------
-    grid : CartesianGrid1D
+    grid : ArakawaCGrid1D
+        Any 1-D Arakawa C-grid.  Reconstruction is coordinate-agnostic —
+        the grid is stored for downstream consumers but its spacing
+        fields are never read by the reconstruction stencils themselves.
     """
 
-    grid: CartesianGrid1D
+    grid: ArakawaCGrid1D
 
     def naive_x(
         self,
@@ -574,10 +577,14 @@ class Reconstruction2D(eqx.Module):
 
     Parameters
     ----------
-    grid : CartesianGrid2D
+    grid : ArakawaCGrid2D
+        Any 2-D Arakawa C-grid (Cartesian, spherical, etc.).
+        Reconstruction stencils are coordinate-agnostic — the grid is
+        stored for downstream consumers but the spacing fields are
+        never read by the reconstruction itself.
     """
 
-    grid: CartesianGrid2D
+    grid: ArakawaCGrid2D
 
     def naive_x(
         self,
@@ -1311,10 +1318,13 @@ class Reconstruction3D(eqx.Module):
 
     Parameters
     ----------
-    grid : CartesianGrid3D
+    grid : ArakawaCGrid3D
+        Any 3-D Arakawa C-grid.  Reconstruction stencils are
+        coordinate-agnostic — the grid is stored but its spacing
+        fields are never read by the reconstruction itself.
     """
 
-    grid: CartesianGrid3D
+    grid: ArakawaCGrid3D
 
     def naive_x(
         self,
