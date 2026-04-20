@@ -396,3 +396,171 @@ class SphericalDiffusion3D(eqx.Module):
             h, kappa_arr, mu, mv
         )
         return zero_z_ghosts(fx), zero_z_ghosts(fy)
+
+
+class SphericalBiharmonicDiffusion2D(eqx.Module):
+    """Biharmonic (spherical ∇⁴) diffusion on a 2-D spherical C-grid.
+
+    Computes the scale-selective biharmonic tendency
+
+        ∂h/∂t|_diff = −κ · ∇⁴_sphere h
+
+    where ``∇⁴_sphere h = ∇²_sphere(∇²_sphere h)`` is implemented as
+    two successive flux-form spherical Laplacians via
+    :class:`SphericalDiffusion2D`.  Positive κ gives dissipation, with
+    small-scale damping scaling as ``κ·k⁴`` vs ``κ·k²`` for harmonic
+    diffusion — the standard scale-selective mixing used in MITgcm,
+    MOM, and other GCMs on spherical grids.
+
+    Only interior cells ``[1:-1, 1:-1]`` are written; the ghost ring
+    is zero.  The caller is responsible for boundary conditions.
+
+    Parameters
+    ----------
+    grid : SphericalGrid2D
+        The underlying 2-D spherical grid.
+    mask : Mask2D or None, optional
+        Optional land/ocean mask.  When provided, the inner harmonic
+        :class:`SphericalDiffusion2D` is deliberately built with
+        ``mask=None`` — masking the intermediate Laplacian would
+        corrupt the second harmonic pass because ``lap1 == 0`` at dry
+        T-cells becomes a forced zero-Dirichlet boundary for the
+        second pass, which distorts the ∇⁴ stencil at wet cells
+        adjacent to land.  Instead, the mask is applied via a
+        post-compute ``* mask.h`` on the **final** ``−κ · ∇⁴h``
+        tendency only.  This is the design exception called out in
+        issue #209 §4, identical to :class:`BiharmonicDiffusion2D`.
+
+    Notes
+    -----
+    The ghost ring of the intermediate Laplacian ``∇²_sphere h`` is
+    zero (Dirichlet-0), not zero-normal-gradient (Neumann).  The
+    second pass reads a zero halo for the intermediate field, which
+    contaminates the outermost interior row/column of the final
+    tendency — only results in the deep interior ``[2:-2, 2:-2]`` are
+    fully BC-consistent.  Same caveat as :class:`BiharmonicDiffusion2D`.
+
+    Examples
+    --------
+    >>> import jax.numpy as jnp
+    >>> from finitevolx import SphericalGrid2D, SphericalBiharmonicDiffusion2D
+    >>> grid = SphericalGrid2D.from_interior(
+    ...     nx_interior=16,
+    ...     ny_interior=10,
+    ...     lon_range=(0.0, 360.0),
+    ...     lat_range=(-40.0, 40.0),
+    ... )
+    >>> op = SphericalBiharmonicDiffusion2D(grid=grid)
+    >>> h = jnp.ones((grid.Ny, grid.Nx))
+    >>> tend = op(h, kappa=1e6)
+    >>> tend.shape
+    (12, 18)
+    """
+
+    grid: SphericalGrid2D
+    mask: Mask2D | None
+    _harm: SphericalDiffusion2D
+
+    def __init__(
+        self,
+        grid: SphericalGrid2D,
+        mask: Mask2D | None = None,
+    ) -> None:
+        self.grid = grid
+        self.mask = mask
+        # Critical: inner harmonic operator is ALWAYS mask=None, even when
+        # SphericalBiharmonicDiffusion2D has a mask.  See class docstring.
+        self._harm = SphericalDiffusion2D(grid=grid)
+
+    def __call__(
+        self,
+        h: Float[Array, "Ny Nx"],
+        kappa: float,
+    ) -> Float[Array, "Ny Nx"]:
+        """Apply biharmonic diffusion and return ``−κ · ∇⁴_sphere h``.
+
+        Parameters
+        ----------
+        h : Float[Array, "Ny Nx"]
+            Scalar tracer at T-points.
+        kappa : float
+            Biharmonic diffusion coefficient (κ ≥ 0 gives dissipation).
+
+        Returns
+        -------
+        Float[Array, "Ny Nx"]
+            Tendency ``−κ · ∇⁴_sphere h`` at T-points, same shape as
+            ``h``.  Ghost cells are zero.  When ``self.mask`` is set,
+            the output is post-multiplied by ``mask.h``.
+        """
+        lap1 = self._harm(h, kappa=1.0)
+        lap2 = self._harm(lap1, kappa=1.0)
+        out = -kappa * lap2
+        if self.mask is not None:
+            out = out * self.mask.h
+        return out
+
+
+class SphericalBiharmonicDiffusion3D(eqx.Module):
+    """Biharmonic spherical diffusion on a 3-D Arakawa C-grid.
+
+    Applies the horizontal biharmonic spherical Laplacian independently
+    at each z-level
+
+        ∂h/∂t|_diff = −κ · ∇⁴_{h,sphere} h
+
+    where ``∇⁴_{h,sphere}`` denotes the horizontal spherical biharmonic
+    operator, implemented as two successive :class:`SphericalDiffusion3D`
+    passes.
+
+    Parameters
+    ----------
+    grid : SphericalGrid3D
+    mask : Mask3D or None, optional
+        Optional 3-D land/ocean mask.  The inner harmonic
+        :class:`SphericalDiffusion3D` is always built with
+        ``mask=None``; the outer mask is applied as a post-compute
+        ``* mask.h`` on the final tendency — same exception as
+        :class:`SphericalBiharmonicDiffusion2D`.
+    """
+
+    grid: SphericalGrid3D
+    mask: Mask3D | None
+    _harm: SphericalDiffusion3D
+
+    def __init__(
+        self,
+        grid: SphericalGrid3D,
+        mask: Mask3D | None = None,
+    ) -> None:
+        self.grid = grid
+        self.mask = mask
+        self._harm = SphericalDiffusion3D(grid=grid)
+
+    def __call__(
+        self,
+        h: Float[Array, "Nz Ny Nx"],
+        kappa: float,
+    ) -> Float[Array, "Nz Ny Nx"]:
+        """Apply horizontal biharmonic spherical diffusion.
+
+        Parameters
+        ----------
+        h : Float[Array, "Nz Ny Nx"]
+            Scalar tracer at T-points.
+        kappa : float
+            Biharmonic diffusion coefficient (κ ≥ 0 gives dissipation).
+
+        Returns
+        -------
+        Float[Array, "Nz Ny Nx"]
+            Tendency ``−κ · ∇⁴_{h,sphere} h`` at T-points.  Ghost cells
+            are zero.  When ``self.mask`` is set, the output is
+            post-multiplied by ``mask.h``.
+        """
+        lap1 = self._harm(h, kappa=1.0)
+        lap2 = self._harm(lap1, kappa=1.0)
+        out = -kappa * lap2
+        if self.mask is not None:
+            out = out * self.mask.h
+        return out
