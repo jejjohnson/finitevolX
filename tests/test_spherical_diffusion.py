@@ -82,7 +82,7 @@ class TestSphericalDiffusion2D:
         out = diff_op(h, kappa=1.0)
         np.testing.assert_allclose(out[1:-1, 1:-1], 0.0, atol=1e-10)
 
-    def test_kappa_scales_linearly(self, diff_op, grid, rng=None):
+    def test_kappa_scales_linearly(self, diff_op, grid):
         """Doubling κ doubles the tendency."""
         key = jax.random.PRNGKey(0)
         h = jax.random.normal(key, (grid.Ny, grid.Nx))

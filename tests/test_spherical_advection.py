@@ -75,12 +75,15 @@ class TestSphericalAdvection2D:
     @pytest.mark.parametrize(
         "method",
         [
+            "naive",
             "upwind1",
             "upwind2",
             "upwind3",
             "weno3",
             "weno5",
             "wenoz5",
+            "weno7",
+            "weno9",
             "minmod",
             "van_leer",
             "superbee",
@@ -258,6 +261,31 @@ class TestSphericalAdvection3D:
         v = jnp.zeros_like(h)
         out = op(h, u, v, method="upwind1")
         np.testing.assert_allclose(out, 0.0, atol=1e-12)
+
+    @pytest.mark.parametrize(
+        "method",
+        [
+            "naive",
+            "upwind1",
+            "weno3",
+            "weno5",
+            "weno7",
+            "weno9",
+            "minmod",
+            "van_leer",
+            "superbee",
+            "mc",
+        ],
+    )
+    def test_methods_produce_finite_output(self, op, grid3d, method):
+        key = jax.random.PRNGKey(15)
+        k1, k2, k3 = jax.random.split(key, 3)
+        shape = (grid3d.Nz, grid3d.Ny, grid3d.Nx)
+        h = jax.random.normal(k1, shape)
+        u = jax.random.normal(k2, shape)
+        v = jax.random.normal(k3, shape)
+        out = op(h, u, v, method=method)
+        assert jnp.all(jnp.isfinite(out))
 
     def test_z_ghost_slices_zero(self, op, grid3d):
         key = jax.random.PRNGKey(10)

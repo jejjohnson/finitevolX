@@ -8,15 +8,27 @@ spherical flux-divergence::
     ∂h/∂t = − 1/(R·cosφ) · [ ∂(h·u)/∂λ + ∂(h·v·cosφ)/∂φ ]
 
 Only the final flux-divergence step differs from the Cartesian
-:class:`~finitevolx.Advection2D`.  The reconstruction stencils
-(WENO3/5/7/9, WENOz5, TVD with minmod/van_leer/superbee/mc, upwind
-1/2/3, naive) are exactly the Cartesian ones — they take a
-``Float[Array, "Ny Nx"]`` and produce face fluxes on an Arakawa C-grid
-without reading any grid-spacing fields.
+:class:`~finitevolx.Advection2D`.  The reconstruction stencils are
+exactly the Cartesian ones — they take a ``Float[Array, "Ny Nx"]``
+and produce face fluxes on an Arakawa C-grid without reading any
+grid-spacing fields.  The supported ``method`` strings differ by
+dimensionality, matching the corresponding Cartesian operators:
 
-The class :class:`SphericalAdvection2D` mirrors the public API of
-:class:`Advection2D` (same ``method`` strings, same mask-adaptive
-stencil dispatch) and differs only by:
+* :class:`SphericalAdvection2D` (matches :class:`Advection2D`):
+  ``'naive'``, ``'upwind1'``, ``'upwind2'``, ``'upwind3'``,
+  ``'weno3'``, ``'weno5'``, ``'wenoz5'``, ``'weno7'``, ``'weno9'``,
+  and the TVD limiters ``'minmod'``, ``'van_leer'``, ``'superbee'``,
+  ``'mc'``.
+* :class:`SphericalAdvection3D` (matches :class:`Advection3D`) —
+  the 3-D subset: ``'naive'``, ``'upwind1'``, ``'weno3'``,
+  ``'weno5'``, ``'weno7'``, ``'weno9'``, and the TVD limiters.
+  (``upwind2``, ``upwind3``, and ``wenoz5`` are 2-D-only because
+  :class:`~finitevolx.Reconstruction3D` does not expose native 3-D
+  versions of those stencils.)
+
+The spherical 2-D class mirrors the public API of :class:`Advection2D`
+(same ``method`` alphabet, same mask-adaptive stencil dispatch) and
+differs only by:
 
 * ``grid`` is a :class:`SphericalGrid2D` instead of ``CartesianGrid2D``;
 * the final divergence step applies the cos(lat) metric weights.
