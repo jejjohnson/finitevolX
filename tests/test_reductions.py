@@ -384,3 +384,170 @@ class TestVolume:
             np.zeros((cart_grid.Nz, cart_grid.Ny, cart_grid.Nx), dtype=bool)
         )
         assert jnp.isnan(volume_mean(h, cart_grid, mask=all_dry))
+
+
+# ======================================================================
+# NaN/Inf on dry cells — must not contaminate wet totals
+# (PR #221 feedback: IEEE 0 * NaN = NaN.)
+# ======================================================================
+
+
+class TestDryCellNaNSafety:
+    def test_area_sum_dry_nan_does_not_contaminate(self):
+        grid = CartesianGrid2D.from_interior(
+            nx_interior=10, ny_interior=8, Lx=10.0, Ly=8.0
+        )
+        mask_arr = np.ones((grid.Ny, grid.Nx), dtype=bool)
+        mask_arr[3, 4] = False
+        m = Mask2D.from_mask(mask_arr)
+
+        field_np = np.ones((grid.Ny, grid.Nx))
+        field_np[3, 4] = np.nan  # common sentinel on land
+        field = jnp.asarray(field_np)
+
+        s = area_sum(field, grid, mask=m)
+        assert jnp.isfinite(s)
+        # Expected sum: (Nx-2)(Ny-2) - 1 wet cells, each unit value times cell area.
+        expected = ((grid.Nx - 2) * (grid.Ny - 2) - 1) * grid.dx * grid.dy
+        np.testing.assert_allclose(float(s), expected, rtol=1e-12)
+
+    def test_area_mean_dry_nan_does_not_contaminate(self):
+        grid = SphericalGrid2D.from_interior(
+            16,
+            10,
+            lon_range=(0.0, 360.0),
+            lat_range=(-40.0, 40.0),
+            R=R,
+        )
+        mask_arr = np.ones((grid.Ny, grid.Nx), dtype=bool)
+        mask_arr[2, 6] = False
+        m = Mask2D.from_mask(mask_arr)
+
+        field_np = 2.5 * np.ones((grid.Ny, grid.Nx))
+        field_np[2, 6] = np.inf  # land sentinel (could be NaN or Inf)
+        field = jnp.asarray(field_np)
+
+        mean = area_mean(field, grid, mask=m)
+        assert jnp.isfinite(mean)
+        np.testing.assert_allclose(float(mean), 2.5, rtol=1e-10)
+
+    def test_volume_sum_dry_nan_does_not_contaminate(self):
+        grid = CartesianGrid3D.from_interior(
+            nx_interior=6,
+            ny_interior=6,
+            nz_interior=4,
+            Lx=1.0,
+            Ly=1.0,
+            Lz=1.0,
+        )
+        mask_arr = np.ones((grid.Nz, grid.Ny, grid.Nx), dtype=bool)
+        mask_arr[1, 2, 3] = False
+        m = Mask3D.from_mask(mask_arr)
+
+        field_np = np.ones((grid.Nz, grid.Ny, grid.Nx))
+        field_np[1, 2, 3] = np.nan
+        field = jnp.asarray(field_np)
+
+        s = volume_sum(field, grid, mask=m)
+        assert jnp.isfinite(s)
+        cell_vol = grid.dx * grid.dy * grid.dz
+        interior_cells = (grid.Nz - 2) * (grid.Ny - 2) * (grid.Nx - 2)
+        expected = (interior_cells - 1) * cell_vol
+        np.testing.assert_allclose(float(s), expected, rtol=1e-12)
+
+    def test_volume_mean_dry_nan_does_not_contaminate(self):
+        grid = SphericalGrid3D.from_interior(
+            16,
+            10,
+            nz_interior=3,
+            lon_range=(0.0, 360.0),
+            lat_range=(-40.0, 40.0),
+            Lz=100.0,
+            R=R,
+        )
+        mask_arr = np.ones((grid.Nz, grid.Ny, grid.Nx), dtype=bool)
+        mask_arr[1, 3, 5] = False
+        m = Mask3D.from_mask(mask_arr)
+
+        field_np = 7.0 * np.ones((grid.Nz, grid.Ny, grid.Nx))
+        field_np[1, 3, 5] = np.nan
+        field = jnp.asarray(field_np)
+
+        mean = volume_mean(field, grid, mask=m)
+        assert jnp.isfinite(mean)
+        np.testing.assert_allclose(float(mean), 7.0, rtol=1e-10)
+
+
+# ======================================================================
+# Dtype preservation (PR #221 feedback: no silent float32 → float64)
+# ======================================================================
+
+
+class TestDtypePreservation:
+    """The mask path must not silently upcast beyond the unmasked path.
+
+    The OLD code forced ``mask.h`` to ``float64`` via
+    ``jnp.asarray(mask.h, dtype=jnp.float64)``, so enabling a mask
+    would silently upgrade a float32 workload to float64.  The fix
+    uses ``jnp.where(mask.h, …, 0.0)``, leaving dtype selection
+    entirely to JAX's normal promotion rules (driven by ``field`` and
+    the grid-derived weights).  These tests pin that "masked == unmasked
+    dtype" invariant across both sum and mean, 2-D and 3-D, Cartesian
+    and spherical.  The exact resulting dtype depends on JAX's weak-
+    type promotion (e.g. ``jnp.sum(weak_f64 * strong_f32)`` stays
+    float32) and is not the concern here — the concern is that the
+    mask does not introduce an *additional* upcast.
+    """
+
+    def test_area_sum_mask_matches_unmasked_dtype_cartesian(self):
+        grid = CartesianGrid2D.from_interior(
+            nx_interior=8,
+            ny_interior=6,
+            Lx=1.0,
+            Ly=1.0,
+        )
+        field = jnp.ones((grid.Ny, grid.Nx), dtype=jnp.float32)
+        m = Mask2D.from_mask(np.ones((grid.Ny, grid.Nx), dtype=bool))
+        assert area_sum(field, grid, mask=m).dtype == area_sum(field, grid).dtype
+        assert area_mean(field, grid, mask=m).dtype == area_mean(field, grid).dtype
+
+    def test_area_sum_mask_matches_unmasked_dtype_spherical(self):
+        grid = SphericalGrid2D.from_interior(
+            16,
+            10,
+            lon_range=(0.0, 360.0),
+            lat_range=(-40.0, 40.0),
+            R=R,
+        )
+        field = jnp.ones((grid.Ny, grid.Nx), dtype=jnp.float32)
+        m = Mask2D.from_mask(np.ones((grid.Ny, grid.Nx), dtype=bool))
+        assert area_sum(field, grid, mask=m).dtype == area_sum(field, grid).dtype
+        assert area_mean(field, grid, mask=m).dtype == area_mean(field, grid).dtype
+
+    def test_volume_mask_matches_unmasked_dtype(self):
+        grid = CartesianGrid3D.from_interior(
+            nx_interior=4,
+            ny_interior=4,
+            nz_interior=3,
+            Lx=1.0,
+            Ly=1.0,
+            Lz=1.0,
+        )
+        field = jnp.ones((grid.Nz, grid.Ny, grid.Nx), dtype=jnp.float32)
+        m = Mask3D.from_mask(np.ones((grid.Nz, grid.Ny, grid.Nx), dtype=bool))
+        assert volume_sum(field, grid, mask=m).dtype == volume_sum(field, grid).dtype
+        assert volume_mean(field, grid, mask=m).dtype == volume_mean(field, grid).dtype
+
+    def test_float32_sum_stays_float32(self):
+        """Under JAX weak promotion, f32 field × weak-f64 weights → f32."""
+        grid = CartesianGrid2D.from_interior(
+            nx_interior=8,
+            ny_interior=6,
+            Lx=1.0,
+            Ly=1.0,
+        )
+        field = jnp.ones((grid.Ny, grid.Nx), dtype=jnp.float32)
+        m = Mask2D.from_mask(np.ones((grid.Ny, grid.Nx), dtype=bool))
+        # This is the concrete regression guard from the reviewer
+        # comment: the OLD code returned float64 here.
+        assert area_sum(field, grid, mask=m).dtype == jnp.float32

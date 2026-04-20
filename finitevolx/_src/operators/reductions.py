@@ -18,6 +18,7 @@ runtime based on the grid type, so user code can stay grid-agnostic.
 
 Example
 -------
+>>> import jax.numpy as jnp
 >>> from finitevolx import area_sum, SphericalGrid2D
 >>> grid = SphericalGrid2D.from_interior(64, 32, (0.0, 360.0), (-80.0, 80.0))
 >>> h = jnp.ones((grid.Ny, grid.Nx))
@@ -149,14 +150,28 @@ def _interior_2d(field: Float[Array, "Ny Nx"]) -> Float[Array, "Ny_i Nx_i"]:
     return field[1:-1, 1:-1]
 
 
-def _mask_factor_2d(
+def _apply_mask_2d(
+    field: Float[Array, "Ny Nx"],
+    weights: Float[Array, "Ny Nx"],
     mask: Mask2D | None,
-    grid: ArakawaCGrid2D,
-) -> Float[Array, "Ny Nx"]:
-    """Return a float mask for T-points (1.0 wet, 0.0 dry) or all-ones."""
+) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
+    """Zero out dry cells in ``field`` and ``weights`` (2-D).
+
+    Uses ``jnp.where(mask.h, x, 0.0)`` rather than a multiplicative
+    float-cast mask, so that NaN/Inf values on dry T-cells — common
+    for land cells in realistic data — cannot contaminate the wet-cell
+    totals.  Returns the inputs unchanged when ``mask is None``.  The
+    dtype of ``field`` and ``weights`` is preserved.
+    """
     if mask is None:
-        return jnp.ones((grid.Ny, grid.Nx))
-    return jnp.asarray(mask.h, dtype=jnp.float64)
+        return field, weights
+    m = mask.h  # Bool[Array, "Ny Nx"]
+    # Use plain 0.0 (weak-typed) so the mask path does not introduce an
+    # upcast to float64 on top of the input dtype; the actual dtype
+    # comes from the field/weights arrays themselves.
+    safe_field = jnp.where(m, field, 0.0)
+    safe_weights = jnp.where(m, weights, 0.0)
+    return safe_field, safe_weights
 
 
 def area_sum(
@@ -166,11 +181,11 @@ def area_sum(
 ) -> Float[Array, ""]:
     """Area-weighted sum over physical interior T-cells.
 
-    Computes ``Σ_j Σ_i A[j, i] · m[j, i] · field[j, i]`` where ``A``
-    is the per-cell area metric for the grid type (Cartesian or
-    spherical), ``m`` is the T-point wet/dry mask (1.0 wet, 0.0 dry)
-    when ``mask`` is supplied, and the sum is taken over the interior
-    ``[1:-1, 1:-1]`` only.
+    Computes ``Σ_j Σ_i A[j, i] · field[j, i]`` summed over the
+    interior ``[1:-1, 1:-1]`` only.  When ``mask`` is supplied, dry
+    T-cells are zeroed out *before* multiplication using
+    ``jnp.where(mask.h, field, 0.0)`` so NaN/Inf sentinels stored on
+    land cells cannot contaminate the result.
 
     Parameters
     ----------
@@ -184,11 +199,12 @@ def area_sum(
     Returns
     -------
     Float[Array, ""]
-        Scalar area-weighted sum.
+        Scalar area-weighted sum.  Dtype follows the promoted dtype of
+        ``field`` and the area weights.
     """
     w = area_weights(grid)
-    m = _mask_factor_2d(mask, grid)
-    return jnp.sum(_interior_2d(w * m * field))
+    f, w = _apply_mask_2d(field, w, mask)
+    return jnp.sum(_interior_2d(w * f))
 
 
 def area_mean(
@@ -198,9 +214,11 @@ def area_mean(
 ) -> Float[Array, ""]:
     """Area-weighted mean over physical interior T-cells.
 
-    Returns ``(Σ A·m·field) / (Σ A·m)``.  Dry cells are excluded from
-    both sums.  When the total wet area is zero, returns NaN rather
-    than ±inf.
+    Returns ``(Σ A·field) / (Σ A)`` over wet T-cells.  Dry cells are
+    excluded from both numerator and denominator via
+    ``jnp.where(mask.h, ..., 0.0)``, so NaN/Inf on land does not
+    contaminate the mean.  When the total wet area is zero, returns
+    NaN rather than ±inf.
 
     Parameters
     ----------
@@ -215,10 +233,10 @@ def area_mean(
         Scalar area-weighted mean, or NaN if the total wet area is 0.
     """
     w = area_weights(grid)
-    m = _mask_factor_2d(mask, grid)
-    wm = _interior_2d(w * m)
-    num = jnp.sum(wm * _interior_2d(field))
-    den = jnp.sum(wm)
+    f, w = _apply_mask_2d(field, w, mask)
+    wi = _interior_2d(w)
+    num = jnp.sum(wi * _interior_2d(f))
+    den = jnp.sum(wi)
     return jnp.where(den == 0.0, jnp.nan, num / jnp.where(den == 0.0, 1.0, den))
 
 
@@ -233,13 +251,22 @@ def _interior_3d(
     return field[1:-1, 1:-1, 1:-1]
 
 
-def _mask_factor_3d(
+def _apply_mask_3d(
+    field: Float[Array, "Nz Ny Nx"],
+    weights: Float[Array, "Nz Ny Nx"],
     mask: Mask3D | None,
-    grid: ArakawaCGrid3D,
-) -> Float[Array, "Nz Ny Nx"]:
+) -> tuple[Float[Array, "Nz Ny Nx"], Float[Array, "Nz Ny Nx"]]:
+    """Zero out dry cells in ``field`` and ``weights`` (3-D).
+
+    Same NaN/Inf-safe pattern as :func:`_apply_mask_2d`.
+    """
     if mask is None:
-        return jnp.ones((grid.Nz, grid.Ny, grid.Nx))
-    return jnp.asarray(mask.h, dtype=jnp.float64)
+        return field, weights
+    m = mask.h  # Bool[Array, "Nz Ny Nx"]
+    # See _apply_mask_2d for the weak-typed 0.0 rationale.
+    safe_field = jnp.where(m, field, 0.0)
+    safe_weights = jnp.where(m, weights, 0.0)
+    return safe_field, safe_weights
 
 
 def volume_sum(
@@ -251,7 +278,9 @@ def volume_sum(
 
     Same semantics as :func:`area_sum` but with the per-cell volume
     metric ``V[k, j, i] = A[j, i] · dz`` and interior
-    ``[1:-1, 1:-1, 1:-1]``.
+    ``[1:-1, 1:-1, 1:-1]``.  NaN/Inf-safe under masking — dry cells
+    are zeroed via ``jnp.where(mask.h, field, 0.0)`` before
+    multiplication.
 
     Parameters
     ----------
@@ -265,8 +294,8 @@ def volume_sum(
     Float[Array, ""]
     """
     w = volume_weights(grid)
-    m = _mask_factor_3d(mask, grid)
-    return jnp.sum(_interior_3d(w * m * field))
+    f, w = _apply_mask_3d(field, w, mask)
+    return jnp.sum(_interior_3d(w * f))
 
 
 def volume_mean(
@@ -276,14 +305,14 @@ def volume_mean(
 ) -> Float[Array, ""]:
     """Volume-weighted mean over physical interior T-cells (3-D).
 
-    Returns ``(Σ V·m·field) / (Σ V·m)``.  NaN when the total wet
-    volume is zero.
+    Returns ``(Σ V·field) / (Σ V)`` over wet T-cells.  NaN/Inf-safe
+    under masking; NaN when the total wet volume is zero.
     """
     w = volume_weights(grid)
-    m = _mask_factor_3d(mask, grid)
-    wm = _interior_3d(w * m)
-    num = jnp.sum(wm * _interior_3d(field))
-    den = jnp.sum(wm)
+    f, w = _apply_mask_3d(field, w, mask)
+    wi = _interior_3d(w)
+    num = jnp.sum(wi * _interior_3d(f))
+    den = jnp.sum(wi)
     return jnp.where(den == 0.0, jnp.nan, num / jnp.where(den == 0.0, 1.0, den))
 
 
