@@ -23,6 +23,10 @@ from finitevolx._src.advection.reconstruction import (
     Reconstruction2D,
     Reconstruction3D,
 )
+from finitevolx._src.advection.spherical_advection import (
+    SphericalAdvection2D,
+    SphericalAdvection3D,
+)
 from finitevolx._src.advection.weno import (
     weno_3pts,
     weno_3pts_improved,
@@ -69,6 +73,10 @@ from finitevolx._src.diffusion.diffusion import (
     diffusion_2d,
 )
 from finitevolx._src.diffusion.momentum import MomentumAdvection2D, MomentumAdvection3D
+from finitevolx._src.diffusion.spherical_diffusion import (
+    SphericalDiffusion2D,
+    SphericalDiffusion3D,
+)
 from finitevolx._src.grid.base import (
     ArakawaCGrid1D,
     ArakawaCGrid2D,
@@ -336,6 +344,8 @@ __all__ = [
     "Advection1D",
     "Advection2D",
     "Advection3D",
+    "SphericalAdvection2D",
+    "SphericalAdvection3D",
     # WENO stencil functions
     "weno_3pts",
     "weno_3pts_improved",
@@ -443,6 +453,8 @@ __all__ = [
     "BiharmonicDiffusion3D",
     "Diffusion2D",
     "Diffusion3D",
+    "SphericalDiffusion2D",
+    "SphericalDiffusion3D",
     "diffusion_2d",
     # Divergence
     "Divergence2D",
