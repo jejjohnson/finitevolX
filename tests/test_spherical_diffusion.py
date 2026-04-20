@@ -1,4 +1,4 @@
-"""Tests for SphericalDiffusion2D and SphericalDiffusion3D."""
+"""Tests for spherical diffusion (harmonic + biharmonic)."""
 
 from __future__ import annotations
 
@@ -7,8 +7,10 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.diffusion.diffusion import Diffusion2D
+from finitevolx._src.diffusion.diffusion import BiharmonicDiffusion2D, Diffusion2D
 from finitevolx._src.diffusion.spherical_diffusion import (
+    SphericalBiharmonicDiffusion2D,
+    SphericalBiharmonicDiffusion3D,
     SphericalDiffusion2D,
     SphericalDiffusion3D,
 )
@@ -280,5 +282,178 @@ class TestSphericalDiffusion3D:
         out = jitted(h, 1.0)
         assert out.shape == h.shape
         g = jax.grad(lambda x: diff_op3d(x, 1.0).sum())(h)
+        assert g.shape == h.shape
+        assert jnp.all(jnp.isfinite(g))
+
+
+# ======================================================================
+# SphericalBiharmonicDiffusion2D
+# ======================================================================
+
+
+class TestSphericalBiharmonicDiffusion2D:
+    @pytest.fixture
+    def op(self, grid):
+        return SphericalBiharmonicDiffusion2D(grid=grid)
+
+    def test_output_shape(self, op, grid):
+        h = jnp.ones((grid.Ny, grid.Nx))
+        assert op(h, kappa=1.0).shape == (grid.Ny, grid.Nx)
+
+    def test_ghost_ring_zero(self, op, grid):
+        key = jax.random.PRNGKey(40)
+        h = jax.random.normal(key, (grid.Ny, grid.Nx))
+        out = op(h, kappa=1.0)
+        np.testing.assert_allclose(out[0, :], 0.0)
+        np.testing.assert_allclose(out[-1, :], 0.0)
+        np.testing.assert_allclose(out[:, 0], 0.0)
+        np.testing.assert_allclose(out[:, -1], 0.0)
+
+    def test_constant_field_zero(self, op, grid):
+        h = 4.2 * jnp.ones((grid.Ny, grid.Nx))
+        np.testing.assert_allclose(op(h, kappa=1.0)[1:-1, 1:-1], 0.0, atol=1e-10)
+
+    def test_kappa_scales_linearly(self, op, grid):
+        key = jax.random.PRNGKey(41)
+        h = jax.random.normal(key, (grid.Ny, grid.Nx))
+        t1 = op(h, kappa=1.0)
+        t2 = op(h, kappa=2.5)
+        np.testing.assert_allclose(t2[1:-1, 1:-1], 2.5 * t1[1:-1, 1:-1], rtol=1e-10)
+
+    def test_zero_kappa(self, op, grid):
+        key = jax.random.PRNGKey(42)
+        h = jax.random.normal(key, (grid.Ny, grid.Nx))
+        np.testing.assert_allclose(op(h, kappa=0.0), 0.0, atol=1e-12)
+
+    def test_sign_is_dissipative_for_small_scales(self, grid):
+        """For a short-wave mode, positive kappa should dissipate.
+
+        Evaluates -kappa * nabla^4 h on a sinusoidal field and checks
+        that the sign of the tendency opposes the field at interior
+        cells — the defining property of dissipative biharmonic mixing.
+        """
+        op = SphericalBiharmonicDiffusion2D(grid=grid)
+        # Use grid indices to get an oscillating pattern.
+        jj, ii = jnp.indices((grid.Ny, grid.Nx))
+        h = jnp.cos(jnp.pi * ii / 3.0) * jnp.cos(jnp.pi * jj / 3.0)
+        tend = op(h, kappa=1.0)
+        # In the deep interior, sign(tend) * sign(h) should be <= 0
+        # for a dissipative operator.
+        deep_h = h[3:-3, 3:-3]
+        deep_t = tend[3:-3, 3:-3]
+        # Amplitudes where |h| is large — should be clearly opposite-signed.
+        large = jnp.abs(deep_h) > 0.5
+        assert jnp.all(jnp.where(large, deep_t * deep_h <= 0, True))
+
+    def test_matches_cartesian_at_narrow_equatorial_band(self):
+        nx, ny = 20, 6
+        sphere = SphericalGrid2D.from_interior(
+            nx_interior=nx,
+            ny_interior=ny,
+            lon_range=(0.0, 20.0),
+            lat_range=(-0.5, 0.5),
+            R=R,
+        )
+        cart = CartesianGrid2D.from_interior(
+            nx_interior=nx,
+            ny_interior=ny,
+            Lx=sphere.Lx,
+            Ly=sphere.Ly,
+        )
+        key = jax.random.PRNGKey(43)
+        h = jax.random.normal(key, (sphere.Ny, sphere.Nx))
+        t_s = SphericalBiharmonicDiffusion2D(grid=sphere)(h, kappa=1.0)
+        t_c = BiharmonicDiffusion2D(grid=cart)(h, kappa=1.0)
+        np.testing.assert_allclose(
+            t_s[2:-2, 2:-2],
+            t_c[2:-2, 2:-2],
+            rtol=5e-3,
+            atol=5e-3,
+        )
+
+    def test_jit_grad(self, op, grid):
+        key = jax.random.PRNGKey(44)
+        h = jax.random.normal(key, (grid.Ny, grid.Nx))
+        out = jax.jit(op.__call__)(h, 1.0)
+        assert out.shape == h.shape
+        g = jax.grad(lambda x: op(x, 1.0).sum())(h)
+        assert g.shape == h.shape
+        assert jnp.all(jnp.isfinite(g))
+
+    def test_masked_all_dry_zero(self, grid):
+        all_dry = Mask2D.from_mask(np.zeros((grid.Ny, grid.Nx), dtype=bool))
+        op = SphericalBiharmonicDiffusion2D(grid=grid, mask=all_dry)
+        key = jax.random.PRNGKey(45)
+        h = jax.random.normal(key, (grid.Ny, grid.Nx))
+        np.testing.assert_allclose(op(h, kappa=1.0), 0.0, atol=1e-12)
+
+    def test_masked_all_wet_matches_unmasked(self, grid):
+        all_wet = Mask2D.from_mask(np.ones((grid.Ny, grid.Nx), dtype=bool))
+        op_m = SphericalBiharmonicDiffusion2D(grid=grid, mask=all_wet)
+        op_u = SphericalBiharmonicDiffusion2D(grid=grid)
+        key = jax.random.PRNGKey(46)
+        h = jax.random.normal(key, (grid.Ny, grid.Nx))
+        np.testing.assert_allclose(op_m(h, 1.0), op_u(h, 1.0), atol=1e-12)
+
+    def test_dry_cell_zero(self, grid):
+        m = np.ones((grid.Ny, grid.Nx), dtype=bool)
+        m[4, 7] = False
+        op = SphericalBiharmonicDiffusion2D(grid=grid, mask=Mask2D.from_mask(m))
+        key = jax.random.PRNGKey(47)
+        h = jax.random.normal(key, (grid.Ny, grid.Nx))
+        out = op(h, kappa=1.0)
+        assert float(out[4, 7]) == 0.0
+
+
+# ======================================================================
+# SphericalBiharmonicDiffusion3D
+# ======================================================================
+
+
+class TestSphericalBiharmonicDiffusion3D:
+    @pytest.fixture
+    def op(self, grid3d):
+        return SphericalBiharmonicDiffusion3D(grid=grid3d)
+
+    def test_output_shape(self, op, grid3d):
+        h = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        assert op(h, kappa=1.0).shape == (grid3d.Nz, grid3d.Ny, grid3d.Nx)
+
+    def test_constant_zero(self, op, grid3d):
+        h = 1.7 * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        np.testing.assert_allclose(op(h, kappa=1.0)[:, 1:-1, 1:-1], 0.0, atol=1e-10)
+
+    def test_z_ghost_slices_zero(self, op, grid3d):
+        key = jax.random.PRNGKey(48)
+        h = jax.random.normal(key, (grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        out = op(h, kappa=1.0)
+        np.testing.assert_allclose(out[0], 0.0, atol=1e-10)
+        np.testing.assert_allclose(out[-1], 0.0, atol=1e-10)
+
+    def test_matches_2d_per_level(self, op, grid3d):
+        op2d = SphericalBiharmonicDiffusion2D(grid=grid3d.horizontal_grid())
+        key = jax.random.PRNGKey(49)
+        h2 = jax.random.normal(key, (grid3d.Ny, grid3d.Nx))
+        h3 = jnp.broadcast_to(h2, (grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        t2 = op2d(h2, kappa=1.0)
+        t3 = op(h3, kappa=1.0)
+        for k in range(1, grid3d.Nz - 1):
+            np.testing.assert_allclose(t3[k], t2, atol=1e-12)
+
+    def test_masked_all_dry_zero(self, grid3d):
+        all_dry = Mask3D.from_mask(
+            np.zeros((grid3d.Nz, grid3d.Ny, grid3d.Nx), dtype=bool)
+        )
+        op = SphericalBiharmonicDiffusion3D(grid=grid3d, mask=all_dry)
+        key = jax.random.PRNGKey(50)
+        h = jax.random.normal(key, (grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        np.testing.assert_allclose(op(h, kappa=1.0), 0.0, atol=1e-12)
+
+    def test_jit_grad(self, op, grid3d):
+        key = jax.random.PRNGKey(51)
+        h = jax.random.normal(key, (grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        out = jax.jit(op.__call__)(h, 1.0)
+        assert out.shape == h.shape
+        g = jax.grad(lambda x: op(x, 1.0).sum())(h)
         assert g.shape == h.shape
         assert jnp.all(jnp.isfinite(g))

@@ -74,8 +74,14 @@ from finitevolx._src.diffusion.diffusion import (
 )
 from finitevolx._src.diffusion.momentum import MomentumAdvection2D, MomentumAdvection3D
 from finitevolx._src.diffusion.spherical_diffusion import (
+    SphericalBiharmonicDiffusion2D,
+    SphericalBiharmonicDiffusion3D,
     SphericalDiffusion2D,
     SphericalDiffusion3D,
+)
+from finitevolx._src.diffusion.spherical_momentum import (
+    SphericalMomentumAdvection2D,
+    SphericalMomentumAdvection3D,
 )
 from finitevolx._src.grid.base import (
     ArakawaCGrid1D,
@@ -142,6 +148,26 @@ from finitevolx._src.operators.interpolation import (
     Interpolation3D,
 )
 from finitevolx._src.operators.jacobian import arakawa_jacobian
+from finitevolx._src.operators.reductions import (
+    area_mean,
+    area_sum,
+    area_weights,
+    cartesian_area_mean,
+    cartesian_area_sum,
+    cartesian_area_weights,
+    cartesian_volume_mean,
+    cartesian_volume_sum,
+    cartesian_volume_weights,
+    spherical_area_mean,
+    spherical_area_sum,
+    spherical_area_weights,
+    spherical_volume_mean,
+    spherical_volume_sum,
+    spherical_volume_weights,
+    volume_mean,
+    volume_sum,
+    volume_weights,
+)
 from finitevolx._src.operators.spherical_compound import (
     SphericalDivergence2D,
     SphericalDivergence3D,
@@ -379,8 +405,29 @@ __all__ = [
     # Momentum advection
     "MomentumAdvection2D",
     "MomentumAdvection3D",
+    "SphericalMomentumAdvection2D",
+    "SphericalMomentumAdvection3D",
     # Jacobian
     "arakawa_jacobian",
+    # Area- and volume-weighted reductions (grid-polymorphic + explicit)
+    "area_weights",
+    "area_sum",
+    "area_mean",
+    "volume_weights",
+    "volume_sum",
+    "volume_mean",
+    "cartesian_area_weights",
+    "cartesian_area_sum",
+    "cartesian_area_mean",
+    "cartesian_volume_weights",
+    "cartesian_volume_sum",
+    "cartesian_volume_mean",
+    "spherical_area_weights",
+    "spherical_area_sum",
+    "spherical_area_mean",
+    "spherical_volume_weights",
+    "spherical_volume_sum",
+    "spherical_volume_mean",
     # Multilayer vmap helper
     "multilayer",
     # Grid — abstract topology
@@ -453,6 +500,8 @@ __all__ = [
     "BiharmonicDiffusion3D",
     "Diffusion2D",
     "Diffusion3D",
+    "SphericalBiharmonicDiffusion2D",
+    "SphericalBiharmonicDiffusion3D",
     "SphericalDiffusion2D",
     "SphericalDiffusion3D",
     "diffusion_2d",
