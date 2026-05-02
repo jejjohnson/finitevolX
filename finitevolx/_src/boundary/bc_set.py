@@ -52,7 +52,9 @@ class BoundaryConditionSet(eqx.Module):
         )
 
     @classmethod
-    def closed(cls, mask: Mask2D | Float[Array, "Ny Nx"] | None = None) -> BoundaryConditionSet:
+    def closed(
+        cls, mask: Mask2D | Float[Array, "Ny Nx"] | None = None
+    ) -> BoundaryConditionSet:
         """Return a zero-Dirichlet boundary-condition set on all faces."""
         return cls(
             south=Dirichlet1D("south", value=0.0),

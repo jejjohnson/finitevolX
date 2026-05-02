@@ -26,7 +26,6 @@ from jaxtyping import Array, Bool, Float
 from finitevolx._src.mask import Mask2D
 from finitevolx._src.solvers.iterative import masked_laplacian
 
-
 # ---------------------------------------------------------------------------
 # Primitive: boundary_ring
 # ---------------------------------------------------------------------------
@@ -53,10 +52,10 @@ def boundary_ring(mask: Float[Array, "Ny Nx"]) -> Bool[Array, "Ny Nx"]:
     dry = ~wet
     padded_dry = jnp.pad(dry, pad_width=1, mode="constant", constant_values=False)
     adjacent_to_dry = (
-        padded_dry[2:, 1:-1]      # south neighbor is dry
-        | padded_dry[:-2, 1:-1]   # north neighbor is dry
-        | padded_dry[1:-1, 2:]    # east neighbor is dry
-        | padded_dry[1:-1, :-2]   # west neighbor is dry
+        padded_dry[2:, 1:-1]  # south neighbor is dry
+        | padded_dry[:-2, 1:-1]  # north neighbor is dry
+        | padded_dry[1:-1, 2:]  # east neighbor is dry
+        | padded_dry[1:-1, :-2]  # west neighbor is dry
     )
     return wet & adjacent_to_dry
 

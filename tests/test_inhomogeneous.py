@@ -5,7 +5,6 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pytest
 
 import finitevolx as fvx
 from finitevolx._src.solvers.inhomogeneous import (
@@ -20,6 +19,7 @@ jax.config.update("jax_enable_x64", True)
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 def _basin_mask(ny: int, nx: int) -> np.ndarray:
     """Simple rectangular basin mask: wet interior, dry border."""
@@ -39,6 +39,7 @@ def _island_mask(ny: int, nx: int) -> np.ndarray:
 # ---------------------------------------------------------------------------
 # boundary_ring
 # ---------------------------------------------------------------------------
+
 
 class TestBoundaryRing:
     def test_simple_basin(self):
@@ -70,10 +71,14 @@ class TestBoundaryRing:
         cy, cx = 5, 5
         # Check cells around the island (north/south/east/west of island)
         island_neighbors = [
-            (cy - 1, cx), (cy - 1, cx + 1),     # north of island
-            (cy + 2, cx), (cy + 2, cx + 1),      # south of island
-            (cy, cx - 1), (cy + 1, cx - 1),      # west of island
-            (cy, cx + 2), (cy + 1, cx + 2),       # east of island
+            (cy - 1, cx),
+            (cy - 1, cx + 1),  # north of island
+            (cy + 2, cx),
+            (cy + 2, cx + 1),  # south of island
+            (cy, cx - 1),
+            (cy + 1, cx - 1),  # west of island
+            (cy, cx + 2),
+            (cy + 1, cx + 2),  # east of island
         ]
         for iy, ix in island_neighbors:
             assert ring[iy, ix], f"Cell ({iy},{ix}) should be in ring (island neighbor)"
@@ -108,6 +113,7 @@ class TestBoundaryRing:
 # SolveDomain
 # ---------------------------------------------------------------------------
 
+
 class TestSolveDomain:
     def test_partition_is_complete(self):
         mask = jnp.array(_basin_mask(8, 8))
@@ -117,9 +123,7 @@ class TestSolveDomain:
         # all_known and effective_mask are disjoint
         assert not jnp.any(domain.all_known & domain.effective_mask)
         # their union is the full wet domain
-        np.testing.assert_array_equal(
-            domain.all_known | domain.effective_mask, wet
-        )
+        np.testing.assert_array_equal(domain.all_known | domain.effective_mask, wet)
 
     def test_no_known_mask(self):
         mask = jnp.array(_basin_mask(8, 8))
@@ -163,14 +167,13 @@ class TestSolveDomain:
         assert not domain.effective_mask[0, 0]
         # Partition still holds
         wet = mask > 0.5
-        np.testing.assert_array_equal(
-            domain.all_known | domain.effective_mask, wet
-        )
+        np.testing.assert_array_equal(domain.all_known | domain.effective_mask, wet)
 
 
 # ---------------------------------------------------------------------------
 # KnownValueLifting
 # ---------------------------------------------------------------------------
+
 
 class TestKnownValueLifting:
     def test_homogeneous_is_identity(self):
@@ -218,7 +221,9 @@ class TestKnownValueLifting:
         x = jnp.linspace(0, 1, Nx)
         y = jnp.linspace(0, 1, Ny)
         X, Y = jnp.meshgrid(x, y)
-        psi_exact = jnp.sin(jnp.pi * X) * jnp.sin(jnp.pi * Y) + 0.1 * jnp.sin(2 * jnp.pi * Y)
+        psi_exact = jnp.sin(jnp.pi * X) * jnp.sin(jnp.pi * Y) + 0.1 * jnp.sin(
+            2 * jnp.pi * Y
+        )
 
         # Exact RHS: (∇² - λ)ψ
         rhs_exact = fvx.masked_laplacian(psi_exact, mask, dx, dy, lambda_=lambda_)
@@ -235,7 +240,7 @@ class TestKnownValueLifting:
         def matvec(x):
             return fvx.masked_laplacian(x, eff_mask_f, dx, dy, lambda_=lambda_)
 
-        psi_hom, info = fvx.solve_cg(
+        psi_hom, _info = fvx.solve_cg(
             matvec, rhs_corrected, rtol=1e-10, atol=1e-10, max_steps=2000
         )
         psi_hom = psi_hom * eff_mask_f
@@ -308,6 +313,7 @@ class TestKnownValueLifting:
 # ---------------------------------------------------------------------------
 # BoundaryConditionSet.mask and .closed()
 # ---------------------------------------------------------------------------
+
 
 class TestBoundaryConditionSetMask:
     def test_mask_field_default_none(self):
