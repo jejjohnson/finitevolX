@@ -110,6 +110,14 @@ from finitevolx._src.mask import (
 )
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.coriolis import Coriolis2D, Coriolis3D
+from finitevolx._src.operators.eos import (
+    buoyancy,
+    linear_density,
+    linear_density_anomaly,
+    linear_drho_dS,
+    linear_drho_dT,
+    reduced_gravity,
+)
 from finitevolx._src.operators.diagnostics import (
     available_potential_energy,
     bernoulli_potential,
@@ -541,6 +549,13 @@ __all__ = [
     "StencilCapability1D",
     "StencilCapability2D",
     "StencilCapability3D",
+    # Equation of state
+    "linear_density",
+    "linear_density_anomaly",
+    "linear_drho_dT",
+    "linear_drho_dS",
+    "buoyancy",
+    "reduced_gravity",
     # Diagnostics
     "available_potential_energy",
     "bernoulli_potential",
