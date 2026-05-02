@@ -306,6 +306,11 @@ from finitevolx._src.solvers.elliptic import (
     solve_poisson_fft_3d,
     streamfunction_from_vorticity,
 )
+from finitevolx._src.solvers.inhomogeneous import (
+    KnownValueLifting,
+    SolveDomain,
+    boundary_ring,
+)
 from finitevolx._src.solvers.multigrid import (
     MultigridSolver,
     build_multigrid_solver,
@@ -685,6 +690,10 @@ __all__ = [
     "streamfunction_from_vorticity",
     "pressure_from_divergence",
     "pv_inversion",
+    # Known-value lifting (inhomogeneous BCs)
+    "boundary_ring",
+    "SolveDomain",
+    "KnownValueLifting",
     # Multigrid Helmholtz solver
     "MultigridSolver",
     "build_multigrid_solver",
