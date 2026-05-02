@@ -5,7 +5,12 @@ from __future__ import annotations
 import equinox as eqx
 from jaxtyping import Array, Float
 
-from finitevolx._src.boundary.bc_1d import BoundaryCondition1D, Outflow1D, Periodic1D
+from finitevolx._src.boundary.bc_1d import (
+    BoundaryCondition1D,
+    Dirichlet1D,
+    Outflow1D,
+    Periodic1D,
+)
 
 
 class BoundaryConditionSet(eqx.Module):
@@ -24,12 +29,16 @@ class BoundaryConditionSet(eqx.Module):
         Boundary condition for the west ghost column.
     east : BoundaryCondition1D | None, optional
         Boundary condition for the east ghost column.
+    mask : Mask2D or Float[Array, "Ny Nx"] or None, optional
+        Domain mask.  When provided, solvers can extract it from the
+        BCSet instead of requiring a separate ``mask=`` argument.
     """
 
     south: BoundaryCondition1D | None = None
     north: BoundaryCondition1D | None = None
     west: BoundaryCondition1D | None = None
     east: BoundaryCondition1D | None = None
+    mask: object = None
 
     @classmethod
     def periodic(cls) -> BoundaryConditionSet:
@@ -39,6 +48,17 @@ class BoundaryConditionSet(eqx.Module):
             north=Periodic1D("north"),
             west=Periodic1D("west"),
             east=Periodic1D("east"),
+        )
+
+    @classmethod
+    def closed(cls, mask: object = None) -> BoundaryConditionSet:
+        """Return a zero-Dirichlet boundary-condition set on all faces."""
+        return cls(
+            south=Dirichlet1D("south", value=0.0),
+            north=Dirichlet1D("north", value=0.0),
+            west=Dirichlet1D("west", value=0.0),
+            east=Dirichlet1D("east", value=0.0),
+            mask=mask,
         )
 
     @classmethod
