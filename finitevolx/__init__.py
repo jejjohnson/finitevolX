@@ -142,6 +142,14 @@ from finitevolx._src.operators.difference import (
     Difference3D,
 )
 from finitevolx._src.operators.divergence import Divergence2D, divergence_2d
+from finitevolx._src.operators.eos import (
+    buoyancy,
+    linear_density,
+    linear_density_anomaly,
+    linear_drho_dS,
+    linear_drho_dT,
+    reduced_gravity,
+)
 from finitevolx._src.operators.interpolation import (
     Interpolation1D,
     Interpolation2D,
@@ -541,6 +549,13 @@ __all__ = [
     "StencilCapability1D",
     "StencilCapability2D",
     "StencilCapability3D",
+    # Equation of state
+    "linear_density",
+    "linear_density_anomaly",
+    "linear_drho_dT",
+    "linear_drho_dS",
+    "buoyancy",
+    "reduced_gravity",
     # Diagnostics
     "available_potential_energy",
     "bernoulli_potential",
