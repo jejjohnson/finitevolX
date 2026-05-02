@@ -101,7 +101,7 @@ class SolveDomain(eqx.Module):
         self.boundary_ring = boundary_ring(mask_arr)
 
         if known_mask is not None:
-            self.all_known = self.boundary_ring | known_mask
+            self.all_known = self.boundary_ring | (known_mask & self.wet_mask)
         else:
             self.all_known = self.boundary_ring
 
@@ -181,4 +181,5 @@ class KnownValueLifting(eqx.Module):
         value_lift: Float[Array, "Ny Nx"],
     ) -> Float[Array, "Ny Nx"]:
         """Reconstruct full solution from homogeneous solve + lift."""
-        return value_lift + psi_hom
+        eff_f = self.domain.effective_mask.astype(psi_hom.dtype)
+        return value_lift + psi_hom * eff_f

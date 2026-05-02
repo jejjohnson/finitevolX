@@ -95,8 +95,8 @@ The set of "known cells" is computed by combining two sources:
 
 ```
 # 1. Auto-derive boundary cells from mask topology
-#    (outer boundary ring + island coast rings)
-boundary_cells = _dilate(wet_mask) & ~wet_mask
+#    (inner ring: wet cells adjacent to at least one dry cell)
+boundary_cells = boundary_ring(mask)  # wet & adjacent_to_dry
 
 # 2. Merge with explicit known_mask (sparse obs, etc.)
 if known_mask is not None:
@@ -215,32 +215,31 @@ lifting trick.  Accepts all parameters explicitly (maximum composability for
 power users who want to bring their own solver).
 
 ```python
-from finitevolx import apply_known_values
+from finitevolx import SolveDomain, KnownValueLifting
 
-rhs_corrected, value_lift = apply_known_values(
-    rhs=rhs,
-    known_values=obs_field,     # (Ny, Nx) prescribed values
-    mask=mask,                  # (Ny, Nx) wet/dry mask
-    dx=dx, dy=dy,
-    lambda_=0.0,
-    known_mask=obs_locations,   # optional: explicit obs cells
-)
+# Setup (once)
+domain = SolveDomain(mask=mask, known_mask=obs_locations)
+lifter = KnownValueLifting(domain=domain, dx=dx, dy=dy, lambda_=0.0)
 
-# Solve with ANY solver
+# Per step
+rhs_corrected, value_lift = lifter.preprocess(rhs, obs_field)
+
+# Solve with ANY solver (built with domain.effective_mask)
 psi_hom = my_solver(rhs_corrected)
 
 # Reconstruct
-psi = value_lift + psi_hom
+psi = lifter.postprocess(psi_hom, value_lift)
 ```
 
 **What it does internally:**
 
 ```
-1. Auto-derive boundary ring from mask (JAX-native dilation):
+1. Auto-derive boundary ring from mask (pad-then-slice):
    wet = mask > 0.5
-   dilated = wet | roll(wet, +1, 0) | roll(wet, -1, 0)
-                  | roll(wet, +1, 1) | roll(wet, -1, 1)
-   boundary_cells = dilated & ~wet
+   dry = ~wet
+   padded_dry = pad(dry, 1, constant=False)
+   adjacent_to_dry = padded_dry[2:,1:-1] | padded_dry[:-2,1:-1] | ...
+   boundary_cells = wet & adjacent_to_dry
 
 2. Merge with explicit known_mask:
    all_known = boundary_cells | known_mask   (if known_mask given)

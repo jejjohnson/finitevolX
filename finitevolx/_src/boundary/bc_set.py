@@ -11,6 +11,7 @@ from finitevolx._src.boundary.bc_1d import (
     Outflow1D,
     Periodic1D,
 )
+from finitevolx._src.mask import Mask2D
 
 
 class BoundaryConditionSet(eqx.Module):
@@ -38,7 +39,7 @@ class BoundaryConditionSet(eqx.Module):
     north: BoundaryCondition1D | None = None
     west: BoundaryCondition1D | None = None
     east: BoundaryCondition1D | None = None
-    mask: object = None
+    mask: Mask2D | Float[Array, "Ny Nx"] | None = None
 
     @classmethod
     def periodic(cls) -> BoundaryConditionSet:
@@ -51,7 +52,7 @@ class BoundaryConditionSet(eqx.Module):
         )
 
     @classmethod
-    def closed(cls, mask: object = None) -> BoundaryConditionSet:
+    def closed(cls, mask: Mask2D | Float[Array, "Ny Nx"] | None = None) -> BoundaryConditionSet:
         """Return a zero-Dirichlet boundary-condition set on all faces."""
         return cls(
             south=Dirichlet1D("south", value=0.0),

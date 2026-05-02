@@ -41,7 +41,7 @@ Keep the existing 9 atom types (Dirichlet1D, Neumann1D, etc.) with their
 current interface. No mask on individual atoms — they remain face-level
 building blocks.
 2.2 BoundaryConditionSet (evolve existing bc_set.py)
-Add two new fields to the existing BoundaryConditionSet:
+Add three new fields to the existing BoundaryConditionSet:
 pythonclass BoundaryConditionSet(eqx.Module):
     # --- Existing fields (unchanged) ---
     south: BoundaryCondition1D | None = None

@@ -158,10 +158,14 @@ class TestSolveDomain:
 
         domain = SolveDomain(mask, known_mask=known_mask)
 
-        # Dry cell in known_mask doesn't break anything
-        assert domain.all_known[0, 0]
-        # But it's not wet, so not in effective_mask either way
+        # Dry cell in known_mask is filtered out (intersected with wet_mask)
+        assert not domain.all_known[0, 0]
         assert not domain.effective_mask[0, 0]
+        # Partition still holds
+        wet = mask > 0.5
+        np.testing.assert_array_equal(
+            domain.all_known | domain.effective_mask, wet
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -195,7 +199,10 @@ class TestKnownValueLifting:
         value_lift = jnp.ones((8, 8)) * 3.0
 
         psi = lifter.postprocess(psi_hom, value_lift)
-        np.testing.assert_allclose(psi, 5.0)
+        # postprocess masks psi_hom to effective_mask before adding lift
+        eff = domain.effective_mask
+        expected = value_lift + jnp.where(eff, 2.0, 0.0)
+        np.testing.assert_allclose(psi, expected)
 
     def test_manufactured_solution_cg(self):
         """Verify the full lifting trick with a manufactured solution."""
