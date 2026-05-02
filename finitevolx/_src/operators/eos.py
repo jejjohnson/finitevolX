@@ -5,7 +5,7 @@ partial derivatives, buoyancy, and reduced gravity from tracer fields.
 
 Phase 1 implements the **linear equation of state**::
 
-    ρ(T, S) = ρ₀ · (1 − α·(T − T₀) + β·(S − S₀))
+    ρ(T, S) = ρ₀ · (1 − α·(T − T_ref) + β·(S − S_ref))
 
 where α is the thermal expansion coefficient and β is the haline
 contraction coefficient.
@@ -30,7 +30,7 @@ def linear_density(
     r"""Compute density from temperature and salinity using a linear EOS.
 
     .. math::
-        \rho = \rho_0 \bigl(1 - \alpha\,(T - T_0) + \beta\,(S - S_0)\bigr)
+        \rho = \rho_0 \bigl(1 - \alpha\,(T - T_{\mathrm{ref}}) + \beta\,(S - S_{\mathrm{ref}})\bigr)
 
     Parameters
     ----------
@@ -69,7 +69,7 @@ def linear_density_anomaly(
     r"""Compute density anomaly ρ' = ρ − ρ₀ using a linear EOS.
 
     .. math::
-        \rho' = \rho_0 \bigl(-\alpha\,(T - T_0) + \beta\,(S - S_0)\bigr)
+        \rho' = \rho_0 \bigl(-\alpha\,(T - T_{\mathrm{ref}}) + \beta\,(S - S_{\mathrm{ref}})\bigr)
 
     Parameters
     ----------
@@ -182,9 +182,10 @@ def reduced_gravity(
     .. math::
         g' = g \, \frac{\rho_{\text{lower}} - \rho_{\text{upper}}}{\rho_0}
 
-    This is the input expected by
-    :func:`~finitevolx.build_coupling_matrix` for multi-layer
-    vertical-mode decomposition.
+    Computes the interface reduced gravity between two adjacent layers.
+    To build the ``g_prime`` vector expected by
+    :func:`~finitevolx.build_coupling_matrix`, compute this for each
+    interface and stack into a 1-D array of shape ``(nl,)``.
 
     Parameters
     ----------
