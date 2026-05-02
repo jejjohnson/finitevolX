@@ -110,14 +110,6 @@ from finitevolx._src.mask import (
 )
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.coriolis import Coriolis2D, Coriolis3D
-from finitevolx._src.operators.eos import (
-    buoyancy,
-    linear_density,
-    linear_density_anomaly,
-    linear_drho_dS,
-    linear_drho_dT,
-    reduced_gravity,
-)
 from finitevolx._src.operators.diagnostics import (
     available_potential_energy,
     bernoulli_potential,
@@ -150,6 +142,14 @@ from finitevolx._src.operators.difference import (
     Difference3D,
 )
 from finitevolx._src.operators.divergence import Divergence2D, divergence_2d
+from finitevolx._src.operators.eos import (
+    buoyancy,
+    linear_density,
+    linear_density_anomaly,
+    linear_drho_dS,
+    linear_drho_dT,
+    reduced_gravity,
+)
 from finitevolx._src.operators.interpolation import (
     Interpolation1D,
     Interpolation2D,
