@@ -62,6 +62,14 @@ field stored column indices and `_yids` stored row indices.
   library.  Equivalent inline code is available in
   `docs/notebooks/demo_masks.py`.
 
+## [0.0.42](https://github.com/jejjohnson/finitevolX/compare/v0.0.41...v0.0.42) (2026-06-02)
+
+
+### Features
+
+* add linear equation of state module ([#226](https://github.com/jejjohnson/finitevolX/issues/226)) ([3e80896](https://github.com/jejjohnson/finitevolX/commit/3e80896023c921b5c02af3c134914f11faa9e00e))
+* boundary_ring, SolveDomain, KnownValueLifting for inhomogeneous BCs ([#224](https://github.com/jejjohnson/finitevolX/issues/224)) ([31c7cb2](https://github.com/jejjohnson/finitevolX/commit/31c7cb20a0420ac21fcaffe1fe9a62d6259a773f))
+
 ## [0.0.41](https://github.com/jejjohnson/finitevolX/compare/v0.0.40...v0.0.41) (2026-04-20)
 
 
