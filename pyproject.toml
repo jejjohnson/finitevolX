@@ -31,11 +31,15 @@ dependencies = [
     "scipy>=1.14.0",
     "lineax>=0.1.0",
     "diffrax>=0.6.0",
-    "spectraldiffx>=0.0.10",
+    "spectraldiffx>=0.0.13",
+    "gaussx>=0.0.17",
 ]
 
+# gaussx provides the shared solver substrate: the Nyström preconditioner and
+# the tridiagonal solve are delegated to it.
 [tool.uv.sources]
-spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "v0.0.10" }
+spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "0.0.13" }
+gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.0.17" }
 
 [project.urls]
 Repository = "https://github.com/jejjohnson/finitevolX"
