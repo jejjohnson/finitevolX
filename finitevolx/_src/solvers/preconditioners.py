@@ -28,7 +28,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-import equinox as eqx
+import gaussx
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
@@ -97,34 +97,25 @@ def make_nystrom_preconditioner(
 ) -> Callable[[Float[Array, "Ny Nx"]], Float[Array, "Ny Nx"]]:
     r"""Build a randomized Nyström preconditioner for a symmetric operator.
 
-    Uses random probing vectors to approximate the action of ``A^{-1}`` via
-    a low-rank Nyström factorisation.  The resulting preconditioner is a
-    callable that can be passed to :func:`~finitevolx._src.solvers.iterative.solve_cg`.
+    Delegates the low-rank Nyström construction to
+    :class:`gaussx.NystromPreconditioner`, then adapts it to the finitevolX
+    convention: the returned callable operates on 2-D fields and approximates
+    ``A^{-1}`` for the symmetric **negative-definite** operator ``A``.
 
-    Algorithm
-    ---------
-    1. Draw a Gaussian random matrix ``Ω ∈ ℝ^{n × k}`` (``k = rank``).
-    2. QR-factorize: ``Ω = Q R`` to get orthonormal ``Q ∈ ℝ^{n × k}``.
-    3. Compute ``Y = A Q`` (``k`` matvec applications).
-    4. Form the small matrix ``B = Q^T Y ∈ ℝ^{k × k}``.
-    5. Compute ``B = U S U^T`` (eigendecomposition of the small matrix).
-    6. The preconditioner applies ``M^{-1} x ≈ (Q U S^{-1} U^T Q^T) x``.
-
-    The operator ``A`` is assumed to be symmetric **negative definite**.
-    The eigenvalues of ``B`` will be negative; their absolute values are
-    used internally for inversion.
+    gaussx works with positive-semidefinite operators, so this probes the PSD
+    operator ``-A`` (obtaining ``(-A)^{-1}``) and negates the result to recover
+    ``A^{-1}``. The resulting callable can be passed straight to
+    :func:`~finitevolx._src.solvers.iterative.solve_cg`.
 
     Parameters
     ----------
     matvec : callable
-        Function implementing the symmetric linear operator ``A``.
-        Signature: ``matvec(x: Array) -> Array``.
+        Function implementing the symmetric (negative-definite) linear operator
+        ``A``.  Signature: ``matvec(x: Array) -> Array``.
     shape : (int, int)
         Spatial shape ``(Ny, Nx)`` of the 2-D fields.
     rank : int
-        Number of probing vectors (approximation rank).  Higher values
-        give a better preconditioner but cost more setup time.
-        Default: 50.
+        Number of probing vectors (approximation rank).  Default: 50.
     key : jax.Array or None
         PRNG key for the random probing matrix.  If ``None``, uses
         ``jax.random.PRNGKey(0)``.
@@ -141,60 +132,21 @@ def make_nystrom_preconditioner(
     Ny, Nx = shape
     n = Ny * Nx
 
-    # Clamp rank to problem size
-    k = min(rank, n)
+    # gaussx Nyström expects a PSD operator; probe -A (which is PSD) on flat
+    # vectors, then negate the approximate inverse to recover A^{-1}.
+    def _neg_flat_matvec(v: Float[Array, " n"]) -> Float[Array, " n"]:
+        return -matvec(v.reshape(Ny, Nx)).ravel()
 
-    # Step 1: Random probing matrix Omega in R^{n x k}, then QR for stability
-    omega = jax.random.normal(key, (n, k))
-    Q, _ = jnp.linalg.qr(omega)  # Q in R^{n x k}, orthonormal columns
-
-    # Step 2: Y = A Q  (k matvec applications)
-    def _apply_col(col: Float[Array, " n"]) -> Float[Array, " n"]:
-        return matvec(col.reshape(Ny, Nx)).ravel()
-
-    Y = eqx.filter_vmap(_apply_col, in_axes=1, out_axes=1)(Q)  # [n, k]
-
-    # Step 3: Small matrix B = Q^T Y = Q^T A Q in R^{k x k}
-    B = Q.T @ Y  # [k, k]
-
-    # Step 4: Eigendecomposition of B (symmetric)
-    eigvals, U = jnp.linalg.eigh(B)  # eigvals sorted ascending
-
-    # For a negative-definite A, eigvals should be negative.
-    # Invert using absolute values, with a floor for numerical safety.
-    abs_eigvals = jnp.abs(eigvals)
-    eps = jnp.finfo(abs_eigvals.dtype).eps * n
-    s_inv = jnp.where(abs_eigvals > eps, 1.0 / abs_eigvals, 0.0)
-    # Preserve the sign: A^{-1} is also negative definite
-    s_inv = -s_inv  # negate so preconditioner ≈ A^{-1} (negative)
-
-    # Basis vectors: W = Q U has orthonormal columns (product of orthonormal
-    # matrices), so M^{-1} = W diag(s_inv) W^T is a proper spectral
-    # decomposition of the rank-k approximate inverse.
-    W = Q @ U  # [n, k], orthonormal columns
-
-    # Full-rank correction: for directions orthogonal to the captured subspace,
-    # apply a scalar scaling instead of mapping to zero.  Without this, CG
-    # falsely "converges" in the preconditioned norm while the true residual
-    # remains ~1.0 (see #187).
-    #
-    # Random probing preferentially captures the largest-magnitude eigenvalues
-    # of A; the uncaptured directions tend to have smaller-magnitude eigenvalues
-    # and therefore *larger*-magnitude inverses.  Using s_inv[-1] (the largest-
-    # magnitude captured inverse, from the smallest captured |eigenvalue|) as
-    # the fallback keeps the preconditioned spectrum of uncaptured directions
-    # close to 1, which is what CG needs for fast convergence.
-    #
-    # Rewrite:  M^{-1} x = a*x + W*((s_inv - a)*(W^T x))
-    # which avoids explicit projection and is efficient.
-    alpha_shift = s_inv[-1]  # best estimate for uncaptured (small |eig|) directions
-    s_eff = s_inv - alpha_shift  # extra scaling for the captured subspace
+    operator = gaussx.as_linear_operator(
+        _neg_flat_matvec, shape=(n, n), positive_semidefinite=True
+    )
+    preconditioner = gaussx.NystromPreconditioner.from_operator(
+        operator, rank=rank, key=key
+    )
+    minv = preconditioner.as_operator()  # applies (-A)^{-1} on flat vectors
 
     def _preconditioner(r: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
-        r_flat = r.ravel()  # [n]
-        coeffs = W.T @ r_flat  # [k]
-        result = alpha_shift * r_flat + W @ (s_eff * coeffs)  # [n]
-        return result.reshape(Ny, Nx)
+        return -minv.mv(r.reshape(n)).reshape(Ny, Nx)
 
     return _preconditioner
 
