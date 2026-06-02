@@ -32,7 +32,7 @@ dependencies = [
     "lineax>=0.1.0",
     "diffrax>=0.6.0",
     "spectraldiffx>=0.0.10",
-    "gaussx",
+    "gaussx>=0.0.17",
 ]
 
 # gaussx provides the shared solver substrate: the Nyström preconditioner and
