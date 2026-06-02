@@ -579,7 +579,7 @@ requires-dist = [
     { name = "cyclopts", marker = "extra == 'examples'", specifier = ">=2.0.0" },
     { name = "diffrax", specifier = ">=0.6.0" },
     { name = "equinox", specifier = ">=0.11.0" },
-    { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?branch=claude%2Fgaussx-solver-refactor-scope-3hTFq" },
+    { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?tag=v0.0.17" },
     { name = "jax", specifier = ">=0.4.38" },
     { name = "jaxlib", specifier = ">=0.4.38" },
     { name = "jaxtyping", specifier = ">=0.3.0" },
@@ -652,8 +652,8 @@ wheels = [
 
 [[package]]
 name = "gaussx"
-version = "0.0.15"
-source = { git = "https://github.com/jejjohnson/gaussx?branch=claude%2Fgaussx-solver-refactor-scope-3hTFq#258e7ec17509ff1be6ff702145e838723433fa4c" }
+version = "0.0.17"
+source = { git = "https://github.com/jejjohnson/gaussx?tag=v0.0.17#156f0c77835e2ad59befd4b5d89257f3dfa49b47" }
 dependencies = [
     { name = "einx" },
     { name = "equinox" },

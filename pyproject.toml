@@ -36,12 +36,10 @@ dependencies = [
 ]
 
 # gaussx provides the shared solver substrate: the Nyström preconditioner and
-# the tridiagonal solve are delegated to it. Until the unified-solver work is
-# released, track the feature branch.
-# TODO: switch to a released version pin once gaussx publishes these APIs.
+# the tridiagonal solve are delegated to it.
 [tool.uv.sources]
 spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "v0.0.10" }
-gaussx = { git = "https://github.com/jejjohnson/gaussx", branch = "claude/gaussx-solver-refactor-scope-3hTFq" }
+gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.0.17" }
 
 [project.urls]
 Repository = "https://github.com/jejjohnson/finitevolX"
