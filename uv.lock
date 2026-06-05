@@ -516,7 +516,7 @@ wheels = [
 
 [[package]]
 name = "finitevolx"
-version = "0.0.41"
+version = "0.0.42"
 source = { editable = "." }
 dependencies = [
     { name = "beartype" },
