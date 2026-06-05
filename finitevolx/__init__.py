@@ -1,5 +1,9 @@
 from finitevolx._src.advection.advection import Advection1D, Advection2D, Advection3D
-from finitevolx._src.advection.face_flux import uv_center_flux, uv_node_flux
+from finitevolx._src.advection.face_flux import (
+    rusanov_flux,
+    uv_center_flux,
+    uv_node_flux,
+)
 from finitevolx._src.advection.flux import upwind_flux
 from finitevolx._src.advection.limiters import mc, minmod, superbee, van_leer
 from finitevolx._src.advection.linear import (
@@ -109,6 +113,7 @@ from finitevolx._src.mask import (
     StencilCapability3D,
 )
 from finitevolx._src.operators._ghost import interior
+from finitevolx._src.operators.barotropic import barotropic_filter
 from finitevolx._src.operators.coriolis import Coriolis2D, Coriolis3D
 from finitevolx._src.operators.diagnostics import (
     available_potential_energy,
@@ -140,6 +145,11 @@ from finitevolx._src.operators.difference import (
     Difference1D,
     Difference2D,
     Difference3D,
+)
+from finitevolx._src.operators.differentiable import (
+    smooth_abs,
+    smooth_clamp,
+    smooth_max,
 )
 from finitevolx._src.operators.divergence import Divergence2D, divergence_2d
 from finitevolx._src.operators.eos import (
@@ -176,6 +186,7 @@ from finitevolx._src.operators.reductions import (
     volume_sum,
     volume_weights,
 )
+from finitevolx._src.operators.relaxation import linear_drag, rayleigh_relaxation
 from finitevolx._src.operators.spherical_compound import (
     SphericalDivergence2D,
     SphericalDivergence3D,
@@ -214,7 +225,12 @@ from finitevolx._src.operators.stencils import (
     diff_y_fwd,
     diff_y_fwd_3d,
 )
-from finitevolx._src.operators.vorticity import Vorticity2D, Vorticity3D
+from finitevolx._src.operators.vorticity import (
+    Vorticity2D,
+    Vorticity3D,
+    pv_flux_arakawa_lamb,
+    vorticity_flux_upwind,
+)
 from finitevolx._src.solvers.elliptic import (
     # Types
     BoundaryCondition,
@@ -379,6 +395,7 @@ __all__ = [
     # Raw face fluxes
     "uv_center_flux",
     "uv_node_flux",
+    "rusanov_flux",
     # Advection
     "Advection1D",
     "Advection2D",
@@ -594,6 +611,17 @@ __all__ = [
     # Vorticity
     "Vorticity2D",
     "Vorticity3D",
+    "pv_flux_arakawa_lamb",
+    "vorticity_flux_upwind",
+    # Barotropic-mode filter
+    "barotropic_filter",
+    # Linear drag / Rayleigh relaxation
+    "linear_drag",
+    "rayleigh_relaxation",
+    # Differentiable surrogates
+    "smooth_abs",
+    "smooth_clamp",
+    "smooth_max",
     # Vertical coupling and mode transforms
     "build_coupling_matrix",
     "decompose_vertical_modes",
