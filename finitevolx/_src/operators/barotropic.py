@@ -69,6 +69,20 @@ def barotropic_filter(
     The returned corrections are single-layer (barotropic) fields the caller
     adds back to every layer's momentum tendency, e.g. ``dt_u += filt_u``.
 
+    ``helm_solve`` is invoked as a plain callable (``helm_solve(rhs)``); pass
+    the :class:`~finitevolx.MultigridSolver` object itself (it is callable via
+    ``__call__``).
+
+    .. note::
+        :func:`~finitevolx.build_multigrid_solver` **freezes** the coefficient
+        (interpolated to the staggered ``cx``/``cy`` face fields) into the level
+        hierarchy at construction time.  A prebuilt ``helm_solve`` therefore
+        solves with a *fixed* coefficient; it is correct only when the
+        barotropic coefficient is time-invariant.  If ``h_u``/``h_v`` evolve,
+        either accept the fixed-coefficient (frozen-``h``) barotropic
+        approximation or rebuild the solver each step — do not reuse a stale
+        solver across changing thicknesses.
+
     Parameters
     ----------
     u_star, v_star : Float[Array, "Nz Ny Nx"]

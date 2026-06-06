@@ -112,7 +112,15 @@ def rusanov_flux(
 
 Re-export it flat in `finitevolx/__init__.py` (and add to `__all__`), exactly like the existing
 `uv_center_flux` / `divergence_2d`. Keep `eps` exposed: `eps=0` recovers the textbook flux;
-`eps>0` is the AD-safe variant. The divergence of the flux reuses `divergence_2d`.
+`eps>0` is the AD-safe variant.
+
+!!! warning "Reduced-shape output — `divergence_2d` does not apply directly"
+    `rusanov_flux` returns the `N−1` face values along `axis` (e.g. `(Ny, Nx−1)` for
+    `axis=-1`), **not** a full ghost-padded C-grid array. finitevolX's `divergence_2d`
+    expects both inputs to be full `[Ny, Nx]` arrays with the ghost ring (it takes
+    `diff_x_bwd`/`diff_y_bwd` internally), so it cannot consume the reduced output.
+    Take the continuity divergence by differencing the faces along the same axis (see
+    the example), or embed the fluxes into ghost-padded arrays first.
 
 ### Example
 
@@ -121,11 +129,20 @@ import finitevolx as fvx
 import jax.numpy as jnp
 
 h  = jnp.array(...)                                   # (Ny, Nx) on h-grid
-u  = jnp.array(...)                                   # face-normal velocity
-Fx = fvx.rusanov_flux(h, u, axis=-1, eps=1e-8)        # flat API
-Fy = fvx.rusanov_flux(h, v, axis=-2, eps=1e-8)
-dhdt = -fvx.divergence_2d(Fx, Fy, dx, dy)             # existing op (flat)
+u  = jnp.array(...)                                   # face-normal velocity, x-faces
+v  = jnp.array(...)                                   # face-normal velocity, y-faces
+Fx = fvx.rusanov_flux(h, u, axis=-1, eps=1e-8)        # (Ny, Nx-1) east-face flux
+Fy = fvx.rusanov_flux(h, v, axis=-2, eps=1e-8)        # (Ny-1, Nx) north-face flux
+# Continuity tendency at interior T-cells (reduced-shape divergence of the faces):
+dhdt = jnp.zeros_like(h)
+dhdt = dhdt.at[1:-1, 1:-1].set(
+    -(
+        (Fx[1:-1, 1:] - Fx[1:-1, :-1]) / dx
+        + (Fy[1:, 1:-1] - Fy[:-1, 1:-1]) / dy
+    )
+)
 ```
+
 
 -----
 
@@ -195,8 +212,11 @@ def pv_flux_arakawa_lamb(                 # thin free-function wrapper over the 
 ```
 
 Ship the conservation property as a **test**, not a promise: an `enstrophy_conservation_residual`
-diagnostic that shows `d/dt Σ q²/2 → 0` to round-off in a closed basin. (Note `potential_enstrophy`
-already exists in `diagnostics.py:332` to build that check on.)
+diagnostic that shows `d/dt Σ ½ h q² → 0` to round-off in a closed basin. Use the
+*thickness-weighted* potential enstrophy `Σ ½ h q²` — the physical shallow-water invariant
+Arakawa–Lamb conserves — **not** the unweighted `Σ q²/2`, which a correct flux need not conserve
+when `h` varies in space. The existing `potential_enstrophy(q, h)` (`diagnostics.py:332`, returns
+`0.5 * q² * h`) already takes the thickness field, so build the check on it directly.
 
 ### Example
 
@@ -272,13 +292,28 @@ def barotropic_filter(
     u_star, v_star,                  # provisional velocities (after explicit RHS)
     h_u, h_v,                        # layer thickness on u-/v-faces
     *, dx, dy, g, tau, dt,
-    helm_solve: Callable,            # e.g. build_multigrid_solver(..., coeff=h).solve
+    helm_solve: Callable,            # the solver itself, e.g. build_multigrid_solver(..., coeff=h)
 ) -> tuple[Array, Array]:
     """Subtract the implicit external-gravity-wave (barotropic) mode.
     Returns (filt_u, filt_v) tendency corrections. See MASSH sw.py:1019.
     The variable-coef Helmholtz ∇·(h∇w) is provided by the existing
     multigrid solver (build_multigrid_solver(coeff=...))."""
 ```
+
+`helm_solve` is **called as a plain callable** (`helm_solve(rhs)`). Pass the
+`MultigridSolver` *object* returned by `build_multigrid_solver(...)` — it is callable via
+`__call__` (there is no `.solve` method; the other entry points are `solve_onestep` /
+`solve_unrolled`).
+
+!!! warning "Coefficient is frozen at solver-construction time"
+    `build_multigrid_solver(coeff=h)` converts `coeff` to NumPy, interpolates it to the
+    staggered face coefficients `cx`/`cy`, and **freezes** them in the level hierarchy when
+    the solver is built. MASSH, by contrast, passes the current `coef_ugrid`/`coef_vgrid`
+    into every solve. So a prebuilt `helm_solve` is only correct when the barotropic
+    coefficient is **time-invariant**. If `h_u`/`h_v` evolve, either (a) treat the
+    coefficient as fixed (a common, well-justified barotropic-mode approximation), or
+    (b) rebuild the solver each step (cheap relative to the solve), or (c) extend the
+    solver with a per-step-coefficient interface. The signature above assumes (a)/(b).
 
 So this gap is **a thin operator over an existing solver**, not new elliptic machinery. (It is
 the same variable-coef use-case flagged on the spectraldiffx side; finitevolX is the better home
