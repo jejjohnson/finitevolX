@@ -62,6 +62,13 @@ field stored column indices and `_yids` stored row indices.
   library.  Equivalent inline code is available in
   `docs/notebooks/demo_masks.py`.
 
+## [0.0.43](https://github.com/jejjohnson/finitevolX/compare/v0.0.42...v0.0.43) (2026-06-07)
+
+
+### Features
+
+* **operators:** add massh gap-analysis note and the operators it proposes ([#230](https://github.com/jejjohnson/finitevolX/issues/230)) ([a72f722](https://github.com/jejjohnson/finitevolX/commit/a72f722e603795c07d286ed96bf8c2ced4da1505))
+
 ## [0.0.42](https://github.com/jejjohnson/finitevolX/compare/v0.0.41...v0.0.42) (2026-06-02)
 
 
