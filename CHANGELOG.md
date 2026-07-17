@@ -62,6 +62,13 @@ field stored column indices and `_yids` stored row indices.
   library.  Equivalent inline code is available in
   `docs/notebooks/demo_masks.py`.
 
+## [0.0.44](https://github.com/jejjohnson/finitevolX/compare/v0.0.43...v0.0.44) (2026-07-17)
+
+
+### Features
+
+* **operators:** opt-in "open" lateral-wall mode for advection & diffusion ([#235](https://github.com/jejjohnson/finitevolX/issues/235)) ([89e43bb](https://github.com/jejjohnson/finitevolX/commit/89e43bb54f358715bafd7b17bb7a2999ac5b0648))
+
 ## [0.0.43](https://github.com/jejjohnson/finitevolX/compare/v0.0.42...v0.0.43) (2026-06-07)
 
 
