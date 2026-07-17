@@ -203,9 +203,25 @@ def _diffusion_2d_fluxes_impl(
 
     if wall == "open":
         # East-face flux at ALL faces i = 0 ... Nx-2, including the west
-        # (i=0) and east (i=Nx-2) domain-wall faces, reading the ghost ring.
-        kappa_x = kappa_arr[1:-1, :-1] if kappa_arr.ndim >= 2 else kappa_arr
-        kappa_y = kappa_arr[:-1, 1:-1] if kappa_arr.ndim >= 2 else kappa_arr
+        # (i=0) and east (i=Nx-2) domain-wall faces, reading the tracer ghost
+        # ring.  The face diffusivity uses the *source* (western/southern)
+        # T-cell value, but at the west/south walls that source cell is a
+        # coefficient ghost — and the public ``kappa`` contract does not
+        # require filling its ghost ring.  So clamp the west/south wall faces
+        # to the first *interior* coefficient cell instead of the ghost; this
+        # keeps the two low-side walls consistent with the east/north walls
+        # (which already source from interior cells) regardless of how the
+        # kappa halo was initialised.
+        if kappa_arr.ndim >= 2:
+            kappa_x = jnp.concatenate(
+                [kappa_arr[1:-1, 1:2], kappa_arr[1:-1, 1:-1]], axis=1
+            )
+            kappa_y = jnp.concatenate(
+                [kappa_arr[1:2, 1:-1], kappa_arr[1:-1, 1:-1]], axis=0
+            )
+        else:
+            kappa_x = kappa_arr
+            kappa_y = kappa_arr
         flux_x = flux_x.at[1:-1, :-1].set(kappa_x * (h[1:-1, 1:] - h[1:-1, :-1]) / dx)
         flux_y = flux_y.at[:-1, 1:-1].set(kappa_y * (h[1:, 1:-1] - h[:-1, 1:-1]) / dy)
     else:

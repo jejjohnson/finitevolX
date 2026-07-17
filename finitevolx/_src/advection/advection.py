@@ -80,9 +80,30 @@ def _wall_upwind_flux(
 
     ``q_lo`` is the cell on the low-index side of the face (the upwind cell
     when ``vel_wall >= 0``) and ``q_hi`` the high-index side.  Matches the
-    ``u >= 0`` convention used by the reconstruction primitives, and reads
-    the caller-filled ghost cell on the outward side so that Dirichlet /
-    outflow / periodic boundary values enter the wall-face flux.
+    ``u >= 0`` convention used by the reconstruction primitives.
+
+    Ghost-cell contract for ``wall="open"``
+    ---------------------------------------
+    On an inflow wall the flux carries the ghost cell **as-is**, i.e. the
+    ghost is interpreted as the *exterior cell-centred* tracer value.  This is
+    exact for:
+
+    * **periodic** — the ghost is the opposite interior cell, so the seam
+      flux uses the wrapped upwind cell (and the paired walls net to zero,
+      conserving mass); and
+    * **outflow** — zero-gradient, the interior cell is used regardless.
+
+    For a **Dirichlet inflow** wall the ghost must therefore hold the boundary
+    concentration *as a cell value* (``ghost = value``).  Note that
+    :class:`~finitevolx.Dirichlet1D` instead writes the *face* reflection
+    ``2*value - interior`` (chosen so a centred stencil sees ``value`` at the
+    face — the right convention for :class:`~finitevolx.Diffusion2D`).  Pairing
+    that atom with open-mode advection makes the inflow carry
+    ``2*value - interior`` rather than ``value``; fill the ghost with the
+    plain boundary value when an exact advective Dirichlet inflow is required.
+    A single BC-agnostic wall flux cannot satisfy both the periodic and the
+    face-Dirichlet conventions at once, so this is resolved by the ghost fill,
+    not the operator.
     """
     return jnp.where(vel_wall >= 0.0, q_lo, q_hi) * vel_wall
 

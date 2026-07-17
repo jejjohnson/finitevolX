@@ -213,6 +213,30 @@ def test_diffusion_open_is_exactly_conservative_2d(grid2d):
     )
 
 
+def test_diffusion_open_field_kappa_ignores_coefficient_ghost(grid2d):
+    """Field kappa with an *unfilled* (zero) ghost ring must not zero the
+    west/south wall fluxes — those faces source kappa from the interior cell."""
+    op = Diffusion2D(grid=grid2d)
+    rng = np.random.default_rng(11)
+    Ny, Nx = grid2d.Ny, grid2d.Nx
+    # Coefficient populated on interior T-cells only; ghost ring left at 0.
+    kappa = np.zeros((Ny, Nx))
+    kappa[1:-1, 1:-1] = rng.uniform(0.3, 1.0, size=(Ny - 2, Nx - 2))
+    kappa = jnp.asarray(kappa)
+    h = jnp.asarray(rng.normal(size=(Ny, Nx)).astype(np.float64))
+    fx, fy = op.fluxes(h, kappa, wall="open")
+    # West wall face (col 0) and south wall face (row 0) carry a real flux.
+    assert float(jnp.max(jnp.abs(fx[1:-1, 0]))) > 0.0
+    assert float(jnp.max(jnp.abs(fy[0, 1:-1]))) > 0.0
+    # Still exactly flux-conservative.
+    tend = op(h, kappa, wall="open")
+    x_term = jnp.sum(fx[1:-1, -2] - fx[1:-1, 0]) / grid2d.dx
+    y_term = jnp.sum(fy[-2, 1:-1] - fy[0, 1:-1]) / grid2d.dy
+    np.testing.assert_allclose(
+        float(jnp.sum(tend[1:-1, 1:-1])), float(x_term + y_term), rtol=1e-6, atol=1e-8
+    )
+
+
 def test_diffusion_dirichlet_wall_flux(grid2d):
     """A Dirichlet ghost drives a nonzero wall diffusive flux (open only)."""
     op = Diffusion2D(grid=grid2d)
