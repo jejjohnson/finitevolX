@@ -43,8 +43,11 @@ The class operators :class:`Diffusion2D` / :class:`Diffusion3D` also accept
 Dirichlet / periodic boundary applied to the ghost cells (e.g. via
 :class:`~finitevolx.BoundaryConditionSet`) then produces a diffusive flux
 through the wall.  The flux field stays single-valued, so the tendency is
-exactly flux-conservative.  ``wall="open"`` is not supported together with a
-mask.
+exactly flux-conservative for a **scalar** ``kappa``.  For a
+**spatially-varying** ``kappa`` the wall face reads the source-cell
+coefficient from the halo, so its halo must be filled consistently with the
+tracer BC (a periodic seam needs the wrapped coefficient) for conservation to
+hold.  ``wall="open"`` is not supported together with a mask.
 
 Custom closed-wall boundary conditions can also be imposed via the tracer
 field ``h``, the diffusivity ``kappa``, or by providing a ``Mask2D`` /
@@ -205,23 +208,16 @@ def _diffusion_2d_fluxes_impl(
         # East-face flux at ALL faces i = 0 ... Nx-2, including the west
         # (i=0) and east (i=Nx-2) domain-wall faces, reading the tracer ghost
         # ring.  The face diffusivity uses the *source* (western/southern)
-        # T-cell value, but at the west/south walls that source cell is a
-        # coefficient ghost — and the public ``kappa`` contract does not
-        # require filling its ghost ring.  So clamp the west/south wall faces
-        # to the first *interior* coefficient cell instead of the ghost; this
-        # keeps the two low-side walls consistent with the east/north walls
-        # (which already source from interior cells) regardless of how the
-        # kappa halo was initialised.
-        if kappa_arr.ndim >= 2:
-            kappa_x = jnp.concatenate(
-                [kappa_arr[1:-1, 1:2], kappa_arr[1:-1, 1:-1]], axis=1
-            )
-            kappa_y = jnp.concatenate(
-                [kappa_arr[1:2, 1:-1], kappa_arr[1:-1, 1:-1]], axis=0
-            )
-        else:
-            kappa_x = kappa_arr
-            kappa_y = kappa_arr
+        # T-cell value — the same convention as the interior faces — so the
+        # west/south wall faces read the coefficient ghost.  For a
+        # spatially-varying ``kappa`` its halo must therefore be filled
+        # consistently with the tracer BC (periodic kappa halo for a periodic
+        # tracer, etc.); this is unavoidable, because a periodic diffusive
+        # seam needs the *wrapped* coefficient and the paired wall faces would
+        # otherwise use one-sided interior values and stop cancelling.  A
+        # scalar ``kappa`` (the common case) conserves unconditionally.
+        kappa_x = kappa_arr[1:-1, :-1] if kappa_arr.ndim >= 2 else kappa_arr
+        kappa_y = kappa_arr[:-1, 1:-1] if kappa_arr.ndim >= 2 else kappa_arr
         flux_x = flux_x.at[1:-1, :-1].set(kappa_x * (h[1:-1, 1:] - h[1:-1, :-1]) / dx)
         flux_y = flux_y.at[:-1, 1:-1].set(kappa_y * (h[1:, 1:-1] - h[:-1, 1:-1]) / dy)
     else:
