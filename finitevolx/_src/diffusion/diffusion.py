@@ -25,17 +25,30 @@ Step 3 – Tendency at T-points (backward diff of fluxes, U → T and V → T):
 
 Boundary conditions
 -------------------
-Face fluxes at domain walls are zero by construction:
+By default (``wall="closed"``) face fluxes at domain walls are zero by
+construction:
 
 * West boundary face (U-point col 0) is never written — stays zero.
 * East boundary face (U-point col Nx-2) is not computed — stays zero.
 * South boundary face (V-point row 0) is never written — stays zero.
 * North boundary face (V-point row Ny-2) is not computed — stays zero.
 
-This gives no-flux (closed-wall) BCs at all four domain walls by default.
-Custom boundary conditions must be imposed via the tracer field ``h``, the
-diffusivity ``kappa``, or by providing a ``Mask2D`` / ``Mask3D`` to the
-class operator.
+This gives no-flux (closed-wall) BCs at all four domain walls — the correct
+convention for a closed / land-masked basin.  The ghost ring has no effect on
+the horizontal diffusion term in this mode.
+
+The class operators :class:`Diffusion2D` / :class:`Diffusion3D` also accept
+``wall="open"``, which additionally assembles the wall-face fluxes
+``κ·(h_edge − h_ghost)/dx`` from the caller-filled ghost ring.  A lateral
+Dirichlet / periodic boundary applied to the ghost cells (e.g. via
+:class:`~finitevolx.BoundaryConditionSet`) then produces a diffusive flux
+through the wall.  The flux field stays single-valued, so the tendency is
+exactly flux-conservative.  ``wall="open"`` is not supported together with a
+mask.
+
+Custom closed-wall boundary conditions can also be imposed via the tracer
+field ``h``, the diffusivity ``kappa``, or by providing a ``Mask2D`` /
+``Mask3D`` to the class operator.
 
 Masking
 -------
@@ -65,6 +78,18 @@ from jaxtyping import Array, Bool, Float
 from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
 from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
+
+
+def _check_diffusion_wall(wall: str, mask: object) -> None:
+    """Validate the ``wall`` argument and reject unsupported combinations."""
+    if wall not in ("closed", "open"):
+        raise ValueError(f"wall must be 'closed' or 'open'; got {wall!r}")
+    if wall == "open" and mask is not None:
+        raise NotImplementedError(
+            "wall='open' is not supported together with a mask; the open-wall "
+            "ghost-flux path assumes a rectangular domain with no interior "
+            "land. Use wall='closed' with the mask, or drop the mask."
+        )
 
 
 def diffusion_2d(
@@ -125,6 +150,7 @@ def _diffusion_2d_impl(
     mh: Bool[Array, "Ny Nx"] | Float[Array, "Ny Nx"] | None,
     mu: Bool[Array, "Ny Nx"] | Float[Array, "Ny Nx"] | None,
     mv: Bool[Array, "Ny Nx"] | Float[Array, "Ny Nx"] | None,
+    wall: str = "closed",
 ) -> Float[Array, "Ny Nx"]:
     """Shared 2-D diffusion kernel with explicit raw-array masks.
 
@@ -133,35 +159,10 @@ def _diffusion_2d_impl(
     raw bool / float arrays).  The three-step intermediate-flux masking
     pattern (see module docstring) is inlined here so vmap can also
     use it per-z-slice from ``Diffusion3D``.
+
+    ``wall`` selects the domain-wall face treatment (see :class:`Diffusion2D`).
     """
-    # Prepare kappa slices for each face direction.
-    # When kappa is a full [Ny, Nx] array, use the western/southern source
-    # T-cell value for each face:
-    #   flux_x at (j, i+½) uses κ[j, i] → slice kappa_arr[1:-1, 1:-2]
-    #   flux_y at (j+½, i) uses κ[j, i] → slice kappa_arr[1:-2, 1:-1]
-    kappa_arr = jnp.asarray(kappa)
-    if kappa_arr.ndim >= 2:
-        kappa_x = kappa_arr[1:-1, 1:-2]  # (Ny-2, Nx-3) — source T-cell for east faces
-        kappa_y = kappa_arr[1:-2, 1:-1]  # (Ny-3, Nx-2) — source T-cell for north faces
-    else:
-        kappa_x = kappa_arr
-        kappa_y = kappa_arr
-
-    # Step 1: East-face flux at U-points
-    # flux_x[j, i+1/2] = κ * (h[j, i+1] - h[j, i]) / dx
-    # Written for i = 1 ... Nx-3 only; east boundary face (i=Nx-2) stays 0.
-    flux_x = jnp.zeros_like(h)
-    flux_x = flux_x.at[1:-1, 1:-2].set(kappa_x * (h[1:-1, 2:-1] - h[1:-1, 1:-2]) / dx)
-    if mu is not None:
-        flux_x = flux_x * mu
-
-    # Step 2: North-face flux at V-points
-    # flux_y[j+1/2, i] = κ * (h[j+1, i] - h[j, i]) / dy
-    # Written for j = 1 ... Ny-3 only; north boundary face (j=Ny-2) stays 0.
-    flux_y = jnp.zeros_like(h)
-    flux_y = flux_y.at[1:-2, 1:-1].set(kappa_y * (h[2:-1, 1:-1] - h[1:-2, 1:-1]) / dy)
-    if mv is not None:
-        flux_y = flux_y * mv
+    flux_x, flux_y = _diffusion_2d_fluxes_impl(h, kappa, dx, dy, mu, mv, wall=wall)
 
     # Step 3: Tendency at T-points (divergence of flux)
     # dh[j, i] = (flux_x[j, i+1/2] - flux_x[j, i-1/2]) / dx
@@ -183,23 +184,45 @@ def _diffusion_2d_fluxes_impl(
     dy: float,
     mu: Bool[Array, "Ny Nx"] | Float[Array, "Ny Nx"] | None,
     mv: Bool[Array, "Ny Nx"] | Float[Array, "Ny Nx"] | None,
+    wall: str = "closed",
 ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
-    """Shared 2-D diagnostic-flux kernel with explicit raw-array masks."""
+    """Shared 2-D diagnostic-flux kernel with explicit raw-array masks.
+
+    ``wall`` selects the domain-wall face treatment (see :class:`Diffusion2D`).
+    ``"closed"`` (default) leaves the four wall faces at zero (no-flux);
+    ``"open"`` also writes the wall faces as ``κ·(h_edge − h_ghost)/dx`` from
+    the caller-filled ghost ring so lateral Dirichlet / periodic boundaries
+    produce a diffusive flux through the wall.
+    """
+    if wall not in ("closed", "open"):
+        raise ValueError(f"wall must be 'closed' or 'open'; got {wall!r}")
     kappa_arr = jnp.asarray(kappa)
-    if kappa_arr.ndim >= 2:
-        kappa_x = kappa_arr[1:-1, 1:-2]
-        kappa_y = kappa_arr[1:-2, 1:-1]
-    else:
-        kappa_x = kappa_arr
-        kappa_y = kappa_arr
 
     flux_x = jnp.zeros_like(h)
-    flux_x = flux_x.at[1:-1, 1:-2].set(kappa_x * (h[1:-1, 2:-1] - h[1:-1, 1:-2]) / dx)
+    flux_y = jnp.zeros_like(h)
+
+    if wall == "open":
+        # East-face flux at ALL faces i = 0 ... Nx-2, including the west
+        # (i=0) and east (i=Nx-2) domain-wall faces, reading the ghost ring.
+        kappa_x = kappa_arr[1:-1, :-1] if kappa_arr.ndim >= 2 else kappa_arr
+        kappa_y = kappa_arr[:-1, 1:-1] if kappa_arr.ndim >= 2 else kappa_arr
+        flux_x = flux_x.at[1:-1, :-1].set(kappa_x * (h[1:-1, 1:] - h[1:-1, :-1]) / dx)
+        flux_y = flux_y.at[:-1, 1:-1].set(kappa_y * (h[1:, 1:-1] - h[:-1, 1:-1]) / dy)
+    else:
+        # Interior faces only; wall faces stay 0 → no-flux (closed) walls.
+        #   flux_x at (j, i+½) uses κ[j, i] → slice kappa_arr[1:-1, 1:-2]
+        #   flux_y at (j+½, i) uses κ[j, i] → slice kappa_arr[1:-2, 1:-1]
+        kappa_x = kappa_arr[1:-1, 1:-2] if kappa_arr.ndim >= 2 else kappa_arr
+        kappa_y = kappa_arr[1:-2, 1:-1] if kappa_arr.ndim >= 2 else kappa_arr
+        flux_x = flux_x.at[1:-1, 1:-2].set(
+            kappa_x * (h[1:-1, 2:-1] - h[1:-1, 1:-2]) / dx
+        )
+        flux_y = flux_y.at[1:-2, 1:-1].set(
+            kappa_y * (h[2:-1, 1:-1] - h[1:-2, 1:-1]) / dy
+        )
+
     if mu is not None:
         flux_x = flux_x * mu
-
-    flux_y = jnp.zeros_like(h)
-    flux_y = flux_y.at[1:-2, 1:-1].set(kappa_y * (h[2:-1, 1:-1] - h[1:-2, 1:-1]) / dy)
     if mv is not None:
         flux_y = flux_y * mv
 
@@ -249,6 +272,7 @@ class Diffusion2D(eqx.Module):
         self,
         h: Float[Array, "Ny Nx"],
         kappa: float | Float[Array, "Ny Nx"],
+        wall: str = "closed",
     ) -> Float[Array, "Ny Nx"]:
         """Diffusion tendency ∂h/∂t = ∇·(κ ∇h) at T-points.
 
@@ -265,6 +289,16 @@ class Diffusion2D(eqx.Module):
             Tracer field at T-points.
         kappa : float or Float[Array, "Ny Nx"]
             Diffusion coefficient (scalar or T-point field).
+        wall : {"closed", "open"}, default "closed"
+            Domain-wall face treatment.  ``"closed"`` (default, unchanged)
+            leaves the four wall faces at zero, giving no-flux (closed-wall)
+            BCs — the ghost ring has no effect on the horizontal diffusion
+            term.  ``"open"`` also assembles the wall-face fluxes
+            ``κ·(h_edge − h_ghost)/dx`` from the caller-filled ghost ring, so
+            lateral Dirichlet / periodic boundaries produce a diffusive flux
+            through the wall.  The flux field stays single-valued, so the
+            tendency is exactly flux-conservative.  ``"open"`` is not
+            supported together with a ``mask``.
 
         Returns
         -------
@@ -273,9 +307,17 @@ class Diffusion2D(eqx.Module):
             the intermediate-flux masking pattern described in the
             class docstring is applied.
         """
+        _check_diffusion_wall(wall, self.mask)
         if self.mask is None:
             return _diffusion_2d_impl(
-                h, kappa, self.grid.dx, self.grid.dy, mh=None, mu=None, mv=None
+                h,
+                kappa,
+                self.grid.dx,
+                self.grid.dy,
+                mh=None,
+                mu=None,
+                mv=None,
+                wall=wall,
             )
         return _diffusion_2d_impl(
             h,
@@ -285,12 +327,14 @@ class Diffusion2D(eqx.Module):
             mh=self.mask.h,
             mu=self.mask.u,
             mv=self.mask.v,
+            wall=wall,
         )
 
     def fluxes(
         self,
         h: Float[Array, "Ny Nx"],
         kappa: float | Float[Array, "Ny Nx"],
+        wall: str = "closed",
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
         """Diagnostic diffusive face fluxes at U- and V-points.
 
@@ -307,6 +351,10 @@ class Diffusion2D(eqx.Module):
             Tracer field at T-points.
         kappa : float or Float[Array, "Ny Nx"]
             Diffusion coefficient (scalar or T-point field).
+        wall : {"closed", "open"}, default "closed"
+            Domain-wall face treatment (see :meth:`__call__`).  ``"closed"``
+            leaves wall faces at zero; ``"open"`` also fills them from the
+            ghost ring.  ``"open"`` is not supported together with a ``mask``.
 
         Returns
         -------
@@ -316,9 +364,10 @@ class Diffusion2D(eqx.Module):
             ``flux_x`` is multiplied by ``mask.u`` and ``flux_y`` by
             ``mask.v``.
         """
+        _check_diffusion_wall(wall, self.mask)
         if self.mask is None:
             return _diffusion_2d_fluxes_impl(
-                h, kappa, self.grid.dx, self.grid.dy, mu=None, mv=None
+                h, kappa, self.grid.dx, self.grid.dy, mu=None, mv=None, wall=wall
             )
         return _diffusion_2d_fluxes_impl(
             h,
@@ -327,6 +376,7 @@ class Diffusion2D(eqx.Module):
             self.grid.dy,
             mu=self.mask.u,
             mv=self.mask.v,
+            wall=wall,
         )
 
 
@@ -366,6 +416,7 @@ class Diffusion3D(eqx.Module):
         self,
         h: Float[Array, "Nz Ny Nx"],
         kappa: float | Float[Array, "Nz Ny Nx"],
+        wall: str = "closed",
     ) -> Float[Array, "Nz Ny Nx"]:
         """Diffusion tendency ∂h/∂t = ∇·(κ ∇h) at T-points over all z-levels.
 
@@ -379,6 +430,13 @@ class Diffusion3D(eqx.Module):
             Tracer field at T-points.
         kappa : float or Float[Array, "Nz Ny Nx"]
             Diffusion coefficient (scalar or T-point field).
+        wall : {"closed", "open"}, default "closed"
+            Lateral domain-wall face treatment, applied identically at every
+            z-level (see :class:`Diffusion2D`).  ``"closed"`` (default,
+            unchanged) gives no-flux lateral walls; ``"open"`` assembles the
+            lateral wall-face fluxes from the caller-filled ghost ring so
+            Dirichlet / periodic lateral boundaries drive horizontal
+            diffusion.  ``"open"`` is not supported together with a ``mask``.
 
         Returns
         -------
@@ -386,6 +444,7 @@ class Diffusion3D(eqx.Module):
             Diffusion tendency at T-points.  When ``self.mask`` is set,
             the intermediate-flux masking pattern is applied per-z-slice.
         """
+        _check_diffusion_wall(wall, self.mask)
         dx, dy = self.grid.dx, self.grid.dy
         kappa_arr = jnp.asarray(kappa)
         kappa_ax = 0 if kappa_arr.ndim >= 3 else None
@@ -393,7 +452,9 @@ class Diffusion3D(eqx.Module):
         if self.mask is None:
             # Unmasked path: vmap the free function over z-levels.
             def _apply_unmasked(h_k, kap_k):
-                return _diffusion_2d_impl(h_k, kap_k, dx, dy, mh=None, mu=None, mv=None)
+                return _diffusion_2d_impl(
+                    h_k, kap_k, dx, dy, mh=None, mu=None, mv=None, wall=wall
+                )
 
             out = eqx.filter_vmap(_apply_unmasked, in_axes=(0, kappa_ax))(h, kappa_arr)
             return zero_z_ghosts(out)
@@ -415,6 +476,7 @@ class Diffusion3D(eqx.Module):
         self,
         h: Float[Array, "Nz Ny Nx"],
         kappa: float | Float[Array, "Nz Ny Nx"],
+        wall: str = "closed",
     ) -> tuple[Float[Array, "Nz Ny Nx"], Float[Array, "Nz Ny Nx"]]:
         """Diagnostic diffusive face fluxes at U- and V-points, all z-levels.
 
@@ -424,6 +486,9 @@ class Diffusion3D(eqx.Module):
             Tracer field at T-points.
         kappa : float or Float[Array, "Nz Ny Nx"]
             Diffusion coefficient (scalar or T-point field).
+        wall : {"closed", "open"}, default "closed"
+            Lateral domain-wall face treatment (see :class:`Diffusion2D`).
+            ``"open"`` is not supported together with a ``mask``.
 
         Returns
         -------
@@ -433,6 +498,7 @@ class Diffusion3D(eqx.Module):
             ``flux_x`` is multiplied by ``mask.u`` and ``flux_y`` by
             ``mask.v`` at each z-level.
         """
+        _check_diffusion_wall(wall, self.mask)
         dx, dy = self.grid.dx, self.grid.dy
         kappa_arr = jnp.asarray(kappa)
         kappa_ax = 0 if kappa_arr.ndim >= 3 else None
@@ -440,7 +506,9 @@ class Diffusion3D(eqx.Module):
         if self.mask is None:
 
             def _apply_unmasked(h_k, kap_k):
-                return _diffusion_2d_fluxes_impl(h_k, kap_k, dx, dy, mu=None, mv=None)
+                return _diffusion_2d_fluxes_impl(
+                    h_k, kap_k, dx, dy, mu=None, mv=None, wall=wall
+                )
 
             fx, fy = eqx.filter_vmap(_apply_unmasked, in_axes=(0, kappa_ax))(
                 h, kappa_arr
