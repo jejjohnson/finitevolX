@@ -1,0 +1,4103 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Finite volume operators for JAX on Arakawa C-grids">
+      
+      
+        <meta name="author" content="Juan Emmanuel Johnson, Takaya Uchida">
+      
+      
+      
+        <link rel="prev" href="../api/vertical_modes/">
+      
+      
+        <link rel="next" href="../api/stencils/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>Theory & Overview - finitevolX</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#raw-stencil-primitives" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="finitevolX" class="md-header__button md-logo" aria-label="finitevolX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            finitevolX
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Theory & Overview
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jejjohnson/finitevolX" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/finitevolX
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../cgrid_discretization/" class="md-tabs__link">
+          
+  
+  
+  C-Grid Discretization
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../masks/" class="md-tabs__link">
+          
+  
+  
+  Masks
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../multilayer_vs_3d/" class="md-tabs__link">
+          
+  
+  
+  Vertical Structure
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+  Raw Stencils
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../difference/" class="md-tabs__link">
+          
+  
+  
+  Difference Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../interpolation/" class="md-tabs__link">
+          
+  
+  
+  Interpolation Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../advection/" class="md-tabs__link">
+          
+  
+  
+  Advection
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../boundary_conditions/" class="md-tabs__link">
+          
+  
+  
+  Boundary Conditions
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../spatial_operators/" class="md-tabs__link">
+          
+  
+  
+  Spatial Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../time_integration/" class="md-tabs__link">
+          
+  
+  
+  Time Integration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../elliptic_solvers/" class="md-tabs__link">
+          
+  
+  
+  Elliptic Solvers
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../multigrid_solver/" class="md-tabs__link">
+          
+  
+  
+  Multigrid Solver
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../solver_comparison/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Solver Comparison
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../examples/" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../CHANGELOG/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="finitevolX" class="md-nav__button md-logo" aria-label="finitevolX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    finitevolX
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jejjohnson/finitevolX" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/finitevolX
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C-Grid Discretization
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    C-Grid Discretization
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cgrid_discretization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/grids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Masks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Masks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vertical Structure
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Vertical Structure
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multilayer_vs_3d/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/vertical_modes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Raw Stencils
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Raw Stencils
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-the-continuous-equations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The Continuous Equations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-the-finite-volume-approximation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. The Finite-Volume Approximation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. The Finite-Volume Approximation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#integrating-over-a-control-volume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integrating over a control volume
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-gauss-divergence-theorem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Gauss divergence theorem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#discretizing-cell-averages-and-face-fluxes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discretizing: cell averages and face fluxes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-arakawa-c-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The Arakawa C-Grid
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. The Arakawa C-Grid">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-stagger-the-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why stagger the grid?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-discrete-divergence-theorem-on-a-c-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The discrete divergence theorem on a C-grid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ghost-cells-and-the-interior-helper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ghost cells and the interior() helper
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-the-3-layer-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. The 3-Layer Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-difference-stencils" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Difference Stencils
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Difference Stencils">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#forward-differences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Forward differences
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backward-differences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backward differences
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#composing-second-derivatives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Composing second derivatives
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-averaging-stencils" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Averaging Stencils
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Averaging Stencils">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2-point-averages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2-point averages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-point-bilinear-averages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4-point bilinear averages
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-complete-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Complete Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Complete Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#difference-stencils" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Difference stencils
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#averaging-stencils" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Averaging stencils
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-usage-building-custom-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Usage: Building Custom Operators
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Usage: Building Custom Operators">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-custom-spherical-gradient" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Custom spherical gradient
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-strain-from-raw-stencils" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Strain from raw stencils
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-principles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design Principles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/stencils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Difference Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Difference Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../difference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/difference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interpolation Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Interpolation Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advection
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advection
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/advection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/reconstruction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reconstruction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Boundary Conditions
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Boundary Conditions
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../boundary_conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/boundary_conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spatial Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Spatial Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spatial_operators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/divergence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Divergence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/vorticity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vorticity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/diffusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diffusion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/coriolis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coriolis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/momentum/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Momentum Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time Integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Time Integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../time_integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../time_integration_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/time_integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Elliptic Solvers
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Elliptic Solvers
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../elliptic_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../elliptic_solvers_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/elliptic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convenience Wrappers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/spectral_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/spectral_transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral Transforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/capacitance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacitance Method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/iterative/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Iterative Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multigrid Solver
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Multigrid Solver
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multigrid_solver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multigrid_solver_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/multigrid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solver_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Solver Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_15" >
+        
+          
+          <label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_15">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/demo_masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Masks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/demo_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Elliptic Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/pressure_poisson/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pressure Poisson
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/streamfunction_inversion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streamfunction Inversion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/helmholtz_screening/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Helmholtz Screening
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/advection_1d_schemes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1-D Advection Schemes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/advection_2d_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2-D Rotating Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/advection_2d_masked/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2-D Masked Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/swm_linear/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linear Shallow Water
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/shallow_water/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nonlinear Shallow Water
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notebooks/qg_1p5_layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.5-Layer QG
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CHANGELOG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-the-continuous-equations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The Continuous Equations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-the-finite-volume-approximation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. The Finite-Volume Approximation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. The Finite-Volume Approximation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#integrating-over-a-control-volume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integrating over a control volume
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-gauss-divergence-theorem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Gauss divergence theorem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#discretizing-cell-averages-and-face-fluxes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Discretizing: cell averages and face fluxes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-arakawa-c-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The Arakawa C-Grid
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. The Arakawa C-Grid">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-stagger-the-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why stagger the grid?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-discrete-divergence-theorem-on-a-c-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The discrete divergence theorem on a C-grid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ghost-cells-and-the-interior-helper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ghost cells and the interior() helper
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-the-3-layer-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. The 3-Layer Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-difference-stencils" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Difference Stencils
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Difference Stencils">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#forward-differences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Forward differences
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backward-differences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backward differences
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#composing-second-derivatives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Composing second derivatives
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-averaging-stencils" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Averaging Stencils
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Averaging Stencils">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2-point-averages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2-point averages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-point-bilinear-averages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4-point bilinear averages
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-complete-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Complete Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Complete Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#difference-stencils" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Difference stencils
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#averaging-stencils" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Averaging stencils
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-usage-building-custom-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Usage: Building Custom Operators
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Usage: Building Custom Operators">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-custom-spherical-gradient" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Custom spherical gradient
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-strain-from-raw-stencils" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Strain from raw stencils
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-principles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design Principles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="raw-stencil-primitives">Raw Stencil Primitives</h1>
+<p>This page explains the theory behind the raw stencil functions in <code>finitevolx</code>,
+walking from the continuous equations through the Gauss divergence theorem to
+the discrete stencils that the library implements.</p>
+<p>For details on ghost-cell layout, same-size array conventions, and boundary
+interactions, see the <a href="../cgrid_discretization/">C-Grid Discretization</a> page.</p>
+<hr />
+<h2 id="1-the-continuous-equations">1. The Continuous Equations</h2>
+<p>Geophysical fluid dynamics models solve <strong>conservation laws</strong> — partial
+differential equations that express the conservation of mass, momentum,
+and tracers:</p>
+<div class="arithmatex">\[
+\frac{\partial q}{\partial t} + \nabla \cdot \mathbf{F}(q) = 0
+\]</div>
+<p>where <span class="arithmatex">\(q\)</span> is a conserved density (layer thickness <span class="arithmatex">\(h\)</span>, momentum
+<span class="arithmatex">\(hu\)</span>, tracer concentration <span class="arithmatex">\(c\)</span>, etc.) and <span class="arithmatex">\(\mathbf{F}(q)\)</span> is the
+corresponding flux vector.  In two dimensions this expands to:</p>
+<div class="arithmatex">\[
+\frac{\partial q}{\partial t}
+  + \frac{\partial F^x}{\partial x}
+  + \frac{\partial F^y}{\partial y} = 0
+\]</div>
+<p>For example, in the shallow-water mass equation <span class="arithmatex">\(q = h\)</span> and
+<span class="arithmatex">\(\mathbf{F} = (hu,\, hv)\)</span>, giving the familiar continuity equation:</p>
+<div class="arithmatex">\[
+\frac{\partial h}{\partial t}
+  + \frac{\partial (hu)}{\partial x}
+  + \frac{\partial (hv)}{\partial y} = 0
+\]</div>
+<p>These are continuous equations defined at every point in space.  To solve
+them numerically, we need to represent them on a finite grid.</p>
+<hr />
+<h2 id="2-the-finite-volume-approximation">2. The Finite-Volume Approximation</h2>
+<h3 id="integrating-over-a-control-volume">Integrating over a control volume</h3>
+<p>Rather than approximating derivatives at a point (as finite-difference
+methods do), the <strong>finite-volume method</strong> works with the <em>integral</em> form
+of the conservation law.  We divide the domain into non-overlapping cells
+<span class="arithmatex">\(\Omega_{j,i}\)</span> and integrate the conservation law over each cell:</p>
+<div class="arithmatex">\[
+\int_{\Omega_{j,i}} \frac{\partial q}{\partial t}\, dA
+  + \int_{\Omega_{j,i}} \nabla \cdot \mathbf{F}\, dA = 0
+\]</div>
+<h3 id="the-gauss-divergence-theorem">The Gauss divergence theorem</h3>
+<p>The key step is applying the <strong>Gauss divergence theorem</strong> (also known as
+the divergence theorem or Green's theorem in 2D) to convert the volume
+integral of the divergence into a surface integral over the cell boundary:</p>
+<div class="arithmatex">\[
+\int_{\Omega_{j,i}} \nabla \cdot \mathbf{F}\, dA
+  = \oint_{\partial \Omega_{j,i}} \mathbf{F} \cdot \hat{\mathbf{n}}\, ds
+\]</div>
+<p>where <span class="arithmatex">\(\hat{\mathbf{n}}\)</span> is the outward unit normal to the cell boundary
+and <span class="arithmatex">\(ds\)</span> is the line element along the boundary.  This gives us:</p>
+<div class="arithmatex">\[
+\frac{d}{dt} \int_{\Omega_{j,i}} q\, dA
+  = -\oint_{\partial \Omega_{j,i}} \mathbf{F} \cdot \hat{\mathbf{n}}\, ds
+\]</div>
+<p>The physical meaning is clear: <strong>the rate of change of <span class="arithmatex">\(q\)</span> inside a cell
+equals the net flux through its faces</strong>.  This is exact — no approximation
+has been made yet.</p>
+<h3 id="discretizing-cell-averages-and-face-fluxes">Discretizing: cell averages and face fluxes</h3>
+<p>Now we introduce approximations.  Define the <strong>cell average</strong>:</p>
+<div class="arithmatex">\[
+\bar{q}_{j,i} = \frac{1}{|\Omega_{j,i}|} \int_{\Omega_{j,i}} q\, dA
+\]</div>
+<p>For a rectangular cell with sides <span class="arithmatex">\(\Delta x\)</span> and <span class="arithmatex">\(\Delta y\)</span>, the boundary
+integral decomposes into four face contributions — east, west, north,
+south.  Approximating the flux as constant along each face:</p>
+<div class="arithmatex">\[
+\oint_{\partial \Omega} \mathbf{F} \cdot \hat{\mathbf{n}}\, ds
+  \approx
+    \underbrace{F^x_{j,\, i+\frac{1}{2}}}_{\text{east}} \Delta y
+  - \underbrace{F^x_{j,\, i-\frac{1}{2}}}_{\text{west}} \Delta y
+  + \underbrace{F^y_{j+\frac{1}{2},\, i}}_{\text{north}} \Delta x
+  - \underbrace{F^y_{j-\frac{1}{2},\, i}}_{\text{south}} \Delta x
+\]</div>
+<p>Dividing by the cell area <span class="arithmatex">\(\Delta x \Delta y\)</span>:</p>
+<div class="arithmatex">\[
+\frac{d\bar{q}_{j,i}}{dt}
+  = -\frac{F^x_{j,\, i+\frac{1}{2}} - F^x_{j,\, i-\frac{1}{2}}}{\Delta x}
+    -\frac{F^y_{j+\frac{1}{2},\, i} - F^y_{j-\frac{1}{2},\, i}}{\Delta y}
+\]</div>
+<p>This is the <strong>semi-discrete finite-volume equation</strong>: continuous in time,
+discrete in space.  Two things are now apparent:</p>
+<ol>
+<li><strong>Cell averages</strong> (<span class="arithmatex">\(\bar{q}_{j,i}\)</span>) naturally live at cell centres.</li>
+<li><strong>Face fluxes</strong> (<span class="arithmatex">\(F^x_{j,i+½}\)</span>, <span class="arithmatex">\(F^y_{j+½,i}\)</span>) naturally live at cell faces.</li>
+</ol>
+<p>This is <em>exactly</em> the Arakawa C-grid staggering — it is not an arbitrary
+choice but a direct consequence of the Gauss divergence theorem.</p>
+<hr />
+<h2 id="3-the-arakawa-c-grid">3. The Arakawa C-Grid</h2>
+<h3 id="why-stagger-the-grid">Why stagger the grid?</h3>
+<p>The finite-volume derivation tells us that scalar quantities and fluxes
+live at geometrically different locations: centres vs. faces.  Storing
+them at the same location (a co-located or "A-grid") introduces
+computational modes and requires explicit filtering.  The <strong>Arakawa C-grid</strong>
+respects the natural staggering by assigning:</p>
+<ul>
+<li><strong>Scalars</strong> (thickness, pressure, tracers) to cell <strong>centres</strong> (T-points)</li>
+<li><strong>x-fluxes</strong> and x-velocity to east <strong>faces</strong> (U-points)</li>
+<li><strong>y-fluxes</strong> and y-velocity to north <strong>faces</strong> (V-points)</li>
+<li><strong>Vorticity</strong> and related quantities to cell <strong>corners</strong> (X-points)</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>   V[j,i] ──── X[j,i] ──── V[j,i+1]
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>     │                        │
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>     │        T[j,i]          │
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>     │                        │
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>   V[j-1,i] ── X[j-1,i] ── V[j-1,i+1]
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>   U[j,i-1]    U[j,i]      U[j,i+1]
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Point</th>
+<th>Position</th>
+<th>Physical role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>T</strong></td>
+<td><span class="arithmatex">\((j,\, i)\)</span> — cell centre</td>
+<td>Scalars: thickness <span class="arithmatex">\(h\)</span>, pressure <span class="arithmatex">\(p\)</span>, tracers</td>
+</tr>
+<tr>
+<td><strong>U</strong></td>
+<td><span class="arithmatex">\((j,\, i+\tfrac{1}{2})\)</span> — east face</td>
+<td>x-velocity <span class="arithmatex">\(u\)</span>, east-face flux <span class="arithmatex">\(F^x\)</span></td>
+</tr>
+<tr>
+<td><strong>V</strong></td>
+<td><span class="arithmatex">\((j+\tfrac{1}{2},\, i)\)</span> — north face</td>
+<td>y-velocity <span class="arithmatex">\(v\)</span>, north-face flux <span class="arithmatex">\(F^y\)</span></td>
+</tr>
+<tr>
+<td><strong>X</strong></td>
+<td><span class="arithmatex">\((j+\tfrac{1}{2},\, i+\tfrac{1}{2})\)</span> — NE corner</td>
+<td>Vorticity <span class="arithmatex">\(\zeta\)</span>, potential vorticity <span class="arithmatex">\(q\)</span></td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-discrete-divergence-theorem-on-a-c-grid">The discrete divergence theorem on a C-grid</h3>
+<p>With this layout, the semi-discrete equation from Section 2 maps directly
+to array operations.  The discrete divergence of the velocity field at
+T-point <span class="arithmatex">\((j, i)\)</span> reads the four surrounding face values:</p>
+<div class="arithmatex">\[
+(\nabla \cdot \mathbf{u})_{j,i}
+  = \frac{u_{j,\, i+\frac{1}{2}} - u_{j,\, i-\frac{1}{2}}}{\Delta x}
+  + \frac{v_{j+\frac{1}{2},\, i} - v_{j-\frac{1}{2},\, i}}{\Delta y}
+\]</div>
+<p>Each term is a <strong>backward difference</strong> of a face quantity returning to
+the cell centre — this is <code>diff_x_bwd(u) / dx + diff_y_bwd(v) / dy</code>.</p>
+<p>Similarly, the <strong>curl</strong> (relative vorticity) at X-point <span class="arithmatex">\((j+½, i+½)\)</span>
+reads the four surrounding face values:</p>
+<div class="arithmatex">\[
+\zeta_{j+\frac{1}{2},\, i+\frac{1}{2}}
+  = \frac{v_{j+\frac{1}{2},\, i+1} - v_{j+\frac{1}{2},\, i}}{\Delta x}
+  - \frac{u_{j+1,\, i+\frac{1}{2}} - u_{j,\, i+\frac{1}{2}}}{\Delta y}
+\]</div>
+<p>Each term is a <strong>forward difference</strong> of a face quantity advancing to
+the corner — this is <code>diff_x_fwd(v) / dx - diff_y_fwd(u) / dy</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Discrete conservation</p>
+<p>Because the east-face flux of cell <span class="arithmatex">\((j,i)\)</span> is identically the west-face
+flux of cell <span class="arithmatex">\((j, i+1)\)</span>, the finite-volume scheme conserves the
+total integral of <span class="arithmatex">\(q\)</span> over the domain to machine precision (up to
+boundary fluxes).  This <strong>telescoping property</strong> is built into the
+C-grid layout and is preserved by the raw stencils.</p>
+</div>
+<h3 id="ghost-cells-and-the-interior-helper">Ghost cells and the <code>interior()</code> helper</h3>
+<p>In <code>finitevolx</code>, every array has the same total shape <code>[Ny, Nx]</code> with a
+one-cell ghost ring on each side.  The physical interior occupies
+<code>[1:-1, 1:-1]</code>.  Raw stencils return arrays of shape <code>(Ny-2, Nx-2)</code> —
+the interior only.  The <code>interior(values, like)</code> helper pads the result
+back to full grid shape with zeros in the ghost ring.</p>
+<p>For full details on ghost-cell layout and boundary interactions, see the
+<a href="../cgrid_discretization/">C-Grid Discretization</a> page.</p>
+<hr />
+<h2 id="4-the-3-layer-architecture">4. The 3-Layer Architecture</h2>
+<p><code>finitevolx</code> organises its spatial operators into three layers:</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>What</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>1 — Raw stencils</strong></td>
+<td>Pure index arithmetic, no scaling</td>
+<td><code>diff_x_fwd(h)</code> returns <code>h[j, i+1] − h[j, i]</code></td>
+</tr>
+<tr>
+<td><strong>2 — Scaled primitives</strong></td>
+<td>Layer 1 + metric scaling</td>
+<td><code>Difference2D.diff_x_T_to_U(h)</code> returns <code>diff_x_fwd(h) / dx</code></td>
+</tr>
+<tr>
+<td><strong>3 — Compound operators</strong></td>
+<td>Compose Layer 2</td>
+<td><code>Difference2D.divergence(u, v)</code> = <code>diff_x_U_to_T(u) + diff_y_V_to_T(v)</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Layer 1</strong> — the raw stencils documented here — is the foundation.
+These functions perform no metric scaling (no division by <span class="arithmatex">\(\Delta x\)</span>,
+<span class="arithmatex">\(R\cos\varphi\,\Delta\lambda\)</span>, etc.) and no ghost-ring padding.  They
+return interior-sized arrays that the caller can scale by any coordinate
+metric, making them reusable across Cartesian, spherical, cylindrical,
+and curvilinear coordinate systems.</p>
+<hr />
+<h2 id="5-difference-stencils">5. Difference Stencils</h2>
+<h3 id="forward-differences">Forward differences</h3>
+<p>A forward difference shifts the output one half-step in the positive
+direction.  These map centre-points to face/corner-points.</p>
+<p><strong>Forward x-difference (T → U or V → X):</strong></p>
+<div class="arithmatex">\[
+\Delta_x\, h_{j,\, i+\frac{1}{2}} = h_{j,\, i+1} - h_{j,\, i}
+\]</div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">diff_x_fwd</span><span class="p">(</span><span class="n">h</span><span class="p">):</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="k">return</span> <span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">:]</span> <span class="o">-</span> <span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+</code></pre></div>
+<p><strong>Forward y-difference (T → V or U → X):</strong></p>
+<div class="arithmatex">\[
+\Delta_y\, h_{j+\frac{1}{2},\, i} = h_{j+1,\, i} - h_{j,\, i}
+\]</div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">diff_y_fwd</span><span class="p">(</span><span class="n">h</span><span class="p">):</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="k">return</span> <span class="n">h</span><span class="p">[</span><span class="mi">2</span><span class="p">:,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+</code></pre></div>
+<h3 id="backward-differences">Backward differences</h3>
+<p>A backward difference shifts the output one half-step in the negative
+direction.  These map face/corner-points back to centre-points.</p>
+<p><strong>Backward x-difference (U → T or X → V):</strong></p>
+<div class="arithmatex">\[
+\Delta_x\, h_{j,\, i} = h_{j,\, i+\frac{1}{2}} - h_{j,\, i-\frac{1}{2}}
+\]</div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">diff_x_bwd</span><span class="p">(</span><span class="n">h</span><span class="p">):</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="k">return</span> <span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span>
+</code></pre></div>
+<p><strong>Backward y-difference (V → T or X → U):</strong></p>
+<div class="arithmatex">\[
+\Delta_y\, h_{j,\, i} = h_{j+\frac{1}{2},\, i} - h_{j-\frac{1}{2},\, i}
+\]</div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">diff_y_bwd</span><span class="p">(</span><span class="n">h</span><span class="p">):</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="k">return</span> <span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">h</span><span class="p">[:</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+</code></pre></div>
+<h3 id="composing-second-derivatives">Composing second derivatives</h3>
+<p>The Laplacian is a forward-then-backward composition:</p>
+<div class="arithmatex">\[
+\frac{\partial^2 h}{\partial x^2} \approx
+  \frac{\Delta_x^{\text{fwd}} h - \Delta_x^{\text{bwd}} h}{\Delta x^2}
+\]</div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">d2h_dx2</span> <span class="o">=</span> <span class="p">(</span><span class="n">diff_x_fwd</span><span class="p">(</span><span class="n">h</span><span class="p">)</span> <span class="o">-</span> <span class="n">diff_x_bwd</span><span class="p">(</span><span class="n">h</span><span class="p">))</span> <span class="o">/</span> <span class="n">dx</span><span class="o">**</span><span class="mi">2</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">d2h_dy2</span> <span class="o">=</span> <span class="p">(</span><span class="n">diff_y_fwd</span><span class="p">(</span><span class="n">h</span><span class="p">)</span> <span class="o">-</span> <span class="n">diff_y_bwd</span><span class="p">(</span><span class="n">h</span><span class="p">))</span> <span class="o">/</span> <span class="n">dy</span><span class="o">**</span><span class="mi">2</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">laplacian</span> <span class="o">=</span> <span class="n">d2h_dx2</span> <span class="o">+</span> <span class="n">d2h_dy2</span>
+</code></pre></div>
+<p>This is exactly how <code>Difference2D.laplacian</code> is implemented internally.</p>
+<hr />
+<h2 id="6-averaging-stencils">6. Averaging Stencils</h2>
+<p>Interpolation between grid locations uses arithmetic averages of
+nearest neighbours.  Like the difference stencils, these return
+interior-sized arrays with no ghost-ring padding.</p>
+<h3 id="2-point-averages">2-point averages</h3>
+<p><strong>Forward x-average (T → U or V → X):</strong></p>
+<div class="arithmatex">\[
+\bar{h}_{j,\, i+\frac{1}{2}} = \tfrac{1}{2}(h_{j,\, i} + h_{j,\, i+1})
+\]</div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">avg_x_fwd</span><span class="p">(</span><span class="n">h</span><span class="p">):</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="k">return</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">:])</span>
+</code></pre></div>
+<p><strong>Backward x-average (U → T or X → V):</strong></p>
+<div class="arithmatex">\[
+\bar{h}_{j,\, i} = \tfrac{1}{2}(h_{j,\, i-\frac{1}{2}} + h_{j,\, i+\frac{1}{2}})
+\]</div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">avg_x_bwd</span><span class="p">(</span><span class="n">h</span><span class="p">):</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="k">return</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">2</span><span class="p">])</span>
+</code></pre></div>
+<p>The y-direction analogues <code>avg_y_fwd</code> and <code>avg_y_bwd</code> follow the same
+pattern along the j-axis.</p>
+<h3 id="4-point-bilinear-averages">4-point bilinear averages</h3>
+<p>For diagonal transfers (T ↔ X, U ↔ V), a <strong>4-point bilinear average</strong>
+is used:</p>
+<p><strong>T → X (NE corner average):</strong></p>
+<div class="arithmatex">\[
+\bar{h}_{j+\frac{1}{2},\, i+\frac{1}{2}} = \tfrac{1}{4}
+  (h_{j,i} + h_{j,i+1} + h_{j+1,i} + h_{j+1,i+1})
+\]</div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">avg_xy_fwd</span><span class="p">(</span><span class="n">h</span><span class="p">):</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="k">return</span> <span class="mf">0.25</span> <span class="o">*</span> <span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">:]</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>                   <span class="o">+</span> <span class="n">h</span><span class="p">[</span><span class="mi">2</span><span class="p">:,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">h</span><span class="p">[</span><span class="mi">2</span><span class="p">:,</span> <span class="mi">2</span><span class="p">:])</span>
+</code></pre></div>
+<p><strong>X → T (SW corner average):</strong></p>
+<div class="arithmatex">\[
+\bar{q}_{j,i} = \tfrac{1}{4}
+  (q_{j+\frac{1}{2},i+\frac{1}{2}} + q_{j-\frac{1}{2},i+\frac{1}{2}}
+ + q_{j+\frac{1}{2},i-\frac{1}{2}} + q_{j-\frac{1}{2},i-\frac{1}{2}})
+\]</div>
+<p><strong>U → V</strong> (<code>avg_xbwd_yfwd</code>) and <strong>V → U</strong> (<code>avg_xfwd_ybwd</code>) use the same
+4-point pattern but with mixed forward/backward shifts in each direction.</p>
+<hr />
+<h2 id="7-complete-reference">7. Complete Reference</h2>
+<h3 id="difference-stencils">Difference stencils</h3>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Formula</th>
+<th>Maps</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>diff_x_fwd</code></td>
+<td><span class="arithmatex">\(h_{j,i+1} - h_{j,i}\)</span></td>
+<td>T→U, V→X</td>
+</tr>
+<tr>
+<td><code>diff_y_fwd</code></td>
+<td><span class="arithmatex">\(h_{j+1,i} - h_{j,i}\)</span></td>
+<td>T→V, U→X</td>
+</tr>
+<tr>
+<td><code>diff_x_bwd</code></td>
+<td><span class="arithmatex">\(h_{j,i+½} - h_{j,i-½}\)</span></td>
+<td>U→T, X→V</td>
+</tr>
+<tr>
+<td><code>diff_y_bwd</code></td>
+<td><span class="arithmatex">\(h_{j+½,i} - h_{j-½,i}\)</span></td>
+<td>V→T, X→U</td>
+</tr>
+<tr>
+<td><code>diff_x_fwd_1d</code></td>
+<td><span class="arithmatex">\(h_{i+1} - h_i\)</span></td>
+<td>T→U (1D)</td>
+</tr>
+<tr>
+<td><code>diff_x_bwd_1d</code></td>
+<td><span class="arithmatex">\(h_{i+½} - h_{i-½}\)</span></td>
+<td>U→T (1D)</td>
+</tr>
+<tr>
+<td><code>diff_x_fwd_3d</code></td>
+<td><span class="arithmatex">\(h_{k,j,i+1} - h_{k,j,i}\)</span></td>
+<td>T→U (3D)</td>
+</tr>
+<tr>
+<td><code>diff_y_fwd_3d</code></td>
+<td><span class="arithmatex">\(h_{k,j+1,i} - h_{k,j,i}\)</span></td>
+<td>T→V (3D)</td>
+</tr>
+<tr>
+<td><code>diff_x_bwd_3d</code></td>
+<td><span class="arithmatex">\(h_{k,j,i+½} - h_{k,j,i-½}\)</span></td>
+<td>U→T (3D)</td>
+</tr>
+<tr>
+<td><code>diff_y_bwd_3d</code></td>
+<td><span class="arithmatex">\(h_{k,j+½,i} - h_{k,j-½,i}\)</span></td>
+<td>V→T (3D)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="averaging-stencils">Averaging stencils</h3>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Formula</th>
+<th>Maps</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>avg_x_fwd</code></td>
+<td><span class="arithmatex">\(\frac{1}{2}(h_{j,i} + h_{j,i+1})\)</span></td>
+<td>T→U, V→X</td>
+</tr>
+<tr>
+<td><code>avg_y_fwd</code></td>
+<td><span class="arithmatex">\(\frac{1}{2}(h_{j,i} + h_{j+1,i})\)</span></td>
+<td>T→V, U→X</td>
+</tr>
+<tr>
+<td><code>avg_x_bwd</code></td>
+<td><span class="arithmatex">\(\frac{1}{2}(h_{j,i-½} + h_{j,i+½})\)</span></td>
+<td>U→T, X→V</td>
+</tr>
+<tr>
+<td><code>avg_y_bwd</code></td>
+<td><span class="arithmatex">\(\frac{1}{2}(h_{j-½,i} + h_{j+½,i})\)</span></td>
+<td>V→T, X→U</td>
+</tr>
+<tr>
+<td><code>avg_xy_fwd</code></td>
+<td><span class="arithmatex">\(\frac{1}{4}\sum\)</span> (NE quad)</td>
+<td>T→X</td>
+</tr>
+<tr>
+<td><code>avg_xy_bwd</code></td>
+<td><span class="arithmatex">\(\frac{1}{4}\sum\)</span> (SW quad)</td>
+<td>X→T</td>
+</tr>
+<tr>
+<td><code>avg_xbwd_yfwd</code></td>
+<td><span class="arithmatex">\(\frac{1}{4}\sum\)</span> (bwd-x, fwd-y)</td>
+<td>U→V</td>
+</tr>
+<tr>
+<td><code>avg_xfwd_ybwd</code></td>
+<td><span class="arithmatex">\(\frac{1}{4}\sum\)</span> (fwd-x, bwd-y)</td>
+<td>V→U</td>
+</tr>
+<tr>
+<td><code>avg_x_fwd_1d</code></td>
+<td><span class="arithmatex">\(\frac{1}{2}(h_i + h_{i+1})\)</span></td>
+<td>T→U (1D)</td>
+</tr>
+<tr>
+<td><code>avg_x_bwd_1d</code></td>
+<td><span class="arithmatex">\(\frac{1}{2}(h_{i-½} + h_{i+½})\)</span></td>
+<td>U→T (1D)</td>
+</tr>
+<tr>
+<td><code>avg_x_fwd_3d</code></td>
+<td><span class="arithmatex">\(\frac{1}{2}(h_{k,j,i} + h_{k,j,i+1})\)</span></td>
+<td>T→U (3D)</td>
+</tr>
+<tr>
+<td><code>avg_y_fwd_3d</code></td>
+<td><span class="arithmatex">\(\frac{1}{2}(h_{k,j,i} + h_{k,j+1,i})\)</span></td>
+<td>T→V (3D)</td>
+</tr>
+<tr>
+<td><code>avg_x_bwd_3d</code></td>
+<td><span class="arithmatex">\(\frac{1}{2}(h_{k,j,i-½} + h_{k,j,i+½})\)</span></td>
+<td>U→T (3D)</td>
+</tr>
+<tr>
+<td><code>avg_y_bwd_3d</code></td>
+<td><span class="arithmatex">\(\frac{1}{2}(h_{k,j-½,i} + h_{k,j+½,i})\)</span></td>
+<td>V→T (3D)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="8-usage-building-custom-operators">8. Usage: Building Custom Operators</h2>
+<p>The raw stencils are designed as building blocks for custom operators,
+especially when working with non-Cartesian coordinate systems where the
+standard <code>Difference2D</code> / <code>Interpolation2D</code> classes (which divide by
+scalar <code>dx</code>, <code>dy</code>) are not appropriate.</p>
+<h3 id="example-custom-spherical-gradient">Example: Custom spherical gradient</h3>
+<p>On a latitude-longitude grid, the x-metric depends on latitude:</p>
+<div class="arithmatex">\[
+\frac{\partial h}{\partial x}\bigg|_{j,i+\frac{1}{2}}
+  = \frac{h_{j,i+1} - h_{j,i}}{R\cos\varphi_j\,\Delta\lambda}
+\]</div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">finitevolx</span><span class="w"> </span><span class="kn">import</span> <span class="n">diff_x_fwd</span><span class="p">,</span> <span class="n">interior</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="c1"># Pure index arithmetic — same for any coordinate system</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">raw</span> <span class="o">=</span> <span class="n">diff_x_fwd</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="c1"># Apply spherical metric (array, not scalar!)</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="n">scaled</span> <span class="o">=</span> <span class="n">raw</span> <span class="o">/</span> <span class="p">(</span><span class="n">R</span> <span class="o">*</span> <span class="n">cos_lat</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dlon</span><span class="p">)</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="c1"># Pad back to full grid shape with zero ghost ring</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="n">result</span> <span class="o">=</span> <span class="n">interior</span><span class="p">(</span><span class="n">scaled</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="example-strain-from-raw-stencils">Example: Strain from raw stencils</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">finitevolx</span><span class="w"> </span><span class="kn">import</span> <span class="n">diff_x_fwd</span><span class="p">,</span> <span class="n">diff_y_fwd</span><span class="p">,</span> <span class="n">diff_x_bwd</span><span class="p">,</span> <span class="n">diff_y_bwd</span><span class="p">,</span> <span class="n">interior</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="c1"># Shear strain at X-points: dv/dx + du/dy</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">shear</span> <span class="o">=</span> <span class="n">interior</span><span class="p">(</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="n">diff_x_fwd</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">/</span> <span class="n">dx</span> <span class="o">+</span> <span class="n">diff_y_fwd</span><span class="p">(</span><span class="n">u</span><span class="p">)</span> <span class="o">/</span> <span class="n">dy</span><span class="p">,</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="n">u</span><span class="p">,</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="p">)</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="c1"># Tensor strain at T-points: du/dx - dv/dy</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="n">tensor</span> <span class="o">=</span> <span class="n">interior</span><span class="p">(</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>    <span class="n">diff_x_bwd</span><span class="p">(</span><span class="n">u</span><span class="p">)</span> <span class="o">/</span> <span class="n">dx</span> <span class="o">-</span> <span class="n">diff_y_bwd</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">/</span> <span class="n">dy</span><span class="p">,</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>    <span class="n">u</span><span class="p">,</span>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="design-principles">Design Principles</h2>
+<ul>
+<li><strong>Pure functions</strong>: Every stencil is a stateless function of a single
+  array argument.  No grid objects, no side effects.</li>
+<li><strong>JAX-compatible</strong>: All stencils work with <code>jax.jit</code>, <code>jax.vmap</code>, and
+  <code>jax.grad</code> out of the box.</li>
+<li><strong>No metric scaling</strong>: The caller chooses whether to divide by <code>dx</code>,
+  <code>R·cos(φ)·dλ</code>, or any other metric.  This keeps the stencils
+  coordinate-system-agnostic.</li>
+<li><strong>Interior-only output</strong>: Results have shape <code>(Ny-2, Nx-2)</code> — the
+  interior without the ghost ring.  Use <code>interior(result, like)</code> to
+  pad back to full grid shape.</li>
+</ul>
+<hr />
+<h2 id="references">References</h2>
+<ul>
+<li>Arakawa, A. &amp; Lamb, V. R. (1977). Computational design of the basic
+  dynamical processes of the UCLA general circulation model. <em>Methods
+  in Computational Physics</em>, 17, 173-265.</li>
+<li>Sadourny, R. (1975). The dynamics of finite-difference models of the
+  shallow-water equations. <em>J. Atmos. Sci.</em>, 32, 680-689.</li>
+<li>LeVeque, R. J. (2002). <em>Finite Volume Methods for Hyperbolic Problems</em>.
+  Cambridge University Press.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "content.code.copy", "content.code.annotate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

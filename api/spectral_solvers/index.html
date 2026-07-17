@@ -1,0 +1,5001 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Finite volume operators for JAX on Arakawa C-grids">
+      
+      
+        <meta name="author" content="Juan Emmanuel Johnson, Takaya Uchida">
+      
+      
+      
+        <link rel="prev" href="../elliptic/">
+      
+      
+        <link rel="next" href="../spectral_transforms/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>Spectral Solvers - finitevolX</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#spectral-poisson-helmholtz-solvers" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="finitevolX" class="md-header__button md-logo" aria-label="finitevolX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            finitevolX
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Spectral Solvers
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jejjohnson/finitevolX" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/finitevolX
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../cgrid_discretization/" class="md-tabs__link">
+          
+  
+  
+  C-Grid Discretization
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../masks/" class="md-tabs__link">
+          
+  
+  
+  Masks
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../multilayer_vs_3d/" class="md-tabs__link">
+          
+  
+  
+  Vertical Structure
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../stencils/" class="md-tabs__link">
+          
+  
+  
+  Raw Stencils
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../difference/" class="md-tabs__link">
+          
+  
+  
+  Difference Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../interpolation/" class="md-tabs__link">
+          
+  
+  
+  Interpolation Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../advection/" class="md-tabs__link">
+          
+  
+  
+  Advection
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../boundary_conditions/" class="md-tabs__link">
+          
+  
+  
+  Boundary Conditions
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../spatial_operators/" class="md-tabs__link">
+          
+  
+  
+  Spatial Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../time_integration/" class="md-tabs__link">
+          
+  
+  
+  Time Integration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../elliptic_solvers/" class="md-tabs__link">
+          
+  
+  
+  Elliptic Solvers
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../multigrid_solver/" class="md-tabs__link">
+          
+  
+  
+  Multigrid Solver
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../solver_comparison/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Solver Comparison
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../examples/" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../CHANGELOG/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="finitevolX" class="md-nav__button md-logo" aria-label="finitevolX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    finitevolX
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jejjohnson/finitevolX" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/finitevolX
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C-Grid Discretization
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    C-Grid Discretization
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cgrid_discretization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../grids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Masks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Masks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vertical Structure
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Vertical Structure
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../multilayer_vs_3d/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vertical_modes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Raw Stencils
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Raw Stencils
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../stencils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../stencils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Difference Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Difference Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../difference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../difference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interpolation Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Interpolation Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advection
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advection
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reconstruction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reconstruction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Boundary Conditions
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Boundary Conditions
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../boundary_conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../boundary_conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spatial Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Spatial Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../spatial_operators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../divergence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Divergence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vorticity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vorticity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diffusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diffusion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../coriolis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coriolis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../momentum/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Momentum Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time Integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Time Integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../time_integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../time_integration_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../time_integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Elliptic Solvers
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Elliptic Solvers
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../elliptic_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../elliptic_solvers_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../elliptic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convenience Wrappers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral Solvers
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#dst-i-dirichlet-bcs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DST-I (Dirichlet BCs)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finitevolx.solve_poisson_dst" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_poisson_dst
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finitevolx.solve_helmholtz_dst" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_helmholtz_dst
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dct-ii-neumann-bcs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DCT-II (Neumann BCs)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finitevolx.solve_poisson_dct" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_poisson_dct
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finitevolx.solve_helmholtz_dct" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_helmholtz_dct
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fft-periodic-bcs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FFT (Periodic BCs)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finitevolx.solve_poisson_fft" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_poisson_fft
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finitevolx.solve_helmholtz_fft" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_helmholtz_fft
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#eigenvalue-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Eigenvalue Helpers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finitevolx.dst1_eigenvalues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dst1_eigenvalues
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finitevolx.dct2_eigenvalues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dct2_eigenvalues
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finitevolx.fft_eigenvalues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fft_eigenvalues
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spectral_transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral Transforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../capacitance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacitance Method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../iterative/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Iterative Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multigrid Solver
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Multigrid Solver
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../multigrid_solver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../multigrid_solver_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multigrid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solver_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Solver Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_15" >
+        
+          
+          <label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_15">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/demo_masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Masks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/demo_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Elliptic Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/pressure_poisson/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pressure Poisson
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/streamfunction_inversion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streamfunction Inversion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/helmholtz_screening/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Helmholtz Screening
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/advection_1d_schemes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1-D Advection Schemes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/advection_2d_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2-D Rotating Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/advection_2d_masked/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2-D Masked Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/swm_linear/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linear Shallow Water
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/shallow_water/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nonlinear Shallow Water
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../notebooks/qg_1p5_layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.5-Layer QG
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CHANGELOG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#dst-i-dirichlet-bcs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DST-I (Dirichlet BCs)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finitevolx.solve_poisson_dst" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_poisson_dst
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finitevolx.solve_helmholtz_dst" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_helmholtz_dst
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dct-ii-neumann-bcs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DCT-II (Neumann BCs)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finitevolx.solve_poisson_dct" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_poisson_dct
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finitevolx.solve_helmholtz_dct" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_helmholtz_dct
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fft-periodic-bcs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FFT (Periodic BCs)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finitevolx.solve_poisson_fft" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_poisson_fft
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finitevolx.solve_helmholtz_fft" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        solve_helmholtz_fft
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#eigenvalue-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Eigenvalue Helpers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finitevolx.dst1_eigenvalues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dst1_eigenvalues
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finitevolx.dct2_eigenvalues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dct2_eigenvalues
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finitevolx.fft_eigenvalues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fft_eigenvalues
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="spectral-poisson-helmholtz-solvers">Spectral Poisson / Helmholtz Solvers</h1>
+<p>Direct spectral solvers for 2-D elliptic PDEs on rectangular domains,
+using DST-I (Dirichlet), DCT-II (Neumann), or FFT (periodic) spectral
+methods.</p>
+<h2 id="dst-i-dirichlet-bcs">DST-I (Dirichlet BCs)</h2>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finitevolx.solve_poisson_dst" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">finitevolx</span><span class="o">.</span><span class="n">solve_poisson_dst</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">approximation</span><span class="o">=</span><span class="s1">&#39;fd2&#39;</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Solve ∇²ψ = f with homogeneous Dirichlet BCs using DST-I.</p>
+<p>Convenience wrapper around :func:<code>solve_helmholtz_dst</code> with <code>lambda_=0</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>rhs</code>
+            </td>
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span>[<span title="jaxtyping.Array">Array</span>, &#39;Ny Nx&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Right-hand side at interior grid points.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dx</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Grid spacing in x.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dy</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Grid spacing in y.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>approximation</code>
+            </td>
+            <td>
+                  <code>(&#39;fd2&#39;, &#39;spectral&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Eigenvalue type.  Default: <code>"fd2"</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;fd2&#34;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span>[<span title="jaxtyping.Array">Array</span>, &#39;Ny Nx&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Solution ψ, same shape as <em>rhs</em>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>.venv/lib/python3.12/site-packages/spectraldiffx/_src/fourier/solvers.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1302">1302</a></span>
+<span class="normal"><a href="#__codelineno-0-1303">1303</a></span>
+<span class="normal"><a href="#__codelineno-0-1304">1304</a></span>
+<span class="normal"><a href="#__codelineno-0-1305">1305</a></span>
+<span class="normal"><a href="#__codelineno-0-1306">1306</a></span>
+<span class="normal"><a href="#__codelineno-0-1307">1307</a></span>
+<span class="normal"><a href="#__codelineno-0-1308">1308</a></span>
+<span class="normal"><a href="#__codelineno-0-1309">1309</a></span>
+<span class="normal"><a href="#__codelineno-0-1310">1310</a></span>
+<span class="normal"><a href="#__codelineno-0-1311">1311</a></span>
+<span class="normal"><a href="#__codelineno-0-1312">1312</a></span>
+<span class="normal"><a href="#__codelineno-0-1313">1313</a></span>
+<span class="normal"><a href="#__codelineno-0-1314">1314</a></span>
+<span class="normal"><a href="#__codelineno-0-1315">1315</a></span>
+<span class="normal"><a href="#__codelineno-0-1316">1316</a></span>
+<span class="normal"><a href="#__codelineno-0-1317">1317</a></span>
+<span class="normal"><a href="#__codelineno-0-1318">1318</a></span>
+<span class="normal"><a href="#__codelineno-0-1319">1319</a></span>
+<span class="normal"><a href="#__codelineno-0-1320">1320</a></span>
+<span class="normal"><a href="#__codelineno-0-1321">1321</a></span>
+<span class="normal"><a href="#__codelineno-0-1322">1322</a></span>
+<span class="normal"><a href="#__codelineno-0-1323">1323</a></span>
+<span class="normal"><a href="#__codelineno-0-1324">1324</a></span>
+<span class="normal"><a href="#__codelineno-0-1325">1325</a></span>
+<span class="normal"><a href="#__codelineno-0-1326">1326</a></span>
+<span class="normal"><a href="#__codelineno-0-1327">1327</a></span>
+<span class="normal"><a href="#__codelineno-0-1328">1328</a></span>
+<span class="normal"><a href="#__codelineno-0-1329">1329</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-1302" name="__codelineno-0-1302"></a><span class="k">def</span><span class="w"> </span><span class="nf">solve_poisson_dst</span><span class="p">(</span>
+<a id="__codelineno-0-1303" name="__codelineno-0-1303"></a>    <span class="n">rhs</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">],</span>
+<a id="__codelineno-0-1304" name="__codelineno-0-1304"></a>    <span class="n">dx</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-0-1305" name="__codelineno-0-1305"></a>    <span class="n">dy</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-0-1306" name="__codelineno-0-1306"></a>    <span class="o">*</span><span class="p">,</span>
+<a id="__codelineno-0-1307" name="__codelineno-0-1307"></a>    <span class="n">approximation</span><span class="p">:</span> <span class="n">Approximation</span> <span class="o">=</span> <span class="s2">&quot;fd2&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-1308" name="__codelineno-0-1308"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">]:</span>
+<a id="__codelineno-0-1309" name="__codelineno-0-1309"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Solve ∇²ψ = f with homogeneous Dirichlet BCs using DST-I.</span>
+<a id="__codelineno-0-1310" name="__codelineno-0-1310"></a>
+<a id="__codelineno-0-1311" name="__codelineno-0-1311"></a><span class="sd">    Convenience wrapper around :func:`solve_helmholtz_dst` with ``lambda_=0``.</span>
+<a id="__codelineno-0-1312" name="__codelineno-0-1312"></a>
+<a id="__codelineno-0-1313" name="__codelineno-0-1313"></a><span class="sd">    Parameters</span>
+<a id="__codelineno-0-1314" name="__codelineno-0-1314"></a><span class="sd">    ----------</span>
+<a id="__codelineno-0-1315" name="__codelineno-0-1315"></a><span class="sd">    rhs : Float[Array, &quot;Ny Nx&quot;]</span>
+<a id="__codelineno-0-1316" name="__codelineno-0-1316"></a><span class="sd">        Right-hand side at interior grid points.</span>
+<a id="__codelineno-0-1317" name="__codelineno-0-1317"></a><span class="sd">    dx : float</span>
+<a id="__codelineno-0-1318" name="__codelineno-0-1318"></a><span class="sd">        Grid spacing in x.</span>
+<a id="__codelineno-0-1319" name="__codelineno-0-1319"></a><span class="sd">    dy : float</span>
+<a id="__codelineno-0-1320" name="__codelineno-0-1320"></a><span class="sd">        Grid spacing in y.</span>
+<a id="__codelineno-0-1321" name="__codelineno-0-1321"></a><span class="sd">    approximation : {&quot;fd2&quot;, &quot;spectral&quot;}</span>
+<a id="__codelineno-0-1322" name="__codelineno-0-1322"></a><span class="sd">        Eigenvalue type.  Default: ``&quot;fd2&quot;``.</span>
+<a id="__codelineno-0-1323" name="__codelineno-0-1323"></a>
+<a id="__codelineno-0-1324" name="__codelineno-0-1324"></a><span class="sd">    Returns</span>
+<a id="__codelineno-0-1325" name="__codelineno-0-1325"></a><span class="sd">    -------</span>
+<a id="__codelineno-0-1326" name="__codelineno-0-1326"></a><span class="sd">    Float[Array, &quot;Ny Nx&quot;]</span>
+<a id="__codelineno-0-1327" name="__codelineno-0-1327"></a><span class="sd">        Solution ψ, same shape as *rhs*.</span>
+<a id="__codelineno-0-1328" name="__codelineno-0-1328"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-0-1329" name="__codelineno-0-1329"></a>    <span class="k">return</span> <span class="n">solve_helmholtz_dst</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">lambda_</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">approximation</span><span class="o">=</span><span class="n">approximation</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finitevolx.solve_helmholtz_dst" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">finitevolx</span><span class="o">.</span><span class="n">solve_helmholtz_dst</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">lambda_</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">approximation</span><span class="o">=</span><span class="s1">&#39;fd2&#39;</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Solve (∇² − λ)ψ = f with homogeneous Dirichlet BCs using DST-I.</p>
+<p>The input <em>rhs</em> lives on the <strong>interior</strong> grid (boundary values are
+implicitly zero: ψ = 0 on all four edges).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>rhs</code>
+            </td>
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span>[<span title="jaxtyping.Array">Array</span>, &#39;Ny Nx&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Right-hand side at interior grid points.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dx</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Grid spacing in x.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dy</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Grid spacing in y.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>lambda_</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Helmholtz parameter λ.  Default: 0.0 (Poisson).</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>approximation</code>
+            </td>
+            <td>
+                  <code>(&#39;fd2&#39;, &#39;spectral&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Eigenvalue type.  Default: <code>"fd2"</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;fd2&#34;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span>[<span title="jaxtyping.Array">Array</span>, &#39;Ny Nx&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Solution ψ at interior grid points, same shape as <em>rhs</em>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>.venv/lib/python3.12/site-packages/spectraldiffx/_src/fourier/solvers.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1258">1258</a></span>
+<span class="normal"><a href="#__codelineno-0-1259">1259</a></span>
+<span class="normal"><a href="#__codelineno-0-1260">1260</a></span>
+<span class="normal"><a href="#__codelineno-0-1261">1261</a></span>
+<span class="normal"><a href="#__codelineno-0-1262">1262</a></span>
+<span class="normal"><a href="#__codelineno-0-1263">1263</a></span>
+<span class="normal"><a href="#__codelineno-0-1264">1264</a></span>
+<span class="normal"><a href="#__codelineno-0-1265">1265</a></span>
+<span class="normal"><a href="#__codelineno-0-1266">1266</a></span>
+<span class="normal"><a href="#__codelineno-0-1267">1267</a></span>
+<span class="normal"><a href="#__codelineno-0-1268">1268</a></span>
+<span class="normal"><a href="#__codelineno-0-1269">1269</a></span>
+<span class="normal"><a href="#__codelineno-0-1270">1270</a></span>
+<span class="normal"><a href="#__codelineno-0-1271">1271</a></span>
+<span class="normal"><a href="#__codelineno-0-1272">1272</a></span>
+<span class="normal"><a href="#__codelineno-0-1273">1273</a></span>
+<span class="normal"><a href="#__codelineno-0-1274">1274</a></span>
+<span class="normal"><a href="#__codelineno-0-1275">1275</a></span>
+<span class="normal"><a href="#__codelineno-0-1276">1276</a></span>
+<span class="normal"><a href="#__codelineno-0-1277">1277</a></span>
+<span class="normal"><a href="#__codelineno-0-1278">1278</a></span>
+<span class="normal"><a href="#__codelineno-0-1279">1279</a></span>
+<span class="normal"><a href="#__codelineno-0-1280">1280</a></span>
+<span class="normal"><a href="#__codelineno-0-1281">1281</a></span>
+<span class="normal"><a href="#__codelineno-0-1282">1282</a></span>
+<span class="normal"><a href="#__codelineno-0-1283">1283</a></span>
+<span class="normal"><a href="#__codelineno-0-1284">1284</a></span>
+<span class="normal"><a href="#__codelineno-0-1285">1285</a></span>
+<span class="normal"><a href="#__codelineno-0-1286">1286</a></span>
+<span class="normal"><a href="#__codelineno-0-1287">1287</a></span>
+<span class="normal"><a href="#__codelineno-0-1288">1288</a></span>
+<span class="normal"><a href="#__codelineno-0-1289">1289</a></span>
+<span class="normal"><a href="#__codelineno-0-1290">1290</a></span>
+<span class="normal"><a href="#__codelineno-0-1291">1291</a></span>
+<span class="normal"><a href="#__codelineno-0-1292">1292</a></span>
+<span class="normal"><a href="#__codelineno-0-1293">1293</a></span>
+<span class="normal"><a href="#__codelineno-0-1294">1294</a></span>
+<span class="normal"><a href="#__codelineno-0-1295">1295</a></span>
+<span class="normal"><a href="#__codelineno-0-1296">1296</a></span>
+<span class="normal"><a href="#__codelineno-0-1297">1297</a></span>
+<span class="normal"><a href="#__codelineno-0-1298">1298</a></span>
+<span class="normal"><a href="#__codelineno-0-1299">1299</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-1258" name="__codelineno-0-1258"></a><span class="k">def</span><span class="w"> </span><span class="nf">solve_helmholtz_dst</span><span class="p">(</span>
+<a id="__codelineno-0-1259" name="__codelineno-0-1259"></a>    <span class="n">rhs</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">],</span>
+<a id="__codelineno-0-1260" name="__codelineno-0-1260"></a>    <span class="n">dx</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-0-1261" name="__codelineno-0-1261"></a>    <span class="n">dy</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-0-1262" name="__codelineno-0-1262"></a>    <span class="n">lambda_</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+<a id="__codelineno-0-1263" name="__codelineno-0-1263"></a>    <span class="o">*</span><span class="p">,</span>
+<a id="__codelineno-0-1264" name="__codelineno-0-1264"></a>    <span class="n">approximation</span><span class="p">:</span> <span class="n">Approximation</span> <span class="o">=</span> <span class="s2">&quot;fd2&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-1265" name="__codelineno-0-1265"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">]:</span>
+<a id="__codelineno-0-1266" name="__codelineno-0-1266"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Solve (∇² − λ)ψ = f with homogeneous Dirichlet BCs using DST-I.</span>
+<a id="__codelineno-0-1267" name="__codelineno-0-1267"></a>
+<a id="__codelineno-0-1268" name="__codelineno-0-1268"></a><span class="sd">    The input *rhs* lives on the **interior** grid (boundary values are</span>
+<a id="__codelineno-0-1269" name="__codelineno-0-1269"></a><span class="sd">    implicitly zero: ψ = 0 on all four edges).</span>
+<a id="__codelineno-0-1270" name="__codelineno-0-1270"></a>
+<a id="__codelineno-0-1271" name="__codelineno-0-1271"></a><span class="sd">    Parameters</span>
+<a id="__codelineno-0-1272" name="__codelineno-0-1272"></a><span class="sd">    ----------</span>
+<a id="__codelineno-0-1273" name="__codelineno-0-1273"></a><span class="sd">    rhs : Float[Array, &quot;Ny Nx&quot;]</span>
+<a id="__codelineno-0-1274" name="__codelineno-0-1274"></a><span class="sd">        Right-hand side at interior grid points.</span>
+<a id="__codelineno-0-1275" name="__codelineno-0-1275"></a><span class="sd">    dx : float</span>
+<a id="__codelineno-0-1276" name="__codelineno-0-1276"></a><span class="sd">        Grid spacing in x.</span>
+<a id="__codelineno-0-1277" name="__codelineno-0-1277"></a><span class="sd">    dy : float</span>
+<a id="__codelineno-0-1278" name="__codelineno-0-1278"></a><span class="sd">        Grid spacing in y.</span>
+<a id="__codelineno-0-1279" name="__codelineno-0-1279"></a><span class="sd">    lambda_ : float</span>
+<a id="__codelineno-0-1280" name="__codelineno-0-1280"></a><span class="sd">        Helmholtz parameter λ.  Default: 0.0 (Poisson).</span>
+<a id="__codelineno-0-1281" name="__codelineno-0-1281"></a><span class="sd">    approximation : {&quot;fd2&quot;, &quot;spectral&quot;}</span>
+<a id="__codelineno-0-1282" name="__codelineno-0-1282"></a><span class="sd">        Eigenvalue type.  Default: ``&quot;fd2&quot;``.</span>
+<a id="__codelineno-0-1283" name="__codelineno-0-1283"></a>
+<a id="__codelineno-0-1284" name="__codelineno-0-1284"></a><span class="sd">    Returns</span>
+<a id="__codelineno-0-1285" name="__codelineno-0-1285"></a><span class="sd">    -------</span>
+<a id="__codelineno-0-1286" name="__codelineno-0-1286"></a><span class="sd">    Float[Array, &quot;Ny Nx&quot;]</span>
+<a id="__codelineno-0-1287" name="__codelineno-0-1287"></a><span class="sd">        Solution ψ at interior grid points, same shape as *rhs*.</span>
+<a id="__codelineno-0-1288" name="__codelineno-0-1288"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-0-1289" name="__codelineno-0-1289"></a>    <span class="n">Ny</span><span class="p">,</span> <span class="n">Nx</span> <span class="o">=</span> <span class="n">rhs</span><span class="o">.</span><span class="n">shape</span>
+<a id="__codelineno-0-1290" name="__codelineno-0-1290"></a>    <span class="n">rhs_hat</span> <span class="o">=</span> <span class="n">dstn</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<a id="__codelineno-0-1291" name="__codelineno-0-1291"></a>    <span class="n">eigx</span> <span class="o">=</span> <span class="n">_eig_1d</span><span class="p">(</span>
+<a id="__codelineno-0-1292" name="__codelineno-0-1292"></a>        <span class="n">dst1_eigenvalues</span><span class="p">,</span> <span class="n">dst1_eigenvalues_ps</span><span class="p">,</span> <span class="n">Nx</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="p">(</span><span class="n">Nx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">dx</span><span class="p">,</span> <span class="n">approximation</span>
+<a id="__codelineno-0-1293" name="__codelineno-0-1293"></a>    <span class="p">)</span>
+<a id="__codelineno-0-1294" name="__codelineno-0-1294"></a>    <span class="n">eigy</span> <span class="o">=</span> <span class="n">_eig_1d</span><span class="p">(</span>
+<a id="__codelineno-0-1295" name="__codelineno-0-1295"></a>        <span class="n">dst1_eigenvalues</span><span class="p">,</span> <span class="n">dst1_eigenvalues_ps</span><span class="p">,</span> <span class="n">Ny</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="p">(</span><span class="n">Ny</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">dy</span><span class="p">,</span> <span class="n">approximation</span>
+<a id="__codelineno-0-1296" name="__codelineno-0-1296"></a>    <span class="p">)</span>
+<a id="__codelineno-0-1297" name="__codelineno-0-1297"></a>    <span class="n">eig2d</span> <span class="o">=</span> <span class="n">eigy</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">+</span> <span class="n">eigx</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span> <span class="o">-</span> <span class="n">lambda_</span>
+<a id="__codelineno-0-1298" name="__codelineno-0-1298"></a>    <span class="n">psi_hat</span> <span class="o">=</span> <span class="n">rhs_hat</span> <span class="o">/</span> <span class="n">eig2d</span>
+<a id="__codelineno-0-1299" name="__codelineno-0-1299"></a>    <span class="k">return</span> <span class="n">idstn</span><span class="p">(</span><span class="n">psi_hat</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div><h2 id="dct-ii-neumann-bcs">DCT-II (Neumann BCs)</h2>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finitevolx.solve_poisson_dct" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">finitevolx</span><span class="o">.</span><span class="n">solve_poisson_dct</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">approximation</span><span class="o">=</span><span class="s1">&#39;fd2&#39;</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Solve ∇²ψ = f with homogeneous Neumann BCs using DCT-II.</p>
+<p>The Poisson problem has a one-dimensional null space (constant solutions).
+This function fixes the gauge by forcing the domain-mean of ψ to zero.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>rhs</code>
+            </td>
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span>[<span title="jaxtyping.Array">Array</span>, &#39;Ny Nx&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Right-hand side.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dx</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Grid spacing in x.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dy</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Grid spacing in y.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>approximation</code>
+            </td>
+            <td>
+                  <code>(&#39;fd2&#39;, &#39;spectral&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Eigenvalue type.  Default: <code>"fd2"</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;fd2&#34;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span>[<span title="jaxtyping.Array">Array</span>, &#39;Ny Nx&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Zero-mean solution ψ, same shape as <em>rhs</em>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>.venv/lib/python3.12/site-packages/spectraldiffx/_src/fourier/solvers.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1385">1385</a></span>
+<span class="normal"><a href="#__codelineno-0-1386">1386</a></span>
+<span class="normal"><a href="#__codelineno-0-1387">1387</a></span>
+<span class="normal"><a href="#__codelineno-0-1388">1388</a></span>
+<span class="normal"><a href="#__codelineno-0-1389">1389</a></span>
+<span class="normal"><a href="#__codelineno-0-1390">1390</a></span>
+<span class="normal"><a href="#__codelineno-0-1391">1391</a></span>
+<span class="normal"><a href="#__codelineno-0-1392">1392</a></span>
+<span class="normal"><a href="#__codelineno-0-1393">1393</a></span>
+<span class="normal"><a href="#__codelineno-0-1394">1394</a></span>
+<span class="normal"><a href="#__codelineno-0-1395">1395</a></span>
+<span class="normal"><a href="#__codelineno-0-1396">1396</a></span>
+<span class="normal"><a href="#__codelineno-0-1397">1397</a></span>
+<span class="normal"><a href="#__codelineno-0-1398">1398</a></span>
+<span class="normal"><a href="#__codelineno-0-1399">1399</a></span>
+<span class="normal"><a href="#__codelineno-0-1400">1400</a></span>
+<span class="normal"><a href="#__codelineno-0-1401">1401</a></span>
+<span class="normal"><a href="#__codelineno-0-1402">1402</a></span>
+<span class="normal"><a href="#__codelineno-0-1403">1403</a></span>
+<span class="normal"><a href="#__codelineno-0-1404">1404</a></span>
+<span class="normal"><a href="#__codelineno-0-1405">1405</a></span>
+<span class="normal"><a href="#__codelineno-0-1406">1406</a></span>
+<span class="normal"><a href="#__codelineno-0-1407">1407</a></span>
+<span class="normal"><a href="#__codelineno-0-1408">1408</a></span>
+<span class="normal"><a href="#__codelineno-0-1409">1409</a></span>
+<span class="normal"><a href="#__codelineno-0-1410">1410</a></span>
+<span class="normal"><a href="#__codelineno-0-1411">1411</a></span>
+<span class="normal"><a href="#__codelineno-0-1412">1412</a></span>
+<span class="normal"><a href="#__codelineno-0-1413">1413</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-1385" name="__codelineno-0-1385"></a><span class="k">def</span><span class="w"> </span><span class="nf">solve_poisson_dct</span><span class="p">(</span>
+<a id="__codelineno-0-1386" name="__codelineno-0-1386"></a>    <span class="n">rhs</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">],</span>
+<a id="__codelineno-0-1387" name="__codelineno-0-1387"></a>    <span class="n">dx</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-0-1388" name="__codelineno-0-1388"></a>    <span class="n">dy</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-0-1389" name="__codelineno-0-1389"></a>    <span class="o">*</span><span class="p">,</span>
+<a id="__codelineno-0-1390" name="__codelineno-0-1390"></a>    <span class="n">approximation</span><span class="p">:</span> <span class="n">Approximation</span> <span class="o">=</span> <span class="s2">&quot;fd2&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-1391" name="__codelineno-0-1391"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">]:</span>
+<a id="__codelineno-0-1392" name="__codelineno-0-1392"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Solve ∇²ψ = f with homogeneous Neumann BCs using DCT-II.</span>
+<a id="__codelineno-0-1393" name="__codelineno-0-1393"></a>
+<a id="__codelineno-0-1394" name="__codelineno-0-1394"></a><span class="sd">    The Poisson problem has a one-dimensional null space (constant solutions).</span>
+<a id="__codelineno-0-1395" name="__codelineno-0-1395"></a><span class="sd">    This function fixes the gauge by forcing the domain-mean of ψ to zero.</span>
+<a id="__codelineno-0-1396" name="__codelineno-0-1396"></a>
+<a id="__codelineno-0-1397" name="__codelineno-0-1397"></a><span class="sd">    Parameters</span>
+<a id="__codelineno-0-1398" name="__codelineno-0-1398"></a><span class="sd">    ----------</span>
+<a id="__codelineno-0-1399" name="__codelineno-0-1399"></a><span class="sd">    rhs : Float[Array, &quot;Ny Nx&quot;]</span>
+<a id="__codelineno-0-1400" name="__codelineno-0-1400"></a><span class="sd">        Right-hand side.</span>
+<a id="__codelineno-0-1401" name="__codelineno-0-1401"></a><span class="sd">    dx : float</span>
+<a id="__codelineno-0-1402" name="__codelineno-0-1402"></a><span class="sd">        Grid spacing in x.</span>
+<a id="__codelineno-0-1403" name="__codelineno-0-1403"></a><span class="sd">    dy : float</span>
+<a id="__codelineno-0-1404" name="__codelineno-0-1404"></a><span class="sd">        Grid spacing in y.</span>
+<a id="__codelineno-0-1405" name="__codelineno-0-1405"></a><span class="sd">    approximation : {&quot;fd2&quot;, &quot;spectral&quot;}</span>
+<a id="__codelineno-0-1406" name="__codelineno-0-1406"></a><span class="sd">        Eigenvalue type.  Default: ``&quot;fd2&quot;``.</span>
+<a id="__codelineno-0-1407" name="__codelineno-0-1407"></a>
+<a id="__codelineno-0-1408" name="__codelineno-0-1408"></a><span class="sd">    Returns</span>
+<a id="__codelineno-0-1409" name="__codelineno-0-1409"></a><span class="sd">    -------</span>
+<a id="__codelineno-0-1410" name="__codelineno-0-1410"></a><span class="sd">    Float[Array, &quot;Ny Nx&quot;]</span>
+<a id="__codelineno-0-1411" name="__codelineno-0-1411"></a><span class="sd">        Zero-mean solution ψ, same shape as *rhs*.</span>
+<a id="__codelineno-0-1412" name="__codelineno-0-1412"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-0-1413" name="__codelineno-0-1413"></a>    <span class="k">return</span> <span class="n">solve_helmholtz_dct</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">lambda_</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">approximation</span><span class="o">=</span><span class="n">approximation</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finitevolx.solve_helmholtz_dct" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">finitevolx</span><span class="o">.</span><span class="n">solve_helmholtz_dct</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">lambda_</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">approximation</span><span class="o">=</span><span class="s1">&#39;fd2&#39;</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Solve (∇² − λ)ψ = f with homogeneous Neumann BCs using DCT-II.</p>
+<p>When <code>lambda_ == 0</code> the (0,0) mode is singular (Λ[0,0] = 0,
+corresponding to the constant null mode of the Neumann Laplacian).
+This is handled by setting ψ̂[0,0] = 0 (zero-mean gauge).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>rhs</code>
+            </td>
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span>[<span title="jaxtyping.Array">Array</span>, &#39;Ny Nx&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Right-hand side.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dx</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Grid spacing in x.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dy</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Grid spacing in y.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>lambda_</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Helmholtz parameter λ.  Default: 0.0 (Poisson).</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>approximation</code>
+            </td>
+            <td>
+                  <code>(&#39;fd2&#39;, &#39;spectral&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Eigenvalue type.  Default: <code>"fd2"</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;fd2&#34;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span>[<span title="jaxtyping.Array">Array</span>, &#39;Ny Nx&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Solution ψ, same shape as <em>rhs</em>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>.venv/lib/python3.12/site-packages/spectraldiffx/_src/fourier/solvers.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1337">1337</a></span>
+<span class="normal"><a href="#__codelineno-0-1338">1338</a></span>
+<span class="normal"><a href="#__codelineno-0-1339">1339</a></span>
+<span class="normal"><a href="#__codelineno-0-1340">1340</a></span>
+<span class="normal"><a href="#__codelineno-0-1341">1341</a></span>
+<span class="normal"><a href="#__codelineno-0-1342">1342</a></span>
+<span class="normal"><a href="#__codelineno-0-1343">1343</a></span>
+<span class="normal"><a href="#__codelineno-0-1344">1344</a></span>
+<span class="normal"><a href="#__codelineno-0-1345">1345</a></span>
+<span class="normal"><a href="#__codelineno-0-1346">1346</a></span>
+<span class="normal"><a href="#__codelineno-0-1347">1347</a></span>
+<span class="normal"><a href="#__codelineno-0-1348">1348</a></span>
+<span class="normal"><a href="#__codelineno-0-1349">1349</a></span>
+<span class="normal"><a href="#__codelineno-0-1350">1350</a></span>
+<span class="normal"><a href="#__codelineno-0-1351">1351</a></span>
+<span class="normal"><a href="#__codelineno-0-1352">1352</a></span>
+<span class="normal"><a href="#__codelineno-0-1353">1353</a></span>
+<span class="normal"><a href="#__codelineno-0-1354">1354</a></span>
+<span class="normal"><a href="#__codelineno-0-1355">1355</a></span>
+<span class="normal"><a href="#__codelineno-0-1356">1356</a></span>
+<span class="normal"><a href="#__codelineno-0-1357">1357</a></span>
+<span class="normal"><a href="#__codelineno-0-1358">1358</a></span>
+<span class="normal"><a href="#__codelineno-0-1359">1359</a></span>
+<span class="normal"><a href="#__codelineno-0-1360">1360</a></span>
+<span class="normal"><a href="#__codelineno-0-1361">1361</a></span>
+<span class="normal"><a href="#__codelineno-0-1362">1362</a></span>
+<span class="normal"><a href="#__codelineno-0-1363">1363</a></span>
+<span class="normal"><a href="#__codelineno-0-1364">1364</a></span>
+<span class="normal"><a href="#__codelineno-0-1365">1365</a></span>
+<span class="normal"><a href="#__codelineno-0-1366">1366</a></span>
+<span class="normal"><a href="#__codelineno-0-1367">1367</a></span>
+<span class="normal"><a href="#__codelineno-0-1368">1368</a></span>
+<span class="normal"><a href="#__codelineno-0-1369">1369</a></span>
+<span class="normal"><a href="#__codelineno-0-1370">1370</a></span>
+<span class="normal"><a href="#__codelineno-0-1371">1371</a></span>
+<span class="normal"><a href="#__codelineno-0-1372">1372</a></span>
+<span class="normal"><a href="#__codelineno-0-1373">1373</a></span>
+<span class="normal"><a href="#__codelineno-0-1374">1374</a></span>
+<span class="normal"><a href="#__codelineno-0-1375">1375</a></span>
+<span class="normal"><a href="#__codelineno-0-1376">1376</a></span>
+<span class="normal"><a href="#__codelineno-0-1377">1377</a></span>
+<span class="normal"><a href="#__codelineno-0-1378">1378</a></span>
+<span class="normal"><a href="#__codelineno-0-1379">1379</a></span>
+<span class="normal"><a href="#__codelineno-0-1380">1380</a></span>
+<span class="normal"><a href="#__codelineno-0-1381">1381</a></span>
+<span class="normal"><a href="#__codelineno-0-1382">1382</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-1337" name="__codelineno-0-1337"></a><span class="k">def</span><span class="w"> </span><span class="nf">solve_helmholtz_dct</span><span class="p">(</span>
+<a id="__codelineno-0-1338" name="__codelineno-0-1338"></a>    <span class="n">rhs</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">],</span>
+<a id="__codelineno-0-1339" name="__codelineno-0-1339"></a>    <span class="n">dx</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-0-1340" name="__codelineno-0-1340"></a>    <span class="n">dy</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-0-1341" name="__codelineno-0-1341"></a>    <span class="n">lambda_</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+<a id="__codelineno-0-1342" name="__codelineno-0-1342"></a>    <span class="o">*</span><span class="p">,</span>
+<a id="__codelineno-0-1343" name="__codelineno-0-1343"></a>    <span class="n">approximation</span><span class="p">:</span> <span class="n">Approximation</span> <span class="o">=</span> <span class="s2">&quot;fd2&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-1344" name="__codelineno-0-1344"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">]:</span>
+<a id="__codelineno-0-1345" name="__codelineno-0-1345"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Solve (∇² − λ)ψ = f with homogeneous Neumann BCs using DCT-II.</span>
+<a id="__codelineno-0-1346" name="__codelineno-0-1346"></a>
+<a id="__codelineno-0-1347" name="__codelineno-0-1347"></a><span class="sd">    When ``lambda_ == 0`` the (0,0) mode is singular (Λ[0,0] = 0,</span>
+<a id="__codelineno-0-1348" name="__codelineno-0-1348"></a><span class="sd">    corresponding to the constant null mode of the Neumann Laplacian).</span>
+<a id="__codelineno-0-1349" name="__codelineno-0-1349"></a><span class="sd">    This is handled by setting ψ̂[0,0] = 0 (zero-mean gauge).</span>
+<a id="__codelineno-0-1350" name="__codelineno-0-1350"></a>
+<a id="__codelineno-0-1351" name="__codelineno-0-1351"></a><span class="sd">    Parameters</span>
+<a id="__codelineno-0-1352" name="__codelineno-0-1352"></a><span class="sd">    ----------</span>
+<a id="__codelineno-0-1353" name="__codelineno-0-1353"></a><span class="sd">    rhs : Float[Array, &quot;Ny Nx&quot;]</span>
+<a id="__codelineno-0-1354" name="__codelineno-0-1354"></a><span class="sd">        Right-hand side.</span>
+<a id="__codelineno-0-1355" name="__codelineno-0-1355"></a><span class="sd">    dx : float</span>
+<a id="__codelineno-0-1356" name="__codelineno-0-1356"></a><span class="sd">        Grid spacing in x.</span>
+<a id="__codelineno-0-1357" name="__codelineno-0-1357"></a><span class="sd">    dy : float</span>
+<a id="__codelineno-0-1358" name="__codelineno-0-1358"></a><span class="sd">        Grid spacing in y.</span>
+<a id="__codelineno-0-1359" name="__codelineno-0-1359"></a><span class="sd">    lambda_ : float</span>
+<a id="__codelineno-0-1360" name="__codelineno-0-1360"></a><span class="sd">        Helmholtz parameter λ.  Default: 0.0 (Poisson).</span>
+<a id="__codelineno-0-1361" name="__codelineno-0-1361"></a><span class="sd">    approximation : {&quot;fd2&quot;, &quot;spectral&quot;}</span>
+<a id="__codelineno-0-1362" name="__codelineno-0-1362"></a><span class="sd">        Eigenvalue type.  Default: ``&quot;fd2&quot;``.</span>
+<a id="__codelineno-0-1363" name="__codelineno-0-1363"></a>
+<a id="__codelineno-0-1364" name="__codelineno-0-1364"></a><span class="sd">    Returns</span>
+<a id="__codelineno-0-1365" name="__codelineno-0-1365"></a><span class="sd">    -------</span>
+<a id="__codelineno-0-1366" name="__codelineno-0-1366"></a><span class="sd">    Float[Array, &quot;Ny Nx&quot;]</span>
+<a id="__codelineno-0-1367" name="__codelineno-0-1367"></a><span class="sd">        Solution ψ, same shape as *rhs*.</span>
+<a id="__codelineno-0-1368" name="__codelineno-0-1368"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-0-1369" name="__codelineno-0-1369"></a>    <span class="n">Ny</span><span class="p">,</span> <span class="n">Nx</span> <span class="o">=</span> <span class="n">rhs</span><span class="o">.</span><span class="n">shape</span>
+<a id="__codelineno-0-1370" name="__codelineno-0-1370"></a>    <span class="n">rhs_hat</span> <span class="o">=</span> <span class="n">dctn</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<a id="__codelineno-0-1371" name="__codelineno-0-1371"></a>    <span class="n">eigx</span> <span class="o">=</span> <span class="n">_eig_1d</span><span class="p">(</span>
+<a id="__codelineno-0-1372" name="__codelineno-0-1372"></a>        <span class="n">dct2_eigenvalues</span><span class="p">,</span> <span class="n">dct2_eigenvalues_ps</span><span class="p">,</span> <span class="n">Nx</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">Nx</span> <span class="o">*</span> <span class="n">dx</span><span class="p">,</span> <span class="n">approximation</span>
+<a id="__codelineno-0-1373" name="__codelineno-0-1373"></a>    <span class="p">)</span>
+<a id="__codelineno-0-1374" name="__codelineno-0-1374"></a>    <span class="n">eigy</span> <span class="o">=</span> <span class="n">_eig_1d</span><span class="p">(</span>
+<a id="__codelineno-0-1375" name="__codelineno-0-1375"></a>        <span class="n">dct2_eigenvalues</span><span class="p">,</span> <span class="n">dct2_eigenvalues_ps</span><span class="p">,</span> <span class="n">Ny</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">Ny</span> <span class="o">*</span> <span class="n">dy</span><span class="p">,</span> <span class="n">approximation</span>
+<a id="__codelineno-0-1376" name="__codelineno-0-1376"></a>    <span class="p">)</span>
+<a id="__codelineno-0-1377" name="__codelineno-0-1377"></a>    <span class="n">eig2d</span> <span class="o">=</span> <span class="n">eigy</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">+</span> <span class="n">eigx</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span> <span class="o">-</span> <span class="n">lambda_</span>
+<a id="__codelineno-0-1378" name="__codelineno-0-1378"></a>    <span class="n">is_null</span> <span class="o">=</span> <span class="n">eig2d</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mf">0.0</span>
+<a id="__codelineno-0-1379" name="__codelineno-0-1379"></a>    <span class="n">eig2d_safe</span> <span class="o">=</span> <span class="n">eig2d</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">is_null</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">eig2d</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]))</span>
+<a id="__codelineno-0-1380" name="__codelineno-0-1380"></a>    <span class="n">psi_hat</span> <span class="o">=</span> <span class="n">rhs_hat</span> <span class="o">/</span> <span class="n">eig2d_safe</span>
+<a id="__codelineno-0-1381" name="__codelineno-0-1381"></a>    <span class="n">psi_hat</span> <span class="o">=</span> <span class="n">psi_hat</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">is_null</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">psi_hat</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]))</span>
+<a id="__codelineno-0-1382" name="__codelineno-0-1382"></a>    <span class="k">return</span> <span class="n">idctn</span><span class="p">(</span><span class="n">psi_hat</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div><h2 id="fft-periodic-bcs">FFT (Periodic BCs)</h2>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finitevolx.solve_poisson_fft" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">finitevolx</span><span class="o">.</span><span class="n">solve_poisson_fft</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">approximation</span><span class="o">=</span><span class="s1">&#39;fd2&#39;</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Solve ∇²ψ = f with periodic BCs using the 2-D FFT.</p>
+<p>Convenience wrapper around :func:<code>solve_helmholtz_fft</code> with <code>lambda_=0</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>rhs</code>
+            </td>
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span>[<span title="jaxtyping.Array">Array</span>, &#39;Ny Nx&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Right-hand side on the periodic domain.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dx</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Grid spacing in x.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dy</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Grid spacing in y.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>approximation</code>
+            </td>
+            <td>
+                  <code>(&#39;fd2&#39;, &#39;spectral&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Eigenvalue type.  Default: <code>"fd2"</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;fd2&#34;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span>[<span title="jaxtyping.Array">Array</span>, &#39;Ny Nx&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Zero-mean solution ψ (real), same shape as <em>rhs</em>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>.venv/lib/python3.12/site-packages/spectraldiffx/_src/fourier/solvers.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1223">1223</a></span>
+<span class="normal"><a href="#__codelineno-0-1224">1224</a></span>
+<span class="normal"><a href="#__codelineno-0-1225">1225</a></span>
+<span class="normal"><a href="#__codelineno-0-1226">1226</a></span>
+<span class="normal"><a href="#__codelineno-0-1227">1227</a></span>
+<span class="normal"><a href="#__codelineno-0-1228">1228</a></span>
+<span class="normal"><a href="#__codelineno-0-1229">1229</a></span>
+<span class="normal"><a href="#__codelineno-0-1230">1230</a></span>
+<span class="normal"><a href="#__codelineno-0-1231">1231</a></span>
+<span class="normal"><a href="#__codelineno-0-1232">1232</a></span>
+<span class="normal"><a href="#__codelineno-0-1233">1233</a></span>
+<span class="normal"><a href="#__codelineno-0-1234">1234</a></span>
+<span class="normal"><a href="#__codelineno-0-1235">1235</a></span>
+<span class="normal"><a href="#__codelineno-0-1236">1236</a></span>
+<span class="normal"><a href="#__codelineno-0-1237">1237</a></span>
+<span class="normal"><a href="#__codelineno-0-1238">1238</a></span>
+<span class="normal"><a href="#__codelineno-0-1239">1239</a></span>
+<span class="normal"><a href="#__codelineno-0-1240">1240</a></span>
+<span class="normal"><a href="#__codelineno-0-1241">1241</a></span>
+<span class="normal"><a href="#__codelineno-0-1242">1242</a></span>
+<span class="normal"><a href="#__codelineno-0-1243">1243</a></span>
+<span class="normal"><a href="#__codelineno-0-1244">1244</a></span>
+<span class="normal"><a href="#__codelineno-0-1245">1245</a></span>
+<span class="normal"><a href="#__codelineno-0-1246">1246</a></span>
+<span class="normal"><a href="#__codelineno-0-1247">1247</a></span>
+<span class="normal"><a href="#__codelineno-0-1248">1248</a></span>
+<span class="normal"><a href="#__codelineno-0-1249">1249</a></span>
+<span class="normal"><a href="#__codelineno-0-1250">1250</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-1223" name="__codelineno-0-1223"></a><span class="k">def</span><span class="w"> </span><span class="nf">solve_poisson_fft</span><span class="p">(</span>
+<a id="__codelineno-0-1224" name="__codelineno-0-1224"></a>    <span class="n">rhs</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">],</span>
+<a id="__codelineno-0-1225" name="__codelineno-0-1225"></a>    <span class="n">dx</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-0-1226" name="__codelineno-0-1226"></a>    <span class="n">dy</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-0-1227" name="__codelineno-0-1227"></a>    <span class="o">*</span><span class="p">,</span>
+<a id="__codelineno-0-1228" name="__codelineno-0-1228"></a>    <span class="n">approximation</span><span class="p">:</span> <span class="n">Approximation</span> <span class="o">=</span> <span class="s2">&quot;fd2&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-1229" name="__codelineno-0-1229"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">]:</span>
+<a id="__codelineno-0-1230" name="__codelineno-0-1230"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Solve ∇²ψ = f with periodic BCs using the 2-D FFT.</span>
+<a id="__codelineno-0-1231" name="__codelineno-0-1231"></a>
+<a id="__codelineno-0-1232" name="__codelineno-0-1232"></a><span class="sd">    Convenience wrapper around :func:`solve_helmholtz_fft` with ``lambda_=0``.</span>
+<a id="__codelineno-0-1233" name="__codelineno-0-1233"></a>
+<a id="__codelineno-0-1234" name="__codelineno-0-1234"></a><span class="sd">    Parameters</span>
+<a id="__codelineno-0-1235" name="__codelineno-0-1235"></a><span class="sd">    ----------</span>
+<a id="__codelineno-0-1236" name="__codelineno-0-1236"></a><span class="sd">    rhs : Float[Array, &quot;Ny Nx&quot;]</span>
+<a id="__codelineno-0-1237" name="__codelineno-0-1237"></a><span class="sd">        Right-hand side on the periodic domain.</span>
+<a id="__codelineno-0-1238" name="__codelineno-0-1238"></a><span class="sd">    dx : float</span>
+<a id="__codelineno-0-1239" name="__codelineno-0-1239"></a><span class="sd">        Grid spacing in x.</span>
+<a id="__codelineno-0-1240" name="__codelineno-0-1240"></a><span class="sd">    dy : float</span>
+<a id="__codelineno-0-1241" name="__codelineno-0-1241"></a><span class="sd">        Grid spacing in y.</span>
+<a id="__codelineno-0-1242" name="__codelineno-0-1242"></a><span class="sd">    approximation : {&quot;fd2&quot;, &quot;spectral&quot;}</span>
+<a id="__codelineno-0-1243" name="__codelineno-0-1243"></a><span class="sd">        Eigenvalue type.  Default: ``&quot;fd2&quot;``.</span>
+<a id="__codelineno-0-1244" name="__codelineno-0-1244"></a>
+<a id="__codelineno-0-1245" name="__codelineno-0-1245"></a><span class="sd">    Returns</span>
+<a id="__codelineno-0-1246" name="__codelineno-0-1246"></a><span class="sd">    -------</span>
+<a id="__codelineno-0-1247" name="__codelineno-0-1247"></a><span class="sd">    Float[Array, &quot;Ny Nx&quot;]</span>
+<a id="__codelineno-0-1248" name="__codelineno-0-1248"></a><span class="sd">        Zero-mean solution ψ (real), same shape as *rhs*.</span>
+<a id="__codelineno-0-1249" name="__codelineno-0-1249"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-0-1250" name="__codelineno-0-1250"></a>    <span class="k">return</span> <span class="n">solve_helmholtz_fft</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">lambda_</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">approximation</span><span class="o">=</span><span class="n">approximation</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finitevolx.solve_helmholtz_fft" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">finitevolx</span><span class="o">.</span><span class="n">solve_helmholtz_fft</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">lambda_</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">approximation</span><span class="o">=</span><span class="s1">&#39;fd2&#39;</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Solve (∇² − λ)ψ = f with periodic BCs using the 2-D FFT.</p>
+<p>Spectral algorithm:</p>
+<ol>
+<li>Forward 2-D FFT:  f̂ = FFT2(f)                        [Ny, Nx]</li>
+<li>Eigenvalue matrix:
+       Λ[j,i] = Λ_j^y + Λ_i^x − λ                      [Ny, Nx]
+   where Λ^x, Λ^y are FD2 or PS eigenvalues (see <em>approximation</em>).</li>
+<li>Spectral division:  ψ̂[j,i] = f̂[j,i] / Λ[j,i]       [Ny, Nx]</li>
+<li>Inverse 2-D FFT:  ψ = Re(IFFT2(ψ̂))                  [Ny, Nx]</li>
+</ol>
+<p>When <code>lambda_ == 0</code> the (0,0) mode is singular (Λ[0,0] = 0).
+This is handled by setting ψ̂[0,0] = 0 (zero-mean gauge).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>rhs</code>
+            </td>
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span>[<span title="jaxtyping.Array">Array</span>, &#39;Ny Nx&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Right-hand side on the periodic domain.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dx</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Grid spacing in x.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dy</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Grid spacing in y.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>lambda_</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Helmholtz parameter λ.  Default: 0.0 (Poisson).</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>approximation</code>
+            </td>
+            <td>
+                  <code>(&#39;fd2&#39;, &#39;spectral&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Eigenvalue type.  Default: <code>"fd2"</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;fd2&#34;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span>[<span title="jaxtyping.Array">Array</span>, &#39;Ny Nx&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Solution ψ (real), same shape as <em>rhs</em>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>.venv/lib/python3.12/site-packages/spectraldiffx/_src/fourier/solvers.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1169">1169</a></span>
+<span class="normal"><a href="#__codelineno-0-1170">1170</a></span>
+<span class="normal"><a href="#__codelineno-0-1171">1171</a></span>
+<span class="normal"><a href="#__codelineno-0-1172">1172</a></span>
+<span class="normal"><a href="#__codelineno-0-1173">1173</a></span>
+<span class="normal"><a href="#__codelineno-0-1174">1174</a></span>
+<span class="normal"><a href="#__codelineno-0-1175">1175</a></span>
+<span class="normal"><a href="#__codelineno-0-1176">1176</a></span>
+<span class="normal"><a href="#__codelineno-0-1177">1177</a></span>
+<span class="normal"><a href="#__codelineno-0-1178">1178</a></span>
+<span class="normal"><a href="#__codelineno-0-1179">1179</a></span>
+<span class="normal"><a href="#__codelineno-0-1180">1180</a></span>
+<span class="normal"><a href="#__codelineno-0-1181">1181</a></span>
+<span class="normal"><a href="#__codelineno-0-1182">1182</a></span>
+<span class="normal"><a href="#__codelineno-0-1183">1183</a></span>
+<span class="normal"><a href="#__codelineno-0-1184">1184</a></span>
+<span class="normal"><a href="#__codelineno-0-1185">1185</a></span>
+<span class="normal"><a href="#__codelineno-0-1186">1186</a></span>
+<span class="normal"><a href="#__codelineno-0-1187">1187</a></span>
+<span class="normal"><a href="#__codelineno-0-1188">1188</a></span>
+<span class="normal"><a href="#__codelineno-0-1189">1189</a></span>
+<span class="normal"><a href="#__codelineno-0-1190">1190</a></span>
+<span class="normal"><a href="#__codelineno-0-1191">1191</a></span>
+<span class="normal"><a href="#__codelineno-0-1192">1192</a></span>
+<span class="normal"><a href="#__codelineno-0-1193">1193</a></span>
+<span class="normal"><a href="#__codelineno-0-1194">1194</a></span>
+<span class="normal"><a href="#__codelineno-0-1195">1195</a></span>
+<span class="normal"><a href="#__codelineno-0-1196">1196</a></span>
+<span class="normal"><a href="#__codelineno-0-1197">1197</a></span>
+<span class="normal"><a href="#__codelineno-0-1198">1198</a></span>
+<span class="normal"><a href="#__codelineno-0-1199">1199</a></span>
+<span class="normal"><a href="#__codelineno-0-1200">1200</a></span>
+<span class="normal"><a href="#__codelineno-0-1201">1201</a></span>
+<span class="normal"><a href="#__codelineno-0-1202">1202</a></span>
+<span class="normal"><a href="#__codelineno-0-1203">1203</a></span>
+<span class="normal"><a href="#__codelineno-0-1204">1204</a></span>
+<span class="normal"><a href="#__codelineno-0-1205">1205</a></span>
+<span class="normal"><a href="#__codelineno-0-1206">1206</a></span>
+<span class="normal"><a href="#__codelineno-0-1207">1207</a></span>
+<span class="normal"><a href="#__codelineno-0-1208">1208</a></span>
+<span class="normal"><a href="#__codelineno-0-1209">1209</a></span>
+<span class="normal"><a href="#__codelineno-0-1210">1210</a></span>
+<span class="normal"><a href="#__codelineno-0-1211">1211</a></span>
+<span class="normal"><a href="#__codelineno-0-1212">1212</a></span>
+<span class="normal"><a href="#__codelineno-0-1213">1213</a></span>
+<span class="normal"><a href="#__codelineno-0-1214">1214</a></span>
+<span class="normal"><a href="#__codelineno-0-1215">1215</a></span>
+<span class="normal"><a href="#__codelineno-0-1216">1216</a></span>
+<span class="normal"><a href="#__codelineno-0-1217">1217</a></span>
+<span class="normal"><a href="#__codelineno-0-1218">1218</a></span>
+<span class="normal"><a href="#__codelineno-0-1219">1219</a></span>
+<span class="normal"><a href="#__codelineno-0-1220">1220</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-1169" name="__codelineno-0-1169"></a><span class="k">def</span><span class="w"> </span><span class="nf">solve_helmholtz_fft</span><span class="p">(</span>
+<a id="__codelineno-0-1170" name="__codelineno-0-1170"></a>    <span class="n">rhs</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">],</span>
+<a id="__codelineno-0-1171" name="__codelineno-0-1171"></a>    <span class="n">dx</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-0-1172" name="__codelineno-0-1172"></a>    <span class="n">dy</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-0-1173" name="__codelineno-0-1173"></a>    <span class="n">lambda_</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+<a id="__codelineno-0-1174" name="__codelineno-0-1174"></a>    <span class="o">*</span><span class="p">,</span>
+<a id="__codelineno-0-1175" name="__codelineno-0-1175"></a>    <span class="n">approximation</span><span class="p">:</span> <span class="n">Approximation</span> <span class="o">=</span> <span class="s2">&quot;fd2&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-1176" name="__codelineno-0-1176"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">]:</span>
+<a id="__codelineno-0-1177" name="__codelineno-0-1177"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Solve (∇² − λ)ψ = f with periodic BCs using the 2-D FFT.</span>
+<a id="__codelineno-0-1178" name="__codelineno-0-1178"></a>
+<a id="__codelineno-0-1179" name="__codelineno-0-1179"></a><span class="sd">    Spectral algorithm:</span>
+<a id="__codelineno-0-1180" name="__codelineno-0-1180"></a>
+<a id="__codelineno-0-1181" name="__codelineno-0-1181"></a><span class="sd">    1. Forward 2-D FFT:  f̂ = FFT2(f)                        [Ny, Nx]</span>
+<a id="__codelineno-0-1182" name="__codelineno-0-1182"></a><span class="sd">    2. Eigenvalue matrix:</span>
+<a id="__codelineno-0-1183" name="__codelineno-0-1183"></a><span class="sd">           Λ[j,i] = Λ_j^y + Λ_i^x − λ                      [Ny, Nx]</span>
+<a id="__codelineno-0-1184" name="__codelineno-0-1184"></a><span class="sd">       where Λ^x, Λ^y are FD2 or PS eigenvalues (see *approximation*).</span>
+<a id="__codelineno-0-1185" name="__codelineno-0-1185"></a><span class="sd">    3. Spectral division:  ψ̂[j,i] = f̂[j,i] / Λ[j,i]       [Ny, Nx]</span>
+<a id="__codelineno-0-1186" name="__codelineno-0-1186"></a><span class="sd">    4. Inverse 2-D FFT:  ψ = Re(IFFT2(ψ̂))                  [Ny, Nx]</span>
+<a id="__codelineno-0-1187" name="__codelineno-0-1187"></a>
+<a id="__codelineno-0-1188" name="__codelineno-0-1188"></a><span class="sd">    When ``lambda_ == 0`` the (0,0) mode is singular (Λ[0,0] = 0).</span>
+<a id="__codelineno-0-1189" name="__codelineno-0-1189"></a><span class="sd">    This is handled by setting ψ̂[0,0] = 0 (zero-mean gauge).</span>
+<a id="__codelineno-0-1190" name="__codelineno-0-1190"></a>
+<a id="__codelineno-0-1191" name="__codelineno-0-1191"></a><span class="sd">    Parameters</span>
+<a id="__codelineno-0-1192" name="__codelineno-0-1192"></a><span class="sd">    ----------</span>
+<a id="__codelineno-0-1193" name="__codelineno-0-1193"></a><span class="sd">    rhs : Float[Array, &quot;Ny Nx&quot;]</span>
+<a id="__codelineno-0-1194" name="__codelineno-0-1194"></a><span class="sd">        Right-hand side on the periodic domain.</span>
+<a id="__codelineno-0-1195" name="__codelineno-0-1195"></a><span class="sd">    dx : float</span>
+<a id="__codelineno-0-1196" name="__codelineno-0-1196"></a><span class="sd">        Grid spacing in x.</span>
+<a id="__codelineno-0-1197" name="__codelineno-0-1197"></a><span class="sd">    dy : float</span>
+<a id="__codelineno-0-1198" name="__codelineno-0-1198"></a><span class="sd">        Grid spacing in y.</span>
+<a id="__codelineno-0-1199" name="__codelineno-0-1199"></a><span class="sd">    lambda_ : float</span>
+<a id="__codelineno-0-1200" name="__codelineno-0-1200"></a><span class="sd">        Helmholtz parameter λ.  Default: 0.0 (Poisson).</span>
+<a id="__codelineno-0-1201" name="__codelineno-0-1201"></a><span class="sd">    approximation : {&quot;fd2&quot;, &quot;spectral&quot;}</span>
+<a id="__codelineno-0-1202" name="__codelineno-0-1202"></a><span class="sd">        Eigenvalue type.  Default: ``&quot;fd2&quot;``.</span>
+<a id="__codelineno-0-1203" name="__codelineno-0-1203"></a>
+<a id="__codelineno-0-1204" name="__codelineno-0-1204"></a><span class="sd">    Returns</span>
+<a id="__codelineno-0-1205" name="__codelineno-0-1205"></a><span class="sd">    -------</span>
+<a id="__codelineno-0-1206" name="__codelineno-0-1206"></a><span class="sd">    Float[Array, &quot;Ny Nx&quot;]</span>
+<a id="__codelineno-0-1207" name="__codelineno-0-1207"></a><span class="sd">        Solution ψ (real), same shape as *rhs*.</span>
+<a id="__codelineno-0-1208" name="__codelineno-0-1208"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-0-1209" name="__codelineno-0-1209"></a>    <span class="n">Ny</span><span class="p">,</span> <span class="n">Nx</span> <span class="o">=</span> <span class="n">rhs</span><span class="o">.</span><span class="n">shape</span>
+<a id="__codelineno-0-1210" name="__codelineno-0-1210"></a>    <span class="n">rhs_hat</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fft2</span><span class="p">(</span><span class="n">rhs</span><span class="p">)</span>
+<a id="__codelineno-0-1211" name="__codelineno-0-1211"></a>    <span class="n">eigx</span> <span class="o">=</span> <span class="n">_eig_1d</span><span class="p">(</span><span class="n">fft_eigenvalues</span><span class="p">,</span> <span class="n">fft_eigenvalues_ps</span><span class="p">,</span> <span class="n">Nx</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">Nx</span> <span class="o">*</span> <span class="n">dx</span><span class="p">,</span> <span class="n">approximation</span><span class="p">)</span>
+<a id="__codelineno-0-1212" name="__codelineno-0-1212"></a>    <span class="n">eigy</span> <span class="o">=</span> <span class="n">_eig_1d</span><span class="p">(</span><span class="n">fft_eigenvalues</span><span class="p">,</span> <span class="n">fft_eigenvalues_ps</span><span class="p">,</span> <span class="n">Ny</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">Ny</span> <span class="o">*</span> <span class="n">dy</span><span class="p">,</span> <span class="n">approximation</span><span class="p">)</span>
+<a id="__codelineno-0-1213" name="__codelineno-0-1213"></a>    <span class="n">eig2d</span> <span class="o">=</span> <span class="n">eigy</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">+</span> <span class="n">eigx</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span> <span class="o">-</span> <span class="n">lambda_</span>
+<a id="__codelineno-0-1214" name="__codelineno-0-1214"></a>    <span class="n">is_null</span> <span class="o">=</span> <span class="n">eig2d</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mf">0.0</span>
+<a id="__codelineno-0-1215" name="__codelineno-0-1215"></a>    <span class="n">eig2d_safe</span> <span class="o">=</span> <span class="n">eig2d</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">is_null</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">eig2d</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]))</span>
+<a id="__codelineno-0-1216" name="__codelineno-0-1216"></a>    <span class="n">psi_hat</span> <span class="o">=</span> <span class="n">rhs_hat</span> <span class="o">/</span> <span class="n">eig2d_safe</span>
+<a id="__codelineno-0-1217" name="__codelineno-0-1217"></a>    <span class="n">psi_hat</span> <span class="o">=</span> <span class="n">psi_hat</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+<a id="__codelineno-0-1218" name="__codelineno-0-1218"></a>        <span class="n">jnp</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">is_null</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">psi_hat</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">psi_hat</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+<a id="__codelineno-0-1219" name="__codelineno-0-1219"></a>    <span class="p">)</span>
+<a id="__codelineno-0-1220" name="__codelineno-0-1220"></a>    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">ifft2</span><span class="p">(</span><span class="n">psi_hat</span><span class="p">))</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div><h2 id="eigenvalue-helpers">Eigenvalue Helpers</h2>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finitevolx.dst1_eigenvalues" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">finitevolx</span><span class="o">.</span><span class="n">dst1_eigenvalues</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">dx</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+        <p>1-D Laplacian eigenvalues for the DST-I basis (homogeneous Dirichlet BCs).</p>
+<p>Returns the eigenvalues of the second-order finite-difference Laplacian</p>
+<div class="highlight"><pre><span></span><code>(L·v)_i = (v_{i-1} − 2v_i + v_{i+1}) / dx²
+</code></pre></div>
+<p>on <em>N</em> interior points with v_0 = v_{N+1} = 0.  The DST-I diagonalises
+this operator, yielding:</p>
+<div class="highlight"><pre><span></span><code>λ_k = −4/dx² · sin²(π(k+1) / (2(N+1))),   k = 0, …, N−1
+</code></pre></div>
+<p>All eigenvalues are strictly negative (the discrete Dirichlet Laplacian
+is negative definite).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>N</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of interior grid points (excluding the two zero-boundary points).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dx</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Uniform grid spacing.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span>[<span title="jaxtyping.Array">Array</span>, &#39; N&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>1-D array of <em>N</em> eigenvalues, ordered k = 0, …, N−1.  All &lt; 0.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>.venv/lib/python3.12/site-packages/spectraldiffx/_src/fourier/eigenvalues.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-69">69</a></span>
+<span class="normal"><a href="#__codelineno-0-70">70</a></span>
+<span class="normal"><a href="#__codelineno-0-71">71</a></span>
+<span class="normal"><a href="#__codelineno-0-72">72</a></span>
+<span class="normal"><a href="#__codelineno-0-73">73</a></span>
+<span class="normal"><a href="#__codelineno-0-74">74</a></span>
+<span class="normal"><a href="#__codelineno-0-75">75</a></span>
+<span class="normal"><a href="#__codelineno-0-76">76</a></span>
+<span class="normal"><a href="#__codelineno-0-77">77</a></span>
+<span class="normal"><a href="#__codelineno-0-78">78</a></span>
+<span class="normal"><a href="#__codelineno-0-79">79</a></span>
+<span class="normal"><a href="#__codelineno-0-80">80</a></span>
+<span class="normal"><a href="#__codelineno-0-81">81</a></span>
+<span class="normal"><a href="#__codelineno-0-82">82</a></span>
+<span class="normal"><a href="#__codelineno-0-83">83</a></span>
+<span class="normal"><a href="#__codelineno-0-84">84</a></span>
+<span class="normal"><a href="#__codelineno-0-85">85</a></span>
+<span class="normal"><a href="#__codelineno-0-86">86</a></span>
+<span class="normal"><a href="#__codelineno-0-87">87</a></span>
+<span class="normal"><a href="#__codelineno-0-88">88</a></span>
+<span class="normal"><a href="#__codelineno-0-89">89</a></span>
+<span class="normal"><a href="#__codelineno-0-90">90</a></span>
+<span class="normal"><a href="#__codelineno-0-91">91</a></span>
+<span class="normal"><a href="#__codelineno-0-92">92</a></span>
+<span class="normal"><a href="#__codelineno-0-93">93</a></span>
+<span class="normal"><a href="#__codelineno-0-94">94</a></span>
+<span class="normal"><a href="#__codelineno-0-95">95</a></span>
+<span class="normal"><a href="#__codelineno-0-96">96</a></span>
+<span class="normal"><a href="#__codelineno-0-97">97</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-69" name="__codelineno-0-69"></a><span class="k">def</span><span class="w"> </span><span class="nf">dst1_eigenvalues</span><span class="p">(</span><span class="n">N</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">dx</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot; N&quot;</span><span class="p">]:</span>
+<a id="__codelineno-0-70" name="__codelineno-0-70"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;1-D Laplacian eigenvalues for the DST-I basis (homogeneous Dirichlet BCs).</span>
+<a id="__codelineno-0-71" name="__codelineno-0-71"></a>
+<a id="__codelineno-0-72" name="__codelineno-0-72"></a><span class="sd">    Returns the eigenvalues of the second-order finite-difference Laplacian</span>
+<a id="__codelineno-0-73" name="__codelineno-0-73"></a>
+<a id="__codelineno-0-74" name="__codelineno-0-74"></a><span class="sd">        (L·v)_i = (v_{i-1} − 2v_i + v_{i+1}) / dx²</span>
+<a id="__codelineno-0-75" name="__codelineno-0-75"></a>
+<a id="__codelineno-0-76" name="__codelineno-0-76"></a><span class="sd">    on *N* interior points with v_0 = v_{N+1} = 0.  The DST-I diagonalises</span>
+<a id="__codelineno-0-77" name="__codelineno-0-77"></a><span class="sd">    this operator, yielding:</span>
+<a id="__codelineno-0-78" name="__codelineno-0-78"></a>
+<a id="__codelineno-0-79" name="__codelineno-0-79"></a><span class="sd">        λ_k = −4/dx² · sin²(π(k+1) / (2(N+1))),   k = 0, …, N−1</span>
+<a id="__codelineno-0-80" name="__codelineno-0-80"></a>
+<a id="__codelineno-0-81" name="__codelineno-0-81"></a><span class="sd">    All eigenvalues are strictly negative (the discrete Dirichlet Laplacian</span>
+<a id="__codelineno-0-82" name="__codelineno-0-82"></a><span class="sd">    is negative definite).</span>
+<a id="__codelineno-0-83" name="__codelineno-0-83"></a>
+<a id="__codelineno-0-84" name="__codelineno-0-84"></a><span class="sd">    Parameters</span>
+<a id="__codelineno-0-85" name="__codelineno-0-85"></a><span class="sd">    ----------</span>
+<a id="__codelineno-0-86" name="__codelineno-0-86"></a><span class="sd">    N : int</span>
+<a id="__codelineno-0-87" name="__codelineno-0-87"></a><span class="sd">        Number of interior grid points (excluding the two zero-boundary points).</span>
+<a id="__codelineno-0-88" name="__codelineno-0-88"></a><span class="sd">    dx : float</span>
+<a id="__codelineno-0-89" name="__codelineno-0-89"></a><span class="sd">        Uniform grid spacing.</span>
+<a id="__codelineno-0-90" name="__codelineno-0-90"></a>
+<a id="__codelineno-0-91" name="__codelineno-0-91"></a><span class="sd">    Returns</span>
+<a id="__codelineno-0-92" name="__codelineno-0-92"></a><span class="sd">    -------</span>
+<a id="__codelineno-0-93" name="__codelineno-0-93"></a><span class="sd">    Float[Array, &quot; N&quot;]</span>
+<a id="__codelineno-0-94" name="__codelineno-0-94"></a><span class="sd">        1-D array of *N* eigenvalues, ordered k = 0, …, N−1.  All &lt; 0.</span>
+<a id="__codelineno-0-95" name="__codelineno-0-95"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-0-96" name="__codelineno-0-96"></a>    <span class="n">k</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">N</span><span class="p">)</span>
+<a id="__codelineno-0-97" name="__codelineno-0-97"></a>    <span class="k">return</span> <span class="o">-</span><span class="mf">4.0</span> <span class="o">/</span> <span class="n">dx</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="p">(</span><span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">N</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)))</span> <span class="o">**</span> <span class="mi">2</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finitevolx.dct2_eigenvalues" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">finitevolx</span><span class="o">.</span><span class="n">dct2_eigenvalues</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">dx</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+        <p>1-D Laplacian eigenvalues for the DCT-II basis (homogeneous Neumann BCs).</p>
+<p>Returns the eigenvalues of the second-order finite-difference Laplacian</p>
+<div class="highlight"><pre><span></span><code>(L·v)_i = (v_{i-1} − 2v_i + v_{i+1}) / dx²
+</code></pre></div>
+<p>on <em>N</em> points with ∂v/∂n = 0 at both boundaries (ghost-point Neumann).
+The DCT-II diagonalises this operator, yielding:</p>
+<div class="highlight"><pre><span></span><code>λ_k = −4/dx² · sin²(πk / (2N)),   k = 0, …, N−1
+</code></pre></div>
+<p>The k=0 eigenvalue is exactly zero (the constant mode), corresponding
+to the one-dimensional null space of the Neumann Laplacian.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>N</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of grid points.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dx</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Uniform grid spacing.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span>[<span title="jaxtyping.Array">Array</span>, &#39; N&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>1-D array of <em>N</em> eigenvalues, ordered k = 0, …, N−1.
+λ_0 = 0; all others &lt; 0.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>.venv/lib/python3.12/site-packages/spectraldiffx/_src/fourier/eigenvalues.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-100">100</a></span>
+<span class="normal"><a href="#__codelineno-0-101">101</a></span>
+<span class="normal"><a href="#__codelineno-0-102">102</a></span>
+<span class="normal"><a href="#__codelineno-0-103">103</a></span>
+<span class="normal"><a href="#__codelineno-0-104">104</a></span>
+<span class="normal"><a href="#__codelineno-0-105">105</a></span>
+<span class="normal"><a href="#__codelineno-0-106">106</a></span>
+<span class="normal"><a href="#__codelineno-0-107">107</a></span>
+<span class="normal"><a href="#__codelineno-0-108">108</a></span>
+<span class="normal"><a href="#__codelineno-0-109">109</a></span>
+<span class="normal"><a href="#__codelineno-0-110">110</a></span>
+<span class="normal"><a href="#__codelineno-0-111">111</a></span>
+<span class="normal"><a href="#__codelineno-0-112">112</a></span>
+<span class="normal"><a href="#__codelineno-0-113">113</a></span>
+<span class="normal"><a href="#__codelineno-0-114">114</a></span>
+<span class="normal"><a href="#__codelineno-0-115">115</a></span>
+<span class="normal"><a href="#__codelineno-0-116">116</a></span>
+<span class="normal"><a href="#__codelineno-0-117">117</a></span>
+<span class="normal"><a href="#__codelineno-0-118">118</a></span>
+<span class="normal"><a href="#__codelineno-0-119">119</a></span>
+<span class="normal"><a href="#__codelineno-0-120">120</a></span>
+<span class="normal"><a href="#__codelineno-0-121">121</a></span>
+<span class="normal"><a href="#__codelineno-0-122">122</a></span>
+<span class="normal"><a href="#__codelineno-0-123">123</a></span>
+<span class="normal"><a href="#__codelineno-0-124">124</a></span>
+<span class="normal"><a href="#__codelineno-0-125">125</a></span>
+<span class="normal"><a href="#__codelineno-0-126">126</a></span>
+<span class="normal"><a href="#__codelineno-0-127">127</a></span>
+<span class="normal"><a href="#__codelineno-0-128">128</a></span>
+<span class="normal"><a href="#__codelineno-0-129">129</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-100" name="__codelineno-0-100"></a><span class="k">def</span><span class="w"> </span><span class="nf">dct2_eigenvalues</span><span class="p">(</span><span class="n">N</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">dx</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot; N&quot;</span><span class="p">]:</span>
+<a id="__codelineno-0-101" name="__codelineno-0-101"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;1-D Laplacian eigenvalues for the DCT-II basis (homogeneous Neumann BCs).</span>
+<a id="__codelineno-0-102" name="__codelineno-0-102"></a>
+<a id="__codelineno-0-103" name="__codelineno-0-103"></a><span class="sd">    Returns the eigenvalues of the second-order finite-difference Laplacian</span>
+<a id="__codelineno-0-104" name="__codelineno-0-104"></a>
+<a id="__codelineno-0-105" name="__codelineno-0-105"></a><span class="sd">        (L·v)_i = (v_{i-1} − 2v_i + v_{i+1}) / dx²</span>
+<a id="__codelineno-0-106" name="__codelineno-0-106"></a>
+<a id="__codelineno-0-107" name="__codelineno-0-107"></a><span class="sd">    on *N* points with ∂v/∂n = 0 at both boundaries (ghost-point Neumann).</span>
+<a id="__codelineno-0-108" name="__codelineno-0-108"></a><span class="sd">    The DCT-II diagonalises this operator, yielding:</span>
+<a id="__codelineno-0-109" name="__codelineno-0-109"></a>
+<a id="__codelineno-0-110" name="__codelineno-0-110"></a><span class="sd">        λ_k = −4/dx² · sin²(πk / (2N)),   k = 0, …, N−1</span>
+<a id="__codelineno-0-111" name="__codelineno-0-111"></a>
+<a id="__codelineno-0-112" name="__codelineno-0-112"></a><span class="sd">    The k=0 eigenvalue is exactly zero (the constant mode), corresponding</span>
+<a id="__codelineno-0-113" name="__codelineno-0-113"></a><span class="sd">    to the one-dimensional null space of the Neumann Laplacian.</span>
+<a id="__codelineno-0-114" name="__codelineno-0-114"></a>
+<a id="__codelineno-0-115" name="__codelineno-0-115"></a><span class="sd">    Parameters</span>
+<a id="__codelineno-0-116" name="__codelineno-0-116"></a><span class="sd">    ----------</span>
+<a id="__codelineno-0-117" name="__codelineno-0-117"></a><span class="sd">    N : int</span>
+<a id="__codelineno-0-118" name="__codelineno-0-118"></a><span class="sd">        Number of grid points.</span>
+<a id="__codelineno-0-119" name="__codelineno-0-119"></a><span class="sd">    dx : float</span>
+<a id="__codelineno-0-120" name="__codelineno-0-120"></a><span class="sd">        Uniform grid spacing.</span>
+<a id="__codelineno-0-121" name="__codelineno-0-121"></a>
+<a id="__codelineno-0-122" name="__codelineno-0-122"></a><span class="sd">    Returns</span>
+<a id="__codelineno-0-123" name="__codelineno-0-123"></a><span class="sd">    -------</span>
+<a id="__codelineno-0-124" name="__codelineno-0-124"></a><span class="sd">    Float[Array, &quot; N&quot;]</span>
+<a id="__codelineno-0-125" name="__codelineno-0-125"></a><span class="sd">        1-D array of *N* eigenvalues, ordered k = 0, …, N−1.</span>
+<a id="__codelineno-0-126" name="__codelineno-0-126"></a><span class="sd">        λ_0 = 0; all others &lt; 0.</span>
+<a id="__codelineno-0-127" name="__codelineno-0-127"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-0-128" name="__codelineno-0-128"></a>    <span class="n">k</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">N</span><span class="p">)</span>
+<a id="__codelineno-0-129" name="__codelineno-0-129"></a>    <span class="k">return</span> <span class="o">-</span><span class="mf">4.0</span> <span class="o">/</span> <span class="n">dx</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">k</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">N</span><span class="p">))</span> <span class="o">**</span> <span class="mi">2</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finitevolx.fft_eigenvalues" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">finitevolx</span><span class="o">.</span><span class="n">fft_eigenvalues</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">dx</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+        <p>1-D Laplacian eigenvalues for the FFT basis (periodic BCs).</p>
+<p>Returns the eigenvalues of the second-order finite-difference Laplacian</p>
+<div class="highlight"><pre><span></span><code>(L·v)_i = (v_{i-1} − 2v_i + v_{i+1}) / dx²
+</code></pre></div>
+<p>on <em>N</em> points with periodic boundary conditions v_{N} = v_0.  The DFT
+diagonalises this operator, yielding:</p>
+<div class="highlight"><pre><span></span><code>λ_k = −4/dx² · sin²(πk / N),   k = 0, …, N−1
+</code></pre></div>
+<p>The k=0 eigenvalue is exactly zero (the constant / zero-wavenumber mode),
+corresponding to the one-dimensional null space of the periodic Laplacian.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>N</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of grid points in one period.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dx</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Uniform grid spacing.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="jaxtyping.Float">Float</span>[<span title="jaxtyping.Array">Array</span>, &#39; N&#39;]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>1-D array of <em>N</em> eigenvalues in FFT order (k = 0, …, N−1).
+λ_0 = 0; all others ≤ 0.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>.venv/lib/python3.12/site-packages/spectraldiffx/_src/fourier/eigenvalues.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-309">309</a></span>
+<span class="normal"><a href="#__codelineno-0-310">310</a></span>
+<span class="normal"><a href="#__codelineno-0-311">311</a></span>
+<span class="normal"><a href="#__codelineno-0-312">312</a></span>
+<span class="normal"><a href="#__codelineno-0-313">313</a></span>
+<span class="normal"><a href="#__codelineno-0-314">314</a></span>
+<span class="normal"><a href="#__codelineno-0-315">315</a></span>
+<span class="normal"><a href="#__codelineno-0-316">316</a></span>
+<span class="normal"><a href="#__codelineno-0-317">317</a></span>
+<span class="normal"><a href="#__codelineno-0-318">318</a></span>
+<span class="normal"><a href="#__codelineno-0-319">319</a></span>
+<span class="normal"><a href="#__codelineno-0-320">320</a></span>
+<span class="normal"><a href="#__codelineno-0-321">321</a></span>
+<span class="normal"><a href="#__codelineno-0-322">322</a></span>
+<span class="normal"><a href="#__codelineno-0-323">323</a></span>
+<span class="normal"><a href="#__codelineno-0-324">324</a></span>
+<span class="normal"><a href="#__codelineno-0-325">325</a></span>
+<span class="normal"><a href="#__codelineno-0-326">326</a></span>
+<span class="normal"><a href="#__codelineno-0-327">327</a></span>
+<span class="normal"><a href="#__codelineno-0-328">328</a></span>
+<span class="normal"><a href="#__codelineno-0-329">329</a></span>
+<span class="normal"><a href="#__codelineno-0-330">330</a></span>
+<span class="normal"><a href="#__codelineno-0-331">331</a></span>
+<span class="normal"><a href="#__codelineno-0-332">332</a></span>
+<span class="normal"><a href="#__codelineno-0-333">333</a></span>
+<span class="normal"><a href="#__codelineno-0-334">334</a></span>
+<span class="normal"><a href="#__codelineno-0-335">335</a></span>
+<span class="normal"><a href="#__codelineno-0-336">336</a></span>
+<span class="normal"><a href="#__codelineno-0-337">337</a></span>
+<span class="normal"><a href="#__codelineno-0-338">338</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-309" name="__codelineno-0-309"></a><span class="k">def</span><span class="w"> </span><span class="nf">fft_eigenvalues</span><span class="p">(</span><span class="n">N</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">dx</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot; N&quot;</span><span class="p">]:</span>
+<a id="__codelineno-0-310" name="__codelineno-0-310"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;1-D Laplacian eigenvalues for the FFT basis (periodic BCs).</span>
+<a id="__codelineno-0-311" name="__codelineno-0-311"></a>
+<a id="__codelineno-0-312" name="__codelineno-0-312"></a><span class="sd">    Returns the eigenvalues of the second-order finite-difference Laplacian</span>
+<a id="__codelineno-0-313" name="__codelineno-0-313"></a>
+<a id="__codelineno-0-314" name="__codelineno-0-314"></a><span class="sd">        (L·v)_i = (v_{i-1} − 2v_i + v_{i+1}) / dx²</span>
+<a id="__codelineno-0-315" name="__codelineno-0-315"></a>
+<a id="__codelineno-0-316" name="__codelineno-0-316"></a><span class="sd">    on *N* points with periodic boundary conditions v_{N} = v_0.  The DFT</span>
+<a id="__codelineno-0-317" name="__codelineno-0-317"></a><span class="sd">    diagonalises this operator, yielding:</span>
+<a id="__codelineno-0-318" name="__codelineno-0-318"></a>
+<a id="__codelineno-0-319" name="__codelineno-0-319"></a><span class="sd">        λ_k = −4/dx² · sin²(πk / N),   k = 0, …, N−1</span>
+<a id="__codelineno-0-320" name="__codelineno-0-320"></a>
+<a id="__codelineno-0-321" name="__codelineno-0-321"></a><span class="sd">    The k=0 eigenvalue is exactly zero (the constant / zero-wavenumber mode),</span>
+<a id="__codelineno-0-322" name="__codelineno-0-322"></a><span class="sd">    corresponding to the one-dimensional null space of the periodic Laplacian.</span>
+<a id="__codelineno-0-323" name="__codelineno-0-323"></a>
+<a id="__codelineno-0-324" name="__codelineno-0-324"></a><span class="sd">    Parameters</span>
+<a id="__codelineno-0-325" name="__codelineno-0-325"></a><span class="sd">    ----------</span>
+<a id="__codelineno-0-326" name="__codelineno-0-326"></a><span class="sd">    N : int</span>
+<a id="__codelineno-0-327" name="__codelineno-0-327"></a><span class="sd">        Number of grid points in one period.</span>
+<a id="__codelineno-0-328" name="__codelineno-0-328"></a><span class="sd">    dx : float</span>
+<a id="__codelineno-0-329" name="__codelineno-0-329"></a><span class="sd">        Uniform grid spacing.</span>
+<a id="__codelineno-0-330" name="__codelineno-0-330"></a>
+<a id="__codelineno-0-331" name="__codelineno-0-331"></a><span class="sd">    Returns</span>
+<a id="__codelineno-0-332" name="__codelineno-0-332"></a><span class="sd">    -------</span>
+<a id="__codelineno-0-333" name="__codelineno-0-333"></a><span class="sd">    Float[Array, &quot; N&quot;]</span>
+<a id="__codelineno-0-334" name="__codelineno-0-334"></a><span class="sd">        1-D array of *N* eigenvalues in FFT order (k = 0, …, N−1).</span>
+<a id="__codelineno-0-335" name="__codelineno-0-335"></a><span class="sd">        λ_0 = 0; all others ≤ 0.</span>
+<a id="__codelineno-0-336" name="__codelineno-0-336"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-0-337" name="__codelineno-0-337"></a>    <span class="n">k</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">N</span><span class="p">)</span>
+<a id="__codelineno-0-338" name="__codelineno-0-338"></a>    <span class="k">return</span> <span class="o">-</span><span class="mf">4.0</span> <span class="o">/</span> <span class="n">dx</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">jnp</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">k</span> <span class="o">/</span> <span class="n">N</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
