@@ -54,6 +54,59 @@ _MASK_DISPATCHABLE_3D = _MASK_DISPATCHABLE
 # requested one at dispatch time.
 _HIERARCHY_SIZES: tuple[int, ...] = (2, 4, 6)
 
+# Supported lateral-wall treatments (see the ``wall`` argument on the
+# advection operators).
+_WALL_MODES = frozenset({"closed", "open"})
+
+
+def _validate_wall(wall: str, mask: object) -> None:
+    """Validate the ``wall`` argument and reject unsupported combinations."""
+    if wall not in _WALL_MODES:
+        raise ValueError(f"wall must be one of {sorted(_WALL_MODES)!r}; got {wall!r}")
+    if wall == "open" and mask is not None:
+        raise NotImplementedError(
+            "wall='open' is not supported together with a mask; the open-wall "
+            "ghost-flux path assumes a rectangular domain with no interior "
+            "land. Use wall='closed' with the mask, or drop the mask."
+        )
+
+
+def _wall_upwind_flux(
+    vel_wall: Float[Array, "..."],
+    q_lo: Float[Array, "..."],
+    q_hi: Float[Array, "..."],
+) -> Float[Array, "..."]:
+    """First-order upwind flux at a single domain-wall face.
+
+    ``q_lo`` is the cell on the low-index side of the face (the upwind cell
+    when ``vel_wall >= 0``) and ``q_hi`` the high-index side.  Matches the
+    ``u >= 0`` convention used by the reconstruction primitives.
+
+    Ghost-cell contract for ``wall="open"``
+    ---------------------------------------
+    On an inflow wall the flux carries the ghost cell **as-is**, i.e. the
+    ghost is interpreted as the *exterior cell-centred* tracer value.  This is
+    exact for:
+
+    * **periodic** — the ghost is the opposite interior cell, so the seam
+      flux uses the wrapped upwind cell (and the paired walls net to zero,
+      conserving mass); and
+    * **outflow** — zero-gradient, the interior cell is used regardless.
+
+    For a **Dirichlet inflow** wall the ghost must therefore hold the boundary
+    concentration *as a cell value* (``ghost = value``).  Note that
+    :class:`~finitevolx.Dirichlet1D` instead writes the *face* reflection
+    ``2*value - interior`` (chosen so a centred stencil sees ``value`` at the
+    face — the right convention for :class:`~finitevolx.Diffusion2D`).  Pairing
+    that atom with open-mode advection makes the inflow carry
+    ``2*value - interior`` rather than ``value``; fill the ghost with the
+    plain boundary value when an exact advective Dirichlet inflow is required.
+    A single BC-agnostic wall flux cannot satisfy both the periodic and the
+    face-Dirichlet conventions at once, so this is resolved by the ghost fill,
+    not the operator.
+    """
+    return jnp.where(vel_wall >= 0.0, q_lo, q_hi) * vel_wall
+
 
 def _rec_funcs_for_method_1d(
     recon: Reconstruction1D, method: str
@@ -219,6 +272,7 @@ class Advection1D(eqx.Module):
         h: Float[Array, "Nx"],
         u: Float[Array, "Nx"],
         method: str = "upwind1",
+        wall: str = "closed",
     ) -> Float[Array, "Nx"]:
         """Advective tendency -d(h*u)/dx at T-points.
 
@@ -235,12 +289,25 @@ class Advection1D(eqx.Module):
             ``'upwind3'``, ``'weno3'``, ``'weno5'``, ``'weno7'``, ``'weno9'``,
             or a flux-limiter TVD scheme: ``'minmod'``, ``'van_leer'``,
             ``'superbee'``, ``'mc'``.
+        wall : {"closed", "open"}, default "closed"
+            Lateral-boundary treatment.  ``"closed"`` (default, unchanged)
+            writes the tendency only on the strict interior ``[2:-2]`` and
+            treats the domain walls as no-flux — the wall-adjacent interior
+            cells hold stale values.  ``"open"`` writes the full interior
+            ``[1:-1]`` and computes the two domain-wall face fluxes with a
+            first-order upwind reconstruction that reads the ghost ring, so
+            Dirichlet / outflow / periodic boundaries (applied by the caller
+            to the ghost cells beforehand) drive the advective transport.
+            The interior faces keep the requested high-order ``method``; the
+            flux field stays single-valued, so mass is conserved exactly.
+            ``"open"`` is not supported together with a ``mask``.
 
         Returns
         -------
         Float[Array, "Nx"]
             Advective tendency at T-points.
         """
+        _validate_wall(wall, self.mask)
         # ── masked path: route through upwind_flux with adaptive stencils ─
         if self._mask_hierarchy_x is not None and method in _MASK_DISPATCHABLE:
             rfx, sizes = _rec_funcs_for_method_1d(self.recon, method)
@@ -272,9 +339,17 @@ class Advection1D(eqx.Module):
         # dh[i] = -(fe[i+1/2] - fe[i-1/2]) / dx
         # fe[i] represents the flux at the east face of cell i (at i+1/2)
         # For cell i, we need fe[i] (east) and fe[i-1] (west)
-        # Only use face fluxes that are defined by the reconstruction scheme,
-        # avoiding the ghost-ring entries fe[0] and fe[-1].
-        out = out.at[2:-2].set(-(fe[2:-2] - fe[1:-3]) / self.grid.dx)
+        if wall == "open":
+            # Overwrite the two domain-wall faces (west face 1/2 == fe[0],
+            # east face Nx-3/2 == fe[-2]) with a first-order upwind flux that
+            # reads the ghost ring, then write the full interior [1:-1].
+            fe = fe.at[0].set(_wall_upwind_flux(u[0], h[0], h[1]))
+            fe = fe.at[-2].set(_wall_upwind_flux(u[-2], h[-2], h[-1]))
+            out = out.at[1:-1].set(-(fe[1:-1] - fe[0:-2]) / self.grid.dx)
+        else:
+            # Only use face fluxes that are defined by the reconstruction
+            # scheme, avoiding the ghost-ring entries fe[0] and fe[-1].
+            out = out.at[2:-2].set(-(fe[2:-2] - fe[1:-3]) / self.grid.dx)
         if self.mask is not None:
             out = out * self.mask.h
         return out
@@ -332,6 +407,7 @@ class Advection2D(eqx.Module):
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
         method: str = "upwind1",
+        wall: str = "closed",
     ) -> Float[Array, "Ny Nx"]:
         """Advective tendency -div(h * u_vec) at T-points.
 
@@ -351,12 +427,25 @@ class Advection2D(eqx.Module):
             ``'upwind3'``, ``'weno3'``, ``'weno5'``, ``'weno7'``, ``'weno9'``,
             ``'wenoz5'``, or a flux-limiter TVD scheme: ``'minmod'``,
             ``'van_leer'``, ``'superbee'``, ``'mc'``.
+        wall : {"closed", "open"}, default "closed"
+            Lateral-boundary treatment.  ``"closed"`` (default, unchanged)
+            writes the tendency only on the strict interior ``[2:-2, 2:-2]``
+            and treats all four domain walls as no-flux.  ``"open"`` writes
+            the full interior ``[1:-1, 1:-1]`` and computes the four
+            domain-wall face fluxes with a first-order upwind reconstruction
+            that reads the ghost ring, so Dirichlet / outflow / periodic
+            lateral boundaries (applied by the caller to the ghost cells
+            beforehand) drive horizontal transport.  Interior faces keep the
+            requested high-order ``method`` and the flux field stays
+            single-valued, so mass is conserved exactly.  ``"open"`` is not
+            supported together with a ``mask``.
 
         Returns
         -------
         Float[Array, "Ny Nx"]
             Advective tendency at T-points.
         """
+        _validate_wall(wall, self.mask)
         # ── masked path: route through upwind_flux with pre-built hier. ──
         mh_x = self._mask_hierarchy_x
         mh_y = self._mask_hierarchy_y
@@ -405,16 +494,32 @@ class Advection2D(eqx.Module):
         # fe[j,i] is flux at east face of cell [j,i], fn[j,i] is flux at north face
         # For cell [j,i], we need fe[j,i] (east) and fe[j,i-1] (west),
         #                      and fn[j,i] (north) and fn[j-1,i] (south)
-        # Only use face fluxes that are defined by the reconstruction scheme,
-        # avoiding ghost-ring flux entries.
-        out = interior(
-            -(
-                (fe[2:-2, 2:-2] - fe[2:-2, 1:-3]) / self.grid.dx
-                + (fn[2:-2, 2:-2] - fn[1:-3, 2:-2]) / self.grid.dy
-            ),
-            h,
-            ghost=2,
-        )
+        if wall == "open":
+            # Overwrite the west/east (fe cols 0, -2) and south/north
+            # (fn rows 0, -2) domain-wall faces with a first-order upwind
+            # flux that reads the ghost ring, then write the full interior.
+            fe = fe.at[:, 0].set(_wall_upwind_flux(u[:, 0], h[:, 0], h[:, 1]))
+            fe = fe.at[:, -2].set(_wall_upwind_flux(u[:, -2], h[:, -2], h[:, -1]))
+            fn = fn.at[0, :].set(_wall_upwind_flux(v[0, :], h[0, :], h[1, :]))
+            fn = fn.at[-2, :].set(_wall_upwind_flux(v[-2, :], h[-2, :], h[-1, :]))
+            out = jnp.zeros_like(h)
+            out = out.at[1:-1, 1:-1].set(
+                -(
+                    (fe[1:-1, 1:-1] - fe[1:-1, 0:-2]) / self.grid.dx
+                    + (fn[1:-1, 1:-1] - fn[0:-2, 1:-1]) / self.grid.dy
+                )
+            )
+        else:
+            # Only use face fluxes defined by the reconstruction scheme,
+            # avoiding ghost-ring flux entries.
+            out = interior(
+                -(
+                    (fe[2:-2, 2:-2] - fe[2:-2, 1:-3]) / self.grid.dx
+                    + (fn[2:-2, 2:-2] - fn[1:-3, 2:-2]) / self.grid.dy
+                ),
+                h,
+                ghost=2,
+            )
         if self.mask is not None:
             out = out * self.mask.h
         return out
@@ -475,6 +580,7 @@ class Advection3D(eqx.Module):
         u: Float[Array, "Nz Ny Nx"],
         v: Float[Array, "Nz Ny Nx"],
         method: str = "upwind1",
+        wall: str = "closed",
     ) -> Float[Array, "Nz Ny Nx"]:
         """Advective tendency -div(h * u_vec) at T-points over all z-levels.
 
@@ -490,12 +596,27 @@ class Advection3D(eqx.Module):
             Reconstruction method: ``'naive'``, ``'upwind1'``, ``'weno3'``,
             ``'weno5'``, ``'weno7'``, ``'weno9'``, or a flux-limiter TVD
             scheme: ``'minmod'``, ``'van_leer'``, ``'superbee'``, ``'mc'``.
+        wall : {"closed", "open"}, default "closed"
+            Lateral-boundary treatment for the horizontal plane.
+            ``"closed"`` (default, unchanged) writes the horizontal tendency
+            only on the strict interior ``[1:-1, 2:-2, 2:-2]`` and treats the
+            four lateral walls as no-flux — the wall-adjacent interior ring
+            holds stale values.  ``"open"`` writes the full interior
+            ``[1:-1, 1:-1, 1:-1]`` and computes the lateral domain-wall face
+            fluxes with a first-order upwind reconstruction that reads the
+            ghost ring, so Dirichlet / outflow / periodic lateral boundaries
+            (applied by the caller to the ghost cells beforehand) drive
+            horizontal transport.  Interior faces keep the requested
+            high-order ``method`` and the flux field stays single-valued, so
+            mass is conserved exactly.  The z axis is a batch dimension and is
+            unaffected.  ``"open"`` is not supported together with a ``mask``.
 
         Returns
         -------
         Float[Array, "Nz Ny Nx"]
             Advective tendency at T-points.
         """
+        _validate_wall(wall, self.mask)
         # ── masked path: route through upwind_flux with pre-built 3-D hier. ──
         mh_x = self._mask_hierarchy_x
         mh_y = self._mask_hierarchy_y
@@ -534,17 +655,41 @@ class Advection3D(eqx.Module):
         out = jnp.zeros_like(h)
         # dh[k, j, i] = -( (fe[k,j,i+1/2] - fe[k,j,i-1/2])/dx
         #                 + (fn[k,j+1/2,i] - fn[k,j-1/2,i])/dy )
-        # Reconstruction writes to [1:-1, 1:-1, 1:-1]; the west flux at i=0
-        # and south flux at j=0 are ghost cells (value 0, not filled).
-        # Consistent with 1D/2D operators, skip the ghost-adjacent interior
-        # ring in the horizontal plane so we never read ghost flux cells.
-        # All z-levels are independent, so z uses the full interior [1:-1].
-        out = out.at[1:-1, 2:-2, 2:-2].set(
-            -(
-                (fe[1:-1, 2:-2, 2:-2] - fe[1:-1, 2:-2, 1:-3]) / self.grid.dx
-                + (fn[1:-1, 2:-2, 2:-2] - fn[1:-1, 1:-3, 2:-2]) / self.grid.dy
+        if wall == "open":
+            # Overwrite the west/east (fe cols 0, -2) and south/north
+            # (fn rows 0, -2) lateral wall faces with a first-order upwind
+            # flux that reads the ghost ring, then write the full horizontal
+            # interior.  z is a batch dimension and keeps the full [1:-1].
+            fe = fe.at[:, :, 0].set(
+                _wall_upwind_flux(u[:, :, 0], h[:, :, 0], h[:, :, 1])
             )
-        )
+            fe = fe.at[:, :, -2].set(
+                _wall_upwind_flux(u[:, :, -2], h[:, :, -2], h[:, :, -1])
+            )
+            fn = fn.at[:, 0, :].set(
+                _wall_upwind_flux(v[:, 0, :], h[:, 0, :], h[:, 1, :])
+            )
+            fn = fn.at[:, -2, :].set(
+                _wall_upwind_flux(v[:, -2, :], h[:, -2, :], h[:, -1, :])
+            )
+            out = out.at[1:-1, 1:-1, 1:-1].set(
+                -(
+                    (fe[1:-1, 1:-1, 1:-1] - fe[1:-1, 1:-1, 0:-2]) / self.grid.dx
+                    + (fn[1:-1, 1:-1, 1:-1] - fn[1:-1, 0:-2, 1:-1]) / self.grid.dy
+                )
+            )
+        else:
+            # Reconstruction writes to [1:-1, 1:-1, 1:-1]; the west flux at i=0
+            # and south flux at j=0 are ghost cells (value 0, not filled).
+            # Consistent with 1D/2D operators, skip the ghost-adjacent interior
+            # ring in the horizontal plane so we never read ghost flux cells.
+            # All z-levels are independent, so z uses the full interior [1:-1].
+            out = out.at[1:-1, 2:-2, 2:-2].set(
+                -(
+                    (fe[1:-1, 2:-2, 2:-2] - fe[1:-1, 2:-2, 1:-3]) / self.grid.dx
+                    + (fn[1:-1, 2:-2, 2:-2] - fn[1:-1, 1:-3, 2:-2]) / self.grid.dy
+                )
+            )
         if self.mask is not None:
             out = out * self.mask.h
         return out
