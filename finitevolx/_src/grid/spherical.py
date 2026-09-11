@@ -163,6 +163,129 @@ class SphericalGrid2D(CurvilinearGrid2D):
             lon_T=lon_2d,
         )
 
+    # ------------------------------------------------------------------
+    # Physical cell widths (metric helpers for resolution / CFL guards)
+    # ------------------------------------------------------------------
+
+    @property
+    def dx_T(self) -> Float[Array, "Ny Nx"]:
+        """Zonal cell width at T-points: ``R * cos_lat_T * dlon``.
+
+        The zonal width of a lat-lon cell shrinks as ``cos(lat)``, so
+        unlike the uniform ``dx = R * dlon`` inherited from
+        :class:`CurvilinearGrid2D` this is the *actual* east-west
+        extent of each cell.  It is the length that limits the zonal
+        CFL condition and that resolution guards must compare a
+        physical scale against.
+
+        Returns
+        -------
+        Float[Array, "Ny Nx"]
+            Zonal cell width in the same units as ``R`` (metres for a
+            default-radius grid; nondimensional arc length when the
+            grid was built with ``R=1``).
+
+        Notes
+        -----
+        This is the raw metric, matching
+        :func:`~finitevolx._src.operators.reductions.spherical_area_weights`:
+        it is **not** clamped, so a row at or past a pole carries a
+        degenerate width that can be zero or slightly negative (in
+        float32 ``cos(pi/2)`` evaluates to ``-4.4e-08``).  The
+        reductions :attr:`min_cell_width` and :attr:`max_aspect` do
+        clamp, so prefer them when the value feeds a CFL or resolution
+        guard.
+        """
+        return self.R * self.cos_lat_T * self.dlon
+
+    @property
+    def dx_V(self) -> Float[Array, "Ny Nx"]:
+        """Zonal cell width at V-points: ``R * cos_lat_V * dlon``.
+
+        V-points sit half a cell north of T-points, so their latitude
+        (and hence zonal width) differs from :attr:`dx_T`.  Equal to
+        the X-point (NE corner) width, since ``cos_lat_X == cos_lat_V``.
+
+        Returns
+        -------
+        Float[Array, "Ny Nx"]
+        """
+        return self.R * self.cos_lat_V * self.dlon
+
+    @property
+    def dy_T(self) -> float:
+        """Meridional cell width: ``R * dlat``.
+
+        Uniform across the grid — latitude lines are equally spaced —
+        so this is a scalar and equals the inherited ``dy``.
+
+        Returns
+        -------
+        float
+        """
+        return self.R * self.dlat
+
+    @property
+    def min_cell_width(self) -> Float[Array, ""]:
+        """Smallest physical cell width over the interior.
+
+        ``min(min(dx_T[interior]), dy_T)`` — the CFL-limiting length
+        of the grid.  Only the physical interior ``[1:-1, 1:-1]``
+        contributes: a ghost row can sit past the pole where
+        ``cos(lat) < 0``, which would otherwise dominate the minimum
+        with a negative width.
+
+        Zonal widths are clamped at zero before the reduction, so the
+        result is never negative even when an *interior* row sits on a
+        pole.  That matters because ``cos(pi/2)`` is not exactly zero
+        in floating point — it is ``-4.4e-08`` in float32 — and a
+        negative "width" would silently produce a negative time step in
+        a CFL guard.  A degenerate polar row reports zero instead,
+        which such a guard rejects.
+
+        Returned as a 0-d array rather than a Python ``float`` so the
+        property is usable inside ``jax.jit``; call ``float(...)`` on
+        it in eager code (for example a preflight assertion).
+
+        Returns
+        -------
+        Float[Array, ""]
+            Smallest cell width, never negative.  Zero if the interior
+            reaches a pole, where the zonal width degenerates.
+        """
+        dx_i = jnp.maximum(self.dx_T[1:-1, 1:-1], 0.0)
+        return jnp.minimum(jnp.min(dx_i), self.dy_T)
+
+    @property
+    def max_aspect(self) -> Float[Array, ""]:
+        """Largest cell anisotropy ``dy_T / dx_T`` over the interior.
+
+        Grows without bound towards the poles, where cells become
+        vanishingly narrow in longitude while keeping their full
+        meridional extent.  Useful for warning that an operator or
+        solver is being asked to work on highly anisotropic cells.
+        Ghost cells are excluded, as for :attr:`min_cell_width`.
+
+        Returned as a 0-d array for the same JIT reason as
+        :attr:`min_cell_width`.
+
+        A cell whose zonal width has degenerated at a pole (see
+        :attr:`min_cell_width` for why that width can be zero or
+        slightly negative) reports ``inf`` rather than a huge negative
+        ratio, so ``max_aspect`` stays monotone in how bad the cell is.
+
+        Returns
+        -------
+        Float[Array, ""]
+            Maximum aspect ratio, ``inf`` if any interior cell has a
+            degenerate zonal width (interior reaching a pole).
+        """
+        dx_i = self.dx_T[1:-1, 1:-1]
+        degenerate = dx_i <= 0.0
+        safe_dx = jnp.where(degenerate, 1.0, dx_i)
+        aspect = jnp.where(degenerate, jnp.inf, self.dy_T / safe_dx)
+        return jnp.max(aspect)
+
 
 class SphericalGrid3D(CurvilinearGrid3D):
     """3-D Arakawa C-grid on a sphere.
@@ -315,3 +438,42 @@ class SphericalGrid3D(CurvilinearGrid3D):
             lat_T=self.lat_T,
             lon_T=self.lon_T,
         )
+
+    # ------------------------------------------------------------------
+    # Physical cell widths — delegate to the horizontal grid
+    # ------------------------------------------------------------------
+
+    @property
+    def dx_T(self) -> Float[Array, "Ny Nx"]:
+        """Zonal cell width at T-points (see :attr:`SphericalGrid2D.dx_T`).
+
+        Horizontal staggering is independent of depth, so the width is
+        2-D and broadcasts over the leading ``Nz`` axis.
+        """
+        return self.horizontal_grid().dx_T
+
+    @property
+    def dx_V(self) -> Float[Array, "Ny Nx"]:
+        """Zonal cell width at V-points (see :attr:`SphericalGrid2D.dx_V`)."""
+        return self.horizontal_grid().dx_V
+
+    @property
+    def dy_T(self) -> float:
+        """Meridional cell width (see :attr:`SphericalGrid2D.dy_T`)."""
+        return self.horizontal_grid().dy_T
+
+    @property
+    def min_cell_width(self) -> Float[Array, ""]:
+        """Smallest *horizontal* cell width over the interior.
+
+        Delegates to :attr:`SphericalGrid2D.min_cell_width`; the
+        vertical spacing ``dz`` is deliberately excluded, since the
+        horizontal and vertical CFL conditions are governed by
+        different wave speeds.
+        """
+        return self.horizontal_grid().min_cell_width
+
+    @property
+    def max_aspect(self) -> Float[Array, ""]:
+        """Largest horizontal cell anisotropy (see :attr:`SphericalGrid2D.max_aspect`)."""
+        return self.horizontal_grid().max_aspect
