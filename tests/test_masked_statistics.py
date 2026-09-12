@@ -257,3 +257,37 @@ class TestTransformsAndGradients:
             return jnp.sum(masked_std(x))
 
         assert np.isfinite(np.asarray(jax.grad(total)(constant))).all()
+
+
+class TestHalfPrecision:
+    """float16 saturates at 65504, which breaks both statistics.
+
+    The count of wet cells overflows to ``inf`` and the ``eps**2``
+    variance floor underflows to zero, so accumulation is promoted to
+    at least float32.
+    """
+
+    def test_a_large_wet_count_does_not_overflow(self):
+        samples = jnp.full((2, 256, 256), 3.0, dtype=jnp.float16)
+        got = masked_mean(samples, axis=(0, -2, -1))
+        assert float(got) == pytest.approx(3.0, rel=1e-3)
+
+    def test_the_count_really_would_overflow_in_float16(self):
+        """Otherwise the test above would pass for the wrong reason."""
+        naive = jnp.sum(jnp.ones((2, 256, 256), dtype=jnp.float16))
+        assert not np.isfinite(float(naive))
+
+    def test_a_constant_half_precision_field_gets_a_usable_scale(self):
+        samples = jnp.full((8, 4, 4), 2.0, dtype=jnp.float16)
+        std = masked_std(samples, axis=0)
+        assert float(jnp.min(std)) > 0.0
+
+    def test_half_precision_results_are_promoted(self):
+        samples = jnp.full((4, 4, 4), 1.0, dtype=jnp.float16)
+        assert masked_mean(samples).dtype == jnp.float32
+        assert masked_std(samples).dtype == jnp.float32
+
+    def test_single_precision_is_left_alone(self):
+        samples = jnp.ones((4, 4, 4), dtype=jnp.float32)
+        assert masked_mean(samples).dtype == jnp.float32
+        assert masked_std(samples).dtype == jnp.float32

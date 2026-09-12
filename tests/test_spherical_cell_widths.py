@@ -165,6 +165,24 @@ class TestMinCellWidth:
         assert raw.min() < 0.0  # the unclamped metric really does go negative
         assert float(grid.min_cell_width) == 0.0
 
+    def test_a_positive_roundoff_width_is_also_degenerate(self):
+        """The float64 spelling of the same pole.
+
+        ``cos(pi/2)`` is ``+6.1e-17`` there rather than ``-4.4e-08``,
+        so a clamp at zero would leave a positive width of a few
+        nanometres standing and a CFL guard would accept the grid and
+        then pick an unusable step from it.
+        """
+        grid = grid_with_cos([0.5, 6.123234e-17, 0.5, 0.5])
+        raw = np.asarray(grid.dx_T)[1:-1, 1:-1]
+        assert raw.min() > 0.0  # positive, and still meaningless
+        assert float(grid.min_cell_width) == 0.0
+
+    def test_a_genuinely_narrow_cell_is_kept(self):
+        """The cutoff is roundoff, not "small": real widths survive."""
+        grid = grid_with_cos([0.5, 1.0e-4, 0.5, 0.5])
+        assert float(grid.min_cell_width) == pytest.approx(1.0e-5, rel=1e-5)
+
     def test_is_never_negative_on_a_pole_to_pole_grid(self):
         """Whatever the precision, the reduction stays non-negative."""
         grid = SphericalGrid2D.from_interior(
@@ -220,7 +238,7 @@ class TestMaxAspect:
         # Cells straddle the equator, so the aspect stays very close to 1.
         assert float(grid.max_aspect) == pytest.approx(1.0, abs=1e-3)
 
-    @pytest.mark.parametrize("degenerate_cos", [0.0, -4.371e-08])
+    @pytest.mark.parametrize("degenerate_cos", [0.0, -4.371e-08, 6.123234e-17])
     def test_infinite_when_an_interior_cell_degenerates(self, degenerate_cos):
         """A zero or negative-width cell reports ``inf``, not a huge ratio."""
         grid = grid_with_cos([0.5, degenerate_cos, 0.5, 0.5])

@@ -29,10 +29,12 @@ curvilinear base (`dx = R·dlon`, `dy = R·dlat`), these expose the
 | `max_aspect` | largest interior `dy_T / dx_T` — polar cell anisotropy |
 
 `dx_T` and `dx_V` are the raw metric and are not clamped, so a row at a
-pole carries a degenerate width that can be zero or slightly negative
-(`cos(pi/2)` evaluates to `-4.4e-08` in float32). The two reductions do
-clamp: `min_cell_width` is never negative and `max_aspect` reports `inf`
-for a degenerate cell. Prefer the reductions when the value feeds a CFL
+pole carries a degenerate width of roundoff size and arbitrary sign
+(`cos(pi/2)` evaluates to `-4.4e-08` in float32 and `+6.1e-17` in
+float64). The two reductions recognise both signs: `min_cell_width`
+reports exactly zero for such a row and `max_aspect` reports `inf`. A
+width is judged degenerate when it falls within a few ulps of the
+equatorial width `R * dlon`, so a genuinely narrow cell is kept. Prefer the reductions when the value feeds a CFL
 or resolution guard. Both exclude the ghost ring, and both return 0-d
 arrays so they can be used inside `jax.jit`.
 

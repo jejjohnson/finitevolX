@@ -235,13 +235,15 @@ class SphericalGrid2D(CurvilinearGrid2D):
         ``cos(lat) < 0``, which would otherwise dominate the minimum
         with a negative width.
 
-        Zonal widths are clamped at zero before the reduction, so the
-        result is never negative even when an *interior* row sits on a
-        pole.  That matters because ``cos(pi/2)`` is not exactly zero
-        in floating point — it is ``-4.4e-08`` in float32 — and a
-        negative "width" would silently produce a negative time step in
-        a CFL guard.  A degenerate polar row reports zero instead,
-        which such a guard rejects.
+        A polar row reports exactly zero.  That needs saying because
+        ``cos(pi/2)`` is not exactly zero in floating point, and its
+        sign is not even consistent: it is ``-4.4e-08`` in float32 and
+        ``+6.1e-17`` in float64.  Clamping at zero would therefore fix
+        the float32 case — where a negative "width" would silently
+        produce a negative CFL time step — while leaving float64 to
+        report a positive width of ``4e-10`` metres, which a CFL guard
+        would accept and then choose an unusable step from.  Both are
+        recognised as degenerate instead: see :func:`_degenerate_width`.
 
         Returned as a 0-d array rather than a Python ``float`` so the
         property is usable inside ``jax.jit``; call ``float(...)`` on
@@ -253,7 +255,8 @@ class SphericalGrid2D(CurvilinearGrid2D):
             Smallest cell width, never negative.  Zero if the interior
             reaches a pole, where the zonal width degenerates.
         """
-        dx_i = jnp.maximum(self.dx_T[1:-1, 1:-1], 0.0)
+        dx_i = self.dx_T[1:-1, 1:-1]
+        dx_i = jnp.where(_degenerate_width(dx_i, self.R * self.dlon), 0.0, dx_i)
         return jnp.minimum(jnp.min(dx_i), self.dy_T)
 
     @property
@@ -270,9 +273,11 @@ class SphericalGrid2D(CurvilinearGrid2D):
         :attr:`min_cell_width`.
 
         A cell whose zonal width has degenerated at a pole (see
-        :attr:`min_cell_width` for why that width can be zero or
-        slightly negative) reports ``inf`` rather than a huge negative
-        ratio, so ``max_aspect`` stays monotone in how bad the cell is.
+        :attr:`min_cell_width` for why that width is roundoff of
+        either sign rather than zero) reports ``inf``, so
+        ``max_aspect`` stays monotone in how bad the cell is instead
+        of returning a huge negative ratio in float32 or a merely
+        large positive one in float64.
 
         Returns
         -------
@@ -281,10 +286,42 @@ class SphericalGrid2D(CurvilinearGrid2D):
             degenerate zonal width (interior reaching a pole).
         """
         dx_i = self.dx_T[1:-1, 1:-1]
-        degenerate = dx_i <= 0.0
+        degenerate = _degenerate_width(dx_i, self.R * self.dlon)
         safe_dx = jnp.where(degenerate, 1.0, dx_i)
         aspect = jnp.where(degenerate, jnp.inf, self.dy_T / safe_dx)
         return jnp.max(aspect)
+
+
+def _degenerate_width(dx: Float[Array, "..."], nominal: float) -> Float[Array, "..."]:
+    """Boolean mask of zonal widths that have collapsed at a pole.
+
+    ``dx = R cos(lat) dlon`` vanishes at the poles, but ``cos(pi/2)``
+    is not exactly zero in floating point and its sign depends on the
+    precision: ``-4.4e-08`` in float32, ``+6.1e-17`` in float64.  A
+    test for ``dx <= 0`` therefore catches the float32 case and misses
+    the float64 one, letting a CFL guard accept a grid whose narrowest
+    cell is nanometres wide.
+
+    The cutoff is the floating-point resolution of the nominal width
+    ``R dlon``, with a few ulps of headroom.  Since
+    ``cos(pi/2 + delta) ~ -delta``, a row that is genuinely (rather
+    than spuriously) close to the pole — by more than an ulp of angle
+    — still reports its true width.
+
+    Parameters
+    ----------
+    dx : Float[Array, "..."]
+        Zonal cell widths.
+    nominal : float
+        The equatorial width ``R * dlon`` these are measured against.
+
+    Returns
+    -------
+    Float[Array, "..."]
+        True where the width is indistinguishable from zero.
+    """
+    tolerance = 8.0 * jnp.finfo(jnp.asarray(dx).dtype).eps * abs(nominal)
+    return jnp.abs(dx) <= tolerance
 
 
 class SphericalGrid3D(CurvilinearGrid3D):
