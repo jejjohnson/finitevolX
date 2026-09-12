@@ -437,8 +437,15 @@ def _sample_counts(
     """
     dtype = _accumulation_dtype(samples)
     if mask is None:
-        ones = jnp.ones(samples.shape, dtype=dtype)
-        return samples.astype(dtype), jnp.sum(ones, axis=axis), None
+        # The count is the same everywhere, so take it from the shape
+        # rather than reducing an indicator array: materialising
+        # ``ones`` the size of an ``[N, Nz, Ny, Nx]`` stack can cost
+        # gigabytes of device memory for a number known statically.
+        axes = (axis,) if isinstance(axis, int) else tuple(axis)
+        count = 1
+        for reduced in axes:
+            count *= samples.shape[reduced]
+        return samples.astype(dtype), jnp.asarray(count, dtype=dtype), None
 
     m = _location_mask(mask, location)
     wet = jnp.broadcast_to(m, samples.shape)
@@ -580,18 +587,23 @@ def masked_std(
     #
     # ``sqrt`` has an infinite derivative at zero, so a constant field
     # — exactly the case ``eps`` exists for — would come back with a
-    # NaN gradient. Lifting the variance off zero first fixes that. The
-    # lift is the dtype's smallest normal, not ``eps**2``: squaring the
-    # caller's floor is what breaks for a small one, since ``1e-30``
-    # squares to ``1e-60`` and underflows to zero in float32, putting
-    # the zero straight back.
+    # NaN gradient. The doubled ``where`` is the standard remedy: the
+    # inner one keeps the zero away from ``sqrt`` on the backward pass,
+    # the outer one restores the exact zero on the forward pass. No
+    # value is lifted, so nothing is perturbed.
     #
-    # The requested floor is then applied to the standard deviation
-    # itself, where it is representable whatever its size. Where it
-    # binds, its gradient is zero, which also masks the large (but
-    # finite) derivative of ``sqrt`` near the lift.
-    lift = jnp.finfo(jnp.asarray(var).dtype).tiny
-    std = jnp.sqrt(jnp.maximum(jnp.where(degenerate, lift, var), lift))
+    # Clamping the variance instead would be simpler but wrong twice
+    # over. ``eps**2`` underflows for a small floor — ``1e-30`` squares
+    # to ``1e-60``, which is zero in float32 — and the dtype's smallest
+    # normal imposes a second, invisible floor of ``sqrt(tiny)``, about
+    # ``1.1e-19``, so a requested ``eps`` below it could never be
+    # returned and real deviations beneath it would be inflated.
+    #
+    # The requested floor is applied to the standard deviation itself,
+    # where it is representable whatever its size. Where it binds, its
+    # gradient is zero.
+    positive = var > 0.0
+    std = jnp.where(positive, jnp.sqrt(jnp.where(positive, var, 1.0)), 0.0)
     std = jnp.maximum(std, eps)
     # ``empty`` as well as ``degenerate``: with a negative ddof a dry
     # cell has ``count == 0`` but ``denom > 0``, so it is not
