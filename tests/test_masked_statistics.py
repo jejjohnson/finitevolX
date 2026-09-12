@@ -303,7 +303,21 @@ class TestTheFloorIsHonouredWhateverItsSize:
     def test_a_tiny_floor_is_still_applied(self):
         samples = jnp.full((8, 4, 4), 2.0, dtype=jnp.float32)
         std = masked_std(samples, axis=0, eps=1e-30)
-        assert float(jnp.min(std)) == pytest.approx(1e-30, rel=1e-6)
+        # ``abs=0`` matters: ``approx``'s default absolute tolerance is
+        # 1e-12, which every value below it satisfies, so without this
+        # the assertion holds for any floor that is merely small.
+        assert float(jnp.min(std)) == pytest.approx(1e-30, rel=1e-6, abs=0.0)
+
+    def test_the_floor_is_not_sqrt_of_the_smallest_normal(self):
+        """Clamping the variance would impose a second, hidden floor.
+
+        ``sqrt(finfo(float32).tiny)`` is about 1.1e-19, so a variance
+        clamped at the smallest normal can never return a floor below
+        that however small the caller asks for.
+        """
+        samples = jnp.full((8, 4, 4), 2.0, dtype=jnp.float32)
+        std = masked_std(samples, axis=0, eps=1e-30)
+        assert float(jnp.min(std)) < float(jnp.sqrt(jnp.finfo(jnp.float32).tiny))
 
     def test_its_square_really_would_underflow(self):
         """Otherwise the test above would pass for the wrong reason."""
