@@ -33,44 +33,74 @@ import pytest
 
 jax.config.update("jax_enable_x64", True)
 
-from finitevolx._src.advection.advection import Advection2D
+from finitevolx._src.advection.advection import (
+    Advection1D,
+    Advection2D,
+    Advection3D,
+)
 from finitevolx._src.diffusion.diffusion import (
     BiharmonicDiffusion2D,
+    BiharmonicDiffusion3D,
     Diffusion2D,
+    Diffusion3D,
 )
 from finitevolx._src.diffusion.spherical_diffusion import (
     SphericalBiharmonicDiffusion2D,
     SphericalDiffusion2D,
+    SphericalDiffusion3D,
 )
-from finitevolx._src.grid.cartesian import CartesianGrid2D
-from finitevolx._src.grid.spherical import SphericalGrid2D
-from finitevolx._src.mask.cartesian import Mask2D
-from finitevolx._src.operators.difference import Difference2D
+from finitevolx._src.grid.cartesian import (
+    CartesianGrid1D,
+    CartesianGrid2D,
+    CartesianGrid3D,
+)
+from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
+from finitevolx._src.mask.cartesian import Mask1D, Mask2D, Mask3D
+from finitevolx._src.operators.difference import (
+    Difference1D,
+    Difference2D,
+    Difference3D,
+)
 from finitevolx._src.operators.divergence import Divergence2D
-from finitevolx._src.operators.interpolation import Interpolation2D
+from finitevolx._src.operators.interpolation import (
+    Interpolation1D,
+    Interpolation2D,
+    Interpolation3D,
+)
 from finitevolx._src.operators.jacobian import arakawa_jacobian
 from finitevolx._src.operators.spherical_compound import (
     SphericalDivergence2D,
+    SphericalDivergence3D,
     SphericalLaplacian2D,
+    SphericalLaplacian3D,
     SphericalVorticity2D,
+    SphericalVorticity3D,
 )
 from finitevolx._src.operators.spherical_difference import (
     SphericalDifference2D,
+    SphericalDifference3D,
 )
-from finitevolx._src.operators.vorticity import Vorticity2D
+from finitevolx._src.operators.vorticity import Vorticity2D, Vorticity3D
 from finitevolx._src.solvers.spectral import (
     solve_poisson_dst,
     solve_poisson_fft,
 )
 
 NX = NY = 16
+NZ = 4
 LX = LY = 2.0
+LZ = 0.5
 
 # Grid rescalings and field amplitudes spanning the physical -> nondimensional
 # range. A purely relative bug survives L = U = 1; an absolute-tolerance bug
 # only shows up at the extremes.
 LENGTH_FACTORS = [1e-3, 1.0, 1e6]
 AMPLITUDE_FACTORS = [1e-2, 1.0, 1e3]
+
+#: Per-label multipliers applied on top of the amplitude factor, in
+#: order of first appearance. Unequal and not powers of one another, so
+#: a mix-up between two of a bilinear operator's inputs cannot cancel.
+LABEL_SPREAD = (1.0, 4.0, 0.125, 32.0, 0.0625)
 
 
 def smooth_field(seed, ny=NY, nx=NX):
@@ -84,9 +114,39 @@ def smooth_field(seed, ny=NY, nx=NX):
     return jnp.asarray(out / np.abs(out).max())
 
 
+def smooth_field_1d(seed, nx=NX):
+    """The 1-D counterpart of :func:`smooth_field`."""
+    rng = np.random.RandomState(seed)
+    x = np.linspace(0.0, 2.0 * np.pi, nx)
+    out = np.zeros(nx)
+    for k in (1, 2, 3):
+        out += rng.randn() * np.sin(k * x + rng.randn())
+    return jnp.asarray(out / np.abs(out).max())
+
+
+def smooth_field_3d(seed, nz=NZ, ny=NY, nx=NX):
+    """A stack of decorrelated 2-D fields, one per z-level."""
+    return jnp.stack([smooth_field(100 * seed + k, ny, nx) for k in range(nz)])
+
+
+def cartesian_grid_1d(length_factor):
+    return CartesianGrid1D.from_interior(NX - 2, LX / length_factor)
+
+
 def cartesian_grid(length_factor):
     return CartesianGrid2D.from_interior(
         NX - 2, NY - 2, LX / length_factor, LY / length_factor
+    )
+
+
+def cartesian_grid_3d(length_factor):
+    return CartesianGrid3D.from_interior(
+        NX - 2,
+        NY - 2,
+        NZ - 2,
+        LX / length_factor,
+        LY / length_factor,
+        LZ / length_factor,
     )
 
 
@@ -101,10 +161,47 @@ def spherical_grid(length_factor):
     )
 
 
+def spherical_grid_3d(length_factor):
+    """As :func:`spherical_grid`; the vertical extent is a length too."""
+    return SphericalGrid3D.from_interior(
+        NX - 2,
+        NY - 2,
+        NZ - 2,
+        lon_range=(0.0, 40.0),
+        lat_range=(10.0, 50.0),
+        Lz=LZ / length_factor,
+        R=6.0e6 / length_factor,
+    )
+
+
+def land_mask_1d():
+    wet = np.ones(NX, dtype=bool)
+    wet[5:8] = False
+    return Mask1D.from_mask(jnp.asarray(wet))
+
+
 def land_mask():
     wet = np.ones((NY, NX), dtype=bool)
     wet[4:7, 5:8] = False
     return Mask2D.from_mask(jnp.asarray(wet))
+
+
+def land_mask_3d():
+    wet = np.ones((NZ, NY, NX), dtype=bool)
+    wet[:, 4:7, 5:8] = False
+    return Mask3D.from_mask(jnp.asarray(wet))
+
+
+#: Grid factory and field/mask makers, keyed by ``(dim, geometry)``.
+GRID_FACTORIES = {
+    (1, "cartesian"): cartesian_grid_1d,
+    (2, "cartesian"): cartesian_grid,
+    (2, "spherical"): spherical_grid,
+    (3, "cartesian"): cartesian_grid_3d,
+    (3, "spherical"): spherical_grid_3d,
+}
+FIELD_MAKERS = {1: smooth_field_1d, 2: smooth_field, 3: smooth_field_3d}
+MASK_MAKERS = {1: land_mask_1d, 2: land_mask, 3: land_mask_3d}
 
 
 # ----------------------------------------------------------------------
@@ -119,16 +216,23 @@ def land_mask():
 #            A * B once, not A * B * B
 #   order    power of the length factor L in the expected output scaling
 #   grid     "cartesian" or "spherical"
+#   dim      1, 2 or 3 — picks the grid, field and mask factories
+#
+# Distinct labels get *distinct* amplitudes (see LABEL_SPREAD): scaling
+# every input by the same number would only test total homogeneity, so
+# an operator that accidentally squared one argument and ignored
+# another would still come out covariant.
 
 
 class Case:
-    def __init__(self, name, run, labels, order, grid="cartesian", masked=True):
+    def __init__(self, name, run, labels, order, grid="cartesian", masked=True, dim=2):
         self.name = name
         self.run = run
         self.labels = labels
         self.order = order
         self.grid = grid
         self.masked = masked
+        self.dim = dim
 
     def __repr__(self):
         return self.name
@@ -275,6 +379,138 @@ def _cases():
             4,
             grid="spherical",
         ),
+        # --- 1-D operators -------------------------------------------
+        Case(
+            "interp_1d_T_to_U",
+            lambda g, m, f: Interpolation1D(grid=g).T_to_U(f[0]),
+            ("A",),
+            0,
+            masked=False,
+            dim=1,
+        ),
+        Case(
+            "difference_1d_x_T_to_U",
+            lambda g, m, f: Difference1D(grid=g, mask=m).diff_x_T_to_U(f[0]),
+            ("A",),
+            1,
+            dim=1,
+        ),
+        Case(
+            "difference_1d_laplacian",
+            lambda g, m, f: Difference1D(grid=g, mask=m).laplacian(f[0]),
+            ("A",),
+            2,
+            dim=1,
+        ),
+        Case(
+            "advection_1d_upwind1",
+            lambda g, m, f: Advection1D(grid=g, mask=m)(f[0], f[1], method="upwind1"),
+            ("A", "B"),
+            1,
+            dim=1,
+        ),
+        # --- 3-D operators -------------------------------------------
+        Case(
+            "interp_3d_T_to_U",
+            lambda g, m, f: Interpolation3D(grid=g).T_to_U(f[0]),
+            ("A",),
+            0,
+            masked=False,
+            dim=3,
+        ),
+        Case(
+            "difference_3d_x_T_to_U",
+            lambda g, m, f: Difference3D(grid=g, mask=m).diff_x_T_to_U(f[0]),
+            ("A",),
+            1,
+            dim=3,
+        ),
+        Case(
+            "difference_3d_divergence",
+            lambda g, m, f: Difference3D(grid=g, mask=m).divergence(f[0], f[1]),
+            ("B", "B"),
+            1,
+            dim=3,
+        ),
+        Case(
+            "difference_3d_laplacian",
+            lambda g, m, f: Difference3D(grid=g, mask=m).laplacian(f[0]),
+            ("A",),
+            2,
+            dim=3,
+        ),
+        Case(
+            "relative_vorticity_3d",
+            lambda g, m, f: Vorticity3D(grid=g, mask=m).relative_vorticity(f[0], f[1]),
+            ("B", "B"),
+            1,
+            dim=3,
+        ),
+        Case(
+            "harmonic_diffusion_3d",
+            lambda g, m, f: Diffusion3D(grid=g, mask=m)(f[0], f[1]),
+            ("A", "K"),
+            2,
+            dim=3,
+        ),
+        Case(
+            "biharmonic_diffusion_3d",
+            lambda g, m, f: BiharmonicDiffusion3D(grid=g, mask=m)(f[0], 3.0),
+            ("A",),
+            4,
+            dim=3,
+        ),
+        Case(
+            "advection_3d_upwind1",
+            lambda g, m, f: Advection3D(grid=g, mask=m)(
+                f[0], f[1], f[2], method="upwind1"
+            ),
+            ("A", "B", "B"),
+            1,
+            dim=3,
+        ),
+        Case(
+            "spherical_difference_3d_lon",
+            lambda g, m, f: SphericalDifference3D(grid=g, mask=m).diff_lon_T_to_U(f[0]),
+            ("A",),
+            1,
+            grid="spherical",
+            dim=3,
+        ),
+        Case(
+            "spherical_divergence_3d",
+            lambda g, m, f: SphericalDivergence3D(grid=g, mask=m)(f[0], f[1]),
+            ("B", "B"),
+            1,
+            grid="spherical",
+            dim=3,
+        ),
+        Case(
+            "spherical_vorticity_3d",
+            lambda g, m, f: SphericalVorticity3D(grid=g, mask=m).relative_vorticity(
+                f[0], f[1]
+            ),
+            ("B", "B"),
+            1,
+            grid="spherical",
+            dim=3,
+        ),
+        Case(
+            "spherical_laplacian_3d",
+            lambda g, m, f: SphericalLaplacian3D(grid=g, mask=m)(f[0]),
+            ("A",),
+            2,
+            grid="spherical",
+            dim=3,
+        ),
+        Case(
+            "spherical_diffusion_3d",
+            lambda g, m, f: SphericalDiffusion3D(grid=g, mask=m)(f[0], f[1]),
+            ("A", "K"),
+            2,
+            grid="spherical",
+            dim=3,
+        ),
     ]
 
 
@@ -310,15 +546,19 @@ def run_case(case, length_factor, amplitude, use_mask):
     Returns ``(base_output, scaled_output, expected_factor)``.
     """
     n_fields = len(case.labels)
-    fields = [smooth_field(seed) for seed in range(n_fields)]
+    make_field = FIELD_MAKERS[case.dim]
+    fields = [make_field(seed) for seed in range(n_fields)]
 
-    amplitudes = {label: amplitude for label in dict.fromkeys(case.labels)}
+    amplitudes = {
+        label: amplitude * spread
+        for label, spread in zip(dict.fromkeys(case.labels), LABEL_SPREAD, strict=False)
+    }
     scaled_fields = [
         f / amplitudes[label] for f, label in zip(fields, case.labels, strict=True)
     ]
 
-    make_grid = spherical_grid if case.grid == "spherical" else cartesian_grid
-    mask = land_mask() if (use_mask and case.masked) else None
+    make_grid = GRID_FACTORIES[(case.dim, case.grid)]
+    mask = MASK_MAKERS[case.dim]() if (use_mask and case.masked) else None
 
     base = case.run(make_grid(1.0), mask, fields)
     scaled = case.run(make_grid(length_factor), mask, scaled_fields)
@@ -445,6 +685,40 @@ def _audited_modules():
         yield from sorted((root / package).rglob("*.py"))
 
 
+def _constant_aliases(tree):
+    """Local names that resolve to a physical constant.
+
+    ``from ...constants import GRAVITY as g`` binds the constant to
+    ``g``, so matching the original name alone would miss every later
+    use of it. Returns a mapping from the local name to the constant
+    it came from, including the identity entries for unaliased
+    imports.
+    """
+    aliases = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            for imported in node.names:
+                if imported.name in PHYSICAL_CONSTANTS:
+                    aliases[imported.asname or imported.name] = imported.name
+    return aliases
+
+
+def _referenced_constant(node, aliases):
+    """The physical constant an expression node refers to, if any.
+
+    Covers the three spellings a module can reach one by: the bare
+    imported name, a local alias of it, and an attribute access such
+    as ``constants.GRAVITY`` on an imported module.
+    """
+    if isinstance(node, ast.Name):
+        return aliases.get(node.id) or (
+            node.id if node.id in PHYSICAL_CONSTANTS else None
+        )
+    if isinstance(node, ast.Attribute) and node.attr in PHYSICAL_CONSTANTS:
+        return node.attr
+    return None
+
+
 def _constants_outside_defaults(path):
     """Names of physical constants used anywhere but as a parameter default.
 
@@ -452,8 +726,13 @@ def _constants_outside_defaults(path):
     default (``gravity: float = GRAVITY``) keeps the operator
     unit-agnostic — the caller can pass 1. A constant referenced inside
     an expression bakes SI units into the numerics.
+
+    Qualified (``constants.GRAVITY``) and aliased
+    (``GRAVITY as g``) references count: otherwise a routine change of
+    import style would quietly switch the contract off.
     """
     tree = ast.parse(path.read_text())
+    aliases = _constant_aliases(tree)
 
     allowed = set()
     for node in ast.walk(tree):
@@ -463,17 +742,15 @@ def _constants_outside_defaults(path):
             ]
             for default in defaults:
                 for sub in ast.walk(default):
-                    if isinstance(sub, ast.Name):
-                        allowed.add(id(sub))
+                    allowed.add(id(sub))
 
     offenders = []
     for node in ast.walk(tree):
-        if (
-            isinstance(node, ast.Name)
-            and node.id in PHYSICAL_CONSTANTS
-            and id(node) not in allowed
-        ):
-            offenders.append(f"{node.id} (line {node.lineno})")
+        # An ``import ... as`` clause binds an alias; ``ast.alias`` is
+        # neither a Name nor an Attribute, so it is not a use.
+        constant = _referenced_constant(node, aliases)
+        if constant is not None and id(node) not in allowed:
+            offenders.append(f"{constant} (line {node.lineno})")
     return offenders
 
 
@@ -497,6 +774,45 @@ class TestConstantsAudit:
         names = {p.name for p in modules}
         assert "difference.py" in names
         assert "spherical_diffusion.py" in names
+
+    def test_audit_detects_an_aliased_constant(self, tmp_path):
+        """``GRAVITY as g`` is the same constant under another name."""
+        offending = tmp_path / "aliased.py"
+        offending.write_text(
+            "from finitevolx._src.utils.constants import GRAVITY as g\n"
+            "def f(h):\n"
+            "    return g * h\n"
+        )
+        assert _constants_outside_defaults(offending) == ["GRAVITY (line 3)"]
+
+    def test_audit_detects_a_qualified_constant(self, tmp_path):
+        """``constants.GRAVITY`` bakes in SI just as surely."""
+        offending = tmp_path / "qualified.py"
+        offending.write_text(
+            "from finitevolx._src.utils import constants\n"
+            "def f(h):\n"
+            "    return constants.GRAVITY * h\n"
+        )
+        assert _constants_outside_defaults(offending) == ["GRAVITY (line 3)"]
+
+    def test_audit_allows_an_aliased_default(self, tmp_path):
+        """The alias is still overridable when it is only a default."""
+        fine = tmp_path / "aliased_default.py"
+        fine.write_text(
+            "from finitevolx._src.utils.constants import GRAVITY as g\n"
+            "def f(h, gravity=g):\n"
+            "    return gravity * h\n"
+        )
+        assert not _constants_outside_defaults(fine)
+
+    def test_audit_allows_a_qualified_default(self, tmp_path):
+        fine = tmp_path / "qualified_default.py"
+        fine.write_text(
+            "from finitevolx._src.utils import constants\n"
+            "def f(h, gravity=constants.GRAVITY):\n"
+            "    return gravity * h\n"
+        )
+        assert not _constants_outside_defaults(fine)
 
     def test_audit_detects_a_hard_coded_constant(self, tmp_path):
         """The audit must fail on the pattern it exists to catch."""
