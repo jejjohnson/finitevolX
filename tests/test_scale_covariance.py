@@ -522,22 +522,65 @@ LINEAR_METHODS = ("naive", "upwind1", "upwind2", "upwind3")
 #: amplitude squared. Tracked as #243.
 WENO_METHODS = ("weno3", "weno5", "wenoz5", "weno7", "weno9")
 
+#: TVD limiters. They guard a slope *ratio* with the absolute
+#: ``_TVD_EPS``, so they have the same shape of amplitude dependence
+#: #243 describes for WENO — a ratio is dimensionless, but the epsilon
+#: added to its denominator is not.
+TVD_METHODS = ("minmod", "van_leer", "superbee", "mc")
 
-def _advection_case(method):
-    return Case(
-        f"advection_{method}",
-        lambda g, m, f, method=method: Advection2D(grid=g, mask=m)(
-            f[0], f[1], f[2], method=method
-        ),
-        ("A", "B", "B"),
-        1,
-    )
+#: Advection is implemented separately per dimension — different
+#: dispatch, different reconstruction paths — so a scale regression in
+#: one of them is invisible from the others.
+ADVECTION_DIMS = (1, 2, 3)
+
+
+def _advection_case(method, dim):
+    """One advection case, for whichever dimension's operator applies."""
+    if dim == 1:
+        operator, labels = Advection1D, ("A", "B")
+    elif dim == 2:
+        operator, labels = Advection2D, ("A", "B", "B")
+    else:
+        operator, labels = Advection3D, ("A", "B", "B")
+
+    def run(g, m, f, method=method, operator=operator):
+        return operator(grid=g, mask=m)(*f, method=method)
+
+    return Case(f"advection_{dim}d_{method}", run, labels, 1, dim=dim)
+
+
+#: Not every dimension implements every scheme — ``Advection3D`` has no
+#: ``upwind2``/``upwind3``, and only the 2-D operator has ``wenoz5``.
+#: Probed rather than hard-coded so the matrix cannot drift out of date,
+#: and asserted non-empty below so a probe that silently matches nothing
+#: cannot quietly empty the suite.
+def _supported(operator, grid, fields, method):
+    try:
+        operator(grid=grid)(*fields, method=method)
+    except ValueError:
+        return False
+    return True
+
+
+def _advection_cases(methods):
+    cases = []
+    for dim in ADVECTION_DIMS:
+        grid = GRID_FACTORIES[(dim, "cartesian")](1.0)
+        make_field = FIELD_MAKERS[dim]
+        operator = {1: Advection1D, 2: Advection2D, 3: Advection3D}[dim]
+        n_fields = 2 if dim == 1 else 3
+        probe = [make_field(seed) for seed in range(n_fields)]
+        for method in methods:
+            if _supported(operator, grid, probe, method):
+                cases.append(_advection_case(method, dim))
+    return cases
 
 
 CASES = _cases()
-LINEAR_ADVECTION_CASES = [_advection_case(m) for m in LINEAR_METHODS]
-WENO_ADVECTION_CASES = [_advection_case(m) for m in WENO_METHODS]
-ADVECTION_CASES = LINEAR_ADVECTION_CASES + WENO_ADVECTION_CASES
+LINEAR_ADVECTION_CASES = _advection_cases(LINEAR_METHODS)
+WENO_ADVECTION_CASES = _advection_cases(WENO_METHODS)
+TVD_ADVECTION_CASES = _advection_cases(TVD_METHODS)
+ADVECTION_CASES = LINEAR_ADVECTION_CASES + WENO_ADVECTION_CASES + TVD_ADVECTION_CASES
 
 
 def run_case(case, length_factor, amplitude, use_mask):
@@ -603,10 +646,28 @@ class TestScaleCovariance:
 
     @pytest.mark.parametrize("case", [c for c in CASES if c.masked], ids=repr)
     def test_masked_cells_stay_zero_on_both_sides(self, case):
-        base, scaled, _ = run_case(case, 1e6, 1e-2, use_mask=True)
-        zero_in_base = base == 0.0
+        """Zeroed by the mask, and still zeroed after rescaling.
+
+        The cells to check are found by differencing against an
+        *unmasked* run rather than by reading the mask: an operator's
+        output stagger is not declared on the case, so which of
+        ``mask.h`` / ``.u`` / ``.v`` applies is not known here. Cells
+        that the masked run zeroes and the unmasked run does not are
+        exactly the ones masking is responsible for — which also makes
+        the check fail if an operator stops masking at all, instead of
+        quietly falling back to the structural ghost-ring zeros.
+        """
+        masked, masked_scaled, _ = run_case(case, 1e6, 1e-2, use_mask=True)
+        unmasked, _, _ = run_case(case, 1e6, 1e-2, use_mask=False)
+
+        zeroed_by_the_mask = (masked == 0.0) & (unmasked != 0.0)
+        assert zeroed_by_the_mask.any(), (
+            f"{case.name}: masking zeroed no cell that was nonzero without "
+            f"it — the mask is not reaching the operator"
+        )
         np.testing.assert_array_equal(
-            scaled[zero_in_base] == 0.0, np.ones(zero_in_base.sum(), dtype=bool)
+            masked_scaled[zeroed_by_the_mask],
+            np.zeros(int(zeroed_by_the_mask.sum())),
         )
 
 
@@ -648,6 +709,11 @@ class TestWenoAmplitudeCovariance:
     @pytest.mark.xfail(
         reason="#243: absolute epsilon in the WENO smoothness indicators",
         strict=True,
+        # Only the numerical assertion is expected to fail. Without
+        # this, a WENO operator that started raising during
+        # construction or execution would still report XFAIL and keep
+        # the suite green.
+        raises=AssertionError,
     )
     @pytest.mark.parametrize("case", WENO_ADVECTION_CASES, ids=repr)
     def test_amplitude_rescaling(self, case):
@@ -656,6 +722,11 @@ class TestWenoAmplitudeCovariance:
     @pytest.mark.xfail(
         reason="#243: absolute epsilon in the WENO smoothness indicators",
         strict=True,
+        # Only the numerical assertion is expected to fail. Without
+        # this, a WENO operator that started raising during
+        # construction or execution would still report XFAIL and keep
+        # the suite green.
+        raises=AssertionError,
     )
     @pytest.mark.parametrize("case", WENO_ADVECTION_CASES, ids=repr)
     def test_masked_advection_is_covariant(self, case):
@@ -832,3 +903,75 @@ class TestConstantsAudit:
             "    return g * h / dx\n"
         )
         assert not _constants_outside_defaults(fine)
+
+
+class TestTvdAmplitudeCovariance:
+    """TVD limiters share WENO's defect, three orders of magnitude smaller.
+
+    Each guards a slope *ratio* with the absolute ``_TVD_EPS = 1e-8``.
+    A ratio is dimensionless but that epsilon is not, so rescaling the
+    field shifts the limiter slightly — the same mechanism as #243.
+
+    The size is what differs, and it is why these are not ``xfail``
+    like the WENO cases: at amplitude 1e3 a WENO tendency moves by 3%,
+    a TVD one by about 1e-5. Too large to call exact, far too small to
+    call broken. The bound below states that, so a regression toward
+    WENO-scale breakage fails here.
+    """
+
+    #: Measured departure is ~1.5e-5; an order of magnitude of headroom.
+    TOLERANCE = 1e-4
+
+    @pytest.mark.parametrize("case", TVD_ADVECTION_CASES, ids=repr)
+    @pytest.mark.parametrize("length_factor", LENGTH_FACTORS)
+    def test_length_rescaling_is_exact(self, case, length_factor):
+        """The grid carries no amplitude, so this half is unaffected."""
+        assert_covariant(case, length_factor, 1.0, use_mask=False)
+
+    @pytest.mark.parametrize("case", TVD_ADVECTION_CASES, ids=repr)
+    def test_amplitude_departure_is_bounded(self, case):
+        base, scaled, factor = run_case(case, 1.0, 1e3, use_mask=False)
+        expected = base * factor
+        err = np.abs(scaled - expected).max() / np.abs(expected).max()
+        assert err < self.TOLERANCE, f"{case.name}: amplitude error {err:.3e}"
+
+    @pytest.mark.parametrize("case", TVD_ADVECTION_CASES, ids=repr)
+    def test_the_departure_is_real_and_not_rounding(self, case):
+        """Otherwise the bound above could be met by an exact operator.
+
+        Pinning this means that if #243's fix also makes the limiters
+        exact, this test fails and the suite is updated deliberately
+        rather than keeping a stale allowance.
+        """
+        base, scaled, factor = run_case(case, 1.0, 1e3, use_mask=False)
+        expected = base * factor
+        err = np.abs(scaled - expected).max() / np.abs(expected).max()
+        assert err > 1e-8
+
+    @pytest.mark.parametrize("case", TVD_ADVECTION_CASES, ids=repr)
+    def test_masked_departure_is_bounded_too(self, case):
+        base, scaled, factor = run_case(case, 1e-3, 1e3, use_mask=True)
+        expected = base * factor
+        err = np.abs(scaled - expected).max() / np.abs(expected).max()
+        assert err < self.TOLERANCE
+
+
+class TestTheCaseMatrixIsPopulated:
+    """A probe that matched nothing would silently empty the suite."""
+
+    @pytest.mark.parametrize("dim", ADVECTION_DIMS)
+    def test_every_dimension_contributes_advection_cases(self, dim):
+        for group in (
+            LINEAR_ADVECTION_CASES,
+            WENO_ADVECTION_CASES,
+            TVD_ADVECTION_CASES,
+        ):
+            assert any(case.dim == dim for case in group)
+
+    def test_every_dimension_contributes_operator_cases(self):
+        for dim in (1, 2, 3):
+            assert any(case.dim == dim for case in CASES)
+
+    def test_both_geometries_are_covered(self):
+        for geometry in ("cartesian", "spherical"):
+            assert any(case.grid == geometry for case in CASES)
