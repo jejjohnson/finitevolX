@@ -435,15 +435,34 @@ def _sample_counts(
     entries per output element, and ``wet`` is the broadcast boolean
     mask (``None`` when no mask was supplied).
     """
+    dtype = _accumulation_dtype(samples)
     if mask is None:
-        ones = jnp.ones_like(samples)
-        return samples, jnp.sum(ones, axis=axis), None
+        ones = jnp.ones(samples.shape, dtype=dtype)
+        return samples.astype(dtype), jnp.sum(ones, axis=axis), None
 
     m = _location_mask(mask, location)
     wet = jnp.broadcast_to(m, samples.shape)
-    safe = jnp.where(wet, samples, 0.0)
-    count = jnp.sum(wet.astype(samples.dtype), axis=axis)
+    safe = jnp.where(wet, samples, 0.0).astype(dtype)
+    count = jnp.sum(wet.astype(dtype), axis=axis)
     return safe, count, wet
+
+
+def _accumulation_dtype(samples: Float[Array, "N ..."]) -> jnp.dtype:
+    """Floating dtype wide enough to accumulate ``samples`` safely.
+
+    At least float32.  A half-precision input is promoted rather than
+    accumulated in place: ``float16`` saturates at 65504, so a wet-cell
+    count over a 256x256 field overflows to ``inf`` and every mean it
+    divides silently collapses to zero.  Its ``eps**2`` variance floor
+    underflows to zero for the same reason, taking the documented
+    safe-to-divide guarantee with it.
+
+    Promoting is deliberate rather than a cast-back: at ``eps=1e-8``
+    the floor itself is below ``float16``'s smallest subnormal, so
+    there is no half-precision value that could carry the guarantee.
+    ``float32`` and ``float64`` inputs are returned unchanged.
+    """
+    return jnp.promote_types(jnp.asarray(samples).dtype, jnp.float32)
 
 
 def masked_mean(
@@ -481,7 +500,9 @@ def masked_mean(
     Returns
     -------
     Float[Array, "..."]
-        The mean, with ``0.0`` wherever no wet sample contributed.
+        The mean, in the input dtype or ``float32``, whichever is
+        wider — see :func:`_accumulation_dtype`.  ``0.0`` wherever no
+        wet sample contributed.
         Zero — rather than NaN — so that the paired
         ``(x - loc) / scale`` leaves a dry cell at zero and the inverse
         map stays well defined.
@@ -532,7 +553,8 @@ def masked_std(
     Float[Array, "..."]
         Standard deviation, at least ``eps`` on wet cells and exactly
         ``1.0`` on dry cells or where too few samples contributed to
-        form the estimate.
+        form the estimate.  In the input dtype or ``float32``,
+        whichever is wider — see :func:`_accumulation_dtype`.
     """
     safe, count, wet = _sample_counts(samples, mask, location, axis)
     empty = count == 0
