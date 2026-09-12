@@ -315,13 +315,20 @@ def _degenerate_width(dx: Float[Array, "..."], nominal: float) -> Float[Array, "
     nominal : float
         The equatorial width ``R * dlon`` these are measured against.
 
+    A *genuinely* negative width — a grid whose T rows run past a pole,
+    so ``cos(lat)`` is meaningfully below zero rather than roundoff — is
+    degenerate too, and by a wider margin. Testing only ``|dx| <= tol``
+    would let those through and make ``min_cell_width`` negative, so
+    the two conditions are combined.
+
     Returns
     -------
     Float[Array, "..."]
-        True where the width is indistinguishable from zero.
+        True where the width is indistinguishable from zero, or is
+        negative.
     """
     tolerance = 8.0 * jnp.finfo(jnp.asarray(dx).dtype).eps * abs(nominal)
-    return jnp.abs(dx) <= tolerance
+    return (jnp.abs(dx) <= tolerance) | (dx < 0.0)
 
 
 class SphericalGrid3D(CurvilinearGrid3D):
