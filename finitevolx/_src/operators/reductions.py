@@ -543,7 +543,9 @@ def masked_std(
     axis : int or tuple of int, optional
     eps : float, optional
         Lower bound on the returned standard deviation of a wet cell.
-        Default ``1e-8``.
+        Default ``1e-8``. Applied to the standard deviation itself, so
+        any positive value is honoured exactly — including one whose
+        square would underflow the accumulation dtype.
     ddof : int, optional
         Delta degrees of freedom; the divisor is ``count - ddof``.
         Default ``0``, matching :func:`jax.numpy.std`.
@@ -573,12 +575,28 @@ def masked_std(
     denom = count - ddof
     degenerate = denom <= 0
     var = jnp.sum(dev**2, axis=axis) / jnp.where(degenerate, 1.0, denom)
-    # Floor the *variance* at eps**2 rather than the std at eps. The two
-    # give the same value (sqrt is monotone), but sqrt has an infinite
-    # derivative at 0, so flooring afterwards would hand back a NaN
-    # gradient for any constant field — exactly the case eps exists for.
-    std = jnp.sqrt(jnp.maximum(jnp.where(degenerate, 0.0, var), eps**2))
-    return jnp.where(degenerate, 1.0, std)
+
+    # Two separate jobs, done in two steps rather than one.
+    #
+    # ``sqrt`` has an infinite derivative at zero, so a constant field
+    # — exactly the case ``eps`` exists for — would come back with a
+    # NaN gradient. Lifting the variance off zero first fixes that. The
+    # lift is the dtype's smallest normal, not ``eps**2``: squaring the
+    # caller's floor is what breaks for a small one, since ``1e-30``
+    # squares to ``1e-60`` and underflows to zero in float32, putting
+    # the zero straight back.
+    #
+    # The requested floor is then applied to the standard deviation
+    # itself, where it is representable whatever its size. Where it
+    # binds, its gradient is zero, which also masks the large (but
+    # finite) derivative of ``sqrt`` near the lift.
+    lift = jnp.finfo(jnp.asarray(var).dtype).tiny
+    std = jnp.sqrt(jnp.maximum(jnp.where(degenerate, lift, var), lift))
+    std = jnp.maximum(std, eps)
+    # ``empty`` as well as ``degenerate``: with a negative ddof a dry
+    # cell has ``count == 0`` but ``denom > 0``, so it is not
+    # degenerate and would be handed ``eps`` instead of the identity.
+    return jnp.where(degenerate | empty, 1.0, std)
 
 
 def masked_moments(
