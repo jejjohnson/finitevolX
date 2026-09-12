@@ -28,7 +28,7 @@ Example
 from __future__ import annotations
 
 import jax.numpy as jnp
-from jaxtyping import Array, Float
+from jaxtyping import Array, Bool, Float
 
 from finitevolx._src.grid.base import (
     ArakawaCGrid2D,
@@ -391,3 +391,245 @@ def spherical_volume_mean(
 ) -> Float[Array, ""]:
     """Spherical volume-weighted mean."""
     return volume_mean(field, grid, mask)
+
+
+# ----------------------------------------------------------------------
+# Masked sample statistics
+# ----------------------------------------------------------------------
+
+#: Staggering locations whose mask a sample statistic may be taken at.
+#: ``"w"`` exists only on :class:`Mask3D`.
+_MASK_LOCATIONS: tuple[str, ...] = ("h", "u", "v", "xy_corner", "w")
+
+
+def _location_mask(
+    mask: Mask2D | Mask3D,
+    location: str,
+) -> Bool[Array, "..."]:
+    """Pick the boolean field of ``mask`` for a staggering location."""
+    if location not in _MASK_LOCATIONS:
+        raise ValueError(
+            f"masked statistics: unknown location {location!r}. "
+            f"Expected one of {_MASK_LOCATIONS}."
+        )
+    m = getattr(mask, location, None)
+    if m is None:
+        raise ValueError(
+            f"masked statistics: {type(mask).__name__} has no {location!r} "
+            "mask. (Only Mask3D carries a 'w' mask.)"
+        )
+    return m
+
+
+def _sample_counts(
+    samples: Float[Array, "N ..."],
+    mask: Mask2D | Mask3D | None,
+    location: str,
+    axis: int | tuple[int, ...],
+) -> tuple[Float[Array, "N ..."], Float[Array, "..."], Bool[Array, "..."] | None]:
+    """Mask-safe samples, per-output sample counts, and the wet indicator.
+
+    Returns ``(safe_samples, count, wet)`` where ``safe_samples`` has
+    dry entries replaced by ``0.0`` (so NaN/Inf land sentinels cannot
+    contaminate the reduction), ``count`` is the number of contributing
+    entries per output element, and ``wet`` is the broadcast boolean
+    mask (``None`` when no mask was supplied).
+    """
+    dtype = _accumulation_dtype(samples)
+    if mask is None:
+        # The count is the same everywhere, so take it from the shape
+        # rather than reducing an indicator array: materialising
+        # ``ones`` the size of an ``[N, Nz, Ny, Nx]`` stack can cost
+        # gigabytes of device memory for a number known statically.
+        axes = (axis,) if isinstance(axis, int) else tuple(axis)
+        count = 1
+        for reduced in axes:
+            count *= samples.shape[reduced]
+        return samples.astype(dtype), jnp.asarray(count, dtype=dtype), None
+
+    m = _location_mask(mask, location)
+    wet = jnp.broadcast_to(m, samples.shape)
+    safe = jnp.where(wet, samples, 0.0).astype(dtype)
+    count = jnp.sum(wet.astype(dtype), axis=axis)
+    return safe, count, wet
+
+
+def _accumulation_dtype(samples: Float[Array, "N ..."]) -> jnp.dtype:
+    """Floating dtype wide enough to accumulate ``samples`` safely.
+
+    At least float32.  A half-precision input is promoted rather than
+    accumulated in place: ``float16`` saturates at 65504, so a wet-cell
+    count over a 256x256 field overflows to ``inf`` and every mean it
+    divides silently collapses to zero.  Its ``eps**2`` variance floor
+    underflows to zero for the same reason, taking the documented
+    safe-to-divide guarantee with it.
+
+    Promoting is deliberate rather than a cast-back: at ``eps=1e-8``
+    the floor itself is below ``float16``'s smallest subnormal, so
+    there is no half-precision value that could carry the guarantee.
+    ``float32`` and ``float64`` inputs are returned unchanged.
+    """
+    return jnp.promote_types(jnp.asarray(samples).dtype, jnp.float32)
+
+
+def masked_mean(
+    samples: Float[Array, "N ..."],
+    mask: Mask2D | Mask3D | None = None,
+    *,
+    location: str = "h",
+    axis: int | tuple[int, ...] = 0,
+) -> Float[Array, "..."]:
+    """Mean over ``axis``, excluding dry cells.
+
+    With the default ``axis=0`` and a leading sample axis (time or
+    ensemble member) this is the per-gridpoint mean — the ``loc`` of a
+    standardising affine transform.  Pass ``axis=(0, -2, -1)`` for a
+    single scalar per field, in which case only wet cells enter both
+    the sum and the divisor.
+
+    Dry cells are zeroed via ``jnp.where(mask, x, 0.0)`` *before* the
+    reduction, so NaN/Inf sentinels stored on land cannot contaminate
+    wet-cell statistics — the same guarantee :func:`area_mean` gives.
+
+    Parameters
+    ----------
+    samples : Float[Array, "N ..."]
+        Stacked samples; the reduced axes are given by ``axis``.
+    mask : Mask2D or Mask3D or None, optional
+        Land/ocean mask, broadcast against the trailing axes of
+        ``samples``.  ``None`` means every cell is wet.
+    location : str, optional
+        Staggering location whose mask to use: ``"h"`` (default),
+        ``"u"``, ``"v"``, ``"xy_corner"``, or ``"w"`` (3-D only).
+    axis : int or tuple of int, optional
+        Axis or axes to reduce over.  Default ``0``.
+
+    Returns
+    -------
+    Float[Array, "..."]
+        The mean, in the input dtype or ``float32``, whichever is
+        wider — see :func:`_accumulation_dtype`.  ``0.0`` wherever no
+        wet sample contributed.
+        Zero — rather than NaN — so that the paired
+        ``(x - loc) / scale`` leaves a dry cell at zero and the inverse
+        map stays well defined.
+    """
+    safe, count, _ = _sample_counts(samples, mask, location, axis)
+    total = jnp.sum(safe, axis=axis)
+    empty = count == 0
+    return jnp.where(empty, 0.0, total / jnp.where(empty, 1.0, count))
+
+
+def masked_std(
+    samples: Float[Array, "N ..."],
+    mask: Mask2D | Mask3D | None = None,
+    *,
+    location: str = "h",
+    axis: int | tuple[int, ...] = 0,
+    eps: float = 1e-8,
+    ddof: int = 0,
+) -> Float[Array, "..."]:
+    """Standard deviation over ``axis``, excluding dry cells, floored at ``eps``.
+
+    Companion to :func:`masked_mean`: together they give the ``loc``
+    and ``scale`` of a per-gridpoint standardising transform.
+
+    The floor matters because a constant field — a spun-up layer
+    thickness, or any cell the dynamics never touch — has exactly zero
+    sample variance, and dividing by it would produce inf/NaN.  Dry
+    cells return ``1.0`` (an identity scale) rather than ``eps``, so
+    that a masked field round-trips unchanged through
+    ``(x - loc) / scale``.
+
+    Parameters
+    ----------
+    samples : Float[Array, "N ..."]
+    mask : Mask2D or Mask3D or None, optional
+    location : str, optional
+        See :func:`masked_mean`.
+    axis : int or tuple of int, optional
+    eps : float, optional
+        Lower bound on the returned standard deviation of a wet cell.
+        Default ``1e-8``. Applied to the standard deviation itself, so
+        any positive value is honoured exactly — including one whose
+        square would underflow the accumulation dtype.
+    ddof : int, optional
+        Delta degrees of freedom; the divisor is ``count - ddof``.
+        Default ``0``, matching :func:`jax.numpy.std`.
+
+    Returns
+    -------
+    Float[Array, "..."]
+        Standard deviation, at least ``eps`` on wet cells and exactly
+        ``1.0`` on dry cells or where too few samples contributed to
+        form the estimate.  In the input dtype or ``float32``,
+        whichever is wider — see :func:`_accumulation_dtype`.
+    """
+    safe, count, wet = _sample_counts(samples, mask, location, axis)
+    empty = count == 0
+
+    mean = jnp.where(
+        empty, 0.0, jnp.sum(safe, axis=axis) / jnp.where(empty, 1.0, count)
+    )
+    # ``jnp.expand_dims`` accepts a tuple, re-inserting every reduced
+    # axis as a size-1 dimension so the mean broadcasts back.
+    dev = safe - jnp.expand_dims(mean, axis)
+    # Re-zero dry entries: ``safe - mean`` is ``-mean`` on land, which
+    # would otherwise contribute to the variance of a spatial reduction.
+    if wet is not None:
+        dev = jnp.where(wet, dev, 0.0)
+
+    denom = count - ddof
+    degenerate = denom <= 0
+    var = jnp.sum(dev**2, axis=axis) / jnp.where(degenerate, 1.0, denom)
+
+    # Two separate jobs, done in two steps rather than one.
+    #
+    # ``sqrt`` has an infinite derivative at zero, so a constant field
+    # — exactly the case ``eps`` exists for — would come back with a
+    # NaN gradient. The doubled ``where`` is the standard remedy: the
+    # inner one keeps the zero away from ``sqrt`` on the backward pass,
+    # the outer one restores the exact zero on the forward pass. No
+    # value is lifted, so nothing is perturbed.
+    #
+    # Clamping the variance instead would be simpler but wrong twice
+    # over. ``eps**2`` underflows for a small floor — ``1e-30`` squares
+    # to ``1e-60``, which is zero in float32 — and the dtype's smallest
+    # normal imposes a second, invisible floor of ``sqrt(tiny)``, about
+    # ``1.1e-19``, so a requested ``eps`` below it could never be
+    # returned and real deviations beneath it would be inflated.
+    #
+    # The requested floor is applied to the standard deviation itself,
+    # where it is representable whatever its size. Where it binds, its
+    # gradient is zero.
+    positive = var > 0.0
+    std = jnp.where(positive, jnp.sqrt(jnp.where(positive, var, 1.0)), 0.0)
+    std = jnp.maximum(std, eps)
+    # ``empty`` as well as ``degenerate``: with a negative ddof a dry
+    # cell has ``count == 0`` but ``denom > 0``, so it is not
+    # degenerate and would be handed ``eps`` instead of the identity.
+    return jnp.where(degenerate | empty, 1.0, std)
+
+
+def masked_moments(
+    samples: Float[Array, "N ..."],
+    mask: Mask2D | Mask3D | None = None,
+    *,
+    location: str = "h",
+    axis: int | tuple[int, ...] = 0,
+    eps: float = 1e-8,
+    ddof: int = 0,
+) -> tuple[Float[Array, "..."], Float[Array, "..."]]:
+    """``(mean, std)`` in one call — see :func:`masked_mean`, :func:`masked_std`.
+
+    Returns
+    -------
+    tuple of Float[Array, "..."]
+        The mask-aware mean and the ``eps``-floored standard deviation,
+        which are exactly what :class:`StateAffine`-style standardising
+        transforms need as ``loc`` and ``scale``.
+    """
+    return (
+        masked_mean(samples, mask, location=location, axis=axis),
+        masked_std(samples, mask, location=location, axis=axis, eps=eps, ddof=ddof),
+    )
