@@ -296,3 +296,34 @@ class TestJitCompatibility:
         assert float(jax.jit(lambda g: g.max_aspect)(grid2d)) == pytest.approx(
             float(grid2d.max_aspect)
         )
+
+
+class TestGenuinelyNegativeWidths:
+    """A row past the pole is degenerate by a wide margin, not roundoff.
+
+    The near-zero tolerance alone would let such a width through and
+    make ``min_cell_width`` negative, which is exactly what a CFL guard
+    must never be handed.
+    """
+
+    def test_a_large_negative_width_is_degenerate(self):
+        grid = grid_with_cos([0.5, -0.25, 0.5, 0.5])
+        assert float(grid.min_cell_width) == 0.0
+
+    def test_its_aspect_is_infinite(self):
+        grid = grid_with_cos([0.5, -0.25, 0.5, 0.5])
+        assert np.isinf(float(grid.max_aspect))
+
+    def test_the_raw_metric_really_is_negative(self):
+        """So the reductions are doing the work, not the metric."""
+        grid = grid_with_cos([0.5, -0.25, 0.5, 0.5])
+        assert np.asarray(grid.dx_T)[1:-1, 1:-1].min() < 0.0
+
+    def test_min_cell_width_is_never_negative(self):
+        for degenerate_cos in (-0.9, -0.25, -4.371e-08, 0.0, 6.123234e-17):
+            grid = grid_with_cos([0.5, degenerate_cos, 0.5, 0.5])
+            assert float(grid.min_cell_width) >= 0.0
+
+    def test_positive_widths_are_still_kept(self):
+        grid = grid_with_cos([0.5, 0.25, 0.5, 0.5])
+        assert float(grid.min_cell_width) > 0.0

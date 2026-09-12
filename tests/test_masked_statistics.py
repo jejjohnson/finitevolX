@@ -291,3 +291,84 @@ class TestHalfPrecision:
         samples = jnp.ones((4, 4, 4), dtype=jnp.float32)
         assert masked_mean(samples).dtype == jnp.float32
         assert masked_std(samples).dtype == jnp.float32
+
+
+class TestTheFloorIsHonouredWhateverItsSize:
+    """Squaring the caller's floor is what breaks for a small one.
+
+    ``eps=1e-30`` squares to ``1e-60``, which underflows float32 to
+    zero — putting back the zero scale the floor exists to prevent.
+    """
+
+    def test_a_tiny_floor_is_still_applied(self):
+        samples = jnp.full((8, 4, 4), 2.0, dtype=jnp.float32)
+        std = masked_std(samples, axis=0, eps=1e-30)
+        assert float(jnp.min(std)) == pytest.approx(1e-30, rel=1e-6)
+
+    def test_its_square_really_would_underflow(self):
+        """Otherwise the test above would pass for the wrong reason."""
+        assert float(jnp.asarray(1e-30, dtype=jnp.float32) ** 2) == 0.0
+
+    def test_the_scale_stays_safe_to_divide_by(self):
+        samples = jnp.full((8, 4, 4), 2.0, dtype=jnp.float32)
+        std = masked_std(samples, axis=0, eps=1e-30)
+        assert np.isfinite(np.asarray(1.0 / std)).all()
+
+    def test_the_default_floor_is_unchanged(self):
+        samples = jnp.full((8, 4, 4), 2.0, dtype=jnp.float32)
+        assert float(jnp.min(masked_std(samples, axis=0))) == pytest.approx(1e-8)
+
+    def test_a_constant_field_still_has_a_finite_gradient(self):
+        """The reason the variance is lifted before the sqrt."""
+
+        def loss(x):
+            return jnp.sum(masked_std(x, axis=0) ** 2)
+
+        samples = jnp.full((8, 4, 4), 2.0, dtype=jnp.float32)
+        assert np.isfinite(np.asarray(jax.grad(loss)(samples))).all()
+
+    def test_a_varying_field_is_unaffected_by_the_lift(self):
+        rng = np.random.RandomState(0)
+        samples = jnp.asarray(rng.randn(16, 4, 4), dtype=jnp.float32)
+        got = masked_std(samples, axis=0)
+        expected = jnp.std(samples, axis=0)
+        np.testing.assert_allclose(np.asarray(got), np.asarray(expected), rtol=1e-5)
+
+
+class TestNegativeDdof:
+    """``count - ddof`` stays positive on a dry cell when ddof < 0.
+
+    The cell is then not "degenerate", so the identity scale that dry
+    cells are promised was replaced by ``eps``.
+    """
+
+    def mask(self):
+        wet = np.ones((4, 4), dtype=bool)
+        wet[1:3, 1:3] = False
+        return Mask2D.from_mask(jnp.asarray(wet)), ~wet
+
+    def test_dry_cells_keep_the_identity_scale(self):
+        mask, dry = self.mask()
+        samples = jnp.asarray(np.random.RandomState(0).randn(6, 4, 4))
+        std = masked_std(samples, mask, axis=0, ddof=-1)
+        np.testing.assert_allclose(np.asarray(std)[dry], 1.0)
+
+    def test_dry_cells_keep_a_zero_location(self):
+        mask, dry = self.mask()
+        samples = jnp.asarray(np.random.RandomState(0).randn(6, 4, 4))
+        mean = masked_mean(samples, mask, axis=0)
+        np.testing.assert_allclose(np.asarray(mean)[dry], 0.0)
+
+    def test_wet_cells_still_use_the_smaller_divisor(self):
+        """Negative ddof is mathematically valid, so it must still work."""
+        samples = jnp.asarray(np.random.RandomState(0).randn(6, 4, 4))
+        wider = masked_std(samples, axis=0, ddof=-1)
+        plain = masked_std(samples, axis=0, ddof=0)
+        assert float(jnp.max(wider)) < float(jnp.max(plain))
+
+    def test_the_default_ddof_is_unchanged(self):
+        mask, dry = self.mask()
+        samples = jnp.asarray(np.random.RandomState(0).randn(6, 4, 4))
+        np.testing.assert_allclose(
+            np.asarray(masked_std(samples, mask, axis=0))[dry], 1.0
+        )
