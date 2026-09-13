@@ -1,0 +1,3719 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Finite volume operators for JAX on Arakawa C-grids">
+      
+      
+        <meta name="author" content="Juan Emmanuel Johnson, Takaya Uchida">
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>finitevolX — Gap Analysis vs. MASSH (VarDyn branch) - finitevolX</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#finitevolx-gap-analysis-vs-massh-vardyn-branch" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="finitevolX" class="md-header__button md-logo" aria-label="finitevolX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            finitevolX
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              finitevolX — Gap Analysis vs. MASSH (VarDyn branch)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jejjohnson/finitevolX" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/finitevolX
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../cgrid_discretization/" class="md-tabs__link">
+          
+  
+  
+  C-Grid Discretization
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../masks/" class="md-tabs__link">
+          
+  
+  
+  Masks
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../multilayer_vs_3d/" class="md-tabs__link">
+          
+  
+  
+  Vertical Structure
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../stencils/" class="md-tabs__link">
+          
+  
+  
+  Raw Stencils
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../difference/" class="md-tabs__link">
+          
+  
+  
+  Difference Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../interpolation/" class="md-tabs__link">
+          
+  
+  
+  Interpolation Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../advection/" class="md-tabs__link">
+          
+  
+  
+  Advection
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../boundary_conditions/" class="md-tabs__link">
+          
+  
+  
+  Boundary Conditions
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../spatial_operators/" class="md-tabs__link">
+          
+  
+  
+  Spatial Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../time_integration/" class="md-tabs__link">
+          
+  
+  
+  Time Integration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../elliptic_solvers/" class="md-tabs__link">
+          
+  
+  
+  Elliptic Solvers
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../multigrid_solver/" class="md-tabs__link">
+          
+  
+  
+  Multigrid Solver
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../solver_comparison/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Solver Comparison
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../examples/" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../CHANGELOG/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="finitevolX" class="md-nav__button md-logo" aria-label="finitevolX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    finitevolX
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jejjohnson/finitevolX" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/finitevolX
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C-Grid Discretization
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    C-Grid Discretization
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cgrid_discretization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/grids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Masks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Masks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vertical Structure
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Vertical Structure
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../multilayer_vs_3d/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/vertical_modes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Raw Stencils
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Raw Stencils
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../stencils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/stencils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Difference Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Difference Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../difference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/difference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interpolation Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Interpolation Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advection
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advection
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../advection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/advection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/reconstruction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reconstruction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Boundary Conditions
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Boundary Conditions
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../boundary_conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/boundary_conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spatial Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Spatial Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../spatial_operators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/divergence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Divergence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/vorticity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vorticity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/diffusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diffusion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/coriolis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coriolis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/momentum/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Momentum Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time Integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Time Integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../time_integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../time_integration_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/time_integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Elliptic Solvers
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Elliptic Solvers
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../elliptic_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../elliptic_solvers_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/elliptic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convenience Wrappers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/spectral_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/spectral_transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral Transforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/capacitance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacitance Method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/iterative/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Iterative Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multigrid Solver
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Multigrid Solver
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../multigrid_solver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../multigrid_solver_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/multigrid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../solver_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Solver Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_15" >
+        
+          
+          <label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_15">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/demo_masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Masks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/demo_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Elliptic Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/pressure_poisson/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pressure Poisson
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/streamfunction_inversion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streamfunction Inversion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/helmholtz_screening/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Helmholtz Screening
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/advection_1d_schemes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1-D Advection Schemes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/advection_2d_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2-D Rotating Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/advection_2d_masked/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2-D Masked Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/swm_linear/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linear Shallow Water
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/shallow_water/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nonlinear Shallow Water
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/qg_1p5_layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.5-Layer QG
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../CHANGELOG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#0-what-is-not-a-gap-so-you-dont-re-scope-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0. What is NOT a gap (so you don't re-scope it)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-rusanov-local-laxfriedrichs-flux-for-the-continuity-equation-real-gap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Rusanov / local Lax–Friedrichs flux for the continuity equation (real gap)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Rusanov / local Lax–Friedrichs flux for the continuity equation (real gap)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#math" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Math
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#massh-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MASSH reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#proposed-finitevolx-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed finitevolX API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-upwind-vorticity-flux-operator-a-public-al81-free-function-narrowed-gap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Upwind vorticity-flux operator + a public AL81 free function (narrowed gap)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Upwind vorticity-flux operator + a public AL81 free function (narrowed gap)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-actually-missing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is actually missing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#math_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Math
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#massh-reference-the-upwind-variant-the-parity-target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MASSH reference (the upwind variant — the parity target)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#proposed-finitevolx-api_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed finitevolX API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-barotropic-mode-external-gravity-wave-filter-split-operator-gap-infrastructure-present" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Barotropic-mode (external gravity wave) filter / split (operator gap; infrastructure present)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Barotropic-mode (external gravity wave) filter / split (operator gap; infrastructure present)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#math_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Math
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#massh-reference_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MASSH reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#proposed-finitevolx-api_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed finitevolX API
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-linear-drag-and-rayleigh-sponge-relaxation-operators-real-gap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Linear drag and Rayleigh-sponge relaxation operators (real gap)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Linear drag and Rayleigh-sponge relaxation operators (real gap)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#math_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Math
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#massh-reference_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MASSH reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#proposed-finitevolx-api_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed finitevolX API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-differentiable-positivity-monotonicity-guards-real-gap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Differentiable positivity / monotonicity guards (real gap)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Differentiable positivity / monotonicity guards (real gap)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#math_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Math
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#massh-reference_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MASSH reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#proposed-finitevolx-api_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed finitevolX API
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-cross-cutting-note-the-relaxationnudging-primitive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Cross-cutting note: the relaxation/nudging primitive
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#suggested-ordering-for-finitevolx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suggested ordering for finitevolX
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="finitevolx-gap-analysis-vs-massh-vardyn-branch">finitevolX — Gap Analysis vs. MASSH (VarDyn branch)</h1>
+<p><strong>Scope:</strong> primitives and operators only. Reference: <code>leguillf/MASSH@VarDyn</code>, model cores
+<code>mapping/models/model_qgsw/</code> (shallow-water) and <code>mapping/models/model_qg1l/</code> (QG1L).
+<strong>Date:</strong> 2026-06-05.</p>
+<p>This document is self-contained: each gap states the math, shows the MASSH reference
+implementation (with <code>file:line</code>), proposes a <code>finitevolx</code> API, and gives a worked example.
+The proposals are written against the existing Arakawa-C-grid / Equinox style in
+<code>finitevolx/_src/operators/</code> and <code>_src/advection/</code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Provenance of references</p>
+<p>The finitevolX-side claims in this doc were <strong>verified against the local source on <code>main</code></strong>
+(version <code>0.0.42</code>, 2026-06-05) with concrete <code>file:line</code> citations and verbatim signatures.
+The MASSH <code>file:line</code> citations come from the upstream <code>VarDyn</code> branch and were <strong>not</strong>
+re-verified — treat them as pointers, not exact-line guarantees.</p>
+</div>
+<div class="admonition important">
+<p class="admonition-title">Two conventions this doc corrects relative to an earlier draft</p>
+<ol>
+<li><strong>The public API is flat, not namespaced.</strong> <code>finitevolx/__init__.py</code> re-exports every
+   symbol at the top level (<code>fvx.divergence_2d</code>, <code>fvx.Advection2D</code>, <code>fvx.MomentumAdvection2D</code>).
+   There are <strong>no</strong> <code>fvx.operators.*</code> / <code>fvx.advection.*</code> submodule namespaces — the earlier
+   draft's <code>fvx.operators.divergence_2d(...)</code> / <code>fvx.advection.rusanov_flux(...)</code> would raise
+   <code>AttributeError</code>. All examples below use the real flat form.</li>
+<li><strong>The energy/enstrophy-conserving SW vorticity scheme already exists</strong> (see §2). The earlier
+   draft listed Arakawa–Lamb (1981) as the headline gap; it is in fact implemented. The
+   residual §2 gap is narrower.</li>
+</ol>
+</div>
+<hr />
+<h2 id="0-what-is-not-a-gap-so-you-dont-re-scope-it">0. What is NOT a gap (so you don't re-scope it)</h2>
+<p>Confirmed present in finitevolX, equal to or stronger than MASSH (paths verified):</p>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>finitevolX (verified)</th>
+<th>MASSH equivalent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Conservative Arakawa Jacobian (1966)</td>
+<td><code>operators/jacobian.py:22</code> <code>arakawa_jacobian</code></td>
+<td>— (MASSH uses upwind vort. advection only)</td>
+</tr>
+<tr>
+<td>WENO 3/5/7/9 (+ one-sided <code>_right</code>)</td>
+<td><code>advection/weno.py:297–666</code>, <code>advection/reconstruction.py</code></td>
+<td><code>reconstruction.py</code> WENO-Z 4/6 only</td>
+</tr>
+<tr>
+<td>Flux limiters (minmod / van_leer / superbee / mc)</td>
+<td><code>advection/limiters.py:34–123</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>C-grid PV (single + multilayer)</td>
+<td><code>operators/diagnostics.py</code> <code>potential_vorticity:150</code>, <code>sw_potential_vorticity:828</code>, <code>sw_potential_vorticity_multilayer:873</code></td>
+<td>scattered in <code>sw.py</code></td>
+</tr>
+<tr>
+<td>KE / Bernoulli / Okubo–Weiss / enstrophy</td>
+<td><code>operators/diagnostics.py</code> <code>kinetic_energy:35</code>, <code>bernoulli_potential:76</code>, <code>okubo_weiss:274</code>, <code>enstrophy:308</code>, <code>potential_enstrophy:332</code></td>
+<td><code>finite_diff.py::comp_ke</code> only</td>
+</tr>
+<tr>
+<td><strong>Energy/enstrophy-conserving SW vortex-force</strong></td>
+<td><code>operators/vorticity.py:202</code> <code>Vorticity2D.pv_flux_arakawa_lamb</code> (+ <code>pv_flux_energy_conserving:128</code>, <code>pv_flux_enstrophy_conserving:163</code>); <code>diffusion/momentum.py:35</code> <code>MomentumAdvection2D</code> (Sadourny E/Z + AL81 blend)</td>
+<td>dissipative upwind only</td>
+</tr>
+<tr>
+<td>Elliptic stack (CG, capacitance, MG, spectral) + PV inversion</td>
+<td><code>_src/solvers/*</code> (incl. <strong>variable-coefficient</strong> multigrid <code>∇·(c∇u)</code>)</td>
+<td><code>helmholtz.py</code>, <code>helmholtz_multigrid.py</code></td>
+</tr>
+<tr>
+<td>Split-explicit barotropic/baroclinic time-stepping</td>
+<td><code>timestepping/split_explicit.py:23</code> <code>split_explicit_step</code></td>
+<td>barotropic <em>filter</em> (§3)</td>
+</tr>
+<tr>
+<td>SSP-RK3 (functional + diffrax)</td>
+<td><code>timestepping/explicit_rk.py:70</code> <code>rk3_ssp_step</code>; <code>timestepping/diffrax_solvers.py:102</code> <code>RK3SSP</code></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>So the gaps below are genuinely net-new operators, <strong>not</strong> reimplementations — with the
+important caveat that §2 is narrower than the earlier draft claimed.</p>
+<hr />
+<h2 id="1-rusanov-local-laxfriedrichs-flux-for-the-continuity-equation-real-gap">1. Rusanov / local Lax–Friedrichs flux for the continuity equation  <em>(real gap)</em></h2>
+<p><strong>Status: genuine gap.</strong> No Rusanov / local Lax–Friedrichs / smooth-abs flux exists anywhere in
+<code>advection/</code> (<code>face_flux.py</code>, <code>flux.py</code>, <code>linear.py</code> checked; grep for <code>rusanov</code>/<code>lax</code>/<code>llf</code>
+returns nothing).</p>
+<h3 id="why">Why</h3>
+<p>The continuity/height flux path is reconstruction-based (WENO). MASSH keeps a separate
+<strong>first-order monotone Rusanov flux</strong> for <code>h</code> because WENO's nonlinear smoothness weights make
+the <em>adjoint</em> fragile — the differentiable-DA use case. A Rusanov flux is the standard robust
+fallback and a low-dissipation-budget baseline.</p>
+<h3 id="math">Math</h3>
+<p>For a conserved scalar <code>q</code> advected at face velocity <code>a</code> across face <code>i+½</code>, the local
+Lax–Friedrichs (Rusanov) numerical flux is</p>
+<div class="arithmatex">\[
+F_{i+\frac12} = \tfrac12\,a\,(q_L + q_R) - \tfrac12\,|a|\,(q_R - q_L),
+\]</div>
+<p>where <code>q_L, q_R</code> are the cell values either side of the face and <code>|a|</code> is the local maximum
+wave speed (here <code>|a|</code>). The dissipation term <code>½|a|(q_R−q_L)</code> makes it monotone. For AD
+stability the absolute value is replaced by the smooth surrogate <code>|a| ≈ √(a²+ε²)</code> (the
+<code>smooth_abs</code> of §5).</p>
+<h3 id="massh-reference">MASSH reference</h3>
+<p><code>mapping/models/model_qgsw/sw.py:674</code> — <code>_h_flux_rusanov1</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">_h_flux_rusanov1</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">h_tot_phys</span><span class="p">,</span> <span class="n">velocity</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="c1"># First-order conservative Rusanov flux for h-continuity. Monotone;</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="c1"># avoids WENO smoothness weights, which make adjoints fragile.</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">h_left</span><span class="p">,</span> <span class="n">h_right</span> <span class="o">=</span> <span class="p">((</span><span class="n">h_tot_phys</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">h_tot_phys</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">1</span><span class="p">:])</span> <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                       <span class="k">else</span> <span class="p">(</span><span class="n">h_tot_phys</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:],</span> <span class="n">h_tot_phys</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:,</span> <span class="p">:]))</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">speed</span> <span class="o">=</span> <span class="n">smooth_abs</span><span class="p">(</span><span class="n">velocity</span><span class="p">)</span>                       <span class="c1"># √(v²+ε²)</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="k">return</span> <span class="mf">0.5</span><span class="o">*</span><span class="n">velocity</span><span class="o">*</span><span class="p">(</span><span class="n">h_left</span><span class="o">+</span><span class="n">h_right</span><span class="p">)</span> <span class="o">-</span> <span class="mf">0.5</span><span class="o">*</span><span class="n">speed</span><span class="o">*</span><span class="p">(</span><span class="n">h_right</span><span class="o">-</span><span class="n">h_left</span><span class="p">)</span>
+</code></pre></div>
+<p>with <code>smooth_abs</code> at <code>mapping/models/model_qgsw/reconstruction.py:15</code>.</p>
+<h3 id="proposed-finitevolx-api">Proposed finitevolX API</h3>
+<p>Add to <code>finitevolx/_src/advection/face_flux.py</code> (it already holds <code>uv_center_flux</code>,
+<code>uv_node_flux</code>; the upwind path lives in <code>flux.py::upwind_flux</code>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">rusanov_flux</span><span class="p">(</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">q</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;...&quot;</span><span class="p">],</span>          <span class="c1"># cell-centered scalar (h-grid)</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">a</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;...&quot;</span><span class="p">],</span>          <span class="c1"># face-normal velocity on the same axis</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">axis</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">eps</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-8</span><span class="p">,</span>               <span class="c1"># smooth-abs floor; set 0 for hard |a|</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;...&quot;</span><span class="p">]:</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Local Lax–Friedrichs (Rusanov) flux at faces along `axis`.</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="sd">    F = ½ a (q_L + q_R) − ½ |a|_eps (q_R − q_L),  |a|_eps = sqrt(a² + eps²).</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="sd">    Returns the flux on the (N−1) interior faces along `axis`.</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="sd">    &quot;&quot;&quot;</span>
+</code></pre></div>
+<p>Re-export it flat in <code>finitevolx/__init__.py</code> (and add to <code>__all__</code>), exactly like the existing
+<code>uv_center_flux</code> / <code>divergence_2d</code>. Keep <code>eps</code> exposed: <code>eps=0</code> recovers the textbook flux;
+<code>eps&gt;0</code> is the AD-safe variant.</p>
+<div class="admonition warning">
+<p class="admonition-title">Reduced-shape output — <code>divergence_2d</code> does not apply directly</p>
+<p><code>rusanov_flux</code> returns the <code>N−1</code> face values along <code>axis</code> (e.g. <code>(Ny, Nx−1)</code> for
+<code>axis=-1</code>), <strong>not</strong> a full ghost-padded C-grid array. finitevolX's <code>divergence_2d</code>
+expects both inputs to be full <code>[Ny, Nx]</code> arrays with the ghost ring (it takes
+<code>diff_x_bwd</code>/<code>diff_y_bwd</code> internally), so it cannot consume the reduced output.
+Take the continuity divergence by differencing the faces along the same axis (see
+the example), or embed the fluxes into ghost-padded arrays first.</p>
+</div>
+<h3 id="example">Example</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">finitevolx</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">fvx</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">h</span>  <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>                                   <span class="c1"># (Ny, Nx) on h-grid</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">u</span>  <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>                                   <span class="c1"># face-normal velocity, x-faces</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">v</span>  <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>                                   <span class="c1"># face-normal velocity, y-faces</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">Fx</span> <span class="o">=</span> <span class="n">fvx</span><span class="o">.</span><span class="n">rusanov_flux</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-8</span><span class="p">)</span>        <span class="c1"># (Ny, Nx-1) east-face flux</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">Fy</span> <span class="o">=</span> <span class="n">fvx</span><span class="o">.</span><span class="n">rusanov_flux</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">2</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-8</span><span class="p">)</span>        <span class="c1"># (Ny-1, Nx) north-face flux</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="c1"># Continuity tendency at interior T-cells (reduced-shape divergence of the faces):</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="n">dhdt</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="n">dhdt</span> <span class="o">=</span> <span class="n">dhdt</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    <span class="o">-</span><span class="p">(</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>        <span class="p">(</span><span class="n">Fx</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:]</span> <span class="o">-</span> <span class="n">Fx</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="n">dx</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>        <span class="o">+</span> <span class="p">(</span><span class="n">Fy</span><span class="p">[</span><span class="mi">1</span><span class="p">:,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">Fy</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="n">dy</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="p">)</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="2-upwind-vorticity-flux-operator-a-public-al81-free-function-narrowed-gap">2. Upwind vorticity-flux operator + a public AL81 free function  <em>(narrowed gap)</em></h2>
+<div class="admonition warning">
+<p class="admonition-title">The conservative scheme already exists</p>
+<p>The earlier draft listed the Arakawa–Lamb (1981) energy- and enstrophy-conserving SW scheme
+as the headline gap. <strong>It is already implemented</strong> in finitevolX:
+<code>operators/vorticity.py:202</code> <code>Vorticity2D.pv_flux_arakawa_lamb</code> (a weighted blend of
+<code>pv_flux_energy_conserving:128</code> and <code>pv_flux_enstrophy_conserving:163</code>), and the
+momentum-level operator <code>diffusion/momentum.py:35</code> <code>MomentumAdvection2D</code> offers the Sadourny
+(1975) E-scheme, Z-scheme, and the AL81 blend via a <code>scheme=</code> argument — citing
+<em>Arakawa &amp; Lamb (1981), MWR 109, 18–36</em> in its docstring. Both are in the public <code>__all__</code>.</p>
+</div>
+<h3 id="what-is-actually-missing">What is actually missing</h3>
+<ol>
+<li><strong>The MASSH-parity <em>upwind</em> vorticity flux</strong> (<code>_omega_adv_upwind3/5</code>) — a <em>dissipative</em>
+   reconstruction of (absolute) vorticity for the vortex-force term. finitevolX has the
+   <em>conserving</em> schemes but no upwind vorticity-advection operator (grep <code>vorticity_flux</code>,
+   <code>omega_adv</code> → nothing public). Useful as a robust, cheap baseline and for parity with MASSH.</li>
+<li><strong>A public free-function wrapper</strong> for the AL81 flux. Today it is a <em>method</em> on <code>Vorticity2D</code>;
+   a thin <code>pv_flux_arakawa_lamb(q, U, V, alpha=1/3)</code> free function (matching the <code>divergence_2d</code>
+   style) would make it reachable without instantiating the class.</li>
+</ol>
+<h3 id="math_1">Math</h3>
+<p>In vector-invariant SW the momentum tendency carries <code>q (k × (h u))</code> with <code>q = (ζ+f)/h</code> and
+mass flux <code>h u</code>. Arakawa–Lamb (1981) discretize this so the operator conserves total energy and
+total potential enstrophy simultaneously; the upwind alternative instead reconstructs vorticity
+at faces with an order-3/5 upwind stencil (dissipative). MASSH advects <em>absolute</em> vorticity
+<code>ω+f</code> (it folds <code>f</code> into the PV); AL81 does the same with <code>q=(ζ+f)/h</code>.</p>
+<h3 id="massh-reference-the-upwind-variant-the-parity-target">MASSH reference (the upwind variant — the parity target)</h3>
+<p><code>mapping/models/model_qgsw/sw.py:753</code> — <code>_omega_adv_upwind3</code> (3rd-order upwind on corners):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">#   vel &gt; 0: omega_face = (-omega[j-1] + 5*omega[j]   + 2*omega[j+1]) / 6</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1">#   vel &lt; 0: omega_face = ( 2*omega[j] + 5*omega[j+1] -   omega[j+2]) / 6</span>
+</code></pre></div>
+<p>used at <code>sw.py:690</code> <code>advection_momentum</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">omega_Vm</span><span class="p">,</span> <span class="n">omega_Um</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_omega_adv_upwind3</span><span class="p">(</span><span class="n">omega</span><span class="p">,</span> <span class="n">U_m</span><span class="p">,</span> <span class="n">V_m</span><span class="p">)</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">dt_u</span> <span class="o">=</span>  <span class="n">omega_Vm</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">fstar_ugrid</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">*</span> <span class="n">V_m</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">dt_v</span> <span class="o">=</span> <span class="o">-</span><span class="p">(</span><span class="n">omega_Um</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">fstar_vgrid</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>   <span class="o">*</span> <span class="n">U_m</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="proposed-finitevolx-api_1">Proposed finitevolX API</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># finitevolx/_src/operators/vorticity.py  (alongside Vorticity2D)</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">vorticity_flux_upwind</span><span class="p">(</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">omega</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny1 Nx1&quot;</span><span class="p">],</span>   <span class="c1"># absolute vorticity on cell corners (q-grid)</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">U</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx1&quot;</span><span class="p">],</span>        <span class="c1"># mass flux on u-faces  (h·u)</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">V</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny1 Nx&quot;</span><span class="p">],</span>        <span class="c1"># mass flux on v-faces  (h·v)</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">order</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>                   <span class="c1"># 3 or 5</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx1&quot;</span><span class="p">],</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny1 Nx&quot;</span><span class="p">]]:</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Upwind vortex-force fluxes (omega_V on u-eqn, omega_U on v-eqn).</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="sd">    Matches MASSH sw.py::_omega_adv_upwind{3,5}. Dissipative.&quot;&quot;&quot;</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="k">def</span><span class="w"> </span><span class="nf">pv_flux_arakawa_lamb</span><span class="p">(</span>                 <span class="c1"># thin free-function wrapper over the existing method</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>    <span class="n">q</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny1 Nx1&quot;</span><span class="p">],</span> <span class="n">U</span><span class="p">,</span> <span class="n">V</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">alpha</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="mf">3.0</span><span class="p">,</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx1&quot;</span><span class="p">],</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny1 Nx&quot;</span><span class="p">]]:</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Public free-function form of Vorticity2D.pv_flux_arakawa_lamb (AL81).&quot;&quot;&quot;</span>
+</code></pre></div>
+<p>Ship the conservation property as a <strong>test</strong>, not a promise: an <code>enstrophy_conservation_residual</code>
+diagnostic that shows <code>d/dt Σ ½ h q² → 0</code> to round-off in a closed basin. Use the
+<em>thickness-weighted</em> potential enstrophy <code>Σ ½ h q²</code> — the physical shallow-water invariant
+Arakawa–Lamb conserves — <strong>not</strong> the unweighted <code>Σ q²/2</code>, which a correct flux need not conserve
+when <code>h</code> varies in space. The existing <code>potential_enstrophy(q, h)</code> (<code>diagnostics.py:332</code>, returns
+<code>0.5 * q² * h</code>) already takes the thickness field, so build the check on it directly.</p>
+<h3 id="example_1">Example</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">finitevolx</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">fvx</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="c1"># conserving form via the existing class (works today):</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">vort</span> <span class="o">=</span> <span class="n">fvx</span><span class="o">.</span><span class="n">Vorticity2D</span><span class="p">(</span><span class="n">grid</span><span class="o">=</span><span class="n">grid</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">pv</span>   <span class="o">=</span> <span class="n">fvx</span><span class="o">.</span><span class="n">sw_potential_vorticity</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">)</span>        <span class="c1"># existing diagnostic</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">U</span><span class="p">,</span> <span class="n">V</span> <span class="o">=</span> <span class="n">h_u</span> <span class="o">*</span> <span class="n">u</span><span class="p">,</span> <span class="n">h_v</span> <span class="o">*</span> <span class="n">v</span>                                      <span class="c1"># mass fluxes</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">CAu</span><span class="p">,</span> <span class="n">CAv</span> <span class="o">=</span> <span class="n">vort</span><span class="o">.</span><span class="n">pv_flux_arakawa_lamb</span><span class="p">(</span><span class="n">pv</span><span class="p">,</span> <span class="n">U</span><span class="p">,</span> <span class="n">V</span><span class="p">)</span>               <span class="c1"># energy+enstrophy conserving</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="c1"># or the MASSH-parity dissipative baseline (the §2 gap):</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="n">omega_V</span><span class="p">,</span> <span class="n">omega_U</span> <span class="o">=</span> <span class="n">fvx</span><span class="o">.</span><span class="n">vorticity_flux_upwind</span><span class="p">(</span><span class="n">omega_abs</span><span class="p">,</span> <span class="n">U</span><span class="p">,</span> <span class="n">V</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="3-barotropic-mode-external-gravity-wave-filter-split-operator-gap-infrastructure-present">3. Barotropic-mode (external gravity wave) filter / split  <em>(operator gap; infrastructure present)</em></h2>
+<div class="admonition note">
+<p class="admonition-title">The hard parts already exist</p>
+<p>finitevolX already has (a) <strong>variable-coefficient</strong> multigrid for <code>∇·(c∇u) − λu = rhs</code>
+(<code>solvers/multigrid.py</code>, factory <code>build_multigrid_solver(..., coeff=...)</code>; the per-face
+coefficients are <code>cx</code>/<code>cy</code> from <code>_interpolate_coeff_to_faces</code>, <strong>not</strong> the
+<code>coef_ugrid</code>/<code>coef_vgrid</code> the earlier draft named), and (b) a <strong>split-explicit</strong>
+barotropic/baroclinic time-stepper (<code>timestepping/split_explicit.py:23</code> <code>split_explicit_step</code>)
+plus vertical-mode decomposition (<code>vertical/vertical_modes.py</code>). What is missing is the
+specific <em>implicit barotropic filter operator</em>; the solver and the mode machinery it needs
+are already there, so this is <strong>wiring + one operator</strong>, not new solver math.</p>
+</div>
+<h3 id="why_1">Why</h3>
+<p>For multi-layer SW the external gravity wave sets a punishing CFL. MASSH includes an implicit
+barotropic filter that solves a Helmholtz problem for the barotropic surface mode each step and
+subtracts its fast component, letting you take baroclinic-scale time steps.</p>
+<h3 id="math_2">Math</h3>
+<p>Split the depth-averaged (barotropic) velocity <code>ū = Σ_k h_k u_k / Σ_k h_k</code>. The fast
+surface-mode correction <code>w</code> solves a variable-coefficient Helmholtz/Poisson problem</p>
+<div class="arithmatex">\[
+\frac{1}{g\,\tau\,\Delta t}\,\nabla\!\cdot(h\,\bar{u}^{*}) \;=\; \nabla\!\cdot(h\,\nabla w),
+\qquad
+\mathrm{filt}_u = -g\,\tau\,\partial_x w,\quad \mathrm{filt}_v = -g\,\tau\,\partial_y w,
+\]</div>
+<p>added back to the momentum tendency so the divergent fast part is treated implicitly. <code>τ</code> is an
+implicitness/relaxation parameter.</p>
+<h3 id="massh-reference_1">MASSH reference</h3>
+<p><code>mapping/models/model_qgsw/sw.py:1019</code> — <code>filter_barotropic_waves</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">u_bar_star</span> <span class="o">=</span> <span class="p">(</span><span class="n">u_star</span><span class="o">*</span><span class="n">h_tot_ugrid</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="n">keepdims</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">/</span><span class="n">h_tot_ugrid</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="n">keepdims</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">v_bar_star</span> <span class="o">=</span> <span class="p">(</span><span class="n">v_star</span><span class="o">*</span><span class="n">h_tot_vgrid</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="n">keepdims</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">/</span><span class="n">h_tot_vgrid</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="n">keepdims</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">rhs</span> <span class="o">=</span> <span class="mf">1.</span><span class="o">/</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">g</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">dt</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">tau</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span> <span class="n">jnp</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">h_tot_ugrid</span><span class="o">*</span><span class="n">u_bar_star</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">)</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">dx</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>                                     <span class="o">+</span> <span class="n">jnp</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">h_tot_vgrid</span><span class="o">*</span><span class="n">v_bar_star</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">dy</span> <span class="p">)</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">w_surf_imp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">helm_solver</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">coef_ugrid</span><span class="p">,</span> <span class="n">coef_vgrid</span><span class="p">)</span>   <span class="c1"># variable-coef Helmholtz</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">filt_u</span> <span class="o">=</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">g</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">tau</span><span class="o">*</span><span class="n">jnp</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">w_surf_imp</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">)</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="n">filt_v</span> <span class="o">=</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">g</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">tau</span><span class="o">*</span><span class="n">jnp</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">w_surf_imp</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="k">return</span> <span class="n">dt_u</span><span class="o">+</span><span class="n">filt_u</span><span class="p">,</span> <span class="n">dt_v</span><span class="o">+</span><span class="n">filt_v</span><span class="p">,</span> <span class="n">dt_h</span>
+</code></pre></div>
+<p>(Inspired by Dukowicz &amp; Smith free-surface split, <code>doi:10.1029/2000JC900089</code>.)</p>
+<h3 id="proposed-finitevolx-api_2">Proposed finitevolX API</h3>
+<p>A model-level operator that calls the <em>existing</em> variable-coef multigrid:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># finitevolx/_src/operators/barotropic.py</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">barotropic_filter</span><span class="p">(</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">u_star</span><span class="p">,</span> <span class="n">v_star</span><span class="p">,</span>                  <span class="c1"># provisional velocities (after explicit RHS)</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">h_u</span><span class="p">,</span> <span class="n">h_v</span><span class="p">,</span>                        <span class="c1"># layer thickness on u-/v-faces</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="o">*</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">g</span><span class="p">,</span> <span class="n">tau</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="n">helm_solve</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>            <span class="c1"># the solver itself, e.g. build_multigrid_solver(..., coeff=h)</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="n">Array</span><span class="p">]:</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Subtract the implicit external-gravity-wave (barotropic) mode.</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="sd">    Returns (filt_u, filt_v) tendency corrections. See MASSH sw.py:1019.</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="sd">    The variable-coef Helmholtz ∇·(h∇w) is provided by the existing</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="sd">    multigrid solver (build_multigrid_solver(coeff=...)).&quot;&quot;&quot;</span>
+</code></pre></div>
+<p><code>helm_solve</code> is <strong>called as a plain callable</strong> (<code>helm_solve(rhs)</code>). Pass the
+<code>MultigridSolver</code> <em>object</em> returned by <code>build_multigrid_solver(...)</code> — it is callable via
+<code>__call__</code> (there is no <code>.solve</code> method; the other entry points are <code>solve_onestep</code> /
+<code>solve_unrolled</code>).</p>
+<div class="admonition warning">
+<p class="admonition-title">Coefficient is frozen at solver-construction time</p>
+<p><code>build_multigrid_solver(coeff=h)</code> converts <code>coeff</code> to NumPy, interpolates it to the
+staggered face coefficients <code>cx</code>/<code>cy</code>, and <strong>freezes</strong> them in the level hierarchy when
+the solver is built. MASSH, by contrast, passes the current <code>coef_ugrid</code>/<code>coef_vgrid</code>
+into every solve. So a prebuilt <code>helm_solve</code> is only correct when the barotropic
+coefficient is <strong>time-invariant</strong>. If <code>h_u</code>/<code>h_v</code> evolve, either (a) treat the
+coefficient as fixed (a common, well-justified barotropic-mode approximation), or
+(b) rebuild the solver each step (cheap relative to the solve), or (c) extend the
+solver with a per-step-coefficient interface. The signature above assumes (a)/(b).</p>
+</div>
+<p>So this gap is <strong>a thin operator over an existing solver</strong>, not new elliptic machinery. (It is
+the same variable-coef use-case flagged on the spectraldiffx side; finitevolX is the better home
+because its multigrid already does <code>∇·(c∇u)</code>.)</p>
+<hr />
+<h2 id="4-linear-drag-and-rayleigh-sponge-relaxation-operators-real-gap">4. Linear drag and Rayleigh-sponge relaxation operators  <em>(real gap)</em></h2>
+<p><strong>Status: genuine gap.</strong> Grep for <code>linear_drag</code>, <code>bottom_drag</code>, <code>rayleigh</code>, <code>relaxation</code>,
+<code>sponge</code>, <code>nudg</code>, <code>restoring</code> across <code>_src/</code> finds only (a) the multigrid Jacobi-smoother
+"relaxation" weight (unrelated) and (b) a 1-D <code>Sponge1D</code> boundary condition (<code>boundary/bc_1d.py</code>)
+— <strong>no 2-D relaxation/drag tendency operator</strong>. The diffusion module (<code>Diffusion2D</code>,
+<code>BiharmonicDiffusion2D</code>) provides Laplacian/biharmonic dissipation but no linear drag.</p>
+<h3 id="why_2">Why</h3>
+<p>MASSH treats <strong>bottom drag</strong>, <strong>sponge/Rayleigh damping</strong>, and <strong>BC nudging</strong> as first-class RHS
+terms. These are needed for closed-basin spin-down, sponge boundaries, and BFN, and they are the
+cross-cutting "nudging primitive" of §6.</p>
+<h3 id="math_3">Math</h3>
+<ul>
+<li>Linear (Rayleigh) bottom drag on the lowest layer: <code>∂_t u_N += −r u_N</code>.</li>
+<li>Sponge/relaxation toward a reference <code>X_ref</code> with a spatial weight <code>W∈[0,1]</code>:
+  <code>∂_t X += −γ W (X − X_ref)</code>.</li>
+</ul>
+<h3 id="massh-reference_2">MASSH reference</h3>
+<p>Bottom drag, <code>mapping/models/model_qgsw/sw.py:967</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">add_bottom_drag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">du</span><span class="p">,</span> <span class="n">dv</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">):</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="n">du</span> <span class="o">=</span> <span class="n">du</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">du</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">bottom_drag_coef</span><span class="o">*</span><span class="n">u</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:])</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="n">dv</span> <span class="o">=</span> <span class="n">dv</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">dv</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">bottom_drag_coef</span><span class="o">*</span><span class="n">v</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="k">return</span> <span class="n">du</span><span class="p">,</span> <span class="n">dv</span>
+</code></pre></div>
+<p>Sponge nudging in QG1L (<code>mapping/models/model_qg1l/jqgm.py</code>): <code>sponge_coef * Wbc * (Xb − X)</code>,
+with <code>Wbc</code> a boundary weight map.</p>
+<h3 id="proposed-finitevolx-api_3">Proposed finitevolX API</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># finitevolx/_src/operators/relaxation.py</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">linear_drag</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">coef</span><span class="p">,</span> <span class="n">layer</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="n">Array</span><span class="p">]:</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Rayleigh bottom drag −coef·u on the chosen layer (default deepest).&quot;&quot;&quot;</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">rayleigh_relaxation</span><span class="p">(</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="n">x</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="n">x_ref</span><span class="p">:</span> <span class="n">Array</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">coef</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">weight</span><span class="p">:</span> <span class="n">Array</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Array</span><span class="p">:</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Sponge/relaxation tendency −coef·weight·(x − x_ref).</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="sd">    `weight` is a [0,1] spatial map. One operator behind sponge layers, BC</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="sd">    forcing, BFN nudging, and tracer restoring. MASSH: jqgm.py sponge term.&quot;&quot;&quot;</span>
+</code></pre></div>
+<p>Re-export both flat in <code>__init__.py</code>. <code>rayleigh_relaxation</code> is the single operator behind sponge
+layers, BC forcing, BFN nudging, and tracer restoring — define once, reuse everywhere.</p>
+<div class="admonition note">
+<p class="admonition-title">This is the operator the somax tracer-transport gap needs</p>
+<p>The companion somax gap analysis flags <code>forcing_tracer_from_bc</code> and notes that no
+<code>rayleigh_relaxation</code> op exists anywhere yet. <strong>This §4 is that operator's home.</strong> Landing it
+here unblocks tracer-to-BC nudging in somax without per-model bespoke code.</p>
+</div>
+<h3 id="example_2">Example</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">finitevolx</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">fvx</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">du</span><span class="p">,</span> <span class="n">dv</span> <span class="o">=</span> <span class="n">fvx</span><span class="o">.</span><span class="n">linear_drag</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">coef</span><span class="o">=</span><span class="n">r</span><span class="p">)</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">dssh</span>   <span class="o">=</span> <span class="n">fvx</span><span class="o">.</span><span class="n">rayleigh_relaxation</span><span class="p">(</span><span class="n">ssh</span><span class="p">,</span> <span class="n">ssh_bc</span><span class="p">,</span> <span class="n">coef</span><span class="o">=</span><span class="n">gamma</span><span class="p">,</span> <span class="n">weight</span><span class="o">=</span><span class="n">Wbc</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="5-differentiable-positivity-monotonicity-guards-real-gap">5. Differentiable positivity / monotonicity guards  <em>(real gap)</em></h2>
+<p><strong>Status: genuine gap.</strong> <code>operators/_utils.py</code> holds only <code>_safe_div_cos</code> (a spherical pole
+guard); grep for <code>smooth_abs</code>, <code>smooth_clamp</code>, <code>smooth_max</code>, <code>softplus</code> across <code>_src/</code> finds
+nothing.</p>
+<h3 id="why_3">Why</h3>
+<p>Adjoints break where <code>jnp.maximum</code>, <code>jnp.abs</code>, or hard clamps appear (zero/undefined gradient).
+MASSH uses smooth surrogates so the SW adjoint stays well-defined — directly relevant to the
+differentiable-baseline goal. Tiny, but they belong as named, tested primitives so they are used
+consistently (and <code>rusanov_flux</code> (§1) depends on <code>smooth_abs</code>).</p>
+<h3 id="math_4">Math</h3>
+<ul>
+<li><code>smooth_abs(x) = √(x² + ε²)</code>  (wave speeds, WENO weights).</li>
+<li><code>smooth_clamp(x, x_min) = x_min + softplus((x−x_min)·s)/s</code>  (positive layer thickness).</li>
+</ul>
+<h3 id="massh-reference_3">MASSH reference</h3>
+<p><code>sw.py:27</code> <code>smooth_clamp</code>, <code>reconstruction.py:15</code> <code>smooth_abs</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">smooth_clamp</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x_min</span><span class="p">,</span> <span class="n">sharpness</span><span class="o">=</span><span class="mf">10.</span><span class="p">):</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    <span class="k">return</span> <span class="n">x_min</span> <span class="o">+</span> <span class="n">jax</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">softplus</span><span class="p">((</span><span class="n">x</span> <span class="o">-</span> <span class="n">x_min</span><span class="p">)</span><span class="o">*</span><span class="n">sharpness</span><span class="p">)</span><span class="o">/</span><span class="n">sharpness</span>    <span class="c1"># grad nonzero everywhere</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">smooth_abs</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">WENO_EPS</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="proposed-finitevolx-api_4">Proposed finitevolX API</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># finitevolx/_src/operators/differentiable.py  (new; or extend operators/_utils.py)</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">smooth_abs</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-8</span><span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">smooth_clamp</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x_min</span><span class="p">,</span> <span class="n">sharpness</span><span class="o">=</span><span class="mf">10.0</span><span class="p">):</span> <span class="o">...</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">smooth_max</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">sharpness</span><span class="o">=</span><span class="mf">10.0</span><span class="p">):</span> <span class="o">...</span>      <span class="c1"># generic two-arg variant</span>
+</code></pre></div>
+<p>Document the gradient behavior in each docstring (the entire point). Re-export flat.</p>
+<hr />
+<h2 id="6-cross-cutting-note-the-relaxationnudging-primitive">6. Cross-cutting note: the relaxation/nudging primitive</h2>
+<p>§4 (sponge/drag), the weight map (xrtoolz), and the Gaspari–Cohn taper (gaussx) are three faces
+of one concept:</p>
+<div class="arithmatex">\[
+\text{tendency} \mathrel{+}= \text{coef}\cdot W(x)\cdot (X_{\text{ref}} - X),
+\]</div>
+<p>with <code>W</code> a smooth spatial weight. MASSH uses this exact pattern for sponge layers, BC forcing,
+tracer restoring, <strong>and</strong> BFN. Implementing <code>rayleigh_relaxation</code> here + <code>compute_weight_map</code> in
+xrtoolz + <code>gaspari_cohn</code> in gaussx closes the most gaps per unit effort and is the prerequisite
+for the <code>BFNCycle</code> protocol proposed in the pipekit doc.</p>
+<hr />
+<h2 id="suggested-ordering-for-finitevolx">Suggested ordering for finitevolX</h2>
+<ol>
+<li><code>smooth_abs</code> / <code>smooth_clamp</code> (§5) — trivial; unblocks AD-safe versions of everything else
+   (and <code>rusanov_flux</code> needs <code>smooth_abs</code>).</li>
+<li><code>rusanov_flux</code> (§1) — small, immediately useful as an AD-robust continuity flux.</li>
+<li><code>rayleigh_relaxation</code> + <code>linear_drag</code> (§4) — unblocks sponge/BC/BFN (and the somax tracer
+   nudging gap).</li>
+<li><code>vorticity_flux_upwind</code> + the public <code>pv_flux_arakawa_lamb</code> wrapper (§2) — MASSH parity and a
+   one-call conserving entry point (the conserving <em>scheme</em> already exists).</li>
+<li><code>barotropic_filter</code> (§3) — a thin operator over the existing variable-coef multigrid.</li>
+</ol>
+<h2 id="references">References</h2>
+<ul>
+<li>Arakawa &amp; Lamb (1981), <em>Mon. Wea. Rev.</em> 109, 18–36 — energy/enstrophy-conserving SW scheme
+  (<strong>already implemented</strong>: <code>operators/vorticity.py:202</code>, <code>diffusion/momentum.py:35</code>).</li>
+<li>Arakawa (1966), <em>J. Comput. Phys.</em> 1 — the Jacobian (<code>operators/jacobian.py:22</code>).</li>
+<li>Sadourny (1975) — the E/Z schemes finitevolX's <code>MomentumAdvection2D</code> also offers.</li>
+<li>Dukowicz &amp; Smith (2000), <code>doi:10.1029/2000JC900089</code> — barotropic split (MASSH's cited source).</li>
+<li><strong>finitevolX (verified, <code>0.0.42</code>):</strong> <code>operators/jacobian.py</code>, <code>advection/weno.py</code>,
+  <code>advection/limiters.py</code>, <code>advection/face_flux.py</code>, <code>operators/diagnostics.py</code>,
+  <code>operators/vorticity.py</code>, <code>operators/divergence.py</code>, <code>solvers/multigrid.py</code>
+  (<code>build_multigrid_solver(coeff=...)</code>), <code>timestepping/split_explicit.py</code>,
+  <code>timestepping/explicit_rk.py</code> / <code>diffrax_solvers.py</code>.</li>
+<li><strong>MASSH (<code>VarDyn</code>, unverified line numbers):</strong> <code>mapping/models/model_qgsw/sw.py</code>,
+  <code>reconstruction.py</code>; <code>mapping/models/model_qg1l/jqgm.py</code>.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "content.code.copy", "content.code.annotate"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

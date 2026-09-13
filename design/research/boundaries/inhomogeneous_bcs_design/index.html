@@ -1,0 +1,3797 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Finite volume operators for JAX on Arakawa C-grids">
+      
+      
+        <meta name="author" content="Juan Emmanuel Johnson, Takaya Uchida">
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>Unified Boundary Conditions in finitevolX: Design Document - finitevolX</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#unified-boundary-conditions-in-finitevolx-design-document" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../../.." title="finitevolX" class="md-header__button md-logo" aria-label="finitevolX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            finitevolX
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Unified Boundary Conditions in finitevolX: Design Document
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jejjohnson/finitevolX" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/finitevolX
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../cgrid_discretization/" class="md-tabs__link">
+          
+  
+  
+  C-Grid Discretization
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../masks/" class="md-tabs__link">
+          
+  
+  
+  Masks
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../multilayer_vs_3d/" class="md-tabs__link">
+          
+  
+  
+  Vertical Structure
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../stencils/" class="md-tabs__link">
+          
+  
+  
+  Raw Stencils
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../difference/" class="md-tabs__link">
+          
+  
+  
+  Difference Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../interpolation/" class="md-tabs__link">
+          
+  
+  
+  Interpolation Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../advection/" class="md-tabs__link">
+          
+  
+  
+  Advection
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../boundary_conditions/" class="md-tabs__link">
+          
+  
+  
+  Boundary Conditions
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../spatial_operators/" class="md-tabs__link">
+          
+  
+  
+  Spatial Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../time_integration/" class="md-tabs__link">
+          
+  
+  
+  Time Integration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../elliptic_solvers/" class="md-tabs__link">
+          
+  
+  
+  Elliptic Solvers
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../multigrid_solver/" class="md-tabs__link">
+          
+  
+  
+  Multigrid Solver
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../../solver_comparison/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Solver Comparison
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../examples/" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../../CHANGELOG/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../.." title="finitevolX" class="md-nav__button md-logo" aria-label="finitevolX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    finitevolX
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jejjohnson/finitevolX" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/finitevolX
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C-Grid Discretization
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    C-Grid Discretization
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../cgrid_discretization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/grids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Masks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Masks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vertical Structure
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Vertical Structure
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../multilayer_vs_3d/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/vertical_modes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Raw Stencils
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Raw Stencils
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../stencils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/stencils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Difference Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Difference Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../difference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/difference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interpolation Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Interpolation Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advection
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advection
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../advection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/advection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/reconstruction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reconstruction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Boundary Conditions
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Boundary Conditions
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../boundary_conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/boundary_conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spatial Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Spatial Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../spatial_operators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/divergence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Divergence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/vorticity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vorticity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/diffusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diffusion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/coriolis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coriolis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/momentum/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Momentum Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time Integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Time Integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../time_integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../time_integration_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/time_integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Elliptic Solvers
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Elliptic Solvers
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../elliptic_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../elliptic_solvers_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/elliptic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convenience Wrappers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/spectral_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/spectral_transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral Transforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/capacitance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacitance Method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/iterative/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Iterative Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multigrid Solver
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Multigrid Solver
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../multigrid_solver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../multigrid_solver_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/multigrid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../solver_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Solver Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_15" >
+        
+          
+          <label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_15">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/demo_masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Masks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/demo_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Elliptic Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/pressure_poisson/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pressure Poisson
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/streamfunction_inversion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streamfunction Inversion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/helmholtz_screening/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Helmholtz Screening
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/advection_1d_schemes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1-D Advection Schemes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/advection_2d_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2-D Rotating Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/advection_2d_masked/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2-D Masked Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/swm_linear/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linear Shallow Water
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/shallow_water/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nonlinear Shallow Water
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/qg_1p5_layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.5-Layer QG
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../CHANGELOG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-goal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Goal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-unified-bc-and-bcset-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Unified BC and BCSet Design
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Unified BC and BCSet Design">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-bc-atoms-unchanged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 BC Atoms (unchanged)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-boundaryconditionset-evolved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 BoundaryConditionSet (evolved)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.2 BoundaryConditionSet (evolved)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mask-ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mask ownership
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#auto-derive-merge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Auto-derive + merge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unified-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unified interface
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#factory-methods-extended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Factory methods (extended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-fieldbcset-minimal-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 FieldBCSet (minimal change)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-design-principles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Design Principles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-solver-integration-three-layers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Solver Integration: Three Layers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Solver Integration: Three Layers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#layer-1-pure-function-apply_known_values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 1 — Pure Function: apply_known_values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#layer-2-convenience-wrappers-known_values-known_mask-kwargs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 2 — Convenience Wrappers: known_values / known_mask kwargs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#layer-3-bcset-passthrough-unified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layer 3 — BCSet Passthrough (unified)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-considered-alternatives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Considered Alternatives
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Considered Alternatives">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#option-b-from-issue-186-inhomogeneousbcsolver-wrapper-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option B from issue #186: InhomogeneousBCSolver wrapper class
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-d-from-issue-186-new-dirichletbc-neumannbc-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option D from issue #186: new DirichletBC / NeumannBC types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-edge-cases-and-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Edge Cases and Decisions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Edge Cases and Decisions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#spectral-solvers-without-a-mask" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spectral solvers without a mask
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#capacitance-solver" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capacitance solver
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multigrid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multigrid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#time-varying-known-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Time-varying known values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sparse-observations-as-known-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sparse observations as known values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-layer-pv-inversion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-layer PV inversion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sign-of-lambda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sign of lambda
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#homogeneous-special-case-all-known-values-0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Homogeneous special case (all known values = 0)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-phasing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Phasing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Phasing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pr-1-evolve-boundaryconditionset-apply_known_values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PR 1: Evolve BoundaryConditionSet + apply_known_values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pr-2-thread-through-convenience-wrappers-bcset-passthrough" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PR 2: Thread through convenience wrappers + BCSet passthrough
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pr-3-documentation-notebook-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PR 3: Documentation + notebook migration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-acceptance-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Acceptance Criteria
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-future-extensions-out-of-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Future Extensions (Out of Scope)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="unified-boundary-conditions-in-finitevolx-design-document">Unified Boundary Conditions in finitevolX: Design Document</h1>
+<p>This document proposes a <strong>unified boundary condition system</strong> for finitevolX
+that works across time-stepping, direct state application, and elliptic
+solvers — with first-class support for <strong>known values</strong> at any cell (outer
+boundaries, island coasts, and sparse interior observations).</p>
+<p>Responds to <a href="https://github.com/jejjohnson/finitevolX/issues/186">jejjohnson/finitevolX#186</a>.</p>
+<p><strong>Companion document:</strong> <a href="../inhomogeneous_bcs_current/">inhomogeneous_bcs_current.md</a>
+describes the current state and the manual lifting-trick workaround.</p>
+<hr />
+<h2 id="1-goal">1. Goal</h2>
+<p>A unified boundary condition system for finitevolX that:</p>
+<ul>
+<li><strong>Works everywhere</strong> — time-stepping (ghost-cell updates), direct state
+  application, and elliptic solvers, all through the same BC object.</li>
+<li><strong>Carries domain geometry</strong> — the <code>BoundaryConditionSet</code> owns a <code>Mask2D</code>,
+  so solvers don't need a separate mask argument.</li>
+<li><strong>Supports known values at any cell</strong> — outer boundaries, island coasts
+  (auto-derived from mask topology), and sparse interior observations
+  (user-supplied <code>known_mask</code>).</li>
+<li><strong>Is JIT-compilable and vmap-compatible</strong>, including time-varying known
+  values.</li>
+<li><strong>Causes zero breakage</strong> for existing call sites — all new fields default
+  to <code>None</code>.</li>
+</ul>
+<hr />
+<h2 id="2-unified-bc-and-bcset-design">2. Unified BC and BCSet Design</h2>
+<h3 id="21-bc-atoms-unchanged">2.1 BC Atoms (unchanged)</h3>
+<p>The existing 9 atom types in <code>bc_1d.py</code> remain as-is.  They are face-level
+building blocks with no mask awareness:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># These stay exactly the same</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">Dirichlet1D</span><span class="p">(</span><span class="n">face</span><span class="o">=</span><span class="s2">&quot;south&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">Neumann1D</span><span class="p">(</span><span class="n">face</span><span class="o">=</span><span class="s2">&quot;west&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">Robin1D</span><span class="p">(</span><span class="n">face</span><span class="o">=</span><span class="s2">&quot;north&quot;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">gamma</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">Periodic1D</span><span class="p">(</span><span class="n">face</span><span class="o">=</span><span class="s2">&quot;east&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># ... plus Outflow1D, Reflective1D, Sponge1D, Extrapolation1D, Slip1D</span>
+</code></pre></div>
+<p>No mask on individual atoms — they describe <em>what kind</em> of condition applies
+on a face, not <em>where</em> the domain is.</p>
+<h3 id="22-boundaryconditionset-evolved">2.2 BoundaryConditionSet (evolved)</h3>
+<p>The existing <code>BoundaryConditionSet</code> (<code>bc_set.py</code>) gains three new optional
+fields:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">BoundaryConditionSet</span><span class="p">(</span><span class="n">eqx</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="c1"># --- Existing fields (unchanged) ---</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">south</span><span class="p">:</span> <span class="n">BoundaryCondition1D</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">north</span><span class="p">:</span> <span class="n">BoundaryCondition1D</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">west</span><span class="p">:</span> <span class="n">BoundaryCondition1D</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">east</span><span class="p">:</span> <span class="n">BoundaryCondition1D</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="c1"># --- NEW fields ---</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">mask</span><span class="p">:</span> <span class="n">Mask2D</span> <span class="o">|</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="n">known_values</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="n">known_mask</span><span class="p">:</span> <span class="n">Bool</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+<p>All new fields default to <code>None</code>, so every existing call site continues to
+work unchanged.</p>
+<h4 id="mask-ownership">Mask ownership</h4>
+<ul>
+<li>The BCSet owns a <code>Mask2D</code> (or raw float array).</li>
+<li>When a <code>Mask2D</code> is provided, each atom can extract the correct staggering
+  internally (h/u/v/q) — the atom knows its face, the <code>Mask2D</code> knows the
+  geometry.</li>
+<li>Solver operators read the mask from the BCSet — the user doesn't pass it
+  separately.</li>
+<li><code>mask=None</code> for simple rectangular domains (backward compatible).</li>
+</ul>
+<h4 id="known-values">Known values</h4>
+<ul>
+<li><code>known_values</code>: <code>(Ny, Nx)</code> array of prescribed values.  Only cells
+  identified as "known" are read; values at other cells are ignored.</li>
+<li><code>known_mask</code>: <code>(Ny, Nx)</code> boolean array marking <strong>explicit</strong> known-value
+  locations (e.g., sparse observations at interior wet cells).</li>
+<li>Both are optional.  When absent, behavior is identical to today.</li>
+</ul>
+<h4 id="auto-derive-merge">Auto-derive + merge</h4>
+<p>The set of "known cells" is computed by combining two sources:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a># 1. Auto-derive boundary cells from mask topology
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>#    (inner ring: wet cells adjacent to at least one dry cell)
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>boundary_cells = boundary_ring(mask)  # wet &amp; adjacent_to_dry
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a># 2. Merge with explicit known_mask (sparse obs, etc.)
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>if known_mask is not None:
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    all_known = boundary_cells | known_mask
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>else:
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    all_known = boundary_cells
+</code></pre></div>
+<p>This handles three scenarios transparently:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Scenario 1: Simple basin         Scenario 2: Basin + island      Scenario 3: + sparse observations
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>0 0 0 0 0 0 0 0                  0 0 0 0 0 0 0 0                 0 0 0 0 0 0 0 0
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>0 . . . . . . 0                  0 . . . . . . 0                 0 . . . . . . 0
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>0 . . . . . . 0                  0 . . 0 0 . . 0                 0 . . . . . . 0
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>0 . . . . . . 0                  0 . . 0 0 . . 0                 0 . X . . X . 0
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>0 . . . . . . 0                  0 . . . . . . 0                 0 . . . . . . 0
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>0 . . . . . . 0                  0 . . . . . . 0                 0 . . . X . . 0
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>0 0 0 0 0 0 0 0                  0 0 0 0 0 0 0 0                 0 0 0 0 0 0 0 0
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>0 = land (dry)                   0 = land (dry + island)          X = observation (known interior)
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>. = ocean (wet, solve here)      . = ocean (wet, solve here)      . = ocean (wet, solve here)
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>known_mask: not needed           known_mask: not needed           known_mask: marks X cells
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>Auto-derive finds outer ring     Auto-derive finds outer +        Auto-derive + merge with
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>                                 island rings                     user-supplied known_mask
+</code></pre></div>
+<p>In all three cases, the solver:
+1. Identifies all known cells (boundary ring + explicit <code>known_mask</code>)
+2. Places <code>known_values</code> at those cells (the "lift")
+3. Shrinks the solve domain: <code>effective_solve_mask = wet &amp; ~all_known</code>
+4. Corrects the RHS and solves the homogeneous problem on the reduced domain</p>
+<h4 id="unified-interface">Unified interface</h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">bc</span> <span class="o">=</span> <span class="n">BoundaryConditionSet</span><span class="p">(</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">mask</span><span class="o">=</span><span class="n">cgrid_mask</span><span class="p">,</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">south</span><span class="o">=</span><span class="n">Dirichlet1D</span><span class="p">(</span><span class="s2">&quot;south&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">north</span><span class="o">=</span><span class="n">Dirichlet1D</span><span class="p">(</span><span class="s2">&quot;north&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.1</span><span class="p">),</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">west</span><span class="o">=</span><span class="n">Neumann1D</span><span class="p">(</span><span class="s2">&quot;west&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">east</span><span class="o">=</span><span class="n">Dirichlet1D</span><span class="p">(</span><span class="s2">&quot;east&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.05</span><span class="p">),</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">known_values</span><span class="o">=</span><span class="n">obs_field</span><span class="p">,</span>       <span class="c1"># optional: (Ny, Nx) prescribed values</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">known_mask</span><span class="o">=</span><span class="n">obs_locations</span><span class="p">,</span>     <span class="c1"># optional: (Ny, Nx) where obs apply</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="p">)</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="c1"># Time-stepping: apply ghost cells as before</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="n">state</span> <span class="o">=</span> <span class="n">bc</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">)</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="c1"># Elliptic solver: mask + known values extracted from bc</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="n">psi</span> <span class="o">=</span> <span class="n">fvx</span><span class="o">.</span><span class="n">streamfunction_from_vorticity</span><span class="p">(</span><span class="n">zeta</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">bc</span><span class="o">=</span><span class="n">bc</span><span class="p">)</span>
+</code></pre></div>
+<h4 id="factory-methods-extended">Factory methods (extended)</h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Existing factories still work</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">BoundaryConditionSet</span><span class="o">.</span><span class="n">periodic</span><span class="p">()</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">BoundaryConditionSet</span><span class="o">.</span><span class="n">open</span><span class="p">()</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1"># New: closed basin with mask</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="n">BoundaryConditionSet</span><span class="o">.</span><span class="n">closed</span><span class="p">(</span><span class="n">mask</span><span class="o">=</span><span class="n">cgrid_mask</span><span class="p">)</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># → Dirichlet(value=0) on all four faces, mask attached</span>
+</code></pre></div>
+<h3 id="23-fieldbcset-minimal-change">2.3 FieldBCSet (minimal change)</h3>
+<p>No structural change.  It dispatches per-field <code>BoundaryConditionSet</code> as
+before.  Each BCSet in the map can now carry its own mask + known values:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">field_bcs</span> <span class="o">=</span> <span class="n">FieldBCSet</span><span class="p">(</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="n">bc_map</span><span class="o">=</span><span class="p">{</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>        <span class="s2">&quot;psi&quot;</span><span class="p">:</span> <span class="n">BoundaryConditionSet</span><span class="p">(</span><span class="n">mask</span><span class="o">=</span><span class="n">mask</span><span class="p">,</span> <span class="n">south</span><span class="o">=...</span><span class="p">,</span> <span class="n">known_values</span><span class="o">=</span><span class="n">obs_psi</span><span class="p">),</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>        <span class="s2">&quot;eta&quot;</span><span class="p">:</span> <span class="n">BoundaryConditionSet</span><span class="p">(</span><span class="n">mask</span><span class="o">=</span><span class="n">mask</span><span class="p">,</span> <span class="n">south</span><span class="o">=...</span><span class="p">,</span> <span class="n">known_values</span><span class="o">=</span><span class="n">obs_eta</span><span class="p">),</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="p">},</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="3-design-principles">3. Design Principles</h2>
+<ol>
+<li>
+<p><strong>Unified vocabulary</strong> — one BC object for time-stepping and solvers.
+   Users write <code>BoundaryConditionSet(...)</code> once and use it everywhere.</p>
+</li>
+<li>
+<p><strong>BCSet owns the mask</strong> — solvers extract it from the BC object; users
+   don't pass the mask separately.</p>
+</li>
+<li>
+<p><strong>known_values generalizes boundary data</strong> — outer boundary ring, island
+   coasts, and sparse interior observations all flow through the same
+   mechanism.</p>
+</li>
+<li>
+<p><strong>Auto-derive + merge</strong> — boundary cells are computed from mask topology
+   (JAX-native dilation); merged with any explicit <code>known_mask</code>.</p>
+</li>
+<li>
+<p><strong>The lifting trick is the implementation, not the API</strong> — users never
+   write <code>binary_dilation</code> or manually compute corrected RHS.</p>
+</li>
+<li>
+<p><strong>JAX-native throughout</strong> — no SciPy in the hot path.  The dilation uses
+   <code>jnp.roll</code> + boolean OR (~4 rolls).</p>
+</li>
+<li>
+<p><strong>Additive, not breaking</strong> — all new fields default to <code>None</code>.  Every
+   existing call site continues to work unchanged.</p>
+</li>
+</ol>
+<hr />
+<h2 id="4-solver-integration-three-layers">4. Solver Integration: Three Layers</h2>
+<h3 id="layer-1-pure-function-apply_known_values">Layer 1 — Pure Function: <code>apply_known_values</code></h3>
+<p>The foundation.  A composable pure function that performs the generalized
+lifting trick.  Accepts all parameters explicitly (maximum composability for
+power users who want to bring their own solver).</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">finitevolx</span><span class="w"> </span><span class="kn">import</span> <span class="n">SolveDomain</span><span class="p">,</span> <span class="n">KnownValueLifting</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="c1"># Setup (once)</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">domain</span> <span class="o">=</span> <span class="n">SolveDomain</span><span class="p">(</span><span class="n">mask</span><span class="o">=</span><span class="n">mask</span><span class="p">,</span> <span class="n">known_mask</span><span class="o">=</span><span class="n">obs_locations</span><span class="p">)</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">lifter</span> <span class="o">=</span> <span class="n">KnownValueLifting</span><span class="p">(</span><span class="n">domain</span><span class="o">=</span><span class="n">domain</span><span class="p">,</span> <span class="n">dx</span><span class="o">=</span><span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="o">=</span><span class="n">dy</span><span class="p">,</span> <span class="n">lambda_</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="c1"># Per step</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="n">rhs_corrected</span><span class="p">,</span> <span class="n">value_lift</span> <span class="o">=</span> <span class="n">lifter</span><span class="o">.</span><span class="n">preprocess</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">obs_field</span><span class="p">)</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="c1"># Solve with ANY solver (built with domain.effective_mask)</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="n">psi_hom</span> <span class="o">=</span> <span class="n">my_solver</span><span class="p">(</span><span class="n">rhs_corrected</span><span class="p">)</span>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="c1"># Reconstruct</span>
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="n">psi</span> <span class="o">=</span> <span class="n">lifter</span><span class="o">.</span><span class="n">postprocess</span><span class="p">(</span><span class="n">psi_hom</span><span class="p">,</span> <span class="n">value_lift</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>What it does internally:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>1. Auto-derive boundary ring from mask (pad-then-slice):
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>   wet = mask &gt; 0.5
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>   dry = ~wet
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>   padded_dry = pad(dry, 1, constant=False)
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>   adjacent_to_dry = padded_dry[2:,1:-1] | padded_dry[:-2,1:-1] | ...
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>   boundary_cells = wet &amp; adjacent_to_dry
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>2. Merge with explicit known_mask:
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>   all_known = boundary_cells | known_mask   (if known_mask given)
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>   all_known = boundary_cells                (otherwise)
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>3. Build lift:
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>   value_lift = jnp.where(all_known, known_values, 0.0)
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>
+<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>4. Compute effective solve mask:
+<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a>   effective_solve_mask = wet &amp; ~all_known
+<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a>
+<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a>5. Correct RHS:
+<a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a>   A_lift = masked_laplacian(value_lift, effective_solve_mask, dx, dy, lambda_)
+<a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a>   rhs_corrected = rhs - A_lift
+<a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a>
+<a id="__codelineno-8-22" name="__codelineno-8-22" href="#__codelineno-8-22"></a>6. Return (rhs_corrected, value_lift)
+</code></pre></div>
+<p><strong>Signature:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">apply_known_values</span><span class="p">(</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="n">rhs</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">],</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="n">known_values</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">],</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="n">mask</span><span class="p">:</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">]</span> <span class="o">|</span> <span class="n">Mask2D</span><span class="p">,</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="n">dx</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="n">dy</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="n">lambda_</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="n">known_mask</span><span class="p">:</span> <span class="n">Bool</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">],</span> <span class="n">Float</span><span class="p">[</span><span class="n">Array</span><span class="p">,</span> <span class="s2">&quot;Ny Nx&quot;</span><span class="p">]]:</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Correct RHS for known values via the generalized lifting trick.</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="sd">    Parameters</span>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="sd">    ----------</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="sd">    rhs : (Ny, Nx) array</span>
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="sd">        Original right-hand side.</span>
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="sd">    known_values : (Ny, Nx) array</span>
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="sd">        Prescribed values.  Only cells identified as &quot;known&quot; (boundary</span>
+<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="sd">        ring from mask topology + explicit known_mask) are used.</span>
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="sd">    mask : (Ny, Nx) array or Mask2D</span>
+<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a><span class="sd">        Binary wet/dry mask (1=wet, 0=dry).</span>
+<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a><span class="sd">    dx, dy : float</span>
+<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a><span class="sd">        Grid spacings.</span>
+<a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a><span class="sd">    lambda_ : float</span>
+<a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a><span class="sd">        Helmholtz parameter.</span>
+<a id="__codelineno-9-25" name="__codelineno-9-25" href="#__codelineno-9-25"></a><span class="sd">    known_mask : (Ny, Nx) bool array or None</span>
+<a id="__codelineno-9-26" name="__codelineno-9-26" href="#__codelineno-9-26"></a><span class="sd">        Explicit known-value locations (e.g., sparse observations at</span>
+<a id="__codelineno-9-27" name="__codelineno-9-27" href="#__codelineno-9-27"></a><span class="sd">        interior wet cells).  Merged with auto-derived boundary ring.</span>
+<a id="__codelineno-9-28" name="__codelineno-9-28" href="#__codelineno-9-28"></a>
+<a id="__codelineno-9-29" name="__codelineno-9-29" href="#__codelineno-9-29"></a><span class="sd">    Returns</span>
+<a id="__codelineno-9-30" name="__codelineno-9-30" href="#__codelineno-9-30"></a><span class="sd">    -------</span>
+<a id="__codelineno-9-31" name="__codelineno-9-31" href="#__codelineno-9-31"></a><span class="sd">    rhs_corrected : (Ny, Nx) array</span>
+<a id="__codelineno-9-32" name="__codelineno-9-32" href="#__codelineno-9-32"></a><span class="sd">        Corrected RHS for the reduced homogeneous problem.</span>
+<a id="__codelineno-9-33" name="__codelineno-9-33" href="#__codelineno-9-33"></a><span class="sd">    value_lift : (Ny, Nx) array</span>
+<a id="__codelineno-9-34" name="__codelineno-9-34" href="#__codelineno-9-34"></a><span class="sd">        Lifting function — add to homogeneous solution to get full solution.</span>
+<a id="__codelineno-9-35" name="__codelineno-9-35" href="#__codelineno-9-35"></a><span class="sd">    &quot;&quot;&quot;</span>
+</code></pre></div>
+<p><strong>Proposed location:</strong> <code>finitevolx/_src/solvers/inhomogeneous.py</code> (new file),
+re-exported from <code>finitevolx/__init__.py</code>.</p>
+<hr />
+<h3 id="layer-2-convenience-wrappers-known_values-known_mask-kwargs">Layer 2 — Convenience Wrappers: <code>known_values</code> / <code>known_mask</code> kwargs</h3>
+<p>Adds optional parameters to the existing <code>streamfunction_from_vorticity</code>,
+<code>pressure_from_divergence</code>, and <code>pv_inversion</code> wrappers.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Current API (unchanged, homogeneous only)</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">psi</span> <span class="o">=</span> <span class="n">fvx</span><span class="o">.</span><span class="n">streamfunction_from_vorticity</span><span class="p">(</span><span class="n">zeta</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">bc</span><span class="o">=</span><span class="s2">&quot;dst&quot;</span><span class="p">)</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="c1"># New: pass known values directly</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="n">psi</span> <span class="o">=</span> <span class="n">fvx</span><span class="o">.</span><span class="n">streamfunction_from_vorticity</span><span class="p">(</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="n">zeta</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>    <span class="n">bc</span><span class="o">=</span><span class="s2">&quot;dst&quot;</span><span class="p">,</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    <span class="n">known_values</span><span class="o">=</span><span class="n">g</span><span class="p">,</span>           <span class="c1"># NEW</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>    <span class="n">known_mask</span><span class="o">=</span><span class="n">obs_mask</span><span class="p">,</span>      <span class="c1"># NEW, optional</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>    <span class="n">mask</span><span class="o">=</span><span class="n">mask</span><span class="p">,</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="p">)</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="c1"># Pressure</span>
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="n">p</span> <span class="o">=</span> <span class="n">fvx</span><span class="o">.</span><span class="n">pressure_from_divergence</span><span class="p">(</span>
+<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>    <span class="n">div_u</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span>
+<a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a>    <span class="n">bc</span><span class="o">=</span><span class="s2">&quot;dct&quot;</span><span class="p">,</span>
+<a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a>    <span class="n">known_values</span><span class="o">=</span><span class="n">p_boundary</span><span class="p">,</span>
+<a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a>    <span class="n">mask</span><span class="o">=</span><span class="n">mask</span><span class="p">,</span>
+<a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a><span class="p">)</span>
+<a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a>
+<a id="__codelineno-10-21" name="__codelineno-10-21" href="#__codelineno-10-21"></a><span class="c1"># PV inversion (per-layer broadcast)</span>
+<a id="__codelineno-10-22" name="__codelineno-10-22" href="#__codelineno-10-22"></a><span class="n">psi</span> <span class="o">=</span> <span class="n">fvx</span><span class="o">.</span><span class="n">pv_inversion</span><span class="p">(</span>
+<a id="__codelineno-10-23" name="__codelineno-10-23" href="#__codelineno-10-23"></a>    <span class="n">pv</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span>
+<a id="__codelineno-10-24" name="__codelineno-10-24" href="#__codelineno-10-24"></a>    <span class="n">lambda_</span><span class="o">=</span><span class="n">lambdas</span><span class="p">,</span>
+<a id="__codelineno-10-25" name="__codelineno-10-25" href="#__codelineno-10-25"></a>    <span class="n">known_values</span><span class="o">=</span><span class="n">psi_boundary</span><span class="p">,</span>
+<a id="__codelineno-10-26" name="__codelineno-10-26" href="#__codelineno-10-26"></a>    <span class="n">mask</span><span class="o">=</span><span class="n">mask</span><span class="p">,</span>
+<a id="__codelineno-10-27" name="__codelineno-10-27" href="#__codelineno-10-27"></a><span class="p">)</span>
+</code></pre></div>
+<p><strong>Internal flow when <code>known_values</code> is not None:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>1. apply_known_values(rhs, known_values, mask, dx, dy, lambda_, known_mask)
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>      → (rhs_corrected, value_lift)
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>2. _solve_dispatch(rhs_corrected, ...) on effective_solve_mask
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>      → psi_hom
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>3. Return value_lift + psi_hom
+</code></pre></div>
+<p><strong>When <code>known_values is None</code>:</strong> existing fast path.  Zero behavior change.</p>
+<p><strong>Multi-layer PV inversion:</strong> the lift depends on <code>lambda_</code> (via
+<code>masked_laplacian</code>), so each layer gets its own corrected RHS.  The
+implementation vmaps <code>apply_known_values</code> alongside the solve, matching
+the existing vmap pattern in <code>elliptic.py:437-542</code>.</p>
+<ul>
+<li><code>known_values</code> shape <code>(Ny, Nx)</code> → broadcast to all layers.</li>
+<li><code>known_values</code> shape <code>(nl, Ny, Nx)</code> → per-layer known values.</li>
+</ul>
+<p><strong>Spectral path on rectangular domains:</strong> when the user passes
+<code>known_values</code> with <code>method="spectral"</code> and no mask, synthesise a trivial
+all-wet mask whose dry-boundary ring is the outer ghost frame.</p>
+<hr />
+<h3 id="layer-3-bcset-passthrough-unified">Layer 3 — BCSet Passthrough (unified)</h3>
+<p>The primary user-facing API.  Pass a <code>BoundaryConditionSet</code> directly to
+any solver — the mask, known values, and face BCs are all read from it.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">finitevolx</span><span class="w"> </span><span class="kn">import</span> <span class="n">BoundaryConditionSet</span><span class="p">,</span> <span class="n">Dirichlet1D</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">bc</span> <span class="o">=</span> <span class="n">BoundaryConditionSet</span><span class="p">(</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>    <span class="n">mask</span><span class="o">=</span><span class="n">cgrid_mask</span><span class="p">,</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>    <span class="n">south</span><span class="o">=</span><span class="n">Dirichlet1D</span><span class="p">(</span><span class="s2">&quot;south&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>    <span class="n">north</span><span class="o">=</span><span class="n">Dirichlet1D</span><span class="p">(</span><span class="s2">&quot;north&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.1</span><span class="p">),</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>    <span class="n">west</span><span class="o">=</span><span class="n">Dirichlet1D</span><span class="p">(</span><span class="s2">&quot;west&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.05</span><span class="p">),</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>    <span class="n">east</span><span class="o">=</span><span class="n">Dirichlet1D</span><span class="p">(</span><span class="s2">&quot;east&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.05</span><span class="p">),</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>    <span class="n">known_values</span><span class="o">=</span><span class="n">obs_field</span><span class="p">,</span>       <span class="c1"># optional</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>    <span class="n">known_mask</span><span class="o">=</span><span class="n">obs_locations</span><span class="p">,</span>     <span class="c1"># optional</span>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="p">)</span>
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a><span class="c1"># One object drives everything:</span>
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a><span class="n">state</span> <span class="o">=</span> <span class="n">bc</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">)</span>                                     <span class="c1"># time-stepping</span>
+<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a><span class="n">psi</span> <span class="o">=</span> <span class="n">fvx</span><span class="o">.</span><span class="n">streamfunction_from_vorticity</span><span class="p">(</span><span class="n">zeta</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">bc</span><span class="o">=</span><span class="n">bc</span><span class="p">)</span>  <span class="c1"># solver</span>
+<a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a><span class="n">p</span> <span class="o">=</span> <span class="n">fvx</span><span class="o">.</span><span class="n">pressure_from_divergence</span><span class="p">(</span><span class="n">div_u</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">bc</span><span class="o">=</span><span class="n">bc</span><span class="p">)</span>        <span class="c1"># solver</span>
+</code></pre></div>
+<p><strong>Internal conversion when <code>bc</code> is a <code>BoundaryConditionSet</code>:</strong></p>
+<ol>
+<li>Extract <code>mask</code> from <code>bc.mask</code>.</li>
+<li>If the BCSet has per-face <code>Dirichlet1D</code> atoms with non-zero values,
+   expand them into a <code>(Ny, Nx)</code> array (values at the ghost ring, zero in
+   the interior).</li>
+<li>Merge with <code>bc.known_values</code> / <code>bc.known_mask</code>.</li>
+<li>Determine the BC type for the spectral dispatch:</li>
+<li>All faces <code>Dirichlet1D</code> → <code>"dst"</code></li>
+<li>All faces <code>Neumann1D</code> → <code>"dct"</code></li>
+<li>All faces <code>Periodic1D</code> → <code>"fft"</code></li>
+<li>Call Layer 1 (<code>apply_known_values</code>) with the merged data.</li>
+</ol>
+<p><strong>Fast-path detection:</strong> if all Dirichlet values are zero, no <code>known_values</code>,
+and no <code>known_mask</code> → take the existing spectral fast path (no mask needed).</p>
+<p><strong>Why this matters:</strong> users maintain one mental model.  The same
+<code>BoundaryConditionSet</code> they write for time-stepping drives the elliptic
+solve.  No more <code>Dirichlet1D(value=g)</code> for one system and <code>bc="dst"</code> for the
+other.</p>
+<hr />
+<h2 id="5-considered-alternatives">5. Considered Alternatives</h2>
+<h3 id="option-b-from-issue-186-inhomogeneousbcsolver-wrapper-class">Option B from issue #186: <code>InhomogeneousBCSolver</code> wrapper class</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">solver</span> <span class="o">=</span> <span class="n">InhomogeneousBCSolver</span><span class="p">(</span><span class="n">base_solver</span><span class="o">=...</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="n">mask</span><span class="p">,</span> <span class="n">dx</span><span class="o">=</span><span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="o">=</span><span class="n">dy</span><span class="p">)</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">psi</span> <span class="o">=</span> <span class="n">solver</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">known_values</span><span class="o">=</span><span class="n">g</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Why not:</strong> a class adds state without adding power.  The layered function +
+BCSet passthrough covers every code path with less surface area and better
+composability.</p>
+<h3 id="option-d-from-issue-186-new-dirichletbc-neumannbc-types">Option D from issue #186: new <code>DirichletBC</code> / <code>NeumannBC</code> types</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">bc</span> <span class="o">=</span> <span class="n">DirichletBC</span><span class="p">(</span><span class="n">values</span><span class="o">=</span><span class="n">g</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="n">mask</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Why not:</strong> invents a new BC type parallel to the existing <code>Dirichlet1D</code>.
+The revised design evolves the existing <code>BoundaryConditionSet</code> instead of
+creating a parallel hierarchy.</p>
+<hr />
+<h2 id="6-edge-cases-and-decisions">6. Edge Cases and Decisions</h2>
+<h3 id="spectral-solvers-without-a-mask">Spectral solvers without a mask</h3>
+<p>When <code>method="spectral"</code> and no mask is provided, but <code>known_values</code> is
+given: synthesise a rectangular mask (all-wet interior, dry outer ring).
+Apply the lifting trick normally.</p>
+<h3 id="capacitance-solver">Capacitance solver</h3>
+<p>Operator-agnostic.  The capacitance solver sees only the corrected RHS and
+solves the homogeneous problem as usual.  No changes needed.</p>
+<h3 id="multigrid">Multigrid</h3>
+<p>Same: only the RHS changes.  The V-cycle hierarchy is unaware of the lift.</p>
+<h3 id="time-varying-known-values">Time-varying known values</h3>
+<p>Because Layer 1 is a pure function, the correction is recomputed at every
+call inside a JIT-compiled timestep.  No caching or stale-state issues.</p>
+<h3 id="sparse-observations-as-known-values">Sparse observations as known values</h3>
+<p>When <code>known_mask</code> marks interior wet cells, those cells are removed from the
+solve domain (<code>effective_solve_mask = wet &amp; ~all_known</code>).  Their prescribed
+values feed into the stencil of neighboring "unknown" cells via the lift.
+Mathematically, this treats observations as additional Dirichlet constraints
+in the interior of the domain.</p>
+<h3 id="multi-layer-pv-inversion">Multi-layer PV inversion</h3>
+<p>The lift depends on <code>lambda_</code> (via <code>masked_laplacian</code>), so each layer gets
+its own <code>rhs_corrected</code> and <code>value_lift</code>.  <code>known_values</code> can be <code>(Ny, Nx)</code>
+(broadcast) or <code>(nl, Ny, Nx)</code> (per-layer).</p>
+<h3 id="sign-of-lambda">Sign of lambda</h3>
+<p>Preserved by the existing <code>masked_laplacian</code> definition: it computes
+<span class="arithmatex">\((∇^2 - \lambda)\psi\)</span>, so both the RHS and the correction have consistent
+sign.</p>
+<h3 id="homogeneous-special-case-all-known-values-0">Homogeneous special case (all known values = 0)</h3>
+<p>The lift is zero, the RHS correction is zero, and the solver takes the fast
+path.  No separate code branch needed.</p>
+<hr />
+<h2 id="7-phasing">7. Phasing</h2>
+<h3 id="pr-1-evolve-boundaryconditionset-apply_known_values">PR 1: Evolve <code>BoundaryConditionSet</code> + <code>apply_known_values</code></h3>
+<ul>
+<li>Add <code>mask</code>, <code>known_values</code>, <code>known_mask</code> fields to <code>BoundaryConditionSet</code>
+  (all default <code>None</code> — backward compatible).</li>
+<li>New file <code>finitevolx/_src/solvers/inhomogeneous.py</code> with
+  <code>apply_known_values</code> pure function + JAX-native dilation helper.</li>
+<li>Re-export from <code>finitevolx/__init__.py</code>.</li>
+<li>Tests:</li>
+<li>Manufactured solution: <span class="arithmatex">\(\psi_{\text{exact}} = \sin(\pi x)\sin(\pi y) +
+    0.1\sin(2\pi y)\)</span> with CG, capacitance, spectral.</li>
+<li>Consistency: <code>known_values=0</code> matches current homogeneous API.</li>
+<li>Island mask: verify auto-derive finds inner + outer boundary rings.</li>
+<li>Sparse obs: verify <code>known_mask</code> pins interior cells correctly.</li>
+</ul>
+<h3 id="pr-2-thread-through-convenience-wrappers-bcset-passthrough">PR 2: Thread through convenience wrappers + BCSet passthrough</h3>
+<ul>
+<li>Add <code>known_values</code> / <code>known_mask</code> kwargs to
+  <code>streamfunction_from_vorticity</code>, <code>pressure_from_divergence</code>, <code>pv_inversion</code>.</li>
+<li>Accept <code>BoundaryConditionSet</code> as <code>bc=</code> parameter (Layer 3).</li>
+<li>Multi-layer vmap integration for <code>pv_inversion</code>.</li>
+<li>Auto-synthesise rectangular mask for spectral path.</li>
+<li>Tests for all three wrappers with known values and BCSet passthrough.</li>
+</ul>
+<h3 id="pr-3-documentation-notebook-migration">PR 3: Documentation + notebook migration</h3>
+<ul>
+<li>Update <code>docs/notebooks/demo_solvers.py</code> Section 8 to use new API.</li>
+<li>Documentation in elliptic solver guide.</li>
+<li>Update <code>docs/boundary_conditions.md</code> with unified BCSet description.</li>
+</ul>
+<hr />
+<h2 id="8-acceptance-criteria">8. Acceptance Criteria</h2>
+<p>From issue #186, revised for the broader scope:</p>
+<ul>
+<li>[ ] <code>BoundaryConditionSet</code> gains <code>mask</code>, <code>known_values</code>, <code>known_mask</code> fields</li>
+<li>[ ] <code>apply_known_values(rhs, known_values, mask, dx, dy, lambda_, known_mask)</code> implemented</li>
+<li>[ ] Convenience wrappers accept <code>known_values</code> / <code>known_mask</code> parameters</li>
+<li>[ ] <code>BoundaryConditionSet</code> accepted as <code>bc=</code> on all convenience wrappers</li>
+<li>[ ] Works with all solver methods (spectral, CG, capacitance, multigrid)</li>
+<li>[ ] Manufactured-solution test passes to solver tolerance</li>
+<li>[ ] Island-mask test: auto-derive finds inner + outer boundary rings</li>
+<li>[ ] Sparse-obs test: <code>known_mask</code> pins interior wet cells correctly</li>
+<li>[ ] JIT-compatible for time-stepping applications</li>
+<li>[ ] Multi-layer <code>pv_inversion</code> supports per-layer <code>known_values</code></li>
+<li>[ ] JAX-native dilation (no SciPy dependency in the hot path)</li>
+<li>[ ] Documentation in elliptic solver guide</li>
+<li>[ ] Example in <code>demo_solvers</code> notebook updated to use new API</li>
+</ul>
+<hr />
+<h2 id="9-future-extensions-out-of-scope">9. Future Extensions (Out of Scope)</h2>
+<table>
+<thead>
+<tr>
+<th>Extension</th>
+<th>Integration point</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Spatially-varying per-face Dirichlet</strong> (1-D arrays on <code>Dirichlet1D</code>)</td>
+<td>Layer 3 conversion: expand 1-D face arrays into <code>(Ny, Nx)</code> lift</td>
+</tr>
+<tr>
+<td><strong>Inhomogeneous Neumann</strong> (<span class="arithmatex">\(\partial\psi/\partial n = g\)</span>)</td>
+<td><code>modify_rhs_2d</code> from spectraldiffx (spectral path); extended <code>masked_laplacian</code> (CG path)</td>
+</tr>
+<tr>
+<td><strong>Robin / mixed BCs on the solver</strong></td>
+<td><code>MixedBCHelmholtzSolver2D</code> from spectraldiffx; new Robin-aware operator for CG</td>
+</tr>
+<tr>
+<td><strong>Open-boundary conditions</strong> (radiation, sponge)</td>
+<td>Sponge1D / Robin1D already exist for time-stepping; solver integration requires absorbing-layer operator</td>
+</tr>
+<tr>
+<td><strong>3-D support</strong></td>
+<td>Lifting trick generalises to 3-D with a 6-point dilation; all spectral solvers have 3-D variants</td>
+</tr>
+<tr>
+<td><strong>Weighted observations</strong> (soft constraints)</td>
+<td>Penalty-method variant of the lifting trick: add <code>weight * (psi - obs)</code> to the operator instead of hard pinning</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>See <a href="../inhomogeneous_bcs_current/">inhomogeneous_bcs_current.md</a> for the
+current state and the manual lifting trick this design replaces.</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "content.code.copy", "content.code.annotate"], "search": "../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../../../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

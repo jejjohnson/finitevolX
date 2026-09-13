@@ -1,0 +1,3641 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Finite volume operators for JAX on Arakawa C-grids">
+      
+      
+        <meta name="author" content="Juan Emmanuel Johnson, Takaya Uchida">
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>Inhomogeneous Boundary Conditions in finitevolX: Current State - finitevolX</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#inhomogeneous-boundary-conditions-in-finitevolx-current-state" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../../.." title="finitevolX" class="md-header__button md-logo" aria-label="finitevolX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            finitevolX
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Inhomogeneous Boundary Conditions in finitevolX: Current State
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jejjohnson/finitevolX" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/finitevolX
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../cgrid_discretization/" class="md-tabs__link">
+          
+  
+  
+  C-Grid Discretization
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../masks/" class="md-tabs__link">
+          
+  
+  
+  Masks
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../multilayer_vs_3d/" class="md-tabs__link">
+          
+  
+  
+  Vertical Structure
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../stencils/" class="md-tabs__link">
+          
+  
+  
+  Raw Stencils
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../difference/" class="md-tabs__link">
+          
+  
+  
+  Difference Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../interpolation/" class="md-tabs__link">
+          
+  
+  
+  Interpolation Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../advection/" class="md-tabs__link">
+          
+  
+  
+  Advection
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../boundary_conditions/" class="md-tabs__link">
+          
+  
+  
+  Boundary Conditions
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../spatial_operators/" class="md-tabs__link">
+          
+  
+  
+  Spatial Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../time_integration/" class="md-tabs__link">
+          
+  
+  
+  Time Integration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../elliptic_solvers/" class="md-tabs__link">
+          
+  
+  
+  Elliptic Solvers
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../multigrid_solver/" class="md-tabs__link">
+          
+  
+  
+  Multigrid Solver
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../../solver_comparison/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Solver Comparison
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../../examples/" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../../CHANGELOG/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../.." title="finitevolX" class="md-nav__button md-logo" aria-label="finitevolX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    finitevolX
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jejjohnson/finitevolX" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/finitevolX
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C-Grid Discretization
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    C-Grid Discretization
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../cgrid_discretization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/grids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Masks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Masks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vertical Structure
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Vertical Structure
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../multilayer_vs_3d/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/vertical_modes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Raw Stencils
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Raw Stencils
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../stencils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/stencils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Difference Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Difference Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../difference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/difference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interpolation Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Interpolation Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advection
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advection
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../advection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/advection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/reconstruction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reconstruction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Boundary Conditions
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Boundary Conditions
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../boundary_conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/boundary_conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spatial Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Spatial Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../spatial_operators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/divergence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Divergence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/vorticity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vorticity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/diffusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diffusion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/coriolis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coriolis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/momentum/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Momentum Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time Integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Time Integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../time_integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../time_integration_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/time_integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Elliptic Solvers
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Elliptic Solvers
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../elliptic_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../elliptic_solvers_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/elliptic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convenience Wrappers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/spectral_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/spectral_transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral Transforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/capacitance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacitance Method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/iterative/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Iterative Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multigrid Solver
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Multigrid Solver
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../multigrid_solver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../multigrid_solver_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../api/multigrid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../solver_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Solver Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_15" >
+        
+          
+          <label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_15">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/demo_masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Masks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/demo_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Elliptic Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/pressure_poisson/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pressure Poisson
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/streamfunction_inversion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streamfunction Inversion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/helmholtz_screening/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Helmholtz Screening
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/advection_1d_schemes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1-D Advection Schemes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/advection_2d_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2-D Rotating Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/advection_2d_masked/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2-D Masked Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/swm_linear/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linear Shallow Water
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/shallow_water/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nonlinear Shallow Water
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../notebooks/qg_1p5_layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.5-Layer QG
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../CHANGELOG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-when-non-zero-boundary-data-arises" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. When Non-Zero Boundary Data Arises
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-what-finitevolx-already-has-the-ghost-cell-bc-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. What finitevolX Already Has: The Ghost-Cell BC System
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. What finitevolX Already Has: The Ghost-Cell BC System">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-single-face-bc-atoms-bc_1dpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Single-Face BC Atoms (bc_1d.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-per-face-containers-bc_setpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Per-Face Containers (bc_set.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-multi-field-dispatch-bc_fieldpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Multi-Field Dispatch (bc_field.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-functional-helpers-boundarypy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 Functional Helpers (boundary.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-what-the-elliptic-solvers-accept" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. What the Elliptic Solvers Accept
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. What the Elliptic Solvers Accept">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-bc-parameter-is-a-transform-selector-not-a-bc-object" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The bc= parameter is a transform selector, not a BC object
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#all-four-solver-methods-enforce-homogeneous-bcs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        All four solver methods enforce homogeneous BCs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unsurfaced-prior-art-modify_rhs_-from-spectraldiffx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unsurfaced prior art: modify_rhs_* from spectraldiffx
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-the-gap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. The Gap
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-worked-example-the-lifting-trick-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Worked Example: The Lifting Trick Today
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Worked Example: The Lifting Trick Today">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-decomposition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Decomposition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-1-identify-the-boundary-cells" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Identify the boundary cells
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-build-the-lifting-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Build the lifting function
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-correct-the-rhs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Correct the RHS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-solve-the-homogeneous-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4: Solve the homogeneous problem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-5-reconstruct-the-full-solution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5: Reconstruct the full solution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#summary-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary table
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-pain-points-with-the-manual-approach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Pain Points With the Manual Approach
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-existing-infrastructure-that-a-future-api-can-reuse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Existing Infrastructure That a Future API Can Reuse
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="inhomogeneous-boundary-conditions-in-finitevolx-current-state">Inhomogeneous Boundary Conditions in finitevolX: Current State</h1>
+<p>This document describes how finitevolX handles boundary conditions today,
+highlights the gap between the time-stepping BC vocabulary and the elliptic
+solver layer, and walks through the manual lifting-trick workaround for
+non-zero Dirichlet data.</p>
+<p><strong>Companion document:</strong> <a href="../inhomogeneous_bcs_design/">inhomogeneous_bcs_design.md</a>
+proposes a future API that closes this gap.</p>
+<p><strong>GitHub issue:</strong> <a href="https://github.com/jejjohnson/finitevolX/issues/186">jejjohnson/finitevolX#186</a></p>
+<hr />
+<h2 id="1-when-non-zero-boundary-data-arises">1. When Non-Zero Boundary Data Arises</h2>
+<table>
+<thead>
+<tr>
+<th>Use case</th>
+<th>Boundary data source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Regional nesting</strong></td>
+<td>Parent model provides SSH/streamfunction at open boundaries</td>
+</tr>
+<tr>
+<td><strong>Data assimilation</strong></td>
+<td>Tide gauges or satellite altimetry fix boundary values</td>
+</tr>
+<tr>
+<td><strong>Reanalysis-forced runs</strong></td>
+<td>ERA5 or ORAS5 SSH prescribed at lateral boundaries</td>
+</tr>
+<tr>
+<td><strong>Two-way coupling</strong></td>
+<td>Outer model provides BCs for an inner high-resolution domain</td>
+</tr>
+<tr>
+<td><strong>Manufactured solutions</strong></td>
+<td>Testing with non-trivial exact solutions that don't vanish at boundaries</td>
+</tr>
+</tbody>
+</table>
+<p>All of these require solving <span class="arithmatex">\((A - \lambda)\psi = f\)</span> with <span class="arithmatex">\(\psi = g\)</span> on the
+boundary, where <span class="arithmatex">\(g \neq 0\)</span>.</p>
+<hr />
+<h2 id="2-what-finitevolx-already-has-the-ghost-cell-bc-system">2. What finitevolX Already Has: The Ghost-Cell BC System</h2>
+<p>The boundary module (<code>finitevolx/_src/boundary/</code>) provides a rich, composable
+set of BC objects built on the ghost-cell paradigm.  All arrays have shape
+<code>(Ny, Nx)</code> with an outermost one-cell ghost ring; the physical boundary lies
+between the first interior cell and the ghost cell.</p>
+<h3 id="21-single-face-bc-atoms-bc_1dpy">2.1 Single-Face BC Atoms (<code>bc_1d.py</code>)</h3>
+<p>Nine BC types, all <code>equinox.Module</code> subclasses with a common signature:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">bc</span> <span class="o">=</span> <span class="n">SomeBCType</span><span class="p">(</span><span class="n">face</span><span class="o">=</span><span class="s2">&quot;south&quot;</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">field_updated</span> <span class="o">=</span> <span class="n">bc</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">dx</span><span class="o">=</span><span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="o">=</span><span class="n">dy</span><span class="p">)</span>  <span class="c1"># returns field with one ghost face set</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>BC Type</th>
+<th>Class</th>
+<th>Ghost-cell formula</th>
+<th>Typical use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dirichlet</td>
+<td><code>Dirichlet1D</code></td>
+<td><code>ghost = 2*value - interior</code></td>
+<td>Fixed wall value (<span class="arithmatex">\(\psi = 0\)</span>, <span class="arithmatex">\(u = 0\)</span>)</td>
+</tr>
+<tr>
+<td>Neumann</td>
+<td><code>Neumann1D</code></td>
+<td><code>ghost = interior + sign*value*spacing</code></td>
+<td>Zero normal gradient (free-slip, no-flux)</td>
+</tr>
+<tr>
+<td>Periodic</td>
+<td><code>Periodic1D</code></td>
+<td><code>ghost = opposite_interior</code></td>
+<td>Doubly-periodic channels</td>
+</tr>
+<tr>
+<td>Outflow</td>
+<td><code>Outflow1D</code></td>
+<td><code>ghost = interior</code></td>
+<td>Open boundary (zero gradient)</td>
+</tr>
+<tr>
+<td>Reflective</td>
+<td><code>Reflective1D</code></td>
+<td><code>ghost = interior</code></td>
+<td>Even symmetry (Neumann with <span class="arithmatex">\(g = 0\)</span>)</td>
+</tr>
+<tr>
+<td>Sponge</td>
+<td><code>Sponge1D</code></td>
+<td><code>ghost = (1-w)*interior + w*background</code></td>
+<td>Wave absorption</td>
+</tr>
+<tr>
+<td>Robin</td>
+<td><code>Robin1D</code></td>
+<td><span class="arithmatex">\(\alpha u + \beta \partial u/\partial n = \gamma\)</span></td>
+<td>Mixed BC</td>
+</tr>
+<tr>
+<td>Extrapolation</td>
+<td><code>Extrapolation1D</code></td>
+<td>Lagrange polynomial (orders 1--5)</td>
+<td>Smooth open boundaries</td>
+</tr>
+<tr>
+<td>Slip</td>
+<td><code>Slip1D</code></td>
+<td><code>ghost = (2a-1)*interior</code></td>
+<td>Partial-slip walls (<span class="arithmatex">\(a \in [0,1]\)</span>)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key point:</strong> <code>Dirichlet1D</code> already accepts a non-zero <code>value=g</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">finitevolx</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dirichlet1D</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Non-zero Dirichlet: ψ = 0.5 on the south wall</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">bc_south</span> <span class="o">=</span> <span class="n">Dirichlet1D</span><span class="p">(</span><span class="n">face</span><span class="o">=</span><span class="s2">&quot;south&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">psi</span> <span class="o">=</span> <span class="n">bc_south</span><span class="p">(</span><span class="n">psi</span><span class="p">,</span> <span class="n">dx</span><span class="o">=</span><span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="o">=</span><span class="n">dy</span><span class="p">)</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="c1"># ghost[0, :] = 2*0.5 - psi[1, :] = 1.0 - psi[1, :]</span>
+</code></pre></div>
+<h3 id="22-per-face-containers-bc_setpy">2.2 Per-Face Containers (<code>bc_set.py</code>)</h3>
+<p><code>BoundaryConditionSet</code> composes one atom per face (south, north, west, east):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">finitevolx</span><span class="w"> </span><span class="kn">import</span> <span class="n">BoundaryConditionSet</span><span class="p">,</span> <span class="n">Dirichlet1D</span><span class="p">,</span> <span class="n">Periodic1D</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">bc_set</span> <span class="o">=</span> <span class="n">BoundaryConditionSet</span><span class="p">(</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">south</span><span class="o">=</span><span class="n">Dirichlet1D</span><span class="p">(</span><span class="n">face</span><span class="o">=</span><span class="s2">&quot;south&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">north</span><span class="o">=</span><span class="n">Dirichlet1D</span><span class="p">(</span><span class="n">face</span><span class="o">=</span><span class="s2">&quot;north&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">west</span><span class="o">=</span><span class="n">Periodic1D</span><span class="p">(</span><span class="n">face</span><span class="o">=</span><span class="s2">&quot;west&quot;</span><span class="p">),</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">east</span><span class="o">=</span><span class="n">Periodic1D</span><span class="p">(</span><span class="n">face</span><span class="o">=</span><span class="s2">&quot;east&quot;</span><span class="p">),</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="p">)</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="n">psi</span> <span class="o">=</span> <span class="n">bc_set</span><span class="p">(</span><span class="n">psi</span><span class="p">,</span> <span class="n">dx</span><span class="o">=</span><span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="o">=</span><span class="n">dy</span><span class="p">)</span>  <span class="c1"># all four faces updated</span>
+</code></pre></div>
+<p>Application order: south -&gt; north -&gt; west -&gt; east (west/east overwrite corners).</p>
+<p>Factory methods for common patterns:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">BoundaryConditionSet</span><span class="o">.</span><span class="n">periodic</span><span class="p">()</span>  <span class="c1"># all four faces periodic</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">BoundaryConditionSet</span><span class="o">.</span><span class="n">open</span><span class="p">()</span>      <span class="c1"># all four faces zero-gradient outflow</span>
+</code></pre></div>
+<h3 id="23-multi-field-dispatch-bc_fieldpy">2.3 Multi-Field Dispatch (<code>bc_field.py</code>)</h3>
+<p><code>FieldBCSet</code> applies different BC sets to different state-dictionary entries:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">finitevolx</span><span class="w"> </span><span class="kn">import</span> <span class="n">FieldBCSet</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">field_bcs</span> <span class="o">=</span> <span class="n">FieldBCSet</span><span class="p">(</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">bc_map</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;psi&quot;</span><span class="p">:</span> <span class="n">bc_closed_basin</span><span class="p">,</span> <span class="s2">&quot;eta&quot;</span><span class="p">:</span> <span class="n">bc_open_boundary</span><span class="p">},</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">default</span><span class="o">=</span><span class="n">BoundaryConditionSet</span><span class="o">.</span><span class="n">periodic</span><span class="p">(),</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="p">)</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="n">state_out</span> <span class="o">=</span> <span class="n">field_bcs</span><span class="p">(</span><span class="n">state_dict</span><span class="p">,</span> <span class="n">dx</span><span class="o">=</span><span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="o">=</span><span class="n">dy</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="24-functional-helpers-boundarypy">2.4 Functional Helpers (<code>boundary.py</code>)</h3>
+<p>Quick one-liners for common homogeneous patterns:</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>zero_boundaries(field)</code></td>
+<td>Homogeneous Dirichlet (<span class="arithmatex">\(\psi = 0\)</span>) on all faces</td>
+</tr>
+<tr>
+<td><code>zero_gradient_boundaries(field)</code></td>
+<td>Homogeneous Neumann (<span class="arithmatex">\(\partial\psi/\partial n = 0\)</span>)</td>
+</tr>
+<tr>
+<td><code>no_flux_boundaries(field)</code></td>
+<td>Alias for <code>zero_boundaries</code> (normal flux = 0)</td>
+</tr>
+<tr>
+<td><code>no_slip_boundaries(field)</code></td>
+<td>Tangential velocity = 0 (ghost = <span class="arithmatex">\(-\)</span>interior)</td>
+</tr>
+<tr>
+<td><code>free_slip_boundaries(field)</code></td>
+<td>Zero normal gradient (ghost = interior)</td>
+</tr>
+<tr>
+<td><code>enforce_periodic(field)</code></td>
+<td>Periodic wrapping in x and/or y</td>
+</tr>
+<tr>
+<td><code>wall_boundaries(field, stag)</code></td>
+<td>C-grid composite: picks correct BC per staggering (<code>h</code>/<code>u</code>/<code>v</code>/<code>q</code>)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-what-the-elliptic-solvers-accept">3. What the Elliptic Solvers Accept</h2>
+<p>The three convenience wrappers live in <code>finitevolx/_src/solvers/elliptic.py</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Streamfunction from vorticity: ∇²ψ − λψ = ζ</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">psi</span> <span class="o">=</span> <span class="n">fvx</span><span class="o">.</span><span class="n">streamfunction_from_vorticity</span><span class="p">(</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">zeta</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">bc</span><span class="o">=</span><span class="s2">&quot;dst&quot;</span><span class="p">,</span>              <span class="c1"># ← a STRING, not a BC object</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">lambda_</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;spectral&quot;</span><span class="p">,</span>     <span class="c1"># or &quot;cg&quot; or &quot;capacitance&quot;</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">mask</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="n">capacitance_solver</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="n">preconditioner</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="p">)</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="c1"># Pressure from divergence: ∇²p = ∇·u</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="n">p</span> <span class="o">=</span> <span class="n">fvx</span><span class="o">.</span><span class="n">pressure_from_divergence</span><span class="p">(</span><span class="n">div_u</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">bc</span><span class="o">=</span><span class="s2">&quot;dct&quot;</span><span class="p">)</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="c1"># PV inversion: (∇² − λ)ψ = q  (multi-layer / batched)</span>
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="n">psi</span> <span class="o">=</span> <span class="n">fvx</span><span class="o">.</span><span class="n">pv_inversion</span><span class="p">(</span><span class="n">pv</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">lambda_</span><span class="o">=</span><span class="n">lam</span><span class="p">,</span> <span class="n">bc</span><span class="o">=</span><span class="s2">&quot;dst&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="the-bc-parameter-is-a-transform-selector-not-a-bc-object">The <code>bc=</code> parameter is a transform selector, not a BC object</h3>
+<table>
+<thead>
+<tr>
+<th><code>bc</code> value</th>
+<th>Transform</th>
+<th>Implicit boundary condition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"dst"</code></td>
+<td>Discrete Sine Transform</td>
+<td>Homogeneous Dirichlet (<span class="arithmatex">\(\psi = 0\)</span>)</td>
+</tr>
+<tr>
+<td><code>"dct"</code></td>
+<td>Discrete Cosine Transform</td>
+<td>Homogeneous Neumann (<span class="arithmatex">\(\partial\psi/\partial n = 0\)</span>)</td>
+</tr>
+<tr>
+<td><code>"fft"</code></td>
+<td>Fast Fourier Transform</td>
+<td>Periodic</td>
+</tr>
+</tbody>
+</table>
+<p>All three call the same internal dispatcher (<code>_solve_dispatch</code>, line 253),
+which routes to one of:</p>
+<ul>
+<li><strong>Spectral</strong> (<code>_solve_spectral</code>): calls <code>spectraldiffx</code>'s <code>solve_helmholtz_dst/dct/fft</code></li>
+<li><strong>CG</strong> (<code>_solve_cg_method</code>): uses <code>masked_laplacian</code> as the <code>matvec</code> operator</li>
+<li><strong>Capacitance</strong> (<code>_solve_capacitance_method</code>): calls a pre-built <code>CapacitanceSolver</code></li>
+</ul>
+<p>Plus the <strong>multigrid</strong> path, accessible through <code>build_multigrid_solver</code> -&gt;
+<code>make_multigrid_preconditioner</code> -&gt; CG.</p>
+<h3 id="all-four-solver-methods-enforce-homogeneous-bcs">All four solver methods enforce homogeneous BCs</h3>
+<p><strong>Masked Laplacian</strong> (<code>iterative.py:144-191</code>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">masked_laplacian</span><span class="p">(</span><span class="n">psi</span><span class="p">,</span> <span class="n">mask</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">lambda_</span><span class="o">=</span><span class="mf">0.0</span><span class="p">):</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="n">psi_m</span> <span class="o">=</span> <span class="n">psi</span> <span class="o">*</span> <span class="n">mask_arr</span>          <span class="c1"># ← zero outside domain</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">lap</span> <span class="o">=</span> <span class="p">(</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>        <span class="n">jnp</span><span class="o">.</span><span class="n">roll</span><span class="p">(</span><span class="n">psi_m</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">jnp</span><span class="o">.</span><span class="n">roll</span><span class="p">(</span><span class="n">psi_m</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">psi_m</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="p">)</span> <span class="o">/</span> <span class="n">dx</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="p">(</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>        <span class="n">jnp</span><span class="o">.</span><span class="n">roll</span><span class="p">(</span><span class="n">psi_m</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="n">jnp</span><span class="o">.</span><span class="n">roll</span><span class="p">(</span><span class="n">psi_m</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="o">-</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">psi_m</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="p">)</span> <span class="o">/</span> <span class="n">dy</span><span class="o">**</span><span class="mi">2</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="k">return</span> <span class="p">(</span><span class="n">lap</span> <span class="o">-</span> <span class="n">lambda_</span> <span class="o">*</span> <span class="n">psi_m</span><span class="p">)</span> <span class="o">*</span> <span class="n">mask_arr</span>  <span class="c1"># ← zero outside domain</span>
+</code></pre></div>
+<p>The two <code>* mask_arr</code> operations hard-wire <span class="arithmatex">\(\psi = 0\)</span> at the mask boundary.
+There is no parameter to inject non-zero boundary values.</p>
+<p><strong>Capacitance solver:</strong> Enforces <span class="arithmatex">\(\psi = 0\)</span> at all inner-boundary points
+(ocean cells adjacent to land) through the Sherman-Morrison correction.</p>
+<p><strong>Multigrid operator</strong> (<code>multigrid.py:327-410</code>): Zeroes the face coefficients
+<code>cx</code>/<code>cy</code> at the mask edge, baking homogeneous Dirichlet into the precomputed
+level hierarchy.</p>
+<h3 id="unsurfaced-prior-art-modify_rhs_-from-spectraldiffx">Unsurfaced prior art: <code>modify_rhs_*</code> from spectraldiffx</h3>
+<p><code>spectraldiffx</code> already ships <code>modify_rhs_1d</code>, <code>modify_rhs_2d</code>, and
+<code>modify_rhs_3d</code> for encoding inhomogeneous BC values into the RHS of a
+spectral solve.  finitevolX re-exports them (<code>spectral.py:48-50</code>) but <strong>none
+of the convenience wrappers surface them</strong> -- they sit unused in the public API.</p>
+<hr />
+<h2 id="4-the-gap">4. The Gap</h2>
+<p>The BC vocabulary is <strong>rich on one side</strong> (9 atom types, per-face composition,
+multi-field dispatch, non-zero <code>value=</code> support) and <strong>a single string on the
+other</strong> (the <code>bc="dst"</code> parameter on the elliptic wrappers).</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>Time-stepping BCs              Elliptic solver BCs
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>──────────────────              ──────────────────
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>Dirichlet1D(value=g)           bc=&quot;dst&quot; → ψ=0
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>Neumann1D(value=g)             bc=&quot;dct&quot; → ∂ψ/∂n=0
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>Robin1D(α, β, γ)               bc=&quot;fft&quot; → periodic
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>Sponge1D(bg, weight)           (nothing)
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>Slip1D(coefficient)            (nothing)
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>BoundaryConditionSet           (nothing)
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>FieldBCSet                     (nothing)
+</code></pre></div>
+<p>Non-zero boundary data has nowhere to go.  Users who need <span class="arithmatex">\(\psi = g \neq 0\)</span>
+must hand-roll the <strong>lifting trick</strong>.</p>
+<hr />
+<h2 id="5-worked-example-the-lifting-trick-today">5. Worked Example: The Lifting Trick Today</h2>
+<p>This is the workflow from <code>docs/notebooks/demo_solvers.py</code>, Section 8
+(lines 944--1087).  It solves the Helmholtz equation on a basin domain with
+prescribed non-zero Dirichlet data: <span class="arithmatex">\(\psi = g\)</span> on the boundary, where
+<span class="arithmatex">\(g(y) = 0.1 \sin(2\pi y / L_y)\)</span>.</p>
+<h3 id="the-decomposition">The Decomposition</h3>
+<div class="arithmatex">\[
+\psi = \psi_{\text{lift}} + \psi_{\text{hom}}
+\]</div>
+<p>where <span class="arithmatex">\(\psi_{\text{lift}}\)</span> matches the prescribed boundary data <span class="arithmatex">\(g\)</span>, and
+<span class="arithmatex">\(\psi_{\text{hom}}\)</span> solves the <strong>corrected</strong> equation with <strong>zero</strong> BCs:</p>
+<div class="arithmatex">\[
+(A - \lambda)\,\psi_{\text{hom}} = f - (A - \lambda)\,\psi_{\text{lift}},
+\qquad \psi_{\text{hom}} = 0 \;\text{on boundary}
+\]</div>
+<h3 id="step-1-identify-the-boundary-cells">Step 1: Identify the boundary cells</h3>
+<p>The "boundary cells" for the lift are the <strong>dry cells adjacent to at least one
+wet cell</strong> -- the 1-cell-wide land ring around the ocean.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scipy.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="n">binary_dilation</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">wet</span> <span class="o">=</span> <span class="n">mask_basin</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">wet_dilated</span> <span class="o">=</span> <span class="n">binary_dilation</span><span class="p">(</span><span class="n">wet</span><span class="p">)</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="n">dry_boundary</span> <span class="o">=</span> <span class="n">wet_dilated</span> <span class="o">&amp;</span> <span class="o">~</span><span class="n">wet</span>
+</code></pre></div>
+<h3 id="step-2-build-the-lifting-function">Step 2: Build the lifting function</h3>
+<p>Place the prescribed values at dry boundary cells, zero elsewhere:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">g_field</span> <span class="o">=</span> <span class="mf">0.1</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">Y</span> <span class="o">/</span> <span class="n">Ny</span><span class="p">)</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">psi_lift</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">Ny</span><span class="p">,</span> <span class="n">Nx</span><span class="p">))</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="n">psi_lift</span><span class="p">[</span><span class="n">dry_boundary</span><span class="p">]</span> <span class="o">=</span> <span class="n">g_field</span><span class="p">[</span><span class="n">dry_boundary</span><span class="p">]</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="n">psi_lift_jnp</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">psi_lift</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="step-3-correct-the-rhs">Step 3: Correct the RHS</h3>
+<p>Subtract the operator applied to the lift at wet cells:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">A_psi_lift</span> <span class="o">=</span> <span class="n">fvx</span><span class="o">.</span><span class="n">masked_laplacian</span><span class="p">(</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="n">psi_lift_jnp</span><span class="p">,</span> <span class="n">mask_basin_jnp</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">lambda_</span><span class="o">=</span><span class="n">lambda_</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="p">)</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">rhs_corrected</span> <span class="o">=</span> <span class="n">rhs_basin</span> <span class="o">-</span> <span class="n">A_psi_lift</span>
+</code></pre></div>
+<h3 id="step-4-solve-the-homogeneous-problem">Step 4: Solve the homogeneous problem</h3>
+<p>Any solver works here -- the lift only changed the RHS:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">sol_cg_inhom</span><span class="p">,</span> <span class="n">info_inhom</span> <span class="o">=</span> <span class="n">fvx</span><span class="o">.</span><span class="n">solve_cg</span><span class="p">(</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>    <span class="n">A_basin</span><span class="p">,</span> <span class="n">rhs_corrected</span><span class="p">,</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    <span class="n">preconditioner</span><span class="o">=</span><span class="n">pc_basin</span><span class="p">,</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    <span class="n">rtol</span><span class="o">=</span><span class="mf">1e-10</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-10</span><span class="p">,</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="p">)</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="n">sol_cg_inhom</span> <span class="o">=</span> <span class="n">sol_cg_inhom</span> <span class="o">*</span> <span class="n">mask_basin_jnp</span>  <span class="c1"># zero outside</span>
+</code></pre></div>
+<h3 id="step-5-reconstruct-the-full-solution">Step 5: Reconstruct the full solution</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">psi_full_inhom</span> <span class="o">=</span> <span class="n">psi_lift_jnp</span> <span class="o">+</span> <span class="n">sol_cg_inhom</span>
+</code></pre></div>
+<p>At wet cells: <span class="arithmatex">\(\psi = 0 + \psi_{\text{hom}}\)</span> (the solver result).
+At dry boundary cells: <span class="arithmatex">\(\psi = g + 0\)</span> (the prescribed data).</p>
+<h3 id="summary-table">Summary table</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Operation</th>
+<th>Code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Find boundary ring</td>
+<td><code>dry_boundary = binary_dilation(wet) &amp; ~wet</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Build <span class="arithmatex">\(\psi_{\text{lift}}\)</span></td>
+<td><code>psi_lift[dry_boundary] = g[dry_boundary]</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Correct RHS</td>
+<td><code>rhs' = rhs - masked_laplacian(psi_lift, ...)</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Solve homogeneous</td>
+<td><code>psi_hom = solver(rhs')</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Reconstruct</td>
+<td><code>psi = psi_lift + psi_hom</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-pain-points-with-the-manual-approach">6. Pain Points With the Manual Approach</h2>
+<ol>
+<li>
+<p><strong>Users must know which cells are "boundary".</strong>  The lift lives at <em>dry
+   cells adjacent to wet</em>, not the coast ring itself.  Getting this wrong
+   silently produces garbage.</p>
+</li>
+<li>
+<p><strong>The dilation requires SciPy.</strong>  <code>scipy.ndimage.binary_dilation</code> is a
+   NumPy operation that cannot be JIT-compiled.  In a time-stepping loop
+   where <span class="arithmatex">\(g\)</span> changes every step, the mask work must be hoisted outside the
+   JIT boundary -- which is non-obvious.</p>
+</li>
+<li>
+<p><strong>The masked Laplacian must be reapplied to the lift.</strong>  Step 3 is easy
+   to forget or get wrong (e.g. applying the bare Laplacian instead of the
+   Helmholtz operator, or forgetting the mask).</p>
+</li>
+<li>
+<p><strong>Reconstruction is a separate step.</strong>  Step 5 is trivial but easy to
+   forget, especially in a multi-layer <code>pv_inversion</code> loop where each layer
+   needs its own lift.</p>
+</li>
+<li>
+<p><strong>No spectral-path equivalent.</strong>  The lifting trick as written above
+   works only with CG/capacitance/multigrid (all mask-based).  For the
+   spectral path on a rectangular domain, the correct approach is to
+   encode the inhomogeneous data via <code>modify_rhs_2d</code> from <code>spectraldiffx</code>
+   -- but the convenience wrappers don't expose this, so users have to
+   drop down to the raw spectral API.</p>
+</li>
+<li>
+<p><strong>No connection to the BC vocabulary.</strong>  A user who writes
+   <code>Dirichlet1D(face="west", value=0.5)</code> for time-stepping has no way to
+   feed that same information to <code>streamfunction_from_vorticity</code>.  The two
+   systems are completely disconnected.</p>
+</li>
+<li>
+<p><strong>Multi-layer PV inversion is particularly painful.</strong>  <code>pv_inversion</code>
+   accepts a <code>lambda_</code> array for per-layer Helmholtz parameters and handles
+   the <code>vmap</code> internally -- but the user must replicate that batching logic
+   externally to apply the lift per layer, defeating the purpose of the
+   convenience wrapper.</p>
+</li>
+</ol>
+<hr />
+<h2 id="7-existing-infrastructure-that-a-future-api-can-reuse">7. Existing Infrastructure That a Future API Can Reuse</h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Location</th>
+<th>Reuse potential</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Dirichlet1D(value=g)</code></td>
+<td><code>bc_1d.py:68-93</code></td>
+<td>Already carries non-zero values; can be expanded from per-face to per-cell</td>
+</tr>
+<tr>
+<td><code>BoundaryConditionSet</code></td>
+<td><code>bc_set.py:11-66</code></td>
+<td>Natural container to pass 4-face Dirichlet data to a solver</td>
+</tr>
+<tr>
+<td><code>masked_laplacian</code></td>
+<td><code>iterative.py:144-191</code></td>
+<td>Step 3 of the lift already uses this; no new operator needed</td>
+</tr>
+<tr>
+<td><code>_solve_dispatch</code></td>
+<td><code>elliptic.py:253-273</code></td>
+<td>Central routing point; <code>known_values</code>/<code>known_mask</code> kwargs can be added here</td>
+</tr>
+<tr>
+<td><code>modify_rhs_2d</code></td>
+<td><code>spectral.py:49</code> (re-export)</td>
+<td>Spectral-path inhomogeneous BCs; already available but unused</td>
+</tr>
+<tr>
+<td><code>_inner_boundary_indices</code></td>
+<td><code>tests/test_solver_wrappers.py:47-54</code></td>
+<td>SciPy-based helper for finding boundary ring; candidate for JAX-native port</td>
+</tr>
+<tr>
+<td><code>pv_inversion</code> vmap logic</td>
+<td><code>elliptic.py:437-542</code></td>
+<td>Multi-layer batching that the lift must integrate with</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>See <a href="../inhomogeneous_bcs_design/">inhomogeneous_bcs_design.md</a> for the
+proposed API that addresses these pain points.</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "content.code.copy", "content.code.annotate"], "search": "../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../../../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
