@@ -62,6 +62,25 @@ field stored column indices and `_yids` stored row indices.
   library.  Equivalent inline code is available in
   `docs/notebooks/demo_masks.py`.
 
+## [0.0.45](https://github.com/jejjohnson/finitevolX/compare/v0.0.44...v0.0.45) (2026-09-12)
+
+
+### Features
+
+* **grid:** physical cell-width helpers on spherical grids ([6fae0d6](https://github.com/jejjohnson/finitevolX/commit/6fae0d6c43239ee50d5cfa3bab6cf2422647b20a))
+* **grid:** physical cell-width helpers on spherical grids ([409404b](https://github.com/jejjohnson/finitevolX/commit/409404b7423617fe4769ae29bdbd8f9ac547433c))
+* **reductions:** mask-aware sample statistics over a leading axis ([adeabf0](https://github.com/jejjohnson/finitevolX/commit/adeabf0dce8cced7b179fa306388bfcd13764ee3))
+* **reductions:** mask-aware sample statistics over a leading axis ([9525c29](https://github.com/jejjohnson/finitevolX/commit/9525c29a745f62b1802f5fb4fe257bcab8d2aa70))
+
+
+### Bug Fixes
+
+* **grid:** keep rejecting genuinely negative zonal widths ([06b3986](https://github.com/jejjohnson/finitevolX/commit/06b398654240160a0f2fb76b1fae178545c65400))
+* **grid:** recognise positive pole roundoff as a degenerate width ([d8f8bb1](https://github.com/jejjohnson/finitevolX/commit/d8f8bb15f822b0b698441cd9e60661ba575252ed))
+* **reductions:** accumulate masked statistics in at least float32 ([1f1c78c](https://github.com/jejjohnson/finitevolX/commit/1f1c78c25f54b09b281ff6f0b71e98d895b8e60d))
+* **reductions:** honour any eps, and keep dry cells at identity for ddof &lt; 0 ([7cb775a](https://github.com/jejjohnson/finitevolX/commit/7cb775a764e9f099fe53f4335efbda7bdfa86fa2))
+* **reductions:** honour the requested floor, and stop sizing the count ([ddd5153](https://github.com/jejjohnson/finitevolX/commit/ddd5153a821a58b602dd946b76dc9b1feb2e2cf4))
+
 ## [0.0.44](https://github.com/jejjohnson/finitevolX/compare/v0.0.43...v0.0.44) (2026-07-17)
 
 
