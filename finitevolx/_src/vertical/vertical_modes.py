@@ -127,27 +127,47 @@ def decompose_vertical_modes(
 ) -> tuple[Float[Array, "nl"], Float[Array, "nl nl"], Float[Array, "nl nl"]]:
     """Eigendecompose the coupling matrix A to get Rossby radii and transforms.
 
-    Uses ``jnp.linalg.eigh`` (Hermitian eigendecomposition) for numerical
-    stability and JAX-JIT compatibility.  A is treated as symmetric
-    positive-semi-definite, which is exact when all layer thicknesses are equal.
-    The eigenvectors R are orthonormal, so::
+    A is **not** symmetric unless all layer thicknesses are equal: it is
+    ``diag(1/H) @ B`` for a symmetric B, so ``A[i, i+1] / A[i+1, i] =
+    H[i+1] / H[i]``.  Handing it straight to a symmetric eigensolver would
+    silently decompose a different matrix — the one built from a single
+    triangle — whose eigenvectors do not diagonalize A, leaving the modes
+    coupled and the deformation radii wrong.
 
-        Cl2m = Rᵀ
-        Cm2l = R
-        Cl2m @ Cm2l = Rᵀ R = I
+    So A is diagonalized through its symmetric similarity
+    ``S = diag(d) @ A @ diag(1/d)``, where ``d[i] ∝ sqrt(H[i])`` is recovered
+    from A's own off-diagonals.  S shares A's real, non-negative eigenvalues,
+    and A's eigenvectors are ``r = v / d`` for S's orthonormal ``v``.  This
+    keeps ``jnp.linalg.eigh`` — stable, JIT-compatible, and sorted real
+    output — rather than reaching for a general eigensolver, and reduces to
+    the plain symmetric case (``d`` constant) for equal thicknesses::
+
+        Cl2m = vᵀ diag(d)
+        Cm2l = diag(1/d) v
+        Cl2m @ Cm2l = vᵀ v = I
+
+    The mode basis is scaled by ``d[0] = 1`` rather than to unit column norm.
+    A vertical mode is only defined up to a scale, the pair inverts and
+    diagonalizes the same either way, and the choice cancels in a
+    layer → mode → layer round trip.
 
     Parameters
     ----------
     A : Float[Array, "nl nl"]
         Vertical coupling matrix (from :func:`build_coupling_matrix`).
+        Assumed tridiagonal with same-sign off-diagonal pairs, which
+        :func:`build_coupling_matrix` gives for positive ``H`` and
+        ``g_prime``.
     f0 : float
         Reference Coriolis parameter [s⁻¹].
 
     Returns
     -------
     rossby_radii : Float[Array, "nl"]
-        Rossby deformation radii [m] for each vertical mode.
-        The barotropic mode (zero eigenvalue) has an infinite radius.
+        Rossby deformation radii [m] for each vertical mode.  A rigid lid
+        makes the gravest eigenvalue zero and its radius infinite; with a
+        free surface (a finite ``g_prime[0]``) that mode is instead the
+        external one, at a large but finite ``sqrt(g H_total) / f0``.
     Cl2m : Float[Array, "nl nl"]
         Layer-to-mode transform matrix.  ``mode = Cl2m @ layer``.
     Cm2l : Float[Array, "nl nl"]
@@ -167,14 +187,26 @@ def decompose_vertical_modes(
     >>> Cl2m.shape
     (2, 2)
     """
-    # Use the Hermitian eigendecomposition; eigenvectors are orthonormal so
-    # left and right eigenvectors coincide and Lᵀ R = I.
-    lambd, R = jnp.linalg.eigh(jnp.asarray(A, dtype=float))
+    A = jnp.asarray(A, dtype=float)
     f0_arr = jnp.asarray(f0, dtype=float)
 
-    # With orthonormal R: Cl2m = Rᵀ, Cm2l = R  →  Cl2m @ Cm2l = I
-    Cm2l = R
-    Cl2m = R.T
+    # Symmetrizing scale. S = diag(d) A diag(1/d) is symmetric when
+    # d[i]**2 A[i, i+1] == d[i+1]**2 A[i+1, i], i.e. when successive ratios
+    # are sqrt(A[i, i+1] / A[i+1, i]) — which is sqrt(H[i+1] / H[i]) for a
+    # coupling matrix, so d ∝ sqrt(H) without needing H itself. Both
+    # off-diagonals are negative, so the ratio is positive.  For a single
+    # layer the diagonals are empty and d is [1.0].
+    ratio = jnp.diagonal(A, 1) / jnp.diagonal(A, -1)
+    d = jnp.concatenate([jnp.ones((1,), dtype=A.dtype), jnp.cumprod(jnp.sqrt(ratio))])
+
+    S = (d[:, None] * A) / d[None, :]
+    S = 0.5 * (S + S.T)  # drop the residual asymmetry left by round-off
+    lambd, v = jnp.linalg.eigh(S)  # ascending, real; v orthonormal
+
+    # Map S's orthonormal eigenvectors back to A's: r = v / d. The inverse is
+    # exact and needs no solve, since Cm2l = diag(1/d) v inverts to vᵀ diag(d).
+    Cm2l = v / d[:, None]
+    Cl2m = v.T * d[None, :]
 
     # Rossby deformation radii: Rd = 1 / (|f0| * sqrt(lambda))
     # Only positive eigenvalues yield a finite radius.  Eigenvalues that are

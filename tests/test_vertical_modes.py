@@ -107,6 +107,17 @@ class TestBuildCouplingMatrix:
 # decompose_vertical_modes
 # ---------------------------------------------------------------------------
 
+# Stratifications spanning the symmetric case (equal thicknesses) and the
+# non-symmetric one (unequal thicknesses), the latter being what a symmetric
+# eigensolver applied straight to A gets wrong.
+STRATIFICATIONS = [
+    pytest.param([500.0, 500.0], [0.02, 0.02], id="equal-2-layer"),
+    pytest.param([300.0, 400.0, 300.0], [0.02, 0.015, 0.015], id="unequal-3-layer"),
+    pytest.param(
+        [400.0, 1100.0, 2600.0], [9.81, 0.025, 0.0125], id="mqgeometry-3-layer"
+    ),
+]
+
 
 class TestDecomposeVerticalModes:
     @pytest.fixture
@@ -230,6 +241,65 @@ class TestDecomposeVerticalModes:
         _radii, Cl2m, Cm2l = decompose_vertical_modes(A, f0)
         product = np.array(Cl2m) @ np.array(Cm2l)
         np.testing.assert_allclose(product, np.eye(3), atol=1e-5)
+
+    @pytest.mark.parametrize("H,g_prime", STRATIFICATIONS)
+    def test_transform_diagonalizes_the_coupling_matrix(self, H, g_prime):
+        """Cl2m @ A @ Cm2l is diagonal — the whole point of the decomposition.
+
+        ``Cl2m @ Cm2l == I`` holds for any orthonormal eigenvectors and so
+        does not catch this: what decouples the layers is the transform
+        diagonalizing A itself. Unequal thicknesses make A non-symmetric, and
+        vectors read off one triangle of it leave residual coupling of the
+        same order as the eigenvalues, which makes the multilayer Helmholtz
+        inversion solve the wrong coupled problem.
+        """
+        A = build_coupling_matrix(jnp.array(H), jnp.array(g_prime))
+        _radii, Cl2m, Cm2l = decompose_vertical_modes(A, f0=1e-4)
+        diagonalized = np.array(Cl2m) @ np.array(A) @ np.array(Cm2l)
+        off_diagonal = diagonalized - np.diag(np.diag(diagonalized))
+        scale = np.abs(np.diag(diagonalized)).max()
+        assert np.abs(off_diagonal).max() < 1e-5 * scale
+
+    @pytest.mark.parametrize("H,g_prime", STRATIFICATIONS)
+    def test_eigenvalues_match_a_general_eigensolver(self, H, g_prime):
+        """The radii encode A's true spectrum, checked against ``numpy.linalg.eig``.
+
+        The symmetric-similarity route is an implementation detail; a general
+        (non-symmetric) eigensolver is the independent reference for what the
+        eigenvalues of A actually are.
+        """
+        f0 = 1e-4
+        A = build_coupling_matrix(jnp.array(H), jnp.array(g_prime))
+        radii, _Cl2m, _Cm2l = decompose_vertical_modes(A, f0)
+        # Invert Rd = 1 / (|f0| sqrt(lambda)); an infinite radius is a zero
+        # eigenvalue, which this recovers exactly.
+        eigenvalues = np.sort(1.0 / (abs(f0) * np.array(radii)) ** 2)
+        expected = np.sort(np.linalg.eigvals(np.array(A, dtype=float)).real)
+        # A symmetric eigensolver's error is absolute in the matrix norm,
+        # eps*||A||, so the gravest mode — four orders below the largest for
+        # a free surface — cannot be held to a relative bound: float32 eps
+        # alone puts it near 1e-3 relative. atol carries it, rtol the rest.
+        np.testing.assert_allclose(
+            eigenvalues, expected, rtol=1e-4, atol=1e-6 * np.abs(expected).max()
+        )
+
+    def test_free_surface_gravest_mode_is_the_external_radius(self):
+        """With a free surface the gravest mode is external, not infinite.
+
+        MQGeometry's 3-layer stratification (Thiry et al. 2024, GMD), whose
+        ``g_prime[0] = 9.81`` is a free surface rather than a rigid lid. Its
+        gravest radius is ``sqrt(g * H_total) / f0``, about 2000 km, and the
+        first baroclinic mode is the ~40 km one the eddies live on.
+        """
+        H = [400.0, 1100.0, 2600.0]
+        g_prime = [9.81, 0.025, 0.0125]
+        f0 = 1e-4
+        A = build_coupling_matrix(jnp.array(H), jnp.array(g_prime))
+        radii, _Cl2m, _Cm2l = decompose_vertical_modes(A, f0)
+        radii = np.sort(np.array(radii))[::-1]
+        external = np.sqrt(g_prime[0] * sum(H)) / abs(f0)
+        np.testing.assert_allclose(radii[0], external, rtol=1e-2)
+        assert 30e3 < radii[1] < 50e3
 
 
 # ---------------------------------------------------------------------------
