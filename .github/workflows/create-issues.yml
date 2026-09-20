@@ -1,0 +1,76 @@
+name: Create Feature Issues
+
+on:
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  create-issues:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create Issue 1 - Perpendicular Gradient Operator
+        run: |
+          gh issue create \
+            --title "feat: Perpendicular Gradient Operator (grad_perp) for Geostrophic Velocity" \
+            --body-file .github/issue-templates/01-grad-perp.md
+
+      - name: Create Issue 2 - Standalone Divergence Operator
+        run: |
+          gh issue create \
+            --title "feat: Standalone Divergence Operator (Divergence2D / Divergence3D)" \
+            --body-file .github/issue-templates/02-divergence.md
+
+      - name: Create Issue 3 - Multi-Layer Vertical Coupling Matrix
+        run: |
+          gh issue create \
+            --title "feat: Multi-Layer Vertical Coupling Matrix and Layer-Mode Transforms" \
+            --body-file .github/issue-templates/03-multilayer-coupling.md
+
+      - name: Create Issue 4 - Upwind Flux with Stencil-Width-Aware Mask Fallback
+        run: |
+          gh issue create \
+            --title "feat: Upwind Flux Dispatch with Stencil-Width-Aware Mask Fallback" \
+            --body-file .github/issue-templates/04-stencil-flux.md
+
+      - name: Create Issue 5 - Slip BC
+        run: |
+          gh issue create \
+            --title "feat: Slip / No-Slip / Partial-Slip Boundary Condition (SlipBC1D)" \
+            --body-file .github/issue-templates/05-slip-bc.md
+
+      - name: Create Issue 6 - Explicit Time Integrators
+        run: |
+          gh issue create \
+            --title "feat: Explicit Time Integrators (RK3-SSP, Heun/RK2, Adams-Bashforth 3)" \
+            --body-file .github/issue-templates/06-timestepping.md
+
+      - name: Create Issue 7 - Multigrid Helmholtz Solver
+        run: |
+          gh issue create \
+            --title "feat: Multigrid Helmholtz Solver for Variable Coefficients (MultigridHelmholtz)" \
+            --body-file .github/issue-templates/07-multigrid.md
+
+      - name: Create Issue 8 - Physical Forcing and Dissipation Operators
+        run: |
+          gh issue create \
+            --title "feat: Physical Forcing and Dissipation Operators (Wind Stress, Bottom Drag, Viscosity)" \
+            --body-file .github/issue-templates/08-forcing-dissipation.md
+
+      - name: Create Issue 9 - Arakawa Jacobian
+        run: |
+          gh issue create \
+            --title "feat: Arakawa Jacobian for Energy- and Enstrophy-Conserving PV Advection" \
+            --body-file .github/issue-templates/09-arakawa-jacobian.md
+
+      - name: Create Issue 10 - Energy and Enstrophy Diagnostics
+        run: |
+          gh issue create \
+            --title "feat: Energy and Enstrophy Diagnostic Utilities" \
+            --body-file .github/issue-templates/10-energy-diagnostics.md
