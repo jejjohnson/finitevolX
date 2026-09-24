@@ -8,12 +8,14 @@ functional form (or documented composition) when ``mask=None``.
 
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
 from finitevolx import (
     Energetics2D,
+    Mask2D,
     Strain2D,
     available_potential_energy,
     bernoulli_potential,
@@ -182,28 +184,37 @@ class TestStrainGhostCorners:
         np.testing.assert_array_equal(d[2:, :], 0.0)
 
 
+def _interior_dry(wet) -> np.ndarray:
+    """Dry cells of the interior; the ghost ring is BC-owned and finite."""
+    dry = ~np.asarray(wet, dtype=bool)
+    # dry[j, i] = False on the ghost ring
+    dry[0, :] = dry[-1, :] = False
+    dry[:, 0] = dry[:, -1] = False
+    return dry
+
+
 class TestNaNOnLand:
-    """Land values stored as NaN neither leak into wet cells nor survive."""
+    """Interior land values stored as NaN neither leak nor survive."""
 
     @pytest.mark.parametrize(("name", "method"), CASES)
     def test_nan_land_inputs(self, name, method):
         mask = make_mask_2d()
         op = _op(name, mask)
         args = _args(method)
-        wet_of = {
-            "u": np.asarray(mask.u),
-            "v": np.asarray(mask.v),
-            "h": np.asarray(mask.h),
+        dry_of = {
+            "u": _interior_dry(mask.u),
+            "v": _interior_dry(mask.v),
+            "h": _interior_dry(mask.h),
         }
         # Positional stagger of each array argument, per method.
         staggers = {
             "bernoulli_potential": ("h", "u", "v"),
             "available_potential_energy": ("h", "h"),
         }.get(method, ("u", "v"))
-        # arg[j, i] = NaN on dry cells of its stagger
+        # arg[j, i] = NaN on dry interior cells of its stagger
         nan_args = (
             tuple(
-                jnp.where(wet_of[s], a, jnp.nan)
+                jnp.where(dry_of[s], jnp.nan, a)
                 for s, a in zip(staggers, args, strict=False)
             )
             + args[len(staggers) :]
@@ -212,6 +223,79 @@ class TestNaNOnLand:
         out_nan = np.asarray(getattr(op, method)(*nan_args))
         assert np.all(np.isfinite(out_nan))
         np.testing.assert_array_equal(out_nan, out)
+
+
+class TestGradientsWithNaNOnLand:
+    """Reverse mode stays finite with NaN on interior land."""
+
+    def test_energetics_gradients(self):
+        mask = make_mask_2d()
+        op = Energetics2D(grid=make_grid_2d(), mask=mask)
+        dry_h, dry_u, dry_v = (
+            _interior_dry(mask.h),
+            _interior_dry(mask.u),
+            _interior_dry(mask.v),
+        )
+        h, u, v = _args("bernoulli_potential")
+        H = _args("available_potential_energy")[1]
+        # field[j, i] = NaN on dry interior cells of its stagger
+        h = jnp.where(dry_h, jnp.nan, h)
+        H = jnp.where(dry_h, jnp.nan, H)
+        u = jnp.where(dry_u, jnp.nan, u)
+        v = jnp.where(dry_v, jnp.nan, v)
+
+        def loss(h, H, u, v, g, gp):
+            return jnp.sum(op.bernoulli_potential(h, u, v, g)) + jnp.sum(
+                op.available_potential_energy(h, H, gp)
+            )
+
+        grads = jax.grad(loss, argnums=(0, 1, 2, 3, 4, 5))(h, H, u, v, 9.8, G_PRIME)
+        for g in grads:
+            assert np.all(np.isfinite(np.asarray(g)))
+
+    def test_strain_gradients(self):
+        mask = make_mask_2d()
+        op = Strain2D(grid=make_grid_2d(), mask=mask)
+        u, v = _args("shear")
+        u = jnp.where(_interior_dry(mask.u), jnp.nan, u)
+        v = jnp.where(_interior_dry(mask.v), jnp.nan, v)
+        du, dv = jax.grad(lambda u, v: jnp.sum(op.okubo_weiss(u, v)), (0, 1))(u, v)
+        assert np.all(np.isfinite(np.asarray(du)))
+        assert np.all(np.isfinite(np.asarray(dv)))
+
+
+class TestStrainBoundaryConditions:
+    def test_closed_basin_keeps_bc_ghost_velocities(self):
+        """Under a closed-basin mask the south ghost U-row still matters."""
+        grid = make_grid_2d()
+        # Closed basin: only the ghost ring is dry.
+        # h_wet[j, i] = True for 1 <= j <= Ny-2, 1 <= i <= Nx-2
+        h_wet = np.zeros((grid.Ny, grid.Nx), dtype=bool)
+        h_wet[1:-1, 1:-1] = True
+        mask = Mask2D.from_mask(h_wet)
+        op = Strain2D(grid=grid, mask=mask)
+        u, v = _args("shear")
+        # No-slip at the south wall: u[0, i] = -u[1, i]  (ghost row)
+        u_noslip = u.at[0, :].set(-u[1, :])
+        # Free-slip at the south wall: u[0, i] = u[1, i]
+        u_freeslip = u.at[0, :].set(u[1, :])
+        d = np.asarray(
+            op.magnitude_squared(u_noslip, v) - op.magnitude_squared(u_freeslip, v)
+        )
+        wet_first_row = np.asarray(mask.h)[1, :]
+        assert np.any(d[1, wet_first_row] != 0.0)
+        np.testing.assert_array_equal(d[2:, :], 0.0)
+
+    def test_integer_inputs_are_not_truncated(self):
+        """X intermediates use the promoted dtype, not the input dtype."""
+        grid = make_grid_2d()
+        op = Strain2D(grid=grid)
+        # v[j, i] = i (integer), u = 0 -> shear = dv/dx = 1 / dx everywhere
+        v = jnp.broadcast_to(jnp.arange(grid.Nx), (grid.Ny, grid.Nx))
+        u = jnp.zeros((grid.Ny, grid.Nx), dtype=v.dtype)
+        sigma2 = op.magnitude_squared(u, v)
+        # sigma2[j, i] = (1 / dx)^2 for 1 <= j <= Ny-2, 1 <= i <= Nx-2
+        np.testing.assert_allclose(sigma2[1:-1, 1:-1], (1.0 / grid.dx) ** 2)
 
 
 class TestStrainPhysics:

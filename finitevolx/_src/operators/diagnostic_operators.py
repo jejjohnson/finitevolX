@@ -16,11 +16,15 @@ Method                              Output  Mask field
 ``Strain2D.okubo_weiss``            T       ``mask.h``
 ==================================  ======  =========================
 
-Under a mask, velocity inputs are zeroed on dry faces before any stencil
-reads them (``u`` by ``mask.u``, ``v`` by ``mask.v`` -- the no-normal-flow
-condition), and outputs are zeroed with ``jnp.where`` rather than a
-multiply, so land values stored as ``NaN`` (as :meth:`Mask2D.from_center`
-supports) can neither leak into wet cells nor survive at dry ones.
+Under a mask, inputs are zeroed on the dry *interior* cells of their
+stagger before any stencil reads them (``u`` by ``mask.u``, ``v`` by
+``mask.v`` -- the no-normal-flow condition; T-fields by ``mask.h``), and
+outputs are zeroed with ``jnp.where`` rather than a multiply, so interior
+land values stored as ``NaN`` (as :meth:`Mask2D.from_center` supports)
+neither leak into wet cells nor survive at dry ones, in the forward pass
+or its gradient.  The ghost ring is BC-owned: it is passed through
+unchanged (so imposed / no-slip boundary values reach the stencils) and
+must hold finite values.
 
 With ``mask=None`` every method returns exactly what the functional form
 returns, except where a method's docstring says otherwise.
@@ -47,14 +51,33 @@ from finitevolx._src.operators.interpolation import Interpolation2D
 from finitevolx._src.utils.constants import GRAVITY
 
 
-def _where(wet: Array | None, field: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+def _where(
+    wet: Array | None, field: Float[Array, "... Ny Nx"]
+) -> Float[Array, "... Ny Nx"]:
     """Zero ``field`` where ``wet`` is False; identity when ``wet`` is None.
 
-    field[j, i] = field[j, i] if wet[j, i] else 0
+    field[..., j, i] = field[..., j, i] if wet[j, i] else 0
     """
     if wet is None:
         return field
     return jnp.where(wet, field, 0.0)
+
+
+def _sanitize(
+    wet: Array | None, field: Float[Array, "... Ny Nx"]
+) -> Float[Array, "... Ny Nx"]:
+    """Zero ``field`` on dry *interior* cells; pass the ghost ring through.
+
+    field[..., j, i] = field[..., j, i]  on the ghost ring (BC-owned)
+    field[..., j, i] = field[..., j, i] if wet[j, i] else 0
+                                         for 1 <= j <= Ny-2, 1 <= i <= Nx-2
+    """
+    if wet is None:
+        return field
+    wet = jnp.asarray(wet, dtype=bool)
+    # keep[j, i] = True on the ghost ring, wet[j, i] in the interior
+    keep = jnp.ones_like(wet).at[1:-1, 1:-1].set(wet[1:-1, 1:-1])
+    return jnp.where(keep, field, 0.0)
 
 
 class Energetics2D(eqx.Module):
@@ -63,9 +86,9 @@ class Energetics2D(eqx.Module):
     Class form of :func:`~finitevolx.kinetic_energy`,
     :func:`~finitevolx.bernoulli_potential` and
     :func:`~finitevolx.available_potential_energy`.  Every method returns a
-    T-point field with a zero ghost ring; when ``mask`` is set, velocities
-    are zeroed on dry faces first and dry T-cells are zeroed last (via
-    ``jnp.where(mask.h, ...)``).
+    T-point field with a zero ghost ring; when ``mask`` is set, inputs are
+    zeroed on dry interior cells first and dry T-cells are zeroed last (via
+    ``jnp.where(mask.h, ...)``); see the module docstring.
 
     Parameters
     ----------
@@ -91,10 +114,14 @@ class Energetics2D(eqx.Module):
     def _uv(
         self, u: Float[Array, "Ny Nx"], v: Float[Array, "Ny Nx"]
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
-        """Zero velocities on dry faces (no-normal-flow)."""
+        """Zero velocities on dry interior faces (no-normal-flow)."""
         if self.mask is None:
             return u, v
-        return _where(self.mask.u, u), _where(self.mask.v, v)
+        return _sanitize(self.mask.u, u), _sanitize(self.mask.v, v)
+
+    def _t(self, field: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+        """Zero a T-field on dry interior cells."""
+        return _sanitize(None if self.mask is None else self.mask.h, field)
 
     def _out(self, out: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """Zero dry T-cells: out[j, i] = out[j, i] if mask.h[j, i] else 0."""
@@ -157,7 +184,7 @@ class Energetics2D(eqx.Module):
             when ``self.mask`` is set, at dry T-cells.
         """
         u, v = self._uv(u, v)
-        return self._out(bernoulli_potential(h, u, v, gravity))
+        return self._out(bernoulli_potential(self._t(h), u, v, gravity))
 
     def available_potential_energy(
         self,
@@ -188,9 +215,13 @@ class Energetics2D(eqx.Module):
             Available potential energy at T-points, zero in the ghost ring
             and, when ``self.mask`` is set, at dry T-cells.
         """
-        ape = available_potential_energy(h, H, g_prime)
-        # out[j, i] = ape[j, i]  for 1 <= j <= Ny-2, 1 <= i <= Nx-2
-        out = jnp.zeros_like(ape).at[1:-1, 1:-1].set(ape[1:-1, 1:-1])
+        h, H = self._t(h), self._t(H)
+        # Evaluate on the interior only, so ghost values never enter the
+        # arithmetic (or its gradient):
+        # ape[j, i] = 1/2 * g_prime * (h[j, i] - H[j, i])^2
+        #             for 1 <= j <= Ny-2, 1 <= i <= Nx-2
+        ape = available_potential_energy(h[1:-1, 1:-1], H[1:-1, 1:-1], g_prime)
+        out = jnp.zeros_like(h, dtype=ape.dtype).at[1:-1, 1:-1].set(ape)
         return self._out(out)
 
 
@@ -250,10 +281,10 @@ class Strain2D(eqx.Module):
     def _uv(
         self, u: Float[Array, "Ny Nx"], v: Float[Array, "Ny Nx"]
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
-        """Zero velocities on dry faces (no-normal-flow)."""
+        """Zero velocities on dry interior faces (no-normal-flow)."""
         if self.mask is None:
             return u, v
-        return _where(self.mask.u, u), _where(self.mask.v, v)
+        return _sanitize(self.mask.u, u), _sanitize(self.mask.v, v)
 
     def _x_with_ghosts(
         self,
@@ -274,14 +305,19 @@ class Strain2D(eqx.Module):
         outside the domain and stay zero.  At interior X-points this is the
         same arithmetic as :func:`~finitevolx.shear_strain` /
         :func:`~finitevolx.relative_vorticity_cgrid`.
+
+        Under a mask only the dry *interior* corners are zeroed: the south /
+        west ghost corners are BC-owned and keep the values derived from
+        the ghost velocities, even where a closed-basin mask marks them dry.
         """
         # dv_dx[j+1/2, i+1/2] = (v[j+1/2, i+1] - v[j+1/2, i]) / dx
         dv_dx = (v[:-1, 1:] - v[:-1, :-1]) / self.grid.dx
         # du_dy[j+1/2, i+1/2] = (u[j+1, i+1/2] - u[j, i+1/2]) / dy
         du_dy = (u[1:, :-1] - u[:-1, :-1]) / self.grid.dy
-        # x[j, i] set for 0 <= j <= Ny-2, 0 <= i <= Nx-2
-        out = jnp.zeros_like(u).at[:-1, :-1].set(dv_dx + sign * du_dy)
-        return _where(None if self.mask is None else self.mask.xy_corner_strict, out)
+        x = dv_dx + sign * du_dy
+        # out[j, i] = x[j, i] for 0 <= j <= Ny-2, 0 <= i <= Nx-2
+        out = jnp.zeros_like(u, dtype=x.dtype).at[:-1, :-1].set(x)
+        return _sanitize(None if self.mask is None else self.mask.xy_corner_strict, out)
 
     def shear(
         self,
