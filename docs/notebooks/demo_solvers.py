@@ -963,7 +963,8 @@ print("Saved accuracy_timing.png")
 # $$
 #
 # finitevolX does this for you: every convenience wrapper takes
-# `known_values`.  The known cells are the **inner boundary ring** — the
+# `known_values`.  (The *Known Boundary Values* tutorial notebook derives
+# the method from scratch.)  The known cells are the **inner boundary ring** — the
 # *wet* cells adjacent to land, around the walls and any islands — and the
 # solution equals `known_values` exactly there.
 #
