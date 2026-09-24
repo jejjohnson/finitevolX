@@ -190,14 +190,16 @@ $\psi = \psi_{\text{lift}} + \psi_{\text{hom}}$.
     ```
 
 The spectral path solves exactly the problem `method="cg"` solves with the
-basin mask `zeros((Ny, Nx)).at[1:-1, 1:-1].set(1)`, so the two agree to
+basin mask `zeros((Ny, Nx)).at[1:-1, 1:-1].set(1)` (i.e. `mask[j, i] = 1`
+for `1 <= j <= Ny-2`, `1 <= i <= Nx-2`), so the two agree to
 solver tolerance.
 
 !!! note "Known values shift the spectral domain"
     Without `known_values`, `bc="dst"` treats the whole array as unknown with
     $\psi = 0$ just outside it.  With `known_values` (even all zeros) the
     spectral path uses the ghost-ring convention above, so its unknowns are
-    the interior `[2:-2, 2:-2]`.
+    the interior `[2:-2, 2:-2]` (`2 <= j <= Ny-3`, `2 <= i <= Nx-3`), inside
+    the known ring at rows/columns `1` and `N-2`.
 
 #### Sparse observations: `known_mask`
 
