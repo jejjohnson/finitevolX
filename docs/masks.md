@@ -200,8 +200,8 @@ functional code stays coordinate-and-mask agnostic:
 | Layer 2 — functional helpers | `_curl_2d`, `divergence_2d`, `diffusion_2d`, `kinetic_energy`, `enstrophy`, `geostrophic_velocity_sphere`, `arakawa_jacobian`, … | **No** |
 | Layer 3 — class operators | `Difference2D`, `Interpolation2D`, `Divergence2D`, `Vorticity2D`, `Coriolis2D`, `Advection2D`, `Diffusion2D`, `MomentumAdvection2D`, `Energetics2D`, `Strain2D`, `QGPotentialVorticity2D`, `ArakawaJacobian2D`, and their `1D` / `3D` / `Spherical*` siblings | **Yes**, via `self.mask` |
 
-Every Layer-2 diagnostic has a Layer-3 class form, so in a masked domain
-you never need to mask by hand:
+The pointwise and stencil diagnostics below have Layer-3 class forms, so
+in a masked domain you don't need to mask them by hand:
 
 | Layer-2 helper | Layer-3 class form |
 |---|---|
@@ -222,8 +222,22 @@ strain = fvx.Strain2D(grid=grid, mask=mask)
 ow = strain.okubo_weiss(u, v)              # T-points, dry T-cells exactly 0
 ```
 
+The class forms zero their inputs on dry cells of each input's stagger
+before any stencil reads them, and mask outputs with `jnp.where`, so land
+values stored as `NaN` (e.g. from `Mask2D.from_center`) neither leak into
+wet cells nor survive at dry ones.
+
+Diagnostics **without** a class form:
+
+- `total_energy`, `total_enstrophy` are domain reductions, not stencils.
+  Pass them fields that are already masked (e.g. from the class forms
+  above) so dry cells contribute zero.
+- `vertical_velocity` still takes a per-call `mask=` argument; its
+  operator form is tracked in #210.
+
 If you do call a Layer-2 helper directly and want masked output, apply
-the mask at the call site: `ke = kinetic_energy(u, v) * mask.h`.  For
+the mask at the call site: `ke = jnp.where(mask.h, kinetic_energy(u, v), 0.0)`
+(a plain `* mask.h` also works when the inputs are finite on land).  For
 pointwise helpers whose inputs live on different staggers (e.g.
 `okubo_weiss(sn, ss, omega)` with `sn` at T-points and `ss`, `omega` at
 X-points), the class form also does the X → T averaging for you.
@@ -274,7 +288,11 @@ inheriting:
 operators: `Difference*`, `Interpolation*`, `Vorticity3D`,
 `Spherical*`, `Energetics2D`, `QGPotentialVorticity2D`,
 `ArakawaJacobian2D`.  Compute the output as if all-ocean, then multiply by the
-stagger-matched mask field at the end.  Cheap and simple.
+stagger-matched mask field at the end.  Cheap and simple.  The #206
+diagnostic classes (`Energetics2D`, `Strain2D`, `QGPotentialVorticity2D`,
+`ArakawaJacobian2D`) use the `NaN`-safe variant: zero the inputs on dry
+cells first, then select with `jnp.where(mask, out, 0)` instead of
+multiplying.
 
 **Pattern 2 — Pass-down into sub-operators.** Used by composed
 operators with no tricky division — `Divergence2D`, `Vorticity2D`,
@@ -293,8 +311,10 @@ pass-down and typically doesn't need an extra multiply.
   `jnp.where(mask.xy_corner_strict, out, 0)`.  Same fix applies to
   `SphericalVorticity2D.potential_vorticity` and
   `Vorticity2D.potential_enstrophy` (built on it).
-  `SphericalDifference2D.geostrophic_velocity` masks with `jnp.where`
-  for the same reason: a dry face can have `f = 0`.
+  `SphericalDifference2D.geostrophic_velocity` faces the same division
+  (a dry face can have `f = 0`): it replaces `f` by `1` on dry T-cells
+  before dividing, so the value *and* its reverse-mode gradient stay
+  finite, then masks with `jnp.where`.
 
 **Pattern 3 — Intermediate flux masking.** Used by `Diffusion2D` and
 `Diffusion3D` only.  Post-compute multiply is **not** sufficient for

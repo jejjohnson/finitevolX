@@ -332,6 +332,13 @@ The three terms are:
 - $J^{+\times}$: flux form in one direction
 - $J^{\times+}$: flux form in the other direction
 
+!!! warning "Conservation under a mask"
+    The discrete identities above hold for the unmasked operator with
+    suitable boundary conditions (e.g. $\psi$ constant on the boundary).
+    `ArakawaJacobian2D(grid, mask=mask)` zeroes land inputs and dry output
+    cells, so sums over a masked domain such as $\sum J$ or
+    $\sum q\,J$ are **not** guaranteed to vanish exactly.
+
 !!! note "Output shape"
     The class `ArakawaJacobian2D` returns the full `[..., Ny, Nx]` array with
     a zero ghost ring (and dry cells zeroed when given a mask), ready for a

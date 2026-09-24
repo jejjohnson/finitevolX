@@ -18,7 +18,7 @@ for the stagger → mask mapping.
 | Bernoulli potential | `Energetics2D.bernoulli_potential` | `bernoulli_potential` | T |
 | Available potential energy | `Energetics2D.available_potential_energy` | `available_potential_energy` | T |
 | Relative vorticity | `Vorticity2D.relative_vorticity` | `relative_vorticity_cgrid` | X |
-| Shallow-water PV | `Vorticity2D.potential_vorticity` | `sw_potential_vorticity` | X |
+| Shallow-water PV | `Vorticity2D.potential_vorticity` | `sw_potential_vorticity`¹ | X |
 | Enstrophy | `Vorticity2D.enstrophy` | `enstrophy` | X |
 | Potential enstrophy | `Vorticity2D.potential_enstrophy` | `potential_enstrophy` | X |
 | Shear strain | `Strain2D.shear` | `shear_strain` | X |
@@ -28,6 +28,11 @@ for the stagger → mask mapping.
 | QG PV (one layer) | `QGPotentialVorticity2D.__call__` | `qg_potential_vorticity` | T |
 | Stretching term | `QGPotentialVorticity2D.stretching` | `stretching_term` | T |
 | QG PV (multilayer) | `QGPotentialVorticity2D.multilayer` | `potential_vorticity_multilayer` | T |
+
+¹ Not identical where the thickness at a corner is zero: `sw_potential_vorticity`
+returns `0` there, while `Vorticity2D.potential_vorticity` returns a `NaN`
+sentinel at wet corners (dry corners are exactly `0` under a mask), so a
+degenerate layer is flagged rather than hidden.
 
 The functional `strain_magnitude_squared` / `okubo_weiss` / `enstrophy` /
 `potential_enstrophy` are pointwise: their inputs must already share a grid
