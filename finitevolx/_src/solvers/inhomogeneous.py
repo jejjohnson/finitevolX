@@ -50,12 +50,14 @@ def boundary_ring(mask: Float[Array, "Ny Nx"]) -> Bool[Array, "Ny Nx"]:
     """
     wet = mask > 0.5
     dry = ~wet
+    # padded_dry[j+1, i+1] = dry[j, i]; cells outside the array count as wet.
     padded_dry = jnp.pad(dry, pad_width=1, mode="constant", constant_values=False)
+    # adjacent_to_dry[j, i] = dry[j+1, i] | dry[j-1, i] | dry[j, i+1] | dry[j, i-1]
     adjacent_to_dry = (
-        padded_dry[2:, 1:-1]  # south neighbor is dry
-        | padded_dry[:-2, 1:-1]  # north neighbor is dry
-        | padded_dry[1:-1, 2:]  # east neighbor is dry
-        | padded_dry[1:-1, :-2]  # west neighbor is dry
+        padded_dry[2:, 1:-1]  # dry[j+1, i]  (north neighbour)
+        | padded_dry[:-2, 1:-1]  # dry[j-1, i]  (south neighbour)
+        | padded_dry[1:-1, 2:]  # dry[j, i+1]  (east neighbour)
+        | padded_dry[1:-1, :-2]  # dry[j, i-1]  (west neighbour)
     )
     return wet & adjacent_to_dry
 
