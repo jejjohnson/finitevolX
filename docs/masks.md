@@ -231,7 +231,7 @@ The ghost ring is BC-owned: it is passed through unchanged and must be
 finite.
 
 `SphericalDifference2D.geostrophic_velocity` only guards the division (it
-replaces `f` on dry cells); its 4-point stencils read `h` on neighbouring
+sets the face-averaged `f` to `1` on dry faces); its 4-point stencils read `h` on neighbouring
 land cells for wet coastal faces, so **land `h` must be finite** there.
 The same holds for the other existing class operators, which mask outputs
 but do not sanitize inputs.
@@ -321,9 +321,11 @@ pass-down and typically doesn't need an extra multiply.
   `SphericalVorticity2D.potential_vorticity` and
   `Vorticity2D.potential_enstrophy` (built on it).
   `SphericalDifference2D.geostrophic_velocity` faces the same division
-  (a dry face can have `f = 0`): it replaces `f` by `1` on dry T-cells
-  before dividing, so the value *and* its reverse-mode gradient stay
-  finite, then masks with `jnp.where`.
+  (a dry face can have `f_on_face = 0`): it sets the face-averaged `f`
+  to `1` on every dry face right before dividing, so the value *and* its
+  reverse-mode gradient stay finite, then masks with `jnp.where`.
+  `Vorticity2D.potential_vorticity` likewise divides by `1` at dry
+  corners, where pass-down masking makes `h_on_q` exactly `0`.
 
 **Pattern 3 — Intermediate flux masking.** Used by `Diffusion2D` and
 `Diffusion3D` only.  Post-compute multiply is **not** sufficient for
