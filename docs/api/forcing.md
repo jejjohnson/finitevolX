@@ -34,3 +34,19 @@ time-agnostic forcing.
 ::: finitevolx.ForcingProduct
 
 ::: finitevolx.TimeVaryingForcing
+
+## 2D operators
+
+Module operators for `CartesianGrid2D`.  They interpolate T-point inputs to
+the velocity faces, delegate the math to the functional primitives, restore
+the zero ghost ring, and apply an optional `Mask2D` given at construction.
+Multilayer models (`[nl, Ny, Nx]`) reuse them through `multilayer()` or by
+calling them on a single layer, e.g. bottom drag on `u[-1], v[-1]`.
+
+::: finitevolx.WindStress2D
+
+::: finitevolx.LinearDrag2D
+
+::: finitevolx.QuadraticDrag2D
+
+::: finitevolx.RayleighDamping2D
