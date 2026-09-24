@@ -124,6 +124,174 @@ Solves $(\nabla^2 - \lambda_k)\,\psi_k = q_k$ for each vertical mode.
     psi_layers = fvx.mode_to_layer(psi_modes, modes)
     ```
 
+
+### Known Boundary Values (Inhomogeneous Dirichlet)
+
+By default every solver assumes $\psi = 0$ on the boundary.  When the
+boundary values are known but non-zero — SSH from a parent model, a tide
+gauge, reanalysis at an open boundary — pass them as `known_values`.  All
+three wrappers accept it:
+
+```python
+psi = fvx.streamfunction_from_vorticity(
+    zeta, dx, dy, method="cg", mask=mask,
+    known_values=g,          # (Ny, Nx); only the known cells are read
+)
+```
+
+**Which cells are known.**  The *inner boundary ring* — the wet cells
+adjacent to at least one dry cell, around the outer walls *and* any islands
+— plus any extra cells you mark with `known_mask`.  The returned solution
+equals `known_values` exactly on those cells; values of `known_values`
+elsewhere are ignored.  Inspect the ring with `fvx.boundary_ring(mask)`.
+
+Under the hood this is the **lifting trick**: put the known values in a
+field $\psi_{\text{lift}}$ (zero elsewhere), solve the homogeneous problem
+
+$$
+(\nabla^2 - \lambda)\,\psi_{\text{hom}}
+  = f - (\nabla^2 - \lambda)\,\psi_{\text{lift}}
+$$
+
+on the remaining cells, and return
+$\psi = \psi_{\text{lift}} + \psi_{\text{hom}}$.
+
+=== "CG (any mask)"
+
+    ```python
+    psi = fvx.streamfunction_from_vorticity(
+        zeta, dx, dy, lambda_=4.0, method="cg", mask=mask, known_values=g
+    )
+    ```
+
+=== "Capacitance"
+
+    ```python
+    # Build on the SAME wet mask.  The capacitance solver already holds its
+    # own inner ring at zero, so its unknowns are exactly the cells left to
+    # solve.  Use base_bc="dst" when lambda_ == 0.
+    solver = fvx.build_capacitance_solver(
+        np.asarray(mask > 0.5), dx, dy, lambda_=4.0, base_bc="dst"
+    )
+    psi = fvx.streamfunction_from_vorticity(
+        zeta, dx, dy, lambda_=4.0, method="capacitance", mask=mask,
+        capacitance_solver=solver, known_values=g,
+    )
+    ```
+
+=== "Spectral (rectangular basin)"
+
+    ```python
+    # No mask: solves the standard basin -- dry ghost ring, wet interior --
+    # with the known values on rows/columns 1 and -2.  Requires bc="dst".
+    psi = fvx.streamfunction_from_vorticity(
+        zeta, dx, dy, bc="dst", lambda_=4.0, known_values=g
+    )
+    ```
+
+The spectral path solves exactly the problem `method="cg"` solves with the
+basin mask `zeros((Ny, Nx)).at[1:-1, 1:-1].set(1)` (i.e. `mask[j, i] = 1`
+for `1 <= j <= Ny-2`, `1 <= i <= Nx-2`), so the two agree to
+solver tolerance.
+
+!!! note "Known values shift the spectral domain"
+    Without `known_values`, `bc="dst"` treats the whole array as unknown with
+    $\psi = 0$ just outside it.  With `known_values` (even all zeros) the
+    spectral path uses the ghost-ring convention above, so its unknowns are
+    the interior `[2:-2, 2:-2]` (`2 <= j <= Ny-3`, `2 <= i <= Nx-3`), inside
+    the known ring at rows/columns `1` and `N-2`.
+
+#### Sparse observations: `known_mask`
+
+Interior observations are pinned the same way as the boundary ring
+(`method="cg"` only):
+
+```python
+obs = jnp.zeros((Ny, Nx), dtype=bool).at[20, 30].set(True).at[25, 45].set(True)
+values = jnp.zeros((Ny, Nx)).at[20, 30].set(0.12).at[25, 45].set(-0.05)
+
+psi = fvx.streamfunction_from_vorticity(
+    zeta, dx, dy, method="cg", mask=mask,
+    known_values=values, known_mask=obs,
+)
+# psi[20, 30] == 0.12 and psi[25, 45] == -0.05 exactly
+```
+
+#### Multi-layer PV inversion
+
+`known_values` broadcasts against `pv`: a `(Ny, Nx)` field is shared by all
+layers, an `(nl, Ny, Nx)` array gives each layer its own values.  Each
+layer's correction uses its own $\lambda_k$.
+
+```python
+psi = fvx.pv_inversion(
+    pv, dx, dy, lambda_=lambdas, method="cg", mask=mask,
+    known_values=psi_boundary,   # (Ny, Nx) or (nl, Ny, Nx)
+)
+```
+
+#### Boundary conditions as a `BoundaryConditionSet`
+
+`bc` also accepts a `BoundaryConditionSet`.  Its face types choose the
+transform (all `Dirichlet1D` → `"dst"`, all zero `Neumann1D` → `"dct"`,
+all `Periodic1D` → `"fft"`), its `mask` feeds the mask-based methods, and
+non-zero `Dirichlet1D` values become known values on the wall-adjacent wet
+cells:
+
+```python
+bc = fvx.BoundaryConditionSet(
+    mask=mask,
+    south=fvx.Dirichlet1D("south", value=0.0),
+    north=fvx.Dirichlet1D("north", value=0.1),   # prescribed SSH on the north wall
+    west=fvx.Dirichlet1D("west", value=0.0),
+    east=fvx.Dirichlet1D("east", value=0.0),
+)
+psi = fvx.streamfunction_from_vorticity(zeta, dx, dy, bc=bc, method="cg")
+```
+
+West/east own the corner cells, as when the set fills ghost cells.  An
+explicit `known_values` overrides the face values, and an all-zero set
+(`BoundaryConditionSet.closed()`) is the ordinary homogeneous solve.
+
+#### Using the lifting directly
+
+For your own solver or a solve loop that reuses the setup, use
+`SolveDomain` and `KnownValueLifting`:
+
+```python
+# Setup (once): derived masks, then a solver on the effective domain
+domain = fvx.SolveDomain(mask, known_mask=obs)
+lifter = fvx.KnownValueLifting(domain, dx, dy, lambda_=4.0)
+eff = domain.effective_mask.astype(float)
+A = lambda x: fvx.masked_laplacian(x, eff, dx, dy, lambda_=4.0)
+
+# Per step (JIT-friendly): correct, solve, reconstruct
+rhs_corrected, value_lift = lifter.preprocess(rhs, known_values)
+psi_hom, _ = fvx.solve_cg(A, rhs_corrected)
+psi = lifter.postprocess(psi_hom * eff, value_lift)
+```
+
+The solver's unknowns must be exactly `domain.effective_mask`: build a CG
+operator on `domain.effective_mask`, but a capacitance solver on
+`domain.wet_mask` (see the Capacitance tab above).
+
+For **multigrid**, use it as the CG preconditioner — the wrapper then does
+the lifting for you:
+
+```python
+mg = fvx.build_multigrid_solver(
+    np.asarray(domain.effective_mask, dtype=float), dx, dy, lambda_=4.0
+)
+psi = fvx.streamfunction_from_vorticity(
+    zeta, dx, dy, lambda_=4.0, method="cg", mask=mask, known_values=g,
+    preconditioner=fvx.make_multigrid_preconditioner(mg),
+)
+```
+
+A standalone multigrid solve is not a drop-in here: its operator places the
+Dirichlet condition on cell faces rather than using `masked_laplacian`'s
+stencil, so it does not reproduce the lifted problem.
+
 ---
 
 ## Direct Spectral Solvers

@@ -122,6 +122,25 @@ class TestManufacturedSolution:
         )
         assert _wet_max_err(psi, exact, mask) < 1e-8
 
+    def test_multigrid_preconditioned_cg_island(self):
+        """Multigrid enters as the CG preconditioner on the effective domain."""
+        mask, exact = _island_mask(), _exact()
+        domain = fvx.SolveDomain(mask)
+        mg = fvx.build_multigrid_solver(
+            np.asarray(domain.effective_mask, dtype=float), DX, DY, lambda_=4.0
+        )
+        psi = fvx.streamfunction_from_vorticity(
+            _rhs(exact, mask, 4.0),
+            DX,
+            DY,
+            lambda_=4.0,
+            method="cg",
+            mask=mask,
+            known_values=exact,
+            preconditioner=fvx.make_multigrid_preconditioner(mg),
+        )
+        assert _wet_max_err(psi, exact, mask) < CG_TOL
+
     def test_cg_island(self):
         mask, exact = _island_mask(), _exact()
         psi = fvx.streamfunction_from_vorticity(

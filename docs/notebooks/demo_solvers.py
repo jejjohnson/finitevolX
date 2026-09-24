@@ -469,7 +469,7 @@ plot_triplet(
     "capacitance, direct",
     "solver_basin_cap.png",
 )
-print(f"  Capacitance: {t_cap * 1000:.2f} ms, boundary pts = {len(cap._j_b)}")
+print(f"  Capacitance: {t_cap * 1000:.2f} ms, boundary pts = {int(fvx.boundary_ring(mask_basin_jnp).sum())}")
 
 # %% [markdown]
 # ![Basin: Capacitance solver](../../images/demo_solvers/solver_basin_cap.png)
@@ -954,18 +954,18 @@ print("Saved accuracy_timing.png")
 # \psi = \psi_{\text{lift}} + \psi_{\text{hom}}
 # $$
 #
-# where $\psi_{\text{lift}}$ is *any* function that matches the prescribed
-# boundary data $g$, and $\psi_{\text{hom}}$ solves the **corrected** equation
-# with **zero** BCs:
+# where $\psi_{\text{lift}}$ holds the prescribed boundary data $g$ (and is
+# zero elsewhere), and $\psi_{\text{hom}}$ solves the **corrected** equation
+# with **zero** BCs on the remaining cells:
 #
 # $$
-# (A - \lambda)\,\psi_{\text{hom}} = f - (A - \lambda)\,\psi_{\text{lift}},
-# \qquad \psi_{\text{hom}} = 0 \;\text{on boundary}
+# (A - \lambda)\,\psi_{\text{hom}} = f - (A - \lambda)\,\psi_{\text{lift}}
 # $$
 #
-# The simplest $\psi_{\text{lift}}$ is just the boundary values themselves,
-# placed in the ghost cells (or mask-boundary cells) and zero in the interior.
-# The Laplacian of this "shell" provides the correction to the RHS.
+# finitevolX does this for you: every convenience wrapper takes
+# `known_values`.  The known cells are the **inner boundary ring** — the
+# *wet* cells adjacent to land, around the walls and any islands — and the
+# solution equals `known_values` exactly there.
 #
 # ### Example: prescribed sinusoidal SSH on basin walls
 #
@@ -975,80 +975,62 @@ print("Saved accuracy_timing.png")
 # a parent model or observations).
 
 # %%
-# --- Build the lifting function ---
-# The key insight: the discrete Laplacian stencil at a wet cell reads its
-# neighbours regardless of wet/dry status.  For homogeneous BCs, land
-# neighbours are 0.  For inhomogeneous BCs, we put the prescribed values g
-# at the DRY cells adjacent to the ocean — these act as ghost values that
-# the stencil reads, just like ghost cells in the C-grid convention.
-from scipy.ndimage import binary_dilation
-
-wet = mask_basin.astype(bool)
-# Dilate the wet region by 1 cell to find the land cells that touch ocean
-wet_dilated = binary_dilation(wet)
-# Dry boundary cells = the 1-cell-wide land ring adjacent to ocean
-dry_boundary = wet_dilated & ~wet
-
-# Prescribed boundary data: g(y) = 0.1 * sin(2pi * y / Ny)
-# This mimics, e.g., a prescribed SSH gradient from a parent model.
-g_field = 0.1 * np.sin(2 * np.pi * Y / Ny)
-
-# psi_lift: g at dry boundary cells, zero everywhere else
-psi_lift = np.zeros((Ny, Nx))
-psi_lift[dry_boundary] = g_field[dry_boundary]
-psi_lift_jnp = jnp.array(psi_lift)
-
-print(f"Dry boundary cells: {int(dry_boundary.sum())}")
-print(f"Boundary data range: [{psi_lift[dry_boundary].min():.4f}, "
-      f"{psi_lift[dry_boundary].max():.4f}]")
+# --- Prescribed boundary data ---
+# known_values is a full (Ny, Nx) field; only its inner-ring cells are read.
+g_field = jnp.asarray(0.1 * np.sin(2 * np.pi * Y / Ny))
+ring = fvx.boundary_ring(mask_basin_jnp)
+print(f"Inner-ring (known) cells: {int(ring.sum())}")
 
 # %%
-# --- Corrected RHS ---
-# f_corrected = f - A(psi_lift), where A is the masked Laplacian operator
-A_psi_lift = fvx.masked_laplacian(psi_lift_jnp, mask_basin_jnp, dx, dy, lambda_=lambda_)
-rhs_corrected = rhs_basin - A_psi_lift
-
-# Solve with homogeneous BCs on the corrected RHS
-sol_cg_inhom, info_inhom = fvx.solve_cg(
-    A_basin, rhs_corrected, preconditioner=pc_basin, rtol=1e-10, atol=1e-10
+# --- One call per solver ---
+psi_full_inhom = fvx.streamfunction_from_vorticity(
+    rhs_basin, dx, dy, lambda_=lambda_,
+    method="cg", mask=mask_basin_jnp, known_values=g_field,
 )
-sol_cg_inhom = sol_cg_inhom * mask_basin_jnp
 
-# Full solution: psi = psi_lift + psi_hom
-# At wet cells: psi = 0 + psi_hom (the solver result)
-# At dry boundary cells: psi = g + 0 (the prescribed boundary data)
-psi_full_inhom = psi_lift_jnp + sol_cg_inhom
-
-# Verify: residual of the full solution should be small at interior wet cells
-residual_full = rhs_basin - A_basin(psi_full_inhom)
-# The residual at boundary-adjacent wet cells includes the effect of the
-# prescribed dry-cell values — this is the correct inhomogeneous solve.
-interior_residual = float(
-    jnp.max(jnp.abs(residual_full * jnp.array(_erode_mask(mask_basin))))
+# The capacitance solver is built on the SAME wet mask: it already holds its
+# own inner ring at zero, which is exactly the ring the lift prescribes.
+cap_inhom = fvx.build_capacitance_solver(
+    mask_basin.astype(bool), dx, dy, lambda_=lambda_, base_bc="dst"
 )
-print(f"CG iters: {info_inhom.iterations}")
-print(f"Max interior residual: {interior_residual:.2e}")
+psi_full_cap = fvx.streamfunction_from_vorticity(
+    rhs_basin, dx, dy, lambda_=lambda_, method="capacitance",
+    mask=mask_basin_jnp, capacitance_solver=cap_inhom, known_values=g_field,
+)
+
+# Checks: boundary data reproduced exactly, PDE satisfied on the solved cells
+domain = fvx.SolveDomain(mask_basin_jnp)
+eff = domain.effective_mask.astype(float)
+residual = (rhs_basin - A_basin(psi_full_inhom)) * eff
+print(f"Max |psi - g| on ring:       {float(jnp.max(jnp.abs((psi_full_inhom - g_field)[ring]))):.2e}")
+print(f"Max residual on solved cells: {float(jnp.max(jnp.abs(residual))):.2e}")
+print(f"CG vs capacitance:           {float(jnp.max(jnp.abs(psi_full_inhom - psi_full_cap))):.2e}")
 
 # %%
+# --- Look inside: the lift and the homogeneous correction ---
+# SolveDomain / KnownValueLifting are the building blocks the wrapper uses;
+# call them directly to plug the lifting into your own solver.
+lifter = fvx.KnownValueLifting(domain, dx, dy, lambda_)
+rhs_corrected, psi_lift = lifter.preprocess(rhs_basin, g_field)
+sol_hom = (psi_full_inhom - psi_lift) * eff
+
 fig, axes = plt.subplots(1, 3, figsize=(16, 4))
+wet = mask_basin > 0.5
 
-# Show the wet domain + 1-cell dry boundary ring for context
-plot_mask = (mask_basin.astype(bool) | dry_boundary).astype(float)
-
-# (a) Prescribed boundary data (visible at dry boundary cells)
-lift_np = np.where(plot_mask > 0.5, np.asarray(psi_lift_jnp), np.nan)
+# (a) Prescribed boundary data on the inner ring
+lift_np = np.where(np.asarray(ring), np.asarray(psi_lift), np.nan)
 im0 = axes[0].imshow(lift_np, origin="lower", cmap="RdBu_r", interpolation="nearest")
-axes[0].set_title("$\\psi_{\\mathrm{lift}}$ (boundary data $g$)", fontsize=11)
+axes[0].set_title("$\\psi_{\\mathrm{lift}}$ (boundary data $g$ on the ring)", fontsize=11)
 fig.colorbar(im0, ax=axes[0], shrink=0.8)
 
-# (b) Homogeneous correction (interior wet cells only)
-sol_np = np.where(mask_basin > 0.5, np.asarray(sol_cg_inhom), np.nan)
+# (b) Homogeneous correction (cells inside the ring)
+sol_np = np.where(np.asarray(eff) > 0.5, np.asarray(sol_hom), np.nan)
 im1 = axes[1].imshow(sol_np, origin="lower", cmap="RdBu_r", interpolation="nearest")
-axes[1].set_title("$\\psi_{\\mathrm{hom}}$ (correction, $\\psi=0$ BCs)", fontsize=11)
+axes[1].set_title("$\\psi_{\\mathrm{hom}}$ (correction, $\\psi=0$ on ring)", fontsize=11)
 fig.colorbar(im1, ax=axes[1], shrink=0.8)
 
-# (c) Full solution = lift + hom (show wet + boundary ring)
-full_np = np.where(plot_mask > 0.5, np.asarray(psi_full_inhom), np.nan)
+# (c) Full solution = lift + hom on the wet domain
+full_np = np.where(wet, np.asarray(psi_full_inhom), np.nan)
 im2 = axes[2].imshow(full_np, origin="lower", cmap="RdBu_r", interpolation="nearest")
 axes[2].set_title("$\\psi = \\psi_{\\mathrm{lift}} + \\psi_{\\mathrm{hom}}$", fontsize=11)
 fig.colorbar(im2, ax=axes[2], shrink=0.8)
@@ -1070,20 +1052,24 @@ print("Saved inhomogeneous_bc.png")
 # ![Inhomogeneous Dirichlet BCs via lifting](../../images/demo_solvers/inhomogeneous_bc.png)
 
 # %% [markdown]
-# The lifting trick works with **any** solver (spectral, CG, capacitance,
-# multigrid) — it only modifies the RHS, not the solver itself.  This makes
-# it straightforward to incorporate:
+# `known_values` works with every wrapper and method:
+#
+# | Method | How to call it |
+# |--------|----------------|
+# | `cg` | `method="cg", mask=mask, known_values=g` (any mask, islands included) |
+# | `capacitance` | build the solver on the **wet** mask, then `method="capacitance", known_values=g` |
+# | `spectral` | `bc="dst", known_values=g` — the rectangular basin with a dry ghost ring |
+# | multigrid | `method="cg"` with `preconditioner=make_multigrid_preconditioner(mg)`, `mg` built on `SolveDomain(mask).effective_mask` |
+# | custom | `SolveDomain` + `KnownValueLifting.preprocess` → your solver on `domain.effective_mask` → `postprocess` |
+#
+# Interior observations (tide gauges, altimetry) are pinned the same way with
+# `known_mask=` (CG), `pv_inversion` takes per-layer `known_values`, and `bc=`
+# also accepts a `BoundaryConditionSet` whose non-zero `Dirichlet1D` face
+# values become known values on the walls.  This covers:
 #
 # - **Observation-derived boundary data** (tide gauges, altimetry)
 # - **Reanalysis forcing** (ERA5 SSH or currents at open boundaries)
 # - **Nesting** (parent model provides boundary values for a regional child)
-#
-# | Step | Operation |
-# |------|-----------|
-# | 1. Build $\psi_{\text{lift}}$ | Place prescribed values at boundary, zero interior |
-# | 2. Correct RHS | $f' = f - (A - \lambda)\,\psi_{\text{lift}}$ |
-# | 3. Solve homogeneous | $(A - \lambda)\,\psi_{\text{hom}} = f'$ with $\psi = 0$ on boundary |
-# | 4. Reconstruct | $\psi = \psi_{\text{lift}} + \psi_{\text{hom}}$ |
 
 # %% [markdown]
 # ## 9. Summary Table
