@@ -19,6 +19,10 @@ Convenience wrappers
 * :func:`streamfunction_from_vorticity` — ∇²ψ − λψ = ζ
 * :func:`pressure_from_divergence` — ∇²p = ∇·u
 * :func:`pv_inversion` — (∇² − λ)ψ = q  (multi-layer / batched)
+
+All three wrappers accept ``known_values`` (and optionally ``known_mask``)
+for inhomogeneous Dirichlet data, solved with the lifting trick from
+:mod:`finitevolx._src.solvers.inhomogeneous`.
 """
 
 from __future__ import annotations
@@ -35,6 +39,11 @@ from spectraldiffx import (
 )
 
 from finitevolx._src.mask import Mask2D
+from finitevolx._src.solvers.inhomogeneous import (
+    SolveDomain,
+    lift_rhs,
+    reconstruct_from_lift,
+)
 
 # Re-export from iterative module
 from finitevolx._src.solvers.iterative import (  # noqa: F401
@@ -273,6 +282,128 @@ def _solve_dispatch(
     )
 
 
+_METHODS = ("spectral", "cg", "capacitance")
+
+
+def _check_method(method: str) -> None:
+    """Raise the standard error for an unknown solver method."""
+    if method not in _METHODS:
+        raise ValueError(
+            f"method must be 'spectral', 'cg', or 'capacitance'; got {method!r}"
+        )
+
+
+def _known_value_domain(
+    shape: tuple[int, ...],
+    dtype: jnp.dtype,
+    method: str,
+    bc: str,
+    mask: _MaskLike | None,
+    known_mask: Array | None,
+) -> SolveDomain:
+    """Build the :class:`SolveDomain` for a solve with known values.
+
+    Mask-based methods use the caller's *mask* (required).  The spectral
+    path has no mask: it solves the standard rectangular basin -- dry ghost
+    ring, wet interior -- whose inner ring (rows/columns 1 and -2) carries
+    the known values.  This is the same problem ``method="cg"`` solves with
+    that basin mask, so both methods agree to solver tolerance.
+    """
+    _check_method(method)
+    if method == "spectral":
+        if bc != "dst":
+            raise ValueError(
+                "known_values prescribe Dirichlet data, so method='spectral' "
+                f"requires bc='dst'; got bc={bc!r}.  Use method='cg' or "
+                "'capacitance' with a mask for other boundary types."
+            )
+        if mask is not None:
+            raise ValueError(
+                "method='spectral' with known_values solves the rectangular "
+                "basin only and does not accept a mask; use method='cg' or "
+                "'capacitance' for a custom mask."
+            )
+        if known_mask is not None:
+            raise ValueError(
+                "method='spectral' does not support interior known values "
+                "(known_mask); use method='cg'."
+            )
+        ny, nx = shape[-2], shape[-1]
+        # basin[j, i] = 1 for 1 <= j <= Ny-2, 1 <= i <= Nx-2  (dry ghost ring)
+        basin = jnp.zeros((ny, nx), dtype=dtype).at[1:-1, 1:-1].set(1.0)
+        return SolveDomain(basin)
+
+    mask_arr = _resolve_mask_arr(mask)
+    if mask_arr is None:
+        raise ValueError(f"known_values with method={method!r} requires a mask")
+    if method == "capacitance" and known_mask is not None:
+        raise ValueError(
+            "method='capacitance' does not support known_mask: the capacitance "
+            "solver can only hold its own inner ring at zero.  Use method='cg'."
+        )
+    return SolveDomain(mask_arr, known_mask)
+
+
+def _solve_spectral_basin(
+    rhs: Float[Array, "Ny Nx"],
+    dx: float,
+    dy: float,
+    lambda_: float,
+) -> Float[Array, "Ny Nx"]:
+    """DST solve on the basin's solve domain ``[2:-2, 2:-2]``, zero elsewhere.
+
+    The rectangular-basin solve domain (wet interior minus its inner ring)
+    is itself a rectangle, so homogeneous Dirichlet there is a plain DST.
+    """
+    helmholtz = _HELMHOLTZ_DISPATCH["dst"]
+    # Solve cells: 2 <= j <= Ny-3, 2 <= i <= Nx-3 (inside the known ring 1 / N-2).
+    # (A - lambda) psi[j, i] = rhs[j, i] there, psi = 0 on the ring (DST-I).
+    psi = helmholtz(rhs[2:-2, 2:-2], dx, dy, lambda_)
+    # psi_hom[j, i] = psi[j-2, i-2] on the solve cells, 0 elsewhere
+    return jnp.zeros_like(rhs).at[2:-2, 2:-2].set(psi)
+
+
+def _solve_with_known_values(
+    rhs: Float[Array, "Ny Nx"],
+    known_values: Float[Array, "Ny Nx"],
+    dx: float,
+    dy: float,
+    lambda_: float,
+    bc: str,
+    method: str,
+    mask: _MaskLike | None,
+    known_mask: Array | None,
+    capacitance_solver: CapacitanceSolver | None,
+    preconditioner: _PrecondLike | None,
+) -> Float[Array, "Ny Nx"]:
+    """Inhomogeneous solve: lift, solve homogeneously, reconstruct.
+
+    psi = value_lift + psi_hom, where psi_hom solves
+    (A - lambda) psi_hom = f - (A - lambda) value_lift on the solve domain.
+    """
+    domain = _known_value_domain(rhs.shape, rhs.dtype, method, bc, mask, known_mask)
+    rhs_corrected, value_lift = lift_rhs(domain, rhs, known_values, dx, dy, lambda_)
+    if method == "spectral":
+        psi_hom = _solve_spectral_basin(rhs_corrected, dx, dy, lambda_)
+    else:
+        # CG solves on the effective domain directly.  A capacitance solver
+        # built on the wet mask already holds that mask's inner ring at zero,
+        # so its unknowns are exactly the effective domain.
+        eff_mask = domain.effective_mask.astype(rhs.dtype)
+        psi_hom = _solve_dispatch(
+            rhs_corrected,
+            dx,
+            dy,
+            lambda_,
+            bc,
+            method,
+            eff_mask,
+            capacitance_solver,
+            preconditioner,
+        )
+    return reconstruct_from_lift(domain, psi_hom, value_lift)
+
+
 def streamfunction_from_vorticity(
     zeta: Float[Array, "Ny Nx"],
     dx: float,
@@ -283,6 +414,8 @@ def streamfunction_from_vorticity(
     mask: _MaskLike | None = None,
     capacitance_solver: CapacitanceSolver | None = None,
     preconditioner: _PrecondLike | None = None,
+    known_values: Float[Array, "Ny Nx"] | None = None,
+    known_mask: Array | None = None,
 ) -> Float[Array, "Ny Nx"]:
     r"""Invert the vorticity–streamfunction relation ∇²ψ − λψ = ζ.
 
@@ -328,12 +461,42 @@ def streamfunction_from_vorticity(
         Custom preconditioner for ``method="cg"``.  Signature:
         ``preconditioner(r: Array) -> Array``.  When ``None``, a spectral
         preconditioner (FFT-based) is used automatically.
+    known_values : Float[Array, "Ny Nx"] or None
+        Prescribed (inhomogeneous Dirichlet) values of the solution, used
+        at the inner boundary ring -- the wet cells adjacent to a dry cell --
+        and at any ``known_mask`` cells; values elsewhere are ignored.  The
+        solution equals ``known_values`` exactly at those cells.  ``None``
+        (default) keeps the homogeneous solve unchanged.  Mask-based methods
+        require *mask*.  For ``method="capacitance"`` build the solver on the
+        same wet *mask*: it holds its own inner ring at zero, which is exactly
+        the lifted ring (use ``base_bc="dst"`` when ``lambda_ == 0``).
+        ``method="spectral"`` requires ``bc="dst"`` and no *mask*: it solves
+        the rectangular basin whose dry ghost ring surrounds the wet
+        interior, matching ``method="cg"`` with that basin mask.
+    known_mask : Bool[Array, "Ny Nx"] or None
+        Extra interior wet cells with known values (e.g. sparse
+        observations), pinned alongside the boundary ring.
+        ``method="cg"`` only.
 
     Returns
     -------
     Float[Array, "Ny Nx"]
         Streamfunction ψ.
     """
+    if known_values is not None:
+        return _solve_with_known_values(
+            zeta,
+            known_values,
+            dx,
+            dy,
+            lambda_,
+            bc,
+            method,
+            mask,
+            known_mask,
+            capacitance_solver,
+            preconditioner,
+        )
     return _solve_dispatch(
         zeta, dx, dy, lambda_, bc, method, mask, capacitance_solver, preconditioner
     )
@@ -348,6 +511,8 @@ def pressure_from_divergence(
     mask: _MaskLike | None = None,
     capacitance_solver: CapacitanceSolver | None = None,
     preconditioner: _PrecondLike | None = None,
+    known_values: Float[Array, "Ny Nx"] | None = None,
+    known_mask: Array | None = None,
 ) -> Float[Array, "Ny Nx"]:
     r"""Solve ∇²p = ∇·u for the pressure correction.
 
@@ -376,12 +541,42 @@ def pressure_from_divergence(
         ``method="capacitance"``.
     preconditioner : callable or None
         Custom preconditioner for ``method="cg"``.
+    known_values : Float[Array, "Ny Nx"] or None
+        Prescribed (inhomogeneous Dirichlet) values of the solution, used
+        at the inner boundary ring -- the wet cells adjacent to a dry cell --
+        and at any ``known_mask`` cells; values elsewhere are ignored.  The
+        solution equals ``known_values`` exactly at those cells.  ``None``
+        (default) keeps the homogeneous solve unchanged.  Mask-based methods
+        require *mask*.  For ``method="capacitance"`` build the solver on the
+        same wet *mask*: it holds its own inner ring at zero, which is exactly
+        the lifted ring (use ``base_bc="dst"`` when ``lambda_ == 0``).
+        ``method="spectral"`` requires ``bc="dst"`` and no *mask*: it solves
+        the rectangular basin whose dry ghost ring surrounds the wet
+        interior, matching ``method="cg"`` with that basin mask.
+    known_mask : Bool[Array, "Ny Nx"] or None
+        Extra interior wet cells with known values (e.g. sparse
+        observations), pinned alongside the boundary ring.
+        ``method="cg"`` only.
 
     Returns
     -------
     Float[Array, "Ny Nx"]
         Pressure field p.
     """
+    if known_values is not None:
+        return _solve_with_known_values(
+            div_u,
+            known_values,
+            dx,
+            dy,
+            0.0,
+            bc,
+            method,
+            mask,
+            known_mask,
+            capacitance_solver,
+            preconditioner,
+        )
     return _solve_dispatch(
         div_u, dx, dy, 0.0, bc, method, mask, capacitance_solver, preconditioner
     )
@@ -397,6 +592,8 @@ def pv_inversion(
     mask: _MaskLike | None = None,
     capacitance_solver: CapacitanceSolver | None = None,
     preconditioner: _PrecondLike | None = None,
+    known_values: Float[Array, "... Ny Nx"] | None = None,
+    known_mask: Array | None = None,
 ) -> Float[Array, "... Ny Nx"]:
     r"""QG potential-vorticity inversion: solve (∇² − λ)ψ = q.
 
@@ -428,6 +625,14 @@ def pv_inversion(
         ``method="capacitance"``.
     preconditioner : callable or None
         Custom preconditioner for ``method="cg"``.
+    known_values : Float[Array, "... Ny Nx"] or None
+        Prescribed Dirichlet values (see
+        :func:`streamfunction_from_vorticity`), broadcast against *pv*: a
+        ``(Ny, Nx)`` field applies to every layer, ``(nl, Ny, Nx)`` gives
+        per-layer values.  Each layer's lift uses its own *lambda_*.
+    known_mask : Bool[Array, "Ny Nx"] or None
+        Extra interior wet cells with known values, shared by all layers.
+        ``method="cg"`` only.
 
     Returns
     -------
@@ -435,6 +640,33 @@ def pv_inversion(
         Streamfunction ψ, same shape as *pv*.
     """
     lam = jnp.asarray(lambda_)
+    kv = None if known_values is None else jnp.broadcast_to(known_values, pv.shape)
+
+    if lam.ndim == 0 and kv is not None:
+
+        def _solve_one_known(
+            rhs: Float[Array, "Ny Nx"], kv_i: Float[Array, "Ny Nx"]
+        ) -> Float[Array, "Ny Nx"]:
+            return _solve_with_known_values(
+                rhs,
+                kv_i,
+                dx,
+                dy,
+                float(lam),
+                bc,
+                method,
+                mask,
+                known_mask,
+                capacitance_solver,
+                preconditioner,
+            )
+
+        if pv.ndim == 2:
+            return _solve_one_known(pv, kv)
+        shape = pv.shape
+        flat = pv.reshape(-1, shape[-2], shape[-1])
+        kv_flat = kv.reshape(-1, shape[-2], shape[-1])
+        return eqx.filter_vmap(_solve_one_known)(flat, kv_flat).reshape(shape)
 
     if lam.ndim == 0:
         # Scalar lambda: vmap over all leading dims if present
@@ -493,10 +725,21 @@ def pv_inversion(
             "for multi-layer problems."
         )
 
-    elif method == "cg":
+    # Known values: shared solve domain; each layer lifts with its own lambda.
+    domain = (
+        None
+        if kv is None
+        else _known_value_domain(pv.shape, pv.dtype, method, bc, mask, known_mask)
+    )
+
+    if method == "cg":
         mask_arr = _resolve_mask_arr(mask)
         if mask_arr is None:
             raise ValueError("method='cg' requires a mask")
+        # With known values the solve runs on the effective domain.
+        solve_mask = (
+            mask_arr if domain is None else domain.effective_mask.astype(pv.dtype)
+        )
 
         _precond = preconditioner
 
@@ -504,15 +747,22 @@ def pv_inversion(
             rhs: Float[Array, "Ny Nx"], lam_i: float
         ) -> Float[Array, "Ny Nx"]:
             def _matvec(x: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
-                return masked_laplacian(x, mask_arr, dx, dy, lambda_=lam_i)
+                return masked_laplacian(x, solve_mask, dx, dy, lambda_=lam_i)
 
             pc = (
                 _precond
                 if _precond is not None
                 else make_spectral_preconditioner(dx, dy, lambda_=lam_i, bc="fft")
             )
-            x, _info = solve_cg(_matvec, rhs * mask_arr, preconditioner=pc)
-            return x * mask_arr
+            x, _info = solve_cg(_matvec, rhs * solve_mask, preconditioner=pc)
+            return x * solve_mask
+
+    elif method == "spectral" and domain is not None:
+
+        def _solve_layer(
+            rhs: Float[Array, "Ny Nx"], lam_i: float
+        ) -> Float[Array, "Ny Nx"]:
+            return _solve_spectral_basin(rhs, dx, dy, lam_i)
 
     elif method == "spectral":
         _helmholtz = _HELMHOLTZ_DISPATCH.get(bc)
@@ -534,9 +784,28 @@ def pv_inversion(
     ny, nx = shape[-2], shape[-1]
     pv_4d = pv.reshape(-1, nl, ny, nx)
 
-    # vmap over layer axis (pairing each layer with its lambda)
-    _solve_layers = eqx.filter_vmap(_solve_layer, in_axes=(0, 0))
+    if domain is None or kv is None:
+        # vmap over layer axis (pairing each layer with its lambda)
+        _solve_layers = eqx.filter_vmap(_solve_layer, in_axes=(0, 0))
 
-    # vmap over the (flattened) batch axis
-    out_4d = eqx.filter_vmap(lambda batch: _solve_layers(batch, lam))(pv_4d)
+        # vmap over the (flattened) batch axis
+        out_4d = eqx.filter_vmap(lambda batch: _solve_layers(batch, lam))(pv_4d)
+        return out_4d.reshape(shape)
+
+    known_domain = domain
+
+    def _solve_layer_known(
+        rhs: Float[Array, "Ny Nx"], kv_i: Float[Array, "Ny Nx"], lam_i: float
+    ) -> Float[Array, "Ny Nx"]:
+        # psi = lift + psi_hom, psi_hom solving the lambda_i-corrected RHS
+        rhs_c, value_lift = lift_rhs(known_domain, rhs, kv_i, dx, dy, lam_i)
+        return reconstruct_from_lift(
+            known_domain, _solve_layer(rhs_c, lam_i), value_lift
+        )
+
+    kv_4d = jnp.reshape(kv, (-1, nl, ny, nx))
+    _solve_layers_known = eqx.filter_vmap(_solve_layer_known, in_axes=(0, 0, 0))
+    out_4d = eqx.filter_vmap(lambda batch, k: _solve_layers_known(batch, k, lam))(
+        pv_4d, kv_4d
+    )
     return out_4d.reshape(shape)

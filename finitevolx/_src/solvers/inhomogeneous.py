@@ -50,12 +50,14 @@ def boundary_ring(mask: Float[Array, "Ny Nx"]) -> Bool[Array, "Ny Nx"]:
     """
     wet = mask > 0.5
     dry = ~wet
+    # padded_dry[j+1, i+1] = dry[j, i]; cells outside the array count as wet.
     padded_dry = jnp.pad(dry, pad_width=1, mode="constant", constant_values=False)
+    # adjacent_to_dry[j, i] = dry[j+1, i] | dry[j-1, i] | dry[j, i+1] | dry[j, i-1]
     adjacent_to_dry = (
-        padded_dry[2:, 1:-1]  # south neighbor is dry
-        | padded_dry[:-2, 1:-1]  # north neighbor is dry
-        | padded_dry[1:-1, 2:]  # east neighbor is dry
-        | padded_dry[1:-1, :-2]  # west neighbor is dry
+        padded_dry[2:, 1:-1]  # dry[j+1, i]  (north neighbour)
+        | padded_dry[:-2, 1:-1]  # dry[j-1, i]  (south neighbour)
+        | padded_dry[1:-1, 2:]  # dry[j, i+1]  (east neighbour)
+        | padded_dry[1:-1, :-2]  # dry[j, i-1]  (west neighbour)
     )
     return wet & adjacent_to_dry
 
@@ -112,12 +114,60 @@ class SolveDomain(eqx.Module):
 # ---------------------------------------------------------------------------
 
 
+def lift_rhs(
+    domain: SolveDomain,
+    rhs: Float[Array, "Ny Nx"],
+    known_values: Float[Array, "Ny Nx"],
+    dx: float,
+    dy: float,
+    lambda_: float,
+) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
+    """Functional form of :meth:`KnownValueLifting.preprocess`.
+
+    Unlike the operator, ``lambda_`` may be a traced value, so this can be
+    vmapped over layers that each carry their own Helmholtz parameter.
+
+    Returns ``(rhs_corrected, value_lift)``; see
+    :meth:`KnownValueLifting.preprocess`.
+    """
+    value_lift = jnp.where(domain.all_known, known_values, 0.0)
+
+    # Correction uses the FULL wet mask so the stencil reads the lift at
+    # known cells: rhs_corrected = (f - (A - lambda) value_lift) on solve cells.
+    wet_mask_f = domain.wet_mask.astype(rhs.dtype)
+    A_lift = masked_laplacian(value_lift, wet_mask_f, dx, dy, lambda_)
+
+    eff_mask_f = domain.effective_mask.astype(rhs.dtype)
+    rhs_corrected = (rhs - A_lift) * eff_mask_f
+
+    return rhs_corrected, value_lift
+
+
+def reconstruct_from_lift(
+    domain: SolveDomain,
+    psi_hom: Float[Array, "Ny Nx"],
+    value_lift: Float[Array, "Ny Nx"],
+) -> Float[Array, "Ny Nx"]:
+    """Functional form of :meth:`KnownValueLifting.postprocess`.
+
+    psi = value_lift + psi_hom restricted to the effective solve domain.
+    """
+    eff_f = domain.effective_mask.astype(psi_hom.dtype)
+    return value_lift + psi_hom * eff_f
+
+
 class KnownValueLifting(eqx.Module):
     """Pre/post-processing wrapper for the lifting trick.
 
     Does **not** own or call a solver.  The user builds their solver
-    separately (with ``domain.effective_mask``) and calls it themselves.
-    This operator only sandwiches the solve with pre- and post-processing.
+    separately and calls it themselves.  This operator only sandwiches the
+    solve with pre- and post-processing.
+
+    The solver's unknowns must be exactly ``domain.effective_mask``: build a
+    CG / multigrid operator on ``domain.effective_mask``, but build a
+    capacitance solver on ``domain.wet_mask`` -- it already holds its own
+    inner ring at zero, so building it on the effective mask would strip a
+    second ring.  Capacitance therefore cannot honour a ``known_mask``.
 
     Parameters
     ----------
@@ -162,17 +212,7 @@ class KnownValueLifting(eqx.Module):
             Lifting function — add to homogeneous solution to get the
             full solution.
         """
-        value_lift = jnp.where(self.domain.all_known, known_values, 0.0)
-
-        wet_mask_f = self.domain.wet_mask.astype(rhs.dtype)
-        A_lift = masked_laplacian(
-            value_lift, wet_mask_f, self.dx, self.dy, self.lambda_
-        )
-
-        eff_mask_f = self.domain.effective_mask.astype(rhs.dtype)
-        rhs_corrected = (rhs - A_lift) * eff_mask_f
-
-        return rhs_corrected, value_lift
+        return lift_rhs(self.domain, rhs, known_values, self.dx, self.dy, self.lambda_)
 
     def postprocess(
         self,
@@ -180,5 +220,4 @@ class KnownValueLifting(eqx.Module):
         value_lift: Float[Array, "Ny Nx"],
     ) -> Float[Array, "Ny Nx"]:
         """Reconstruct full solution from homogeneous solve + lift."""
-        eff_f = self.domain.effective_mask.astype(psi_hom.dtype)
-        return value_lift + psi_hom * eff_f
+        return reconstruct_from_lift(self.domain, psi_hom, value_lift)
