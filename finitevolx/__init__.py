@@ -87,6 +87,12 @@ from finitevolx._src.diffusion.spherical_momentum import (
     SphericalMomentumAdvection2D,
     SphericalMomentumAdvection3D,
 )
+from finitevolx._src.forcing._base import (
+    AbstractForcing,
+    ForcingProduct,
+    ForcingSum,
+    TimeVaryingForcing,
+)
 from finitevolx._src.forcing.functional import (
     linear_drag_tendency,
     quadratic_drag_tendency,
@@ -635,6 +641,11 @@ __all__ = [
     "linear_drag_tendency",
     "quadratic_drag_tendency",
     "rayleigh_tendency",
+    # Forcing — base class and composition
+    "AbstractForcing",
+    "ForcingSum",
+    "ForcingProduct",
+    "TimeVaryingForcing",
     # Differentiable surrogates
     "smooth_abs",
     "smooth_clamp",
