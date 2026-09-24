@@ -28,6 +28,7 @@ for inhomogeneous Dirichlet data, solved with the lifting trick from
 from __future__ import annotations
 
 from collections.abc import Callable
+import numbers
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -38,6 +39,8 @@ from spectraldiffx import (
     build_capacitance_solver as _build_capacitance_solver_base,
 )
 
+from finitevolx._src.boundary.bc_1d import Dirichlet1D, Neumann1D, Periodic1D
+from finitevolx._src.boundary.bc_set import BoundaryConditionSet
 from finitevolx._src.mask import Mask2D
 from finitevolx._src.solvers.inhomogeneous import (
     SolveDomain,
@@ -283,6 +286,88 @@ def _solve_dispatch(
 
 
 _METHODS = ("spectral", "cg", "capacitance")
+_BCLike = str | BoundaryConditionSet
+
+
+def _is_zero(value: object) -> bool:
+    """True only for a concrete real zero; arrays and tracers count as non-zero."""
+    return isinstance(value, numbers.Real) and value == 0
+
+
+def _resolve_bc(
+    bc: _BCLike,
+    method: str,
+    mask: _MaskLike | None,
+    known_values: Array | None,
+    shape: tuple[int, ...],
+    dtype: jnp.dtype,
+) -> tuple[str, _MaskLike | None, Array | None]:
+    """Translate ``bc`` into ``(bc_str, mask, known_values)``.
+
+    A string passes through unchanged.  A :class:`BoundaryConditionSet`
+    selects the spectral transform from its face types (all Dirichlet ->
+    ``"dst"``, all zero Neumann -> ``"dct"``, all periodic -> ``"fft"``),
+    supplies ``bc.mask`` to the mask-based methods, and turns non-zero
+    Dirichlet face values into known values on the wall-adjacent inner ring
+    unless ``known_values`` is given (which then wins).
+    """
+    if not isinstance(bc, BoundaryConditionSet):
+        return bc, mask, known_values
+
+    faces = (bc.south, bc.north, bc.west, bc.east)
+    if all(isinstance(f, Dirichlet1D) for f in faces):
+        bc_str = "dst"
+    elif all(isinstance(f, Neumann1D) for f in faces):
+        if not all(_is_zero(f.value) for f in faces):
+            raise ValueError(
+                "Inhomogeneous Neumann faces are not supported by the elliptic "
+                "solvers; use Neumann1D faces with value=0."
+            )
+        bc_str = "dct"
+    elif all(isinstance(f, Periodic1D) for f in faces):
+        bc_str = "fft"
+    else:
+        names = [type(f).__name__ for f in faces]
+        raise ValueError(
+            "An elliptic solve needs all four faces of the BoundaryConditionSet "
+            "to be Dirichlet1D, Neumann1D or Periodic1D (no mixing); got "
+            f"south/north/west/east = {names}"
+        )
+
+    # The spectral path is rectangular, so only mask-based methods take bc.mask.
+    if method != "spectral" and bc.mask is not None:
+        if mask is not None:
+            raise ValueError("Pass the mask either as bc.mask or as mask=, not both.")
+        mask = bc.mask
+
+    if (
+        bc_str == "dst"
+        and known_values is None
+        and not all(_is_zero(f.value) for f in faces)
+    ):
+        known_values = _dirichlet_face_values(bc, shape[-2:], dtype)
+    return bc_str, mask, known_values
+
+
+def _dirichlet_face_values(
+    bc: BoundaryConditionSet, shape: tuple[int, ...], dtype: jnp.dtype
+) -> Float[Array, "Ny Nx"]:
+    """Known-value field holding each Dirichlet face value on its wall row/column.
+
+    The wall-adjacent wet cells of the standard basin are rows 1 / -2 and
+    columns 1 / -2 -- the inner ring.  Faces are written in the
+    BoundaryConditionSet order (south, north, west, east), so west/east win
+    at the corners.  Island coasts, which are not on a face, stay at zero.
+    """
+    values = jnp.zeros(shape, dtype=dtype)
+    # values[1, i]    = south   (first wet row,     j = 1)
+    values = values.at[1, :].set(bc.south.value)
+    # values[Ny-2, i] = north   (last wet row,      j = Ny-2)
+    values = values.at[-2, :].set(bc.north.value)
+    # values[j, 1]    = west    (first wet column,  i = 1; overwrites corners)
+    values = values.at[:, 1].set(bc.west.value)
+    # values[j, Nx-2] = east    (last wet column,   i = Nx-2; overwrites corners)
+    return values.at[:, -2].set(bc.east.value)
 
 
 def _check_method(method: str) -> None:
@@ -408,7 +493,7 @@ def streamfunction_from_vorticity(
     zeta: Float[Array, "Ny Nx"],
     dx: float,
     dy: float,
-    bc: str = "dst",
+    bc: _BCLike = "dst",
     lambda_: float = 0.0,
     method: str = "spectral",
     mask: _MaskLike | None = None,
@@ -439,11 +524,19 @@ def streamfunction_from_vorticity(
         Relative vorticity (right-hand side).
     dx, dy : float
         Grid spacings.
-    bc : {"dst", "dct", "fft"}
+    bc : {"dst", "dct", "fft"} or BoundaryConditionSet
         Boundary-condition type for the spectral solver (used by
         ``method="spectral"``).
         ``"dst"`` (Dirichlet, ψ = 0 on boundary) is the most common choice
         for streamfunction inversion.
+        A :class:`BoundaryConditionSet` is also accepted.  Its face types
+        select the transform (all ``Dirichlet1D`` -> ``"dst"``, all
+        ``Neumann1D`` with zero value -> ``"dct"``, all ``Periodic1D`` ->
+        ``"fft"``; mixing raises), its ``mask`` is used by the mask-based
+        methods, and non-zero ``Dirichlet1D`` values become
+        ``known_values`` on the wall-adjacent wet cells (explicit
+        ``known_values`` take precedence).  An all-zero Dirichlet set is the
+        ordinary homogeneous ``"dst"`` solve.
     lambda_ : float
         Helmholtz parameter.  Use 0.0 for the pure Poisson problem
         (streamfunction from vorticity).  Non-zero values arise in QG PV
@@ -483,6 +576,9 @@ def streamfunction_from_vorticity(
     Float[Array, "Ny Nx"]
         Streamfunction ψ.
     """
+    bc, mask, known_values = _resolve_bc(
+        bc, method, mask, known_values, zeta.shape, zeta.dtype
+    )
     if known_values is not None:
         return _solve_with_known_values(
             zeta,
@@ -506,7 +602,7 @@ def pressure_from_divergence(
     div_u: Float[Array, "Ny Nx"],
     dx: float,
     dy: float,
-    bc: str = "dct",
+    bc: _BCLike = "dct",
     method: str = "spectral",
     mask: _MaskLike | None = None,
     capacitance_solver: CapacitanceSolver | None = None,
@@ -528,10 +624,11 @@ def pressure_from_divergence(
         Divergence of the velocity field (right-hand side).
     dx, dy : float
         Grid spacings.
-    bc : {"dct", "dst", "fft"}
+    bc : {"dct", "dst", "fft"} or BoundaryConditionSet
         Boundary-condition type for the spectral solver.
         ``"dct"`` (Neumann, ∂p/∂n = 0) is the standard choice for
-        pressure with solid walls.
+        pressure with solid walls.  A :class:`BoundaryConditionSet` is
+        accepted as in :func:`streamfunction_from_vorticity`.
     method : {"spectral", "cg", "capacitance"}
         Solver method.  Default: ``"spectral"``.
     mask : Float[Array, "Ny Nx"] or Mask2D or None
@@ -563,6 +660,9 @@ def pressure_from_divergence(
     Float[Array, "Ny Nx"]
         Pressure field p.
     """
+    bc, mask, known_values = _resolve_bc(
+        bc, method, mask, known_values, div_u.shape, div_u.dtype
+    )
     if known_values is not None:
         return _solve_with_known_values(
             div_u,
@@ -587,7 +687,7 @@ def pv_inversion(
     dx: float,
     dy: float,
     lambda_: float | Float[Array, " nl"],
-    bc: str = "dst",
+    bc: _BCLike = "dst",
     method: str = "spectral",
     mask: _MaskLike | None = None,
     capacitance_solver: CapacitanceSolver | None = None,
@@ -614,8 +714,10 @@ def pv_inversion(
     lambda_ : float or Float[Array, " nl"]
         Helmholtz parameter(s).  Scalar for a single layer; array of
         shape ``(nl,)`` for multi-layer inversion.
-    bc : {"dst", "dct", "fft"}
-        Boundary-condition type (for ``method="spectral"``).
+    bc : {"dst", "dct", "fft"} or BoundaryConditionSet
+        Boundary-condition type (for ``method="spectral"``).  A
+        :class:`BoundaryConditionSet` is accepted as in
+        :func:`streamfunction_from_vorticity`.
     method : {"spectral", "cg", "capacitance"}
         Solver method.  Default: ``"spectral"``.
     mask : Float[Array, "Ny Nx"] or Mask2D or None
@@ -639,6 +741,9 @@ def pv_inversion(
     Float[Array, "... Ny Nx"]
         Streamfunction ψ, same shape as *pv*.
     """
+    bc, mask, known_values = _resolve_bc(
+        bc, method, mask, known_values, pv.shape, pv.dtype
+    )
     lam = jnp.asarray(lambda_)
     kv = None if known_values is None else jnp.broadcast_to(known_values, pv.shape)
 
