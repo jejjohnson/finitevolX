@@ -192,6 +192,30 @@ bc_set = BoundaryConditionSet(
 psi = bc_set(psi, dx=grid.dx, dy=grid.dy)
 ```
 
+The same set can describe the boundary of an **elliptic solve**: pass it as
+`bc=` to `streamfunction_from_vorticity`, `pressure_from_divergence` or
+`pv_inversion`.  All-`Dirichlet1D` faces select the DST, all zero
+`Neumann1D` faces the DCT and all `Periodic1D` faces the FFT; a set's
+`mask` is used by the mask-based methods; and non-zero `Dirichlet1D` values
+are imposed on the wall-adjacent wet cells:
+
+```python
+bc_set = BoundaryConditionSet(
+    mask=mask,
+    south=Dirichlet1D(face="south", value=0.0),
+    north=Dirichlet1D(face="north", value=0.1),
+    west=Dirichlet1D(face="west",  value=0.0),
+    east=Dirichlet1D(face="east",  value=0.0),
+)
+psi = fvx.streamfunction_from_vorticity(zeta, dx, dy, bc=bc_set, method="cg")
+```
+
+When time-stepping, a `Dirichlet1D` value sits on the wall face, half a
+cell outside the first wet cell; in a solve it pins that first wet cell
+(the inner boundary ring).  See
+[Known Boundary Values](elliptic_solvers_usage.md#known-boundary-values-inhomogeneous-dirichlet)
+for arbitrary per-cell values and interior observations.
+
 ### `FieldBCSet`
 
 Maps a BC set to a named field in a state dictionary or pytree.  Useful

@@ -15,3 +15,14 @@ depending on the ``method`` argument.
 ## PV Inversion
 
 ::: finitevolx.pv_inversion
+
+## Known Values (Inhomogeneous Dirichlet)
+
+Building blocks behind the wrappers' ``known_values`` / ``known_mask``
+arguments, for use with your own solver.
+
+::: finitevolx.boundary_ring
+
+::: finitevolx.SolveDomain
+
+::: finitevolx.KnownValueLifting
