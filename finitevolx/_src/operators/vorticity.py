@@ -13,6 +13,8 @@ from jaxtyping import Array, Float
 from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
 from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
+from finitevolx._src.operators.diagnostic_operators import _sanitize
+from finitevolx._src.operators.diagnostics import enstrophy, potential_enstrophy
 from finitevolx._src.operators.difference import Difference2D, _curl_2d
 from finitevolx._src.operators.interpolation import Interpolation2D
 from finitevolx._src.operators.stencils import (
@@ -124,6 +126,14 @@ class Vorticity2D(eqx.Module):
         # q[j+1/2, i+1/2] = (zeta + f) / h  at X-points
         num = zeta[1:-1, 1:-1] + f_on_q[1:-1, 1:-1]
         den = h_on_q[1:-1, 1:-1]
+        if self.mask is not None:
+            # Pass-down masking makes h_on_q exactly 0 at every dry corner.
+            # Divide by 1 there instead: the output is zeroed below anyway,
+            # and this keeps reverse mode from evaluating 0 * inf at dry
+            # corners.  Wet corners keep their real denominator (and the
+            # NaN sentinel for zero thickness).
+            # den[j, i] = den[j, i] if xy_corner_strict[j+1, i+1] else 1
+            den = jnp.where(self.mask.xy_corner_strict[1:-1, 1:-1], den, 1.0)
         pv = jnp.where(den == 0, jnp.nan, num / den)
         out = interior(pv, h)
         if self.mask is not None:
@@ -132,6 +142,95 @@ class Vorticity2D(eqx.Module):
             # mask artefact, not a degenerate-thickness bug.  Restore the
             # post-compute-zero semantic: dry corners exactly 0, wet
             # corners keep any NaN they got.
+            out = jnp.where(self.mask.xy_corner_strict, out, 0.0)
+        return out
+
+    def enstrophy(
+        self,
+        u: Float[Array, "Ny Nx"],
+        v: Float[Array, "Ny Nx"],
+    ) -> Float[Array, "Ny Nx"]:
+        """Enstrophy at X-points (corners).
+
+        ens[j+1/2, i+1/2] = 1/2 * zeta[j+1/2, i+1/2]^2
+
+        Class form of ``enstrophy(relative_vorticity_cgrid(u, v, dx, dy))``.
+
+        Parameters
+        ----------
+        u : Float[Array, "Ny Nx"]
+            x-velocity at U-points.
+        v : Float[Array, "Ny Nx"]
+            y-velocity at V-points.
+
+        Returns
+        -------
+        Float[Array, "Ny Nx"]
+            Enstrophy at X-points, zero in the ghost ring and, when
+            ``self.mask`` is set, at dry X-corners.  Under a mask ``u`` / ``v``
+            are first zeroed on dry interior faces, so ``NaN`` land values
+            poison neither the value nor its gradient.
+        """
+        if self.mask is not None:
+            # u[j, i] = 0 on dry interior U-faces; v[j, i] = 0 on dry V-faces
+            u = _sanitize(self.mask.u, u)
+            v = _sanitize(self.mask.v, v)
+        out = enstrophy(self.relative_vorticity(u, v))
+        if self.mask is not None:
+            # jnp.where, not a multiply: a NaN land velocity makes zeta NaN
+            # at dry corners, and NaN * 0 is still NaN.
+            out = jnp.where(self.mask.xy_corner_strict, out, 0.0)
+        return out
+
+    def potential_enstrophy(
+        self,
+        u: Float[Array, "Ny Nx"],
+        v: Float[Array, "Ny Nx"],
+        h: Float[Array, "Ny Nx"],
+        f: Float[Array, "Ny Nx"],
+    ) -> Float[Array, "Ny Nx"]:
+        """Potential enstrophy at X-points (corners).
+
+        pens[j+1/2, i+1/2] = 1/2 * q[j+1/2, i+1/2]^2 * h_on_q[j+1/2, i+1/2]
+
+        h_on_q[j+1/2, i+1/2] = 1/4 * (h[j, i] + h[j, i+1]
+                                    + h[j+1, i] + h[j+1, i+1])
+
+        where ``q`` is :meth:`potential_vorticity`.  Class form of
+        ``potential_enstrophy(q, h_on_q)``.
+
+        Parameters
+        ----------
+        u : Float[Array, "Ny Nx"]
+            x-velocity at U-points.
+        v : Float[Array, "Ny Nx"]
+            y-velocity at V-points.
+        h : Float[Array, "Ny Nx"]
+            Layer thickness at T-points.
+        f : Float[Array, "Ny Nx"]
+            Coriolis parameter at T-points.
+
+        Returns
+        -------
+        Float[Array, "Ny Nx"]
+            Potential enstrophy at X-points, zero in the ghost ring and,
+            when ``self.mask`` is set, at dry X-corners.  Inherits the
+            ``NaN`` sentinel of :meth:`potential_vorticity` at wet corners
+            with zero thickness.
+        """
+        if self.mask is not None:
+            # Zero dry interior inputs so NaN land values cannot enter the
+            # arithmetic (or its gradient); wet corners only read wet cells.
+            u = _sanitize(self.mask.u, u)
+            v = _sanitize(self.mask.v, v)
+            f = _sanitize(self.mask.h, f)
+            h = _sanitize(self.mask.h, h)
+        q = self.potential_vorticity(u, v, h, f)  # q at X-points
+        h_on_q = self.interp.T_to_X(h)  # h interpolated to X-points
+        out = potential_enstrophy(q, h_on_q)
+        if self.mask is not None:
+            # q is already exactly 0 at dry corners; the select keeps that
+            # guarantee explicit, mirroring potential_vorticity.
             out = jnp.where(self.mask.xy_corner_strict, out, 0.0)
         return out
 

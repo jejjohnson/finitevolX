@@ -1,4 +1,7 @@
-"""Golden-output regression tests for the Energetics2D / Strain2D mask field.
+"""Golden-output regression tests for the diagnostic classes' mask field.
+
+Covers Energetics2D, Strain2D, QGPotentialVorticity2D and the
+Vorticity2D enstrophy methods.
 
 The classes are the Layer-3 forms of the mask-free functional diagnostics
 (issue #206).  Each method gets: unmasked golden, masked golden, all-ocean
@@ -15,25 +18,39 @@ import pytest
 
 from finitevolx import (
     Energetics2D,
+    Interpolation2D,
     Mask2D,
+    QGPotentialVorticity2D,
     Strain2D,
+    Vorticity2D,
     available_potential_energy,
     bernoulli_potential,
+    enstrophy,
     kinetic_energy,
+    potential_enstrophy,
+    potential_vorticity_multilayer,
+    qg_potential_vorticity,
+    relative_vorticity_cgrid,
     shear_strain,
+    stretching_term,
     tensor_strain,
 )
 from tests.fixtures._helpers import assert_matches_golden
 from tests.fixtures.inputs import (
+    make_f_field_2d,
     make_grid_2d,
     make_h_field_2d,
     make_mask_2d,
     make_mask_2d_all_ocean,
+    make_psi_field_2layer,
+    make_stretching_matrix_2layer,
     make_u_field_2d,
     make_v_field_2d,
+    make_y_coord_2d,
 )
 
 G_PRIME = 0.02
+F0, BETA, Y0 = 1.0, 0.5, 0.5
 
 
 def _args(method: str) -> tuple:
@@ -41,6 +58,21 @@ def _args(method: str) -> tuple:
     h = make_h_field_2d()
     u = make_u_field_2d()
     v = make_v_field_2d()
+    if method == "potential_enstrophy":
+        return (u, v, h, make_f_field_2d())
+    if method == "__call__":
+        return (h, F0, BETA, make_y_coord_2d(), Y0)
+    if method == "stretching":
+        return (make_stretching_matrix_2layer(), make_psi_field_2layer())
+    if method == "multilayer":
+        return (
+            make_psi_field_2layer(),
+            make_stretching_matrix_2layer(),
+            F0,
+            BETA,
+            make_y_coord_2d(),
+            Y0,
+        )
     if method == "bernoulli_potential":
         return (h, u, v)
     if method == "available_potential_energy":
@@ -55,10 +87,26 @@ ENERGETICS_METHODS = [
     "available_potential_energy",
 ]
 STRAIN_METHODS = ["shear", "tensor", "magnitude_squared", "okubo_weiss"]
-CASES = [("Energetics2D", m) for m in ENERGETICS_METHODS] + [
-    ("Strain2D", m) for m in STRAIN_METHODS
-]
-_CLASSES = {"Energetics2D": Energetics2D, "Strain2D": Strain2D}
+QG_METHODS = ["__call__", "stretching", "multilayer"]
+VORTICITY_METHODS = ["enstrophy", "potential_enstrophy"]
+CASES = (
+    [("Energetics2D", m) for m in ENERGETICS_METHODS]
+    + [("Strain2D", m) for m in STRAIN_METHODS]
+    + [("QGPotentialVorticity2D", m) for m in QG_METHODS]
+    + [("Vorticity2D", m) for m in VORTICITY_METHODS]
+)
+_CLASSES = {
+    "Energetics2D": Energetics2D,
+    "Strain2D": Strain2D,
+    "QGPotentialVorticity2D": QGPotentialVorticity2D,
+    "Vorticity2D": Vorticity2D,
+}
+# Methods whose output lives at X-points (corners).
+_X_POINT = {
+    ("Strain2D", "shear"),
+    ("Vorticity2D", "enstrophy"),
+    ("Vorticity2D", "potential_enstrophy"),
+}
 
 
 def _op(name: str, mask=None):
@@ -67,7 +115,7 @@ def _op(name: str, mask=None):
 
 def _dry(name: str, method: str, mask) -> np.ndarray:
     """Dry cells of the method's output stagger."""
-    if name == "Strain2D" and method == "shear":
+    if (name, method) in _X_POINT:
         return ~np.asarray(mask.xy_corner_strict)
     return ~np.asarray(mask.h)
 
@@ -93,7 +141,8 @@ class TestDiagnosticMasks:
         assert np.all(np.isfinite(out))
         dry = _dry(name, method, mask)
         assert dry.any()
-        np.testing.assert_array_equal(out[dry], 0.0)
+        # dry broadcasts over the leading layer axis of multilayer outputs.
+        np.testing.assert_array_equal(out[..., dry], 0.0)
 
 
 class TestMatchesFunctional:
@@ -128,6 +177,34 @@ class TestMatchesFunctional:
         )
         np.testing.assert_array_equal(
             op.tensor(u, v), tensor_strain(u, v, grid.dx, grid.dy)
+        )
+
+    def test_vorticity(self):
+        grid = make_grid_2d()
+        op = Vorticity2D(grid=grid)
+        interp = Interpolation2D(grid=grid)
+        u, v, h, f = _args("potential_enstrophy")
+        omega = relative_vorticity_cgrid(u, v, grid.dx, grid.dy)
+        np.testing.assert_array_equal(op.enstrophy(u, v), enstrophy(omega))
+        q = op.potential_vorticity(u, v, h, f)
+        np.testing.assert_array_equal(
+            op.potential_enstrophy(u, v, h, f),
+            potential_enstrophy(q, interp.T_to_X(h)),
+        )
+
+    def test_qg(self):
+        grid = make_grid_2d()
+        op = QGPotentialVorticity2D(grid=grid)
+        psi, A, f0, beta, y, y0 = _args("multilayer")
+        h = make_h_field_2d()
+        np.testing.assert_array_equal(
+            op(h, f0, beta, y, y0),
+            qg_potential_vorticity(h, f0, beta, grid.dx, grid.dy, y, y0),
+        )
+        np.testing.assert_array_equal(op.stretching(A, psi), stretching_term(A, psi))
+        np.testing.assert_array_equal(
+            op.multilayer(psi, A, f0, beta, y, y0),
+            potential_vorticity_multilayer(psi, A, f0, beta, grid.dx, grid.dy, y, y0),
         )
 
 
@@ -206,15 +283,20 @@ class TestNaNOnLand:
             "v": _interior_dry(mask.v),
             "h": _interior_dry(mask.h),
         }
-        # Positional stagger of each array argument, per method.
+        # Positional stagger of each leading field argument, per method
+        # (None = not a field, left untouched).
         staggers = {
             "bernoulli_potential": ("h", "u", "v"),
             "available_potential_energy": ("h", "h"),
+            "potential_enstrophy": ("u", "v", "h", "h"),
+            "__call__": ("h",),
+            "stretching": (None, "h"),
+            "multilayer": ("h",),
         }.get(method, ("u", "v"))
-        # arg[j, i] = NaN on dry interior cells of its stagger
+        # arg[..., j, i] = NaN on dry interior cells of its stagger
         nan_args = (
             tuple(
-                jnp.where(dry_of[s], jnp.nan, a)
+                a if s is None else jnp.where(dry_of[s], jnp.nan, a)
                 for s, a in zip(staggers, args, strict=False)
             )
             + args[len(staggers) :]
@@ -262,6 +344,24 @@ class TestGradientsWithNaNOnLand:
         du, dv = jax.grad(lambda u, v: jnp.sum(op.okubo_weiss(u, v)), (0, 1))(u, v)
         assert np.all(np.isfinite(np.asarray(du)))
         assert np.all(np.isfinite(np.asarray(dv)))
+
+    def test_vorticity_enstrophy_gradients(self):
+        mask = make_mask_2d()
+        op = Vorticity2D(grid=make_grid_2d(), mask=mask)
+        u, v, h, f = _args("potential_enstrophy")
+        # field[j, i] = NaN on dry interior cells of its stagger
+        u = jnp.where(_interior_dry(mask.u), jnp.nan, u)
+        v = jnp.where(_interior_dry(mask.v), jnp.nan, v)
+        h = jnp.where(_interior_dry(mask.h), jnp.nan, h)
+        f = jnp.where(_interior_dry(mask.h), jnp.nan, f)
+
+        def loss(u, v, h, f):
+            return jnp.sum(op.enstrophy(u, v)) + jnp.sum(
+                op.potential_enstrophy(u, v, h, f)
+            )
+
+        for g in jax.grad(loss, argnums=(0, 1, 2, 3))(u, v, h, f):
+            assert np.all(np.isfinite(np.asarray(g)))
 
 
 class TestStrainBoundaryConditions:
@@ -319,3 +419,17 @@ class TestStrainPhysics:
         np.testing.assert_allclose(
             op.magnitude_squared(u, v)[1:-1, 1:-1], 0.0, atol=1e-12
         )
+
+
+class TestQGComposition:
+    def test_multilayer_is_per_layer_minus_stretching(self):
+        """q[k] = qg(psi[k]) - (A psi)[k], with and without a mask."""
+        psi, A, f0, beta, y, y0 = _args("multilayer")
+        for mask in (None, make_mask_2d()):
+            op = QGPotentialVorticity2D(grid=make_grid_2d(), mask=mask)
+            q = op.multilayer(psi, A, f0, beta, y, y0)
+            s = op.stretching(A, psi)
+            for k in range(psi.shape[0]):
+                np.testing.assert_allclose(
+                    q[k], op(psi[k], f0, beta, y, y0) - s[k], rtol=1e-12, atol=1e-14
+                )
