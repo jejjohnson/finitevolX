@@ -251,3 +251,36 @@ class TestMaskNaNSafety3D:
             return jnp.sum(du) + jnp.sum(dv)
 
         assert bool(jnp.isfinite(jax.grad(loss)(h_bot)).all())
+
+    def test_grad_wrt_coefficients_finite_with_nan_land(self):
+        grid, mask = make_grid_3d(), make_mask_3d()
+        mu, mv, mh = (np.asarray(m) for m in (mask.u, mask.v, mask.h))
+        u = jnp.where(mu, make_u_field_3d(), jnp.nan)
+        v = jnp.where(mv, make_v_field_3d(), jnp.nan)
+        q = jnp.where(mh, make_h_field_3d(), jnp.nan)
+        q_ref = jnp.where(mh, 1.0, jnp.nan)
+        tau = jnp.where(mh[grid.Nz - 2], 0.1, jnp.nan)
+        lin = LinearDrag3D(grid, mask=mask)
+        quad = QuadraticDrag3D(grid, mask=mask)
+        damp = RayleighDamping3D(grid, mask=mask)
+        wind = WindStress3D(grid, mask=mask)
+        losses = [
+            lambda c: sum(jnp.sum(t) for t in lin(u, v, c)),
+            lambda c: sum(jnp.sum(t) for t in quad(u, v, c, 10.0)),
+            lambda c: jnp.sum(damp(q, c, q_ref=q_ref)),
+            lambda c: sum(jnp.sum(t) for t in wind(tau, tau, dz_top=c)),
+        ]
+        for loss in losses:
+            assert bool(jnp.isfinite(jax.grad(loss)(0.5)))
+
+    def test_quadratic_coastal_faces_match_zero_land(self):
+        grid, mask = make_grid_3d(), make_mask_3d()
+        u = jnp.where(np.asarray(mask.u), make_u_field_3d(), jnp.nan)
+        v = jnp.where(np.asarray(mask.v), make_v_field_3d(), jnp.nan)
+        quad = QuadraticDrag3D(grid, mask=mask)
+        du, dv = quad(u, v, cd=1e-3, h_bot=10.0)
+        du_ref, dv_ref = quad(
+            jnp.nan_to_num(u, nan=0.0), jnp.nan_to_num(v, nan=0.0), 1e-3, 10.0
+        )
+        np.testing.assert_allclose(du, du_ref)
+        np.testing.assert_allclose(dv, dv_ref)

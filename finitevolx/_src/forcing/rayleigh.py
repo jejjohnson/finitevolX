@@ -181,6 +181,13 @@ class RayleighDamping3D(AbstractForcing):
             z-ghost slices.  When ``self.mask`` is set, dry cells are
             zeroed.
         """
+        if self.mask is not None:
+            # Zero dry cells first: NaN-filled land would otherwise give NaN
+            # gradients through -r * (q - q_ref) even where dq is masked.
+            q = mask_where(q, self.mask.h)
+            if q_ref is not None and jnp.ndim(q_ref) == 3:
+                q_ref = mask_where(jnp.asarray(q_ref), self.mask.h)
+
         r_arr = jnp.asarray(r)
         if q_ref is None:
             dq = eqx.filter_vmap(

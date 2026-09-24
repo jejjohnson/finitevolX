@@ -346,7 +346,13 @@ class LinearDrag3D(AbstractForcing):
             ``k = 1`` and in the ghost ring.  When ``self.mask`` is
             set, dry faces are zeroed.
         """
-        du_2d, dv_2d = self._drag2d(u[_K_BOT], v[_K_BOT], r)
+        u_k, v_k = u[_K_BOT], v[_K_BOT]
+        if self.mask is not None:
+            # Zero dry velocities first so NaN-filled land cannot give NaN
+            # gradients through -r * u.
+            u_k = mask_where(u_k, self.mask.u[_K_BOT])
+            v_k = mask_where(v_k, self.mask.v[_K_BOT])
+        du_2d, dv_2d = self._drag2d(u_k, v_k, r)
         if self.mask is not None:
             du_2d = mask_where(du_2d, self.mask.u[_K_BOT])
             dv_2d = mask_where(dv_2d, self.mask.v[_K_BOT])
