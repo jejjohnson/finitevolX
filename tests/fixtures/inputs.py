@@ -287,6 +287,22 @@ def make_f_field_2d() -> Float[Array, "Ny Nx"]:
     return 1.0 + 0.1 * Y
 
 
+def make_y_coord_2d() -> Float[Array, "Ny Nx"]:
+    """T-point meridional coordinate y(x, y) = y, normalised to [0, 1]."""
+    _, Y = _xy_2d()
+    return Y
+
+
+def make_psi_field_2layer() -> Float[Array, "2 Ny Nx"]:
+    """Two-layer T-point streamfunction: layer 0 = h, layer 1 = q / 2."""
+    return jnp.stack([make_h_field_2d(), 0.5 * make_q_field_2d()])
+
+
+def make_stretching_matrix_2layer() -> Float[Array, "2 2"]:
+    """Two-layer QG stretching matrix (rows sum to zero, as for F1, F2 = 1)."""
+    return jnp.array([[-1.0, 1.0], [1.0, -1.0]])
+
+
 # ----------------------------------------------------------------------
 # 1-D field generators (slices of the 2-D fields at j = NY // 2)
 # ----------------------------------------------------------------------

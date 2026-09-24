@@ -14,6 +14,7 @@ Method                              Output  Mask field
 ``Strain2D.tensor``                 T       ``mask.h``
 ``Strain2D.magnitude_squared``      T       ``mask.h``
 ``Strain2D.okubo_weiss``            T       ``mask.h``
+``QGPotentialVorticity2D.*``        T       ``mask.h``
 ==================================  ======  =========================
 
 With ``mask=None`` every method returns exactly what the functional form
@@ -32,9 +33,12 @@ from finitevolx._src.operators.diagnostics import (
     bernoulli_potential,
     kinetic_energy,
     okubo_weiss,
+    potential_vorticity_multilayer,
+    qg_potential_vorticity,
     relative_vorticity_cgrid,
     shear_strain,
     strain_magnitude_squared,
+    stretching_term,
     tensor_strain,
 )
 from finitevolx._src.operators.interpolation import Interpolation2D
@@ -341,3 +345,150 @@ class Strain2D(eqx.Module):
         if self.mask is not None:
             out = out * self.mask.h
         return out
+
+
+class QGPotentialVorticity2D(eqx.Module):
+    """Quasi-geostrophic potential vorticity at T-points.
+
+    Class form of :func:`~finitevolx.qg_potential_vorticity`,
+    :func:`~finitevolx.stretching_term` and
+    :func:`~finitevolx.potential_vorticity_multilayer`.  Every method
+    returns a T-point field (``[Ny, Nx]`` for one layer, ``[nl, Ny, Nx]``
+    for the multilayer methods); when ``mask`` is set, dry T-cells are
+    zeroed via ``* mask.h`` (post-compute, Pattern 1 in ``docs/masks.md``),
+    broadcast over the layer axis.
+
+    The Laplacian stencil reads ``psi`` at the four neighbours of each
+    T-cell, so at a coastal cell it sees whatever ``psi`` holds on land.
+    Streamfunctions from a masked elliptic solve are zero on land, which is
+    the usual no-normal-flow condition.
+
+    Parameters
+    ----------
+    grid : CartesianGrid2D
+        The underlying 2-D grid.
+    mask : Mask2D or None, optional
+        Optional land/ocean mask.  ``None`` (default) returns exactly the
+        functional forms' output.
+
+    Examples
+    --------
+    >>> import jax.numpy as jnp
+    >>> from finitevolx import CartesianGrid2D, QGPotentialVorticity2D
+    >>> grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
+    >>> psi = jnp.zeros((grid.Ny, grid.Nx))
+    >>> y = jnp.zeros((grid.Ny, grid.Nx))
+    >>> q = QGPotentialVorticity2D(grid=grid)(psi, 1e-4, 0.0, y, 0.0)
+    """
+
+    grid: CartesianGrid2D
+    mask: Mask2D | None = None
+
+    def _mask_h(self, out: Float[Array, "... Ny Nx"]) -> Float[Array, "... Ny Nx"]:
+        """Zero dry T-cells: out[..., j, i] = out[..., j, i] * mask.h[j, i]."""
+        if self.mask is None:
+            return out
+        return out * self.mask.h
+
+    def __call__(
+        self,
+        psi: Float[Array, "Ny Nx"],
+        f0: float,
+        beta: float,
+        y: Float[Array, "Ny Nx"],
+        y0: float,
+    ) -> Float[Array, "Ny Nx"]:
+        """Single-layer QG potential vorticity.
+
+        q[j, i] = lap_psi[j, i] / f0 + beta * (y[j, i] - y0) / f0
+
+        lap_psi[j, i] = (psi[j, i+1] - 2 * psi[j, i] + psi[j, i-1]) / dx^2
+                      + (psi[j+1, i] - 2 * psi[j, i] + psi[j-1, i]) / dy^2
+
+        Parameters
+        ----------
+        psi : Float[Array, "Ny Nx"]
+            Streamfunction at T-points.
+        f0 : float
+            Reference Coriolis parameter.
+        beta : float
+            Meridional gradient of the Coriolis parameter.
+        y : Float[Array, "Ny Nx"]
+            Meridional coordinate at T-points.
+        y0 : float
+            Reference latitude.
+
+        Returns
+        -------
+        Float[Array, "Ny Nx"]
+            QG potential vorticity at T-points, zero in the ghost ring and,
+            when ``self.mask`` is set, at dry T-cells.
+        """
+        return self._mask_h(
+            qg_potential_vorticity(psi, f0, beta, self.grid.dx, self.grid.dy, y, y0)
+        )
+
+    def stretching(
+        self,
+        A: Float[Array, "nl nl"],
+        psi: Float[Array, "nl Ny Nx"],
+    ) -> Float[Array, "nl Ny Nx"]:
+        """Cross-layer stretching term.
+
+        s[k, j, i] = sum_m A[k, m] * psi[m, j, i]
+
+        Parameters
+        ----------
+        A : Float[Array, "nl nl"]
+            Coupling (stretching) matrix.
+        psi : Float[Array, "nl Ny Nx"]
+            Streamfunction at T-points for all layers.
+
+        Returns
+        -------
+        Float[Array, "nl Ny Nx"]
+            Stretching contribution at T-points, zero in the ghost ring and,
+            when ``self.mask`` is set, at dry T-cells of every layer.
+        """
+        return self._mask_h(stretching_term(A, psi))
+
+    def multilayer(
+        self,
+        psi: Float[Array, "nl Ny Nx"],
+        A: Float[Array, "nl nl"],
+        f0: float,
+        beta: float,
+        y: Float[Array, "Ny Nx"],
+        y0: float,
+    ) -> Float[Array, "nl Ny Nx"]:
+        """Multi-layer QG potential vorticity.
+
+        q[k, j, i] = lap_psi[k, j, i] / f0 + beta * (y[j, i] - y0) / f0
+                   - sum_m A[k, m] * psi[m, j, i]
+
+        Parameters
+        ----------
+        psi : Float[Array, "nl Ny Nx"]
+            Streamfunction at T-points for all layers.
+        A : Float[Array, "nl nl"]
+            Coupling (stretching) matrix.
+        f0 : float
+            Reference Coriolis parameter.
+        beta : float
+            Meridional gradient of the Coriolis parameter.
+        y : Float[Array, "Ny Nx"]
+            Meridional coordinate at T-points.
+        y0 : float
+            Reference latitude.
+
+        Returns
+        -------
+        Float[Array, "nl Ny Nx"]
+            QG potential vorticity at T-points, zero in the ghost ring and,
+            when ``self.mask`` is set, at dry T-cells of every layer.
+        """
+        return self._mask_h(
+            potential_vorticity_multilayer(
+                psi, A, f0, beta, self.grid.dx, self.grid.dy, y, y0
+            )
+        )

@@ -187,7 +187,7 @@ def _register_all() -> list[Entry]:
     )
 
     # ------------------------------------------------------------------
-    # Energetics2D / Strain2D
+    # Energetics2D / Strain2D / QGPotentialVorticity2D
     # ------------------------------------------------------------------
     entries.extend(_diagnostic_entries(grid2d, mask2d, h2d, u2d, v2d))
 
@@ -548,6 +548,30 @@ def _vorticity_entries(
             "pv_flux_arakawa_lamb",
             "masked",
             lambda: v2m.pv_flux_arakawa_lamb(q2d, u2d, v2d),
+        ),
+        (
+            "Vorticity2D",
+            "enstrophy",
+            "unmasked",
+            lambda: v2.enstrophy(u2d, v2d),
+        ),
+        (
+            "Vorticity2D",
+            "enstrophy",
+            "masked",
+            lambda: v2m.enstrophy(u2d, v2d),
+        ),
+        (
+            "Vorticity2D",
+            "potential_enstrophy",
+            "unmasked",
+            lambda: v2.potential_enstrophy(u2d, v2d, h2d, f2d),
+        ),
+        (
+            "Vorticity2D",
+            "potential_enstrophy",
+            "masked",
+            lambda: v2m.potential_enstrophy(u2d, v2d, h2d, f2d),
         ),
     ]
 
@@ -993,10 +1017,16 @@ def _coriolis_entries(
 
 
 def _diagnostic_entries(grid2d, mask2d, h2d, u2d, v2d) -> list[Entry]:
-    """Register goldens for Energetics2D / Strain2D."""
+    """Register goldens for Energetics2D / Strain2D / QGPotentialVorticity2D."""
     from finitevolx._src.operators.diagnostic_operators import (
         Energetics2D,
+        QGPotentialVorticity2D,
         Strain2D,
+    )
+    from tests.fixtures.inputs import (
+        make_psi_field_2layer,
+        make_stretching_matrix_2layer,
+        make_y_coord_2d,
     )
 
     # Reference thickness: the mean of h, so h - H has both signs.
@@ -1040,6 +1070,35 @@ def _diagnostic_entries(grid2d, mask2d, h2d, u2d, v2d) -> list[Entry]:
                     "okubo_weiss",
                     variant,
                     (lambda st=st: st.okubo_weiss(u2d, v2d)),
+                ),
+            ]
+        )
+
+    # QG PV: psi = h, y normalised to [0, 1], f0 = 1, beta = 0.5, y0 = 0.5.
+    y2d = make_y_coord_2d()
+    psi_ml = make_psi_field_2layer()
+    A = make_stretching_matrix_2layer()
+    for variant, mask in (("unmasked", None), ("masked", mask2d)):
+        qg = QGPotentialVorticity2D(grid=grid2d, mask=mask)
+        entries.extend(
+            [
+                (
+                    "QGPotentialVorticity2D",
+                    "__call__",
+                    variant,
+                    (lambda qg=qg: qg(h2d, 1.0, 0.5, y2d, 0.5)),
+                ),
+                (
+                    "QGPotentialVorticity2D",
+                    "stretching",
+                    variant,
+                    (lambda qg=qg: qg.stretching(A, psi_ml)),
+                ),
+                (
+                    "QGPotentialVorticity2D",
+                    "multilayer",
+                    variant,
+                    (lambda qg=qg: qg.multilayer(psi_ml, A, 1.0, 0.5, y2d, 0.5)),
                 ),
             ]
         )
