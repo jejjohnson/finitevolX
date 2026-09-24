@@ -190,7 +190,7 @@ from finitevolx._src.operators.interpolation import (
     Interpolation2D,
     Interpolation3D,
 )
-from finitevolx._src.operators.jacobian import arakawa_jacobian
+from finitevolx._src.operators.jacobian import ArakawaJacobian2D, arakawa_jacobian
 from finitevolx._src.operators.reductions import (
     area_mean,
     area_sum,
@@ -466,6 +466,7 @@ __all__ = [
     "SphericalMomentumAdvection2D",
     "SphericalMomentumAdvection3D",
     # Jacobian
+    "ArakawaJacobian2D",
     "arakawa_jacobian",
     # Area- and volume-weighted reductions (grid-polymorphic + explicit)
     "area_weights",

@@ -648,6 +648,22 @@ def _spherical_entries(
                 (lambda m=method, a=arg: getattr(sd2m, m)(a)),
             )
         )
+    entries.extend(
+        [
+            (
+                "SphericalDifference2D",
+                "geostrophic_velocity",
+                "unmasked",
+                lambda: sd2.geostrophic_velocity(h2d, f2d),
+            ),
+            (
+                "SphericalDifference2D",
+                "geostrophic_velocity",
+                "masked",
+                lambda: sd2m.geostrophic_velocity(h2d, f2d),
+            ),
+        ]
+    )
 
     # --- SphericalDifference3D ----------------------------------------
     sd3 = SphericalDifference3D(grid=sgrid3d)
@@ -1017,12 +1033,13 @@ def _coriolis_entries(
 
 
 def _diagnostic_entries(grid2d, mask2d, h2d, u2d, v2d) -> list[Entry]:
-    """Register goldens for Energetics2D / Strain2D / QGPotentialVorticity2D."""
+    """Register goldens for the diagnostic classes and ArakawaJacobian2D."""
     from finitevolx._src.operators.diagnostic_operators import (
         Energetics2D,
         QGPotentialVorticity2D,
         Strain2D,
     )
+    from finitevolx._src.operators.jacobian import ArakawaJacobian2D
     from tests.fixtures.inputs import (
         make_psi_field_2layer,
         make_stretching_matrix_2layer,
@@ -1072,6 +1089,19 @@ def _diagnostic_entries(grid2d, mask2d, h2d, u2d, v2d) -> list[Entry]:
                     (lambda st=st: st.okubo_weiss(u2d, v2d)),
                 ),
             ]
+        )
+
+    # Arakawa Jacobian: J(psi, q) with psi = h, q = q-field.
+    q2d = make_q_field_2d()
+    for variant, mask in (("unmasked", None), ("masked", mask2d)):
+        jac = ArakawaJacobian2D(grid=grid2d, mask=mask)
+        entries.append(
+            (
+                "ArakawaJacobian2D",
+                "__call__",
+                variant,
+                (lambda jac=jac: jac(h2d, q2d)),
+            )
         )
 
     # QG PV: psi = h, y normalised to [0, 1], f0 = 1, beta = 0.5, y0 = 0.5.
