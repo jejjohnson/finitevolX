@@ -22,6 +22,7 @@ from jaxtyping import Array, Float
 
 from finitevolx._src.grid.cartesian import CartesianGrid2D
 from finitevolx._src.mask import Mask2D
+from finitevolx._src.operators.diagnostic_operators import _sanitize
 
 
 def arakawa_jacobian(
@@ -147,10 +148,11 @@ class ArakawaJacobian2D(eqx.Module):
     J_full[..., j, i] = J[..., j-1, i-1]   for 1 <= j <= Ny-2, 1 <= i <= Nx-2
     J_full[..., j, i] = 0                  on the ghost ring
 
-    When ``mask`` is set, ``f`` and ``g`` are first zeroed on dry T-cells
-    (the stencil reads the eight neighbours of each T-cell, so a coastal
-    cell would otherwise read land values, ``NaN`` or not; a streamfunction
-    from a masked elliptic solve is zero there anyway), and dry output cells
+    When ``mask`` is set, ``f`` and ``g`` are first zeroed on dry *interior*
+    T-cells (the stencil reads the eight neighbours of each T-cell, so a
+    coastal cell would otherwise read land values, ``NaN`` or not; a
+    streamfunction from a masked elliptic solve is zero there anyway; the
+    ghost ring is BC-owned and passed through), and dry output cells
     are zeroed last via ``jnp.where(mask.h, ...)`` (Pattern 1 in
     ``docs/masks.md``), broadcast over any leading batch axes.
 
@@ -201,9 +203,9 @@ class ArakawaJacobian2D(eqx.Module):
             ``self.mask`` is set, at dry T-cells.
         """
         if self.mask is not None:
-            # f[..., j, i] = f[..., j, i] if mask.h[j, i] else 0  (same for g)
-            f = jnp.where(self.mask.h, f, 0.0)
-            g = jnp.where(self.mask.h, g, 0.0)
+            # f[..., j, i] = 0 on dry interior T-cells (same for g)
+            f = _sanitize(self.mask.h, f)
+            g = _sanitize(self.mask.h, g)
         J = arakawa_jacobian(f, g, self.grid.dx, self.grid.dy)
         shape = jnp.broadcast_shapes(f.shape, g.shape)
         # J_full[..., j, i] = J[..., j-1, i-1]  for 1 <= j <= Ny-2, 1 <= i <= Nx-2
