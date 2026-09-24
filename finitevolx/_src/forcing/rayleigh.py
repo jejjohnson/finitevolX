@@ -17,7 +17,7 @@ from __future__ import annotations
 from jaxtyping import Array, Float
 
 from finitevolx._src.forcing._base import AbstractForcing
-from finitevolx._src.forcing._utils import interior_or_scalar
+from finitevolx._src.forcing._utils import interior_or_scalar, mask_where
 from finitevolx._src.forcing.functional import rayleigh_tendency
 from finitevolx._src.grid.cartesian import CartesianGrid2D
 from finitevolx._src.mask import Mask2D
@@ -37,8 +37,9 @@ class RayleighDamping2D(AbstractForcing):
     grid : CartesianGrid2D
         The underlying 2-D grid.
     mask : Mask2D or None, optional
-        Optional land/ocean mask.  When provided, ``dq`` is
-        post-multiplied by ``mask.h``.
+        Optional land/ocean mask.  When provided, ``dq`` is zeroed at dry
+        T-cells (via ``jnp.where``, so NaN-filled land never leaks into the
+        output).
 
     Examples
     --------
@@ -83,7 +84,6 @@ class RayleighDamping2D(AbstractForcing):
             rayleigh_tendency(q[1:-1, 1:-1], interior_or_scalar(r), q_ref_in), q
         )
 
-        if self.mask is not None:
-            dq = dq * self.mask.h
-
-        return dq
+        if self.mask is None:
+            return dq
+        return mask_where(dq, self.mask.h)

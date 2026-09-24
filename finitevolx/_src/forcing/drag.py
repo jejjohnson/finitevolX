@@ -25,7 +25,12 @@ from __future__ import annotations
 from jaxtyping import Array, Float
 
 from finitevolx._src.forcing._base import AbstractForcing
-from finitevolx._src.forcing._utils import on_face_interior, safe_speed
+from finitevolx._src.forcing._utils import (
+    mask_where,
+    on_face_interior,
+    safe_denominator,
+    safe_speed,
+)
 from finitevolx._src.forcing.functional import (
     linear_drag_tendency,
     quadratic_drag_tendency,
@@ -50,8 +55,9 @@ class LinearDrag2D(AbstractForcing):
     grid : CartesianGrid2D
         The underlying 2-D grid.
     mask : Mask2D or None, optional
-        Optional land/ocean mask.  When provided, ``du_drag`` is
-        post-multiplied by ``mask.u`` and ``dv_drag`` by ``mask.v``.
+        Optional land/ocean mask.  When provided, ``du_drag`` is zeroed at
+        dry U-faces and ``dv_drag`` at dry V-faces (via ``jnp.where``, so
+        NaN-filled land never leaks into the output).
 
     Examples
     --------
@@ -111,11 +117,9 @@ class LinearDrag2D(AbstractForcing):
         # dv_drag[j+1/2, i] = -r_on_v * v
         dv_drag = interior(linear_drag_tendency(v[1:-1, 1:-1], r_on_v), v)
 
-        if self.mask is not None:
-            du_drag = du_drag * self.mask.u
-            dv_drag = dv_drag * self.mask.v
-
-        return du_drag, dv_drag
+        if self.mask is None:
+            return du_drag, dv_drag
+        return mask_where(du_drag, self.mask.u), mask_where(dv_drag, self.mask.v)
 
 
 class QuadraticDrag2D(AbstractForcing):
@@ -140,8 +144,9 @@ class QuadraticDrag2D(AbstractForcing):
     grid : CartesianGrid2D
         The underlying 2-D grid.
     mask : Mask2D or None, optional
-        Optional land/ocean mask.  When provided, ``du_drag`` is
-        post-multiplied by ``mask.u`` and ``dv_drag`` by ``mask.v``.
+        Optional land/ocean mask.  When provided, ``du_drag`` is zeroed at
+        dry U-faces and ``dv_drag`` at dry V-faces (via ``jnp.where``, so
+        NaN-filled land never leaks into the output).
 
     Examples
     --------
@@ -195,6 +200,23 @@ class QuadraticDrag2D(AbstractForcing):
             ``(du_drag, dv_drag)`` at U- and V-points, zero in the ghost
             ring.  When ``self.mask`` is set, dry faces are zeroed.
         """
+        mu = None if self.mask is None else self.mask.u
+        mv = None if self.mask is None else self.mask.v
+        return self._tendency(u, v, cd, h_bot, mu, mv)
+
+    def _tendency(
+        self,
+        u: Float[Array, "Ny Nx"],
+        v: Float[Array, "Ny Nx"],
+        cd: float | Float[Array, "Ny Nx"],
+        h_bot: float | Float[Array, "Ny Nx"],
+        mu: Array | None,
+        mv: Array | None,
+    ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
+        """Core stencil with explicit ``[Ny, Nx]`` face masks (or ``None``).
+
+        Shared with :class:`QuadraticDrag3D`, which passes one z-level's masks.
+        """
         # v_on_u[j, i+1/2] = 1/4*(v[j+1/2,i] + v[j-1/2,i] + v[j+1/2,i+1] + v[j-1/2,i+1])
         v_on_u = self.interp.V_to_U(v)[1:-1, 1:-1]
         # u_on_v[j+1/2, i] = 1/4*(u[j,i+1/2] + u[j+1,i+1/2] + u[j,i-1/2] + u[j+1,i-1/2])
@@ -209,16 +231,13 @@ class QuadraticDrag2D(AbstractForcing):
 
         cd_on_u = on_face_interior(cd, self.interp.T_to_U)
         cd_on_v = on_face_interior(cd, self.interp.T_to_V)
-        h_on_u = on_face_interior(h_bot, self.interp.T_to_U)
-        h_on_v = on_face_interior(h_bot, self.interp.T_to_V)
+        # Swap in 1 at dry faces so a zero dry-cell thickness cannot give 0/0.
+        h_on_u = safe_denominator(on_face_interior(h_bot, self.interp.T_to_U), mu)
+        h_on_v = safe_denominator(on_face_interior(h_bot, self.interp.T_to_V), mv)
 
         # du_drag[j, i+1/2] = -Cd * |u|_on_u * u / h_bot_on_u
         du_drag = interior(quadratic_drag_tendency(u_in, speed_u, cd_on_u, h_on_u), u)
         # dv_drag[j+1/2, i] = -Cd * |u|_on_v * v / h_bot_on_v
         dv_drag = interior(quadratic_drag_tendency(v_in, speed_v, cd_on_v, h_on_v), v)
 
-        if self.mask is not None:
-            du_drag = du_drag * self.mask.u
-            dv_drag = dv_drag * self.mask.v
-
-        return du_drag, dv_drag
+        return mask_where(du_drag, mu), mask_where(dv_drag, mv)
