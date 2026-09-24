@@ -62,6 +62,21 @@ field stored column indices and `_yids` stored row indices.
   library.  Equivalent inline code is available in
   `docs/notebooks/demo_masks.py`.
 
+## [0.0.47](https://github.com/jejjohnson/finitevolX/compare/v0.0.46...v0.0.47) (2026-09-24)
+
+
+### Features
+
+* **diagnostics:** add Energetics2D and Strain2D mask-aware classes ([#206](https://github.com/jejjohnson/finitevolX/issues/206), 1/4) ([#267](https://github.com/jejjohnson/finitevolX/issues/267)) ([f60986f](https://github.com/jejjohnson/finitevolX/commit/f60986f97dc84928c35c92a6857c0545d91ab2ca))
+* **diagnostics:** add Vorticity2D enstrophy methods + QGPotentialVorticity2D ([#206](https://github.com/jejjohnson/finitevolX/issues/206), 2/4) ([#268](https://github.com/jejjohnson/finitevolX/issues/268)) ([e5d2529](https://github.com/jejjohnson/finitevolX/commit/e5d252973dba2b049f666691c4b845552f9c740e))
+* **forcing:** add 2D wind-stress, drag and Rayleigh damping operators ([#258](https://github.com/jejjohnson/finitevolX/issues/258)) ([eeae02e](https://github.com/jejjohnson/finitevolX/commit/eeae02e72523ad5dfe645f6f3f242571d616f6d2))
+* **forcing:** add 3D wind-stress, drag and Rayleigh damping operators ([#259](https://github.com/jejjohnson/finitevolX/issues/259)) ([9a8a886](https://github.com/jejjohnson/finitevolX/commit/9a8a8864abb514e56ab342a01fe4fc0e07cf4045))
+* **forcing:** add AbstractForcing base class and composition wrappers ([#257](https://github.com/jejjohnson/finitevolX/issues/257)) ([851225b](https://github.com/jejjohnson/finitevolX/commit/851225bc0a7ca7431d7ca93c4e4e89636457b8d0)), closes [#173](https://github.com/jejjohnson/finitevolX/issues/173)
+* **forcing:** add Layer 0 functional forcing primitives ([#256](https://github.com/jejjohnson/finitevolX/issues/256)) ([19f388f](https://github.com/jejjohnson/finitevolX/commit/19f388f9b3f2a62d95a1299e25c0484c0de83ad2))
+* **operators:** add ArakawaJacobian2D + SphericalDifference2D.geostrophic_velocity ([#206](https://github.com/jejjohnson/finitevolX/issues/206), 3/4) ([#269](https://github.com/jejjohnson/finitevolX/issues/269)) ([f757637](https://github.com/jejjohnson/finitevolX/commit/f757637e14c37f9d6804cbd570571939704318e6))
+* **solvers:** accept a BoundaryConditionSet as bc= in elliptic wrappers ([#263](https://github.com/jejjohnson/finitevolX/issues/263)) ([0350a90](https://github.com/jejjohnson/finitevolX/commit/0350a908623a7ebec7bec8bc92b223b2e4b07608))
+* **solvers:** accept known_values/known_mask in elliptic wrappers ([#262](https://github.com/jejjohnson/finitevolX/issues/262)) ([2fe5f71](https://github.com/jejjohnson/finitevolX/commit/2fe5f71cb60a58a0f99bf3ba65bdacc430315402))
+
 ## [0.0.46](https://github.com/jejjohnson/finitevolX/compare/v0.0.45...v0.0.46) (2026-09-24)
 
 

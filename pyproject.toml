@@ -1,6 +1,6 @@
 [project]
 name = "finitevolx"
-version = "0.0.46"
+version = "0.0.47"
 description = "Arakawa C-grid finite volume operators in JAX."
 authors = [
     { name = "Juan Emmanuel Johnson", email = "jemanjohnson34@gmail.com" },
