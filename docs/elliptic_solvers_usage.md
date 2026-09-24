@@ -127,6 +127,11 @@ Solves $(\nabla^2 - \lambda_k)\,\psi_k = q_k$ for each vertical mode.
 
 ### Known Boundary Values (Inhomogeneous Dirichlet)
 
+!!! tip "Tutorial"
+    For the full derivation — notation, the block linear system, pseudocode,
+    a from-scratch NumPy implementation, convergence and gradients — see the
+    [Known Boundary Values tutorial](notebooks/inhomogeneous_bcs_tutorial.py).
+
 By default every solver assumes $\psi = 0$ on the boundary.  When the
 boundary values are known but non-zero — SSH from a parent model, a tide
 gauge, reanalysis at an open boundary — pass them as `known_values`.  All

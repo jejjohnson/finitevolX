@@ -85,6 +85,7 @@ nav:
   - Elliptic Solvers:
       - Theory & Overview: elliptic_solvers.md
       - Usage Guide: elliptic_solvers_usage.md
+      - "Tutorial: Known Boundary Values": notebooks/inhomogeneous_bcs_tutorial.py
       - Convenience Wrappers: api/elliptic.md
       - Spectral Solvers: api/spectral_solvers.md
       - Spectral Transforms: api/spectral_transforms.md
@@ -99,6 +100,7 @@ nav:
       - Overview: examples.md
       - Masks: notebooks/demo_masks.py
       - Elliptic Solvers: notebooks/demo_solvers.py
+      - Known Boundary Values: notebooks/inhomogeneous_bcs_tutorial.py
       - Pressure Poisson: notebooks/pressure_poisson.py
       - Streamfunction Inversion: notebooks/streamfunction_inversion.py
       - Helmholtz Screening: notebooks/helmholtz_screening.py

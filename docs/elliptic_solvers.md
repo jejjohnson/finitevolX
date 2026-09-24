@@ -50,6 +50,53 @@ The choice of boundary condition determines which spectral transform is used:
 
 ---
 
+## Inhomogeneous Dirichlet Boundary Conditions
+
+The table above assumes the boundary values are **zero**.  Prescribed,
+non-zero values $\psi = g$ on $\partial\Omega$ — SSH from a parent model, a
+tide gauge, reanalysis data — reduce to the homogeneous case by the
+**lifting trick**.  Split $\psi = \psi_{\text{lift}} + \psi_{\text{hom}}$
+with $\psi_{\text{lift}} = g$ on the boundary; by linearity
+
+$$
+(\nabla^2 - \lambda)\,\psi_{\text{hom}}
+  = f - (\nabla^2 - \lambda)\,\psi_{\text{lift}},
+\qquad \psi_{\text{hom}} = 0 \text{ on } \partial\Omega .
+$$
+
+**Discretely**, a mask splits the wet cells $W$ into the *known* cells $K$
+— the inner boundary ring $R$ (wet cells with a dry neighbour) plus any
+observed cells — and the *effective* unknowns $E = W \setminus K$.  Every
+stencil neighbour of an $E$ cell is wet, so the 5-point equations at $E$
+split into
+$A_{EE}\,\psi_E + A_{EK}\,g_K = f_E$, i.e.
+
+$$
+A_{EE}\,\psi_E = f_E - A_{EK}\,g_K .
+$$
+
+This is exact block elimination: the lift is simply "$g$ on $K$, zero
+elsewhere", the correction $A_{EK} g_K$ is the stencil applied to that
+lift with the **wet** mask, and the homogeneous solve runs on the
+**effective** mask.  Accuracy is set by the stencil alone (second order).
+
+| Solver | How it takes known values |
+|--------|---------------------------|
+| CG | operator on the effective mask ($-A_{EE}$ is SPD for $\lambda \ge 0$) |
+| CG + multigrid | multigrid preconditioner built on the effective mask |
+| Spectral (DST) | rectangular basin only: $E$ is the rectangle `[2:-2, 2:-2]` ($2 \le j \le N_y-3$, $2 \le i \le N_x-3$) |
+| Capacitance | solver built on the **wet** mask (it zeroes its own inner ring, which is $K$) |
+
+In finitevolX, pass `known_values=` (and optionally `known_mask=`) to any
+convenience wrapper, or a `BoundaryConditionSet` as `bc=`; see the
+[usage guide](elliptic_solvers_usage.md#known-boundary-values-inhomogeneous-dirichlet).
+The [Known Boundary Values tutorial](notebooks/inhomogeneous_bcs_tutorial.py)
+derives all of this from scratch — notation, block structure, pseudocode, a
+NumPy implementation, a convergence study, and gradients with respect to
+the boundary data.
+
+---
+
 ## Spectral Solver Theory
 
 All three spectral solvers follow the same three-step algorithm:
