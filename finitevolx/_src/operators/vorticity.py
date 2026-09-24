@@ -158,10 +158,14 @@ class Vorticity2D(eqx.Module):
         -------
         Float[Array, "Ny Nx"]
             Enstrophy at X-points, zero in the ghost ring and, when
-            ``self.mask`` is set, at dry X-corners (``zeta`` is already
-            masked there).
+            ``self.mask`` is set, at dry X-corners.
         """
-        return enstrophy(self.relative_vorticity(u, v))
+        out = enstrophy(self.relative_vorticity(u, v))
+        if self.mask is not None:
+            # jnp.where, not a multiply: a NaN land velocity makes zeta NaN
+            # at dry corners, and NaN * 0 is still NaN.
+            out = jnp.where(self.mask.xy_corner_strict, out, 0.0)
+        return out
 
     def potential_enstrophy(
         self,
