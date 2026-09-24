@@ -24,7 +24,11 @@ and what they compute:
 | `BiharmonicDiffusion2D` | diffusion | T-points | $-\kappa\,\nabla^4 h$ |
 | `Coriolis2D` | coriolis | U/V-points | $(+f\bar{v}, -f\bar{u})$ |
 | `MomentumAdvection2D` | momentum | U/V-points | Vortex-force form |
-| `arakawa_jacobian` | jacobian | interior | $J(f, g)$ |
+| `Vorticity2D.enstrophy` / `.potential_enstrophy` | vorticity | X-points | $\tfrac12\zeta^2$, $\tfrac12 q^2 h$ |
+| `Energetics2D` | diagnostics | T-points | KE, Bernoulli potential, APE |
+| `Strain2D` | diagnostics | T/X-points | shear & tensor strain, $\sigma^2$, Okubo–Weiss |
+| `QGPotentialVorticity2D` | diagnostics | T-points | $q = \nabla^2\psi/f_0 + \beta(y - y_0)/f_0$ (− stretching) |
+| `ArakawaJacobian2D` / `arakawa_jacobian` | jacobian | T-points / interior | $J(f, g)$ |
 
 ---
 
@@ -328,23 +332,36 @@ The three terms are:
 - $J^{+\times}$: flux form in one direction
 - $J^{\times+}$: flux form in the other direction
 
+!!! warning "Conservation under a mask"
+    The discrete identities above hold for the unmasked operator with
+    suitable boundary conditions (e.g. $\psi$ constant on the boundary).
+    `ArakawaJacobian2D(grid, mask=mask)` zeroes land inputs and dry output
+    cells, so sums over a masked domain such as $\sum J$ or
+    $\sum q\,J$ are **not** guaranteed to vanish exactly.
+
 !!! note "Output shape"
-    `arakawa_jacobian` returns the interior `[..., Ny−2, Nx−2]` without ghost
-    cells.  The caller must embed this into the full `[Ny, Nx]` array before
-    using the result in a time-stepping loop.
+    The class `ArakawaJacobian2D` returns the full `[..., Ny, Nx]` array with
+    a zero ghost ring (and dry cells zeroed when given a mask), ready for a
+    time-stepping loop.  The functional `arakawa_jacobian` returns only the
+    interior `[..., Ny−2, Nx−2]`; the caller must embed it into the full
+    array.
 
 ### Usage
 
 ```python
-from finitevolx import arakawa_jacobian
-from finitevolx import CartesianGrid2D
+from finitevolx import ArakawaJacobian2D, CartesianGrid2D, arakawa_jacobian
 
 grid = CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 
 # QG vorticity advection: J(psi, q)
 # psi, q have shape [Ny, Nx] with one ghost cell on each side
-Jpsi_q = arakawa_jacobian(psi, q, dx=grid.dx, dy=grid.dy)
-# Jpsi_q has shape [Ny-2, Nx-2]
+jac = ArakawaJacobian2D(grid=grid, mask=mask)   # mask optional
+Jpsi_q = jac(psi, q)
+# Jpsi_q has shape [Ny, Nx]; ghost ring and dry cells are 0
+
+# Functional form: interior only, no mask
+Jpsi_q_int = arakawa_jacobian(psi, q, dx=grid.dx, dy=grid.dy)
+# Jpsi_q_int has shape [Ny-2, Nx-2]
 ```
 
 ---
@@ -373,9 +390,13 @@ What spatial operator do you need?
 │
 ├── Momentum advection ∂u/∂t|adv
 │   ├── Conservative vortex-force form → MomentumAdvection2D
-│   └── QG vorticity advection         → arakawa_jacobian
+│   └── QG vorticity advection         → ArakawaJacobian2D  or  arakawa_jacobian
 │
 └── Diagnostics (KE, APE, enstrophy, Okubo-Weiss, …)
+    ├── Energy                → Energetics2D
+    ├── Strain / Okubo-Weiss  → Strain2D
+    ├── Enstrophy             → Vorticity2D.enstrophy / .potential_enstrophy
+    ├── QG PV                 → QGPotentialVorticity2D
     └── See [Diagnostics API reference](api/diagnostics.md)
 ```
 
