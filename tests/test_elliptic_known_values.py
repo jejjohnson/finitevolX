@@ -25,17 +25,20 @@ CG_TOL = 1e-6
 
 def _basin_mask() -> jnp.ndarray:
     """Standard rectangular basin: dry ghost ring, wet interior."""
+    # mask[j, i] = 1 for 1 <= j <= NY-2, 1 <= i <= NX-2
     return jnp.zeros((NY, NX)).at[1:-1, 1:-1].set(1.0)
 
 
 def _island_mask() -> jnp.ndarray:
     """Basin with a 3x3 island in the middle."""
     cy, cx = NY // 2, NX // 2
+    # mask[j, i] = 0 for cy <= j <= cy+2, cx <= i <= cx+2
     return _basin_mask().at[cy : cy + 3, cx : cx + 3].set(0.0)
 
 
 def _exact() -> jnp.ndarray:
     """psi = sin(pi x) sin(pi y) + 0.1 sin(2 pi y): non-zero on the walls."""
+    # y[j, 0] = j / (NY-1),  x[0, i] = i / (NX-1)  (broadcast to [NY, NX])
     y = jnp.linspace(0.0, 1.0, NY)[:, None]
     x = jnp.linspace(0.0, 1.0, NX)[None, :]
     return jnp.sin(jnp.pi * x) * jnp.sin(jnp.pi * y) + 0.1 * jnp.sin(2 * jnp.pi * y)
