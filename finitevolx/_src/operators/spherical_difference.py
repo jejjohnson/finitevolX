@@ -30,7 +30,7 @@ from finitevolx._src.grid.spherical import (
 from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators._utils import _safe_div_cos
-from finitevolx._src.operators.spherical_compound import geostrophic_velocity_sphere
+from finitevolx._src.operators.spherical_compound import _geostrophic_velocity_sphere
 from finitevolx._src.operators.stencils import (
     diff_x_bwd,
     diff_x_fwd,
@@ -224,22 +224,24 @@ class SphericalDifference2D(eqx.Module):
 
         Notes
         -----
-        Under a mask, ``f`` is replaced by ``1`` on dry T-cells before the
-        division, so a dry face whose two T-neighbours are both dry divides
-        by ``f_on_face = 1`` instead of a land ``f = 0`` -- keeping both the
-        forward value and its reverse-mode gradient finite.  Wet faces have
-        two wet T-neighbours, so their ``f_on_face`` is unchanged.  The
+        Under a mask, the face-averaged Coriolis parameter is replaced by
+        ``1`` on every dry face *before* the division
+        (``f_on_U = 1`` where ``mask.u`` is False, ``f_on_V = 1`` where
+        ``mask.v`` is False), so no dry face divides by zero -- whatever
+        ``f`` holds on land, and even where a wet neighbour's ``f`` would
+        cancel it -- keeping both the forward value and its reverse-mode
+        gradient finite.  Wet faces keep their real ``f_on_face``.  The
         output is then masked with ``jnp.where``.  ``h`` is not modified:
         the 4-point stencils of wet coastal faces read ``h`` on the
         neighbouring land cells, so land ``h`` must be finite.
         """
-        if self.mask is not None:
-            # f[j, i] = f[j, i] if mask.h[j, i] else 1  (harmless denominator)
-            f = jnp.where(self.mask.h, f, 1.0)
-        u_g, v_g = geostrophic_velocity_sphere(h, f, self.grid, gravity)
-        if self.mask is not None:
-            u_g = jnp.where(self.mask.u, u_g, 0.0)
-            v_g = jnp.where(self.mask.v, v_g, 0.0)
+        if self.mask is None:
+            return _geostrophic_velocity_sphere(h, f, self.grid, gravity)
+        u_g, v_g = _geostrophic_velocity_sphere(
+            h, f, self.grid, gravity, wet_u=self.mask.u, wet_v=self.mask.v
+        )
+        u_g = jnp.where(self.mask.u, u_g, 0.0)
+        v_g = jnp.where(self.mask.v, v_g, 0.0)
         return u_g, v_g
 
 

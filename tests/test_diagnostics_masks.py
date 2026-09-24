@@ -345,6 +345,24 @@ class TestGradientsWithNaNOnLand:
         assert np.all(np.isfinite(np.asarray(du)))
         assert np.all(np.isfinite(np.asarray(dv)))
 
+    def test_vorticity_enstrophy_gradients(self):
+        mask = make_mask_2d()
+        op = Vorticity2D(grid=make_grid_2d(), mask=mask)
+        u, v, h, f = _args("potential_enstrophy")
+        # field[j, i] = NaN on dry interior cells of its stagger
+        u = jnp.where(_interior_dry(mask.u), jnp.nan, u)
+        v = jnp.where(_interior_dry(mask.v), jnp.nan, v)
+        h = jnp.where(_interior_dry(mask.h), jnp.nan, h)
+        f = jnp.where(_interior_dry(mask.h), jnp.nan, f)
+
+        def loss(u, v, h, f):
+            return jnp.sum(op.enstrophy(u, v)) + jnp.sum(
+                op.potential_enstrophy(u, v, h, f)
+            )
+
+        for g in jax.grad(loss, argnums=(0, 1, 2, 3))(u, v, h, f):
+            assert np.all(np.isfinite(np.asarray(g)))
+
 
 class TestStrainBoundaryConditions:
     def test_closed_basin_keeps_bc_ghost_velocities(self):
