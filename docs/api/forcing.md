@@ -54,12 +54,14 @@ calling them on a single layer, e.g. bottom drag on `u[-1], v[-1]`.
 ## 3D operators
 
 Wrappers for `CartesianGrid3D` built on the 2D operators, with an optional
-`Mask3D`.  Each follows one of three vertical patterns:
+`Mask3D`.  Levels are stacked bottom-up — `k = 0` is the bottom ghost and
+`k = Nz - 1` the top ghost.  Each operator follows one of three vertical
+patterns:
 
 | Pattern | Operators | Levels written |
 |---------|-----------|----------------|
-| Top injection | `WindStress3D` | top interior level `k = 1` only |
-| Bottom injection | `LinearDrag3D`, `QuadraticDrag3D` | bottom interior level `k = Nz - 2` only |
+| Top injection | `WindStress3D` | top interior level `k = Nz - 2` only |
+| Bottom injection | `LinearDrag3D`, `QuadraticDrag3D` | bottom interior level `k = 1` only |
 | Uniform vmap | `RayleighDamping3D` | every interior level (z-ghosts zeroed) |
 
 ::: finitevolx.WindStress3D

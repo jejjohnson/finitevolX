@@ -115,7 +115,8 @@ class RayleighDamping3D(AbstractForcing):
         The underlying 3-D grid.
     mask : Mask3D or None, optional
         Optional land/ocean mask.  The inner :class:`RayleighDamping2D` is
-        mask-free; the 3-D result is post-multiplied by ``mask.h``.
+        mask-free; dry cells of the 3-D result are zeroed with ``mask.h``
+        via ``jnp.where``, so NaN-filled land never leaks into the output.
 
     Examples
     --------
@@ -189,7 +190,6 @@ class RayleighDamping3D(AbstractForcing):
         # Zero the z-ghost slices to match the 3-D ghost-ring convention.
         dq = zero_z_ghosts(dq)
 
-        if self.mask is not None:
-            dq = dq * self.mask.h
-
-        return dq
+        if self.mask is None:
+            return dq
+        return mask_where(dq, self.mask.h)
