@@ -16,3 +16,21 @@ padding, or masking — the caller applies `interior()` and any mask.
 ::: finitevolx.quadratic_drag_tendency
 
 ::: finitevolx.rayleigh_tendency
+
+## Base class and composition
+
+`AbstractForcing` is the contract every forcing operator satisfies.  The
+composition wrappers combine forcings inside a model's right-hand side:
+`ForcingSum` adds independent processes, `ForcingProduct` modulates a forcing
+by a fixed or callable factor (sponges, seasonal cycles), and
+`TimeVaryingForcing` evaluates time-dependent input fields — analytic or
+interpolated with `diffrax.LinearInterpolation` — before calling a
+time-agnostic forcing.
+
+::: finitevolx.AbstractForcing
+
+::: finitevolx.ForcingSum
+
+::: finitevolx.ForcingProduct
+
+::: finitevolx.TimeVaryingForcing
