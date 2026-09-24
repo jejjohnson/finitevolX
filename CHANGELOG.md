@@ -62,6 +62,13 @@ field stored column indices and `_yids` stored row indices.
   library.  Equivalent inline code is available in
   `docs/notebooks/demo_masks.py`.
 
+## [0.0.46](https://github.com/jejjohnson/finitevolX/compare/v0.0.45...v0.0.46) (2026-09-24)
+
+
+### Bug Fixes
+
+* **vertical:** diagonalize the non-symmetric coupling matrix correctly ([#252](https://github.com/jejjohnson/finitevolX/issues/252)) ([276a288](https://github.com/jejjohnson/finitevolX/commit/276a28827389753d7157a308ecab7bce16393666))
+
 ## [0.0.45](https://github.com/jejjohnson/finitevolX/compare/v0.0.44...v0.0.45) (2026-09-12)
 
 
