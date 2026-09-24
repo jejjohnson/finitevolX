@@ -14,6 +14,7 @@ References
 
 from __future__ import annotations
 
+import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from finitevolx._src.forcing._base import AbstractForcing
@@ -78,6 +79,13 @@ class RayleighDamping2D(AbstractForcing):
             Damping tendency at T-points, zero in the ghost ring.  When
             ``self.mask`` is set, dry cells are zeroed.
         """
+        if self.mask is not None:
+            # Zero dry cells first: NaN-filled land would otherwise give NaN
+            # gradients through -r * (q - q_ref) even where dq is masked.
+            q = mask_where(q, self.mask.h)
+            if q_ref is not None and jnp.ndim(q_ref) == 2:
+                q_ref = mask_where(jnp.asarray(q_ref), self.mask.h)
+
         q_ref_in = None if q_ref is None else interior_or_scalar(q_ref)
         # dq[j, i] = -r[j, i] * (q[j, i] - q_ref[j, i])
         dq = interior(

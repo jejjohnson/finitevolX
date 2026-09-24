@@ -298,3 +298,48 @@ class TestMaskNaNSafety:
             return jnp.sum(du) + jnp.sum(dv)
 
         assert bool(jnp.isfinite(jax.grad(loss)(dz)).all())
+
+
+class TestNaNLandGradients:
+    """NaN-filled dry cells must not poison gradients or wet-face values."""
+
+    @staticmethod
+    def _nan_land():
+        grid, mask = make_grid_2d(), make_mask_2d()
+        mu, mv, mh = (np.asarray(m) for m in (mask.u, mask.v, mask.h))
+        u = jnp.where(mu, make_u_field_2d(), jnp.nan)
+        v = jnp.where(mv, make_v_field_2d(), jnp.nan)
+        q = jnp.where(mh, make_h_field_2d(), jnp.nan)
+        return grid, mask, u, v, q
+
+    def test_grad_wrt_coefficients_finite(self):
+        grid, mask, u, v, q = self._nan_land()
+        tau = jnp.where(np.asarray(mask.h), 0.1, jnp.nan)
+        lin = LinearDrag2D(grid, mask=mask)
+        quad = QuadraticDrag2D(grid, mask=mask)
+        damp = RayleighDamping2D(grid, mask=mask)
+        wind = WindStress2D(grid, mask=mask)
+        losses = [
+            lambda c: sum(jnp.sum(t) for t in lin(u, v, c)),
+            lambda c: sum(jnp.sum(t) for t in quad(u, v, c, 10.0)),
+            lambda c: jnp.sum(
+                damp(q, c, q_ref=jnp.where(np.asarray(mask.h), 1.0, jnp.nan))
+            ),
+            lambda c: sum(jnp.sum(t) for t in wind(tau, tau, dz_top=c)),
+        ]
+        for loss in losses:
+            assert bool(jnp.isfinite(jax.grad(loss)(0.5)))
+
+    def test_quadratic_coastal_faces_match_zero_land(self):
+        """NaN land behaves like zero land velocity, so coastal drag survives."""
+        grid, mask, u, v, _ = self._nan_land()
+        quad = QuadraticDrag2D(grid, mask=mask)
+        du, dv = quad(u, v, cd=1e-3, h_bot=10.0)
+        du_ref, dv_ref = quad(
+            jnp.nan_to_num(u, nan=0.0), jnp.nan_to_num(v, nan=0.0), 1e-3, 10.0
+        )
+        np.testing.assert_allclose(du, du_ref)
+        np.testing.assert_allclose(dv, dv_ref)
+        mu = np.asarray(mask.u)
+        wet_moving = mu & (np.abs(np.nan_to_num(np.asarray(u))) > 0)
+        assert bool((np.asarray(du)[wet_moving] != 0).all())

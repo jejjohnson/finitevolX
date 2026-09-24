@@ -107,6 +107,12 @@ class LinearDrag2D(AbstractForcing):
             ``(du_drag, dv_drag)`` at U- and V-points, zero in the ghost
             ring.  When ``self.mask`` is set, dry faces are zeroed.
         """
+        if self.mask is not None:
+            # Zero dry velocities first: NaN-filled land would otherwise give
+            # NaN gradients through -r * u even where the output is masked.
+            u = mask_where(u, self.mask.u)
+            v = mask_where(v, self.mask.v)
+
         # r_on_u[j, i+1/2] = 1/2 * (r[j, i] + r[j, i+1])
         r_on_u = on_face_interior(r, self.interp.T_to_U)
         # r_on_v[j+1/2, i] = 1/2 * (r[j, i] + r[j+1, i])
@@ -217,6 +223,12 @@ class QuadraticDrag2D(AbstractForcing):
 
         Shared with :class:`QuadraticDrag3D`, which passes one z-level's masks.
         """
+        # Zero dry velocities first (land velocity is zero): the 4-point
+        # cross-face average at a wet coastal face reads dry neighbours, and
+        # NaN-filled land would otherwise make the speed there NaN.
+        u = mask_where(u, mu)
+        v = mask_where(v, mv)
+
         # v_on_u[j, i+1/2] = 1/4*(v[j+1/2,i] + v[j-1/2,i] + v[j+1/2,i+1] + v[j-1/2,i+1])
         v_on_u = self.interp.V_to_U(v)[1:-1, 1:-1]
         # u_on_v[j+1/2, i] = 1/4*(u[j,i+1/2] + u[j+1,i+1/2] + u[j,i-1/2] + u[j+1,i-1/2])
