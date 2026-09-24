@@ -187,6 +187,11 @@ def _register_all() -> list[Entry]:
     )
 
     # ------------------------------------------------------------------
+    # Energetics2D / Strain2D
+    # ------------------------------------------------------------------
+    entries.extend(_diagnostic_entries(grid2d, mask2d, h2d, u2d, v2d))
+
+    # ------------------------------------------------------------------
     # Advection1D / Advection2D / Advection3D
     # ------------------------------------------------------------------
     entries.extend(
@@ -985,6 +990,60 @@ def _coriolis_entries(
         ("Coriolis3D", "__call__", "unmasked", lambda: c3(u3d, v3d, f2d)),
         ("Coriolis3D", "__call__", "masked", lambda: c3m(u3d, v3d, f2d)),
     ]
+
+
+def _diagnostic_entries(grid2d, mask2d, h2d, u2d, v2d) -> list[Entry]:
+    """Register goldens for Energetics2D / Strain2D."""
+    from finitevolx._src.operators.diagnostic_operators import (
+        Energetics2D,
+        Strain2D,
+    )
+
+    # Reference thickness: the mean of h, so h - H has both signs.
+    H2d = h2d.mean() + 0.0 * h2d
+    g_prime = 0.02
+
+    entries: list[Entry] = []
+    for variant, mask in (("unmasked", None), ("masked", mask2d)):
+        en = Energetics2D(grid=grid2d, mask=mask)
+        st = Strain2D(grid=grid2d, mask=mask)
+        entries.extend(
+            [
+                (
+                    "Energetics2D",
+                    "kinetic_energy",
+                    variant,
+                    (lambda en=en: en.kinetic_energy(u2d, v2d)),
+                ),
+                (
+                    "Energetics2D",
+                    "bernoulli_potential",
+                    variant,
+                    (lambda en=en: en.bernoulli_potential(h2d, u2d, v2d)),
+                ),
+                (
+                    "Energetics2D",
+                    "available_potential_energy",
+                    variant,
+                    (lambda en=en: en.available_potential_energy(h2d, H2d, g_prime)),
+                ),
+                ("Strain2D", "shear", variant, (lambda st=st: st.shear(u2d, v2d))),
+                ("Strain2D", "tensor", variant, (lambda st=st: st.tensor(u2d, v2d))),
+                (
+                    "Strain2D",
+                    "magnitude_squared",
+                    variant,
+                    (lambda st=st: st.magnitude_squared(u2d, v2d)),
+                ),
+                (
+                    "Strain2D",
+                    "okubo_weiss",
+                    variant,
+                    (lambda st=st: st.okubo_weiss(u2d, v2d)),
+                ),
+            ]
+        )
+    return entries
 
 
 def main() -> int:
