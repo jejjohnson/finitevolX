@@ -93,15 +93,20 @@ from finitevolx._src.forcing._base import (
     ForcingSum,
     TimeVaryingForcing,
 )
-from finitevolx._src.forcing.drag import LinearDrag2D, QuadraticDrag2D
+from finitevolx._src.forcing.drag import (
+    LinearDrag2D,
+    LinearDrag3D,
+    QuadraticDrag2D,
+    QuadraticDrag3D,
+)
 from finitevolx._src.forcing.functional import (
     linear_drag_tendency,
     quadratic_drag_tendency,
     rayleigh_tendency,
     wind_stress_tendency,
 )
-from finitevolx._src.forcing.rayleigh import RayleighDamping2D
-from finitevolx._src.forcing.wind import WindStress2D
+from finitevolx._src.forcing.rayleigh import RayleighDamping2D, RayleighDamping3D
+from finitevolx._src.forcing.wind import WindStress2D, WindStress3D
 from finitevolx._src.grid.base import (
     ArakawaCGrid1D,
     ArakawaCGrid2D,
@@ -654,6 +659,11 @@ __all__ = [
     "LinearDrag2D",
     "QuadraticDrag2D",
     "RayleighDamping2D",
+    # Forcing — 3D operators
+    "WindStress3D",
+    "LinearDrag3D",
+    "QuadraticDrag3D",
+    "RayleighDamping3D",
     # Differentiable surrogates
     "smooth_abs",
     "smooth_clamp",

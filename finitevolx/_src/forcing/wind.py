@@ -6,7 +6,9 @@ interpolated to the velocity faces, where it accelerates the top layer:
     du_wind[j, i+1/2] = tau_x_on_u[j, i+1/2] / (rho0 * dz_top_on_u[j, i+1/2])
     dv_wind[j+1/2, i] = tau_y_on_v[j+1/2, i] / (rho0 * dz_top_on_v[j+1/2, i])
 
-The core math is :func:`~finitevolx.wind_stress_tendency`.
+The core math is :func:`~finitevolx.wind_stress_tendency`.  On a 3-D grid
+(``k = 0`` bottom ghost, ``k = Nz - 1`` top ghost) the stress acts only on the
+top interior z-level ``k = Nz - 2``.
 
 References
 ----------
@@ -16,6 +18,7 @@ References
 
 from __future__ import annotations
 
+import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from finitevolx._src.forcing._base import AbstractForcing
@@ -25,8 +28,8 @@ from finitevolx._src.forcing._utils import (
     safe_denominator,
 )
 from finitevolx._src.forcing.functional import wind_stress_tendency
-from finitevolx._src.grid.cartesian import CartesianGrid2D
-from finitevolx._src.mask import Mask2D
+from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
+from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.interpolation import Interpolation2D
 
@@ -142,3 +145,91 @@ class WindStress2D(AbstractForcing):
         )
 
         return mask_where(du_wind, mu), mask_where(dv_wind, mv)
+
+
+class WindStress3D(AbstractForcing):
+    """Surface wind-stress forcing on a 3-D Arakawa C-grid.
+
+    Applies the :class:`WindStress2D` stencil to the **top interior
+    z-level only** and returns zero at every other level.  The 3-D grid
+    stacks levels bottom-up (``k = 0`` bottom ghost, ``k = Nz - 1`` top
+    ghost), so the top interior level is ``k_top = Nz - 2``:
+
+        du_wind[k_top, j, i+1/2] = tau_x_on_u[j, i+1/2] / (rho0 * dz_top_on_u[j, i+1/2])
+        dv_wind[k_top, j+1/2, i] = tau_y_on_v[j+1/2, i] / (rho0 * dz_top_on_v[j+1/2, i])
+        du_wind[k != k_top] = dv_wind[k != k_top] = 0
+
+    Parameters
+    ----------
+    grid : CartesianGrid3D
+        The underlying 3-D grid.
+    mask : Mask3D or None, optional
+        Optional land/ocean mask.  The ``k_top`` slices of ``mask.u`` /
+        ``mask.v`` zero dry faces (via ``jnp.where``) and guard the
+        ``dz_top`` division there, so zero dry-cell thickness or NaN-filled
+        land never leaks NaN.
+    rho0 : float, optional
+        Reference density [kg/m^3].  Default ``1025.0``.
+
+    Examples
+    --------
+    >>> import jax.numpy as jnp
+    >>> from finitevolx import CartesianGrid3D, WindStress3D
+    >>> grid = CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+    >>> wind = WindStress3D(grid=grid)
+    >>> tau = 0.1 * jnp.ones((grid.Ny, grid.Nx))
+    >>> du_wind, dv_wind = wind(tau, tau, dz_top=grid.dz)
+    >>> du_wind.shape
+    (6, 8, 8)
+    """
+
+    grid: CartesianGrid3D
+    mask: Mask3D | None
+    _wind2d: WindStress2D
+
+    def __init__(
+        self,
+        grid: CartesianGrid3D,
+        mask: Mask3D | None = None,
+        rho0: float = 1025.0,
+    ) -> None:
+        self.grid = grid
+        self.mask = mask
+        # The inner 2-D op is mask-free; the 3-D wrapper passes per-level masks.
+        self._wind2d = WindStress2D(grid=grid.horizontal_grid(), rho0=rho0)
+
+    def __call__(
+        self,
+        tau_x: Float[Array, "Ny Nx"],
+        tau_y: Float[Array, "Ny Nx"],
+        dz_top: float | Float[Array, "Ny Nx"],
+    ) -> tuple[Float[Array, "Nz Ny Nx"], Float[Array, "Nz Ny Nx"]]:
+        """Wind-stress tendencies, non-zero only at the top interior level.
+
+        Parameters
+        ----------
+        tau_x : Float[Array, "Ny Nx"]
+            Zonal wind stress at T-points [N/m^2].
+        tau_y : Float[Array, "Ny Nx"]
+            Meridional wind stress at T-points [N/m^2].
+        dz_top : float or Float[Array, "Ny Nx"]
+            Top-layer thickness [m] — a scalar, or a T-point field (ghost
+            ring filled) interpolated to U/V-points.
+
+        Returns
+        -------
+        tuple[Float[Array, "Nz Ny Nx"], Float[Array, "Nz Ny Nx"]]
+            ``(du_wind, dv_wind)`` at U- and V-points, zero outside
+            ``k = Nz - 2`` and in the ghost ring.  When ``self.mask`` is set,
+            dry faces are zeroed.
+        """
+        k_top = self.grid.Nz - 2
+        mu = None if self.mask is None else self.mask.u[k_top]
+        mv = None if self.mask is None else self.mask.v[k_top]
+        du_2d, dv_2d = self._wind2d._tendency(tau_x, tau_y, dz_top, mu, mv)
+
+        # Inject at the top interior z-level k_top = Nz - 2.
+        shape = (self.grid.Nz, self.grid.Ny, self.grid.Nx)
+        du_wind = jnp.zeros(shape, dtype=du_2d.dtype).at[k_top].set(du_2d)
+        dv_wind = jnp.zeros(shape, dtype=dv_2d.dtype).at[k_top].set(dv_2d)
+        return du_wind, dv_wind
