@@ -4,8 +4,13 @@ Pure, stateless functions that compute the core math of surface wind
 stress, bottom drag, and Rayleigh damping.  They mirror the
 :mod:`~finitevolx._src.operators.stencils` pattern: no grid object, no
 interpolation, no ghost ring, and no masking.  The caller supplies every
-field **already at the correct stagger** and is responsible for applying
-:func:`~finitevolx.interior` and any land/ocean mask afterwards.
+field **already at the correct stagger** and is responsible for any
+ghost-ring padding and land/ocean masking afterwards.  The output has the
+shape of the inputs: to get a full ``[Ny, Nx]`` field with a zero ghost
+ring, slice every array input to the interior ``[1:-1, 1:-1]`` first and
+pad the result back with :func:`~finitevolx.interior` (as in the example
+below); full-grid inputs give a full-grid output, which ``interior`` does
+not accept.
 
 Each momentum primitive acts on a single velocity component, so it is
 called once for the U-face and once for the V-face.
@@ -48,7 +53,8 @@ def wind_stress_tendency(
 ) -> Float[Array, "..."]:
     """Momentum tendency from a surface wind stress.
 
-    Converts a kinematic stress into an acceleration of the top layer:
+    Converts a dynamic surface stress [N/m^2] (not the kinematic stress
+    ``tau / rho0``) into an acceleration of the top layer:
 
         du_wind = tau / (rho0 * dz_top)
 
