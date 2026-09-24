@@ -87,6 +87,12 @@ from finitevolx._src.diffusion.spherical_momentum import (
     SphericalMomentumAdvection2D,
     SphericalMomentumAdvection3D,
 )
+from finitevolx._src.forcing.functional import (
+    linear_drag_tendency,
+    quadratic_drag_tendency,
+    rayleigh_tendency,
+    wind_stress_tendency,
+)
 from finitevolx._src.grid.base import (
     ArakawaCGrid1D,
     ArakawaCGrid2D,
@@ -624,6 +630,11 @@ __all__ = [
     # Linear drag / Rayleigh relaxation
     "linear_drag",
     "rayleigh_relaxation",
+    # Forcing — Layer 0 functional primitives
+    "wind_stress_tendency",
+    "linear_drag_tendency",
+    "quadratic_drag_tendency",
+    "rayleigh_tendency",
     # Differentiable surrogates
     "smooth_abs",
     "smooth_clamp",

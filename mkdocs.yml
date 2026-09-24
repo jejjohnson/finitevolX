@@ -75,6 +75,7 @@ nav:
       - Vorticity: api/vorticity.md
       - Diffusion: api/diffusion.md
       - Coriolis: api/coriolis.md
+      - Forcing: api/forcing.md
       - Momentum Advection: api/momentum.md
       - Diagnostics: api/diagnostics.md
   - Time Integration:
