@@ -410,6 +410,7 @@ def _known_value_domain(
                 "(known_mask); use method='cg'."
             )
         ny, nx = shape[-2], shape[-1]
+        # basin[j, i] = 1 for 1 <= j <= Ny-2, 1 <= i <= Nx-2  (dry ghost ring)
         basin = jnp.zeros((ny, nx), dtype=dtype).at[1:-1, 1:-1].set(1.0)
         return SolveDomain(basin)
 
@@ -436,7 +437,10 @@ def _solve_spectral_basin(
     is itself a rectangle, so homogeneous Dirichlet there is a plain DST.
     """
     helmholtz = _HELMHOLTZ_DISPATCH["dst"]
+    # Solve cells: 2 <= j <= Ny-3, 2 <= i <= Nx-3 (inside the known ring 1 / N-2).
+    # (A - lambda) psi[j, i] = rhs[j, i] there, psi = 0 on the ring (DST-I).
     psi = helmholtz(rhs[2:-2, 2:-2], dx, dy, lambda_)
+    # psi_hom[j, i] = psi[j-2, i-2] on the solve cells, 0 elsewhere
     return jnp.zeros_like(rhs).at[2:-2, 2:-2].set(psi)
 
 
