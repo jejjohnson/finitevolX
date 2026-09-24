@@ -220,10 +220,22 @@ class SphericalDifference2D(eqx.Module):
         -------
         tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]
             ``(u_g, v_g)`` at U- and V-points, zero in the ghost ring and,
-            when ``self.mask`` is set, at dry U- and V-faces.  The mask is
-            applied with ``jnp.where`` so a non-finite value at a dry face
-            (e.g. ``f = 0`` on an equatorial land face) cannot leak through.
+            when ``self.mask`` is set, at dry U- and V-faces.
+
+        Notes
+        -----
+        Under a mask, ``f`` is replaced by ``1`` on dry T-cells before the
+        division, so a dry face whose two T-neighbours are both dry divides
+        by ``f_on_face = 1`` instead of a land ``f = 0`` -- keeping both the
+        forward value and its reverse-mode gradient finite.  Wet faces have
+        two wet T-neighbours, so their ``f_on_face`` is unchanged.  The
+        output is then masked with ``jnp.where``.  ``h`` is not modified:
+        the 4-point stencils of wet coastal faces read ``h`` on the
+        neighbouring land cells, so land ``h`` must be finite.
         """
+        if self.mask is not None:
+            # f[j, i] = f[j, i] if mask.h[j, i] else 1  (harmless denominator)
+            f = jnp.where(self.mask.h, f, 1.0)
         u_g, v_g = geostrophic_velocity_sphere(h, f, self.grid, gravity)
         if self.mask is not None:
             u_g = jnp.where(self.mask.u, u_g, 0.0)
