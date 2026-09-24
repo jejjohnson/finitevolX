@@ -235,3 +235,66 @@ class TestComposition:
 
         n_interior = (grid.Ny - 2) * (grid.Nx - 2)
         np.testing.assert_allclose(jax.grad(loss)(0.3), -2.0 * n_interior)
+
+
+class TestMaskNaNSafety:
+    """Dry cells with zero thickness or NaN inputs must give exact zeros.
+
+    ``jnp`` multiplication by a *boolean* mask already lowers to a select on
+    the forward pass, so the forward tests pin the contract; the gradient
+    test is the regression — a 0/0 at dry faces used to make ``jax.grad``
+    return NaN even though the masked output was zero.
+    """
+
+    @staticmethod
+    def _land_fields():
+        grid, mask = make_grid_2d(), make_mask_2d()
+        wet = np.asarray(mask.h)
+        # Thickness is zero over land (typical layer-thickness field).
+        dz = jnp.where(wet, 50.0, 0.0)
+        return grid, mask, wet, dz
+
+    def test_zero_thickness_over_land_is_finite(self):
+        grid, mask, _, dz = self._land_fields()
+        u, v = make_u_field_2d(), make_v_field_2d()
+        tau = jnp.ones((grid.Ny, grid.Nx))
+        for du, dv in [
+            WindStress2D(grid, mask=mask)(tau, tau, dz_top=dz),
+            QuadraticDrag2D(grid, mask=mask)(u, v, cd=1e-3, h_bot=dz),
+        ]:
+            assert bool(jnp.isfinite(du).all()) and bool(jnp.isfinite(dv).all())
+            np.testing.assert_array_equal(np.asarray(du)[~np.asarray(mask.u)], 0.0)
+            np.testing.assert_array_equal(np.asarray(dv)[~np.asarray(mask.v)], 0.0)
+
+    def test_wet_faces_unchanged_by_sanitising(self):
+        grid, mask, _, dz = self._land_fields()
+        tau = jnp.ones((grid.Ny, grid.Nx))
+        du, _ = WindStress2D(grid, mask=mask)(tau, tau, dz_top=dz)
+        du_ref, _ = WindStress2D(grid)(tau, tau, dz_top=jnp.where(dz > 0, dz, 1.0))
+        mu = np.asarray(mask.u)
+        np.testing.assert_allclose(np.asarray(du)[mu], np.asarray(du_ref)[mu])
+
+    def test_nan_over_land_is_zeroed(self):
+        grid, mask, wet, _ = self._land_fields()
+        nan_land = jnp.where(wet, 1.0, jnp.nan)
+        u = jnp.where(np.asarray(mask.u), make_u_field_2d(), jnp.nan)
+        v = jnp.where(np.asarray(mask.v), make_v_field_2d(), jnp.nan)
+        dq = RayleighDamping2D(grid, mask=mask)(nan_land, r=0.1)
+        np.testing.assert_array_equal(np.asarray(dq)[~wet], 0.0)
+        for du, dv in [
+            LinearDrag2D(grid, mask=mask)(u, v, r=0.1),
+            QuadraticDrag2D(grid, mask=mask)(u, v, cd=1e-3, h_bot=10.0),
+        ]:
+            np.testing.assert_array_equal(np.asarray(du)[~np.asarray(mask.u)], 0.0)
+            np.testing.assert_array_equal(np.asarray(dv)[~np.asarray(mask.v)], 0.0)
+
+    def test_grad_finite_with_zero_land_thickness(self):
+        grid, mask, _, dz = self._land_fields()
+        wind = WindStress2D(grid, mask=mask)
+        tau = jnp.ones((grid.Ny, grid.Nx))
+
+        def loss(dz):
+            du, dv = wind(tau, tau, dz_top=dz)
+            return jnp.sum(du) + jnp.sum(dv)
+
+        assert bool(jnp.isfinite(jax.grad(loss)(dz)).all())
