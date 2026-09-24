@@ -222,10 +222,19 @@ strain = fvx.Strain2D(grid=grid, mask=mask)
 ow = strain.okubo_weiss(u, v)              # T-points, dry T-cells exactly 0
 ```
 
-The class forms zero their inputs on dry cells of each input's stagger
-before any stencil reads them, and mask outputs with `jnp.where`, so land
-values stored as `NaN` (e.g. from `Mask2D.from_center`) neither leak into
-wet cells nor survive at dry ones.
+`Energetics2D`, `Strain2D`, `QGPotentialVorticity2D` and
+`ArakawaJacobian2D` zero every field input on the dry *interior* cells of
+its stagger before any stencil reads it, and mask outputs with
+`jnp.where`, so interior land values stored as `NaN` (e.g. from
+`Mask2D.from_center`) neither leak into wet cells nor survive at dry ones.
+The ghost ring is BC-owned: it is passed through unchanged and must be
+finite.
+
+`SphericalDifference2D.geostrophic_velocity` only guards the division (it
+replaces `f` on dry cells); its 4-point stencils read `h` on neighbouring
+land cells for wet coastal faces, so **land `h` must be finite** there.
+The same holds for the other existing class operators, which mask outputs
+but do not sanitize inputs.
 
 Diagnostics **without** a class form:
 

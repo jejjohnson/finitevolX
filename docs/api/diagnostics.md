@@ -2,12 +2,18 @@
 
 Pointwise and domain-integrated diagnostic quantities on Arakawa C-grids.
 
-Each diagnostic comes in two forms:
+Each diagnostic in the table below comes in two forms:
 
 - **Class operators** (Layer 3) take the land/ocean mask at construction and
   zero the dry cells of their output stagger — use these in masked domains.
 - **Functional helpers** (Layer 2) are mask-free; apply the mask yourself at
   the call site if you use them directly.
+
+The domain-integrated `total_energy` / `total_enstrophy` and
+`vertical_velocity` have **no** class form: pass the reductions fields that
+are already masked (e.g. from the class operators), and give
+`vertical_velocity` its per-call `mask=` argument (operator form tracked in
+#210).
 
 See [Masks → Operator API](../masks.md#operator-api-how-operators-consume-masks)
 for the stagger → mask mapping.
@@ -67,6 +73,13 @@ the vorticity they are built from.
 ::: finitevolx.relative_vorticity_cgrid
 
 ### Potential Vorticity
+
+`sw_potential_vorticity` is the functional counterpart of
+`Vorticity2D.potential_vorticity` (C-grid vorticity and interpolation
+included); `potential_vorticity` is the pointwise `(omega + f) / h` for
+inputs that already share a grid point.
+
+::: finitevolx.sw_potential_vorticity
 
 ::: finitevolx.potential_vorticity
 
