@@ -24,6 +24,8 @@ Per issue #209 Q2/Q3, the spherical operators accept a Cartesian
 
 from __future__ import annotations
 
+import jax
+import jax.numpy as jnp
 import numpy as np
 import pytest
 
@@ -34,6 +36,7 @@ from finitevolx._src.operators.spherical_compound import (
     SphericalLaplacian3D,
     SphericalVorticity2D,
     SphericalVorticity3D,
+    geostrophic_velocity_sphere,
 )
 from finitevolx._src.operators.spherical_difference import (
     SphericalDifference2D,
@@ -106,6 +109,111 @@ class TestSphericalDifference2DMasks:
         out_unmasked = getattr(op_unmasked, method)(field_fn())
         out_all_ocean = getattr(op_all_ocean, method)(field_fn())
         np.testing.assert_array_equal(out_all_ocean, out_unmasked)
+
+
+class TestSphericalGeostrophicVelocityMasks:
+    """SphericalDifference2D.geostrophic_velocity -> (u_g at U, v_g at V)."""
+
+    @staticmethod
+    def _call(op):
+        return op.geostrophic_velocity(make_h_field_2d(), make_f_field_2d())
+
+    def test_unmasked_golden(self):
+        op = SphericalDifference2D(grid=make_spherical_grid_2d())
+        assert_matches_golden(
+            self._call(op), "SphericalDifference2D", "geostrophic_velocity", "unmasked"
+        )
+
+    def test_masked_golden(self):
+        op = SphericalDifference2D(grid=make_spherical_grid_2d(), mask=make_mask_2d())
+        assert_matches_golden(
+            self._call(op), "SphericalDifference2D", "geostrophic_velocity", "masked"
+        )
+
+    def test_all_ocean_matches_unmasked(self):
+        grid = make_spherical_grid_2d()
+        ug1, vg1 = self._call(SphericalDifference2D(grid=grid))
+        ug2, vg2 = self._call(
+            SphericalDifference2D(grid=grid, mask=make_mask_2d_all_ocean())
+        )
+        np.testing.assert_array_equal(ug1, ug2)
+        np.testing.assert_array_equal(vg1, vg2)
+
+    def test_dry_faces_zero(self):
+        mask = make_mask_2d()
+        op = SphericalDifference2D(grid=make_spherical_grid_2d(), mask=mask)
+        u_g, v_g = (np.asarray(a) for a in self._call(op))
+        assert np.all(np.isfinite(u_g))
+        assert np.all(np.isfinite(v_g))
+        np.testing.assert_array_equal(u_g[~np.asarray(mask.u)], 0.0)
+        np.testing.assert_array_equal(v_g[~np.asarray(mask.v)], 0.0)
+
+    def test_matches_functional(self):
+        grid = make_spherical_grid_2d()
+        h, f = make_h_field_2d(), make_f_field_2d()
+        out = SphericalDifference2D(grid=grid).geostrophic_velocity(h, f, 9.0)
+        ref = geostrophic_velocity_sphere(h, f, grid, 9.0)
+        np.testing.assert_array_equal(out[0], ref[0])
+        np.testing.assert_array_equal(out[1], ref[1])
+
+    def test_nonfinite_at_dry_face_does_not_leak(self):
+        """f = 0 on land gives inf/NaN there; jnp.where keeps it out."""
+        mask = make_mask_2d()
+        grid = make_spherical_grid_2d()
+        h = make_h_field_2d()
+        f = jnp.where(jnp.asarray(mask.h), make_f_field_2d(), 0.0)
+        # A face whose two T-neighbours are both dry gets f_on_face = 0, so
+        # the raw (unmasked) output is non-finite there ...
+        raw_u, raw_v = SphericalDifference2D(grid=grid).geostrophic_velocity(h, f)
+        assert not np.all(np.isfinite(raw_u)) or not np.all(np.isfinite(raw_v))
+        # ... but mask.u / mask.v mark those faces dry, so the masked output
+        # is finite everywhere and exactly 0 on dry faces.
+        u_g, v_g = SphericalDifference2D(grid=grid, mask=mask).geostrophic_velocity(
+            h, f
+        )
+        u_g, v_g = np.asarray(u_g), np.asarray(v_g)
+        assert np.all(np.isfinite(u_g))
+        assert np.all(np.isfinite(v_g))
+        np.testing.assert_array_equal(u_g[~np.asarray(mask.u)], 0.0)
+        np.testing.assert_array_equal(v_g[~np.asarray(mask.v)], 0.0)
+
+    def test_gradient_finite_with_zero_f_on_land(self):
+        """Reverse-mode through dry faces with f = 0 stays finite."""
+        mask = make_mask_2d()
+        grid = make_spherical_grid_2d()
+        op = SphericalDifference2D(grid=grid, mask=mask)
+        h = make_h_field_2d()
+        f = jnp.where(jnp.asarray(mask.h), make_f_field_2d(), 0.0)
+
+        def loss(h, f):
+            u_g, v_g = op.geostrophic_velocity(h, f)
+            return jnp.sum(u_g**2 + v_g**2)
+
+        dh, df = jax.grad(loss, argnums=(0, 1))(h, f)
+        assert np.all(np.isfinite(np.asarray(dh)))
+        assert np.all(np.isfinite(np.asarray(df)))
+
+    def test_gradient_finite_when_face_average_cancels(self):
+        """Wet f = -1 next to a dry cell: the dry face is still guarded."""
+        mask = make_mask_2d()
+        grid = make_spherical_grid_2d()
+        op = SphericalDifference2D(grid=grid, mask=mask)
+        wet = np.asarray(mask.h)
+        # f[j, i] = -1 on wet cells, +1 on dry cells, so every coastal face
+        # averages to f_on_face = 0 if the guard were applied before averaging
+        f = jnp.where(wet, -1.0, 1.0)
+        h = make_h_field_2d()
+
+        def loss(h, f):
+            u_g, v_g = op.geostrophic_velocity(h, f)
+            return jnp.sum(u_g**2 + v_g**2)
+
+        u_g, v_g = op.geostrophic_velocity(h, f)
+        assert np.all(np.isfinite(np.asarray(u_g)))
+        assert np.all(np.isfinite(np.asarray(v_g)))
+        dh, df = jax.grad(loss, argnums=(0, 1))(h, f)
+        assert np.all(np.isfinite(np.asarray(dh)))
+        assert np.all(np.isfinite(np.asarray(df)))
 
 
 # ---------------------------------------------------------------------------

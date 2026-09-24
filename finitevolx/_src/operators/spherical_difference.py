@@ -20,6 +20,7 @@ Operators that divide by ``cos(lat)`` return NaN where
 from __future__ import annotations
 
 import equinox as eqx
+import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.spherical import (
@@ -29,6 +30,7 @@ from finitevolx._src.grid.spherical import (
 from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators._utils import _safe_div_cos
+from finitevolx._src.operators.spherical_compound import _geostrophic_velocity_sphere
 from finitevolx._src.operators.stencils import (
     diff_x_bwd,
     diff_x_fwd,
@@ -55,6 +57,7 @@ class SphericalDifference2D(eqx.Module):
         * V-output → ``mask.v`` (``diff_lat_T_to_V``)
         * X-output → ``mask.xy_corner_strict`` (``diff_lon_V_to_X``,
           ``diff_lat_U_to_X``)
+        * (U, V)-output → ``(mask.u, mask.v)`` (``geostrophic_velocity``)
 
         Per #209 Q2, spherical 2-D operators take a Cartesian ``Mask2D``
         rather than a dedicated ``SphericalMask2D`` — the mask geometry
@@ -175,6 +178,71 @@ class SphericalDifference2D(eqx.Module):
         if self.mask is not None:
             out = out * self.mask.h
         return out
+
+    # ------------------------------------------------------------------
+    # Compound diagnostics
+    # ------------------------------------------------------------------
+
+    def geostrophic_velocity(
+        self,
+        h: Float[Array, "Ny Nx"],
+        f: Float[Array, "Ny Nx"],
+        gravity: float = 9.80665,
+    ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
+        """Geostrophic velocity from free-surface height on a sphere.
+
+        u_g[j, i+1/2] = -g / (f_on_U[j, i+1/2] * R) * dh_dlat_U[j, i+1/2]
+        v_g[j+1/2, i] =  g / (f_on_V[j+1/2, i] * R * cos_V[j+1/2, i])
+                         * dh_dlon_V[j+1/2, i]
+
+        with the compact 4-point stencils
+
+        f_on_U[j, i+1/2]    = 1/2 * (f[j, i] + f[j, i+1])
+        dh_dlat_U[j, i+1/2] = (h[j+1, i] + h[j+1, i+1]
+                              - h[j-1, i] - h[j-1, i+1]) / (4 * dlat)
+        f_on_V[j+1/2, i]    = 1/2 * (f[j, i] + f[j+1, i])
+        cos_V[j+1/2, i]     = 1/2 * (cos_lat_T[j, i] + cos_lat_T[j+1, i])
+        dh_dlon_V[j+1/2, i] = (h[j, i+1] + h[j+1, i+1]
+                              - h[j, i-1] - h[j+1, i-1]) / (4 * dlon)
+
+        Class form of :func:`~finitevolx.geostrophic_velocity_sphere`.
+
+        Parameters
+        ----------
+        h : Float[Array, "Ny Nx"]
+            Free-surface height at T-points.
+        f : Float[Array, "Ny Nx"]
+            Coriolis parameter at T-points.
+        gravity : float, optional
+            Gravitational acceleration.
+
+        Returns
+        -------
+        tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]
+            ``(u_g, v_g)`` at U- and V-points, zero in the ghost ring and,
+            when ``self.mask`` is set, at dry U- and V-faces.
+
+        Notes
+        -----
+        Under a mask, the face-averaged Coriolis parameter is replaced by
+        ``1`` on every dry face *before* the division
+        (``f_on_U = 1`` where ``mask.u`` is False, ``f_on_V = 1`` where
+        ``mask.v`` is False), so no dry face divides by zero -- whatever
+        ``f`` holds on land, and even where a wet neighbour's ``f`` would
+        cancel it -- keeping both the forward value and its reverse-mode
+        gradient finite.  Wet faces keep their real ``f_on_face``.  The
+        output is then masked with ``jnp.where``.  ``h`` is not modified:
+        the 4-point stencils of wet coastal faces read ``h`` on the
+        neighbouring land cells, so land ``h`` must be finite.
+        """
+        if self.mask is None:
+            return _geostrophic_velocity_sphere(h, f, self.grid, gravity)
+        u_g, v_g = _geostrophic_velocity_sphere(
+            h, f, self.grid, gravity, wet_u=self.mask.u, wet_v=self.mask.v
+        )
+        u_g = jnp.where(self.mask.u, u_g, 0.0)
+        v_g = jnp.where(self.mask.v, v_g, 0.0)
+        return u_g, v_g
 
 
 class SphericalDifference3D(eqx.Module):

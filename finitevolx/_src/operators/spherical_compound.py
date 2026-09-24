@@ -292,17 +292,42 @@ def geostrophic_velocity_sphere(
     tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]
         (u_g at U-points, v_g at V-points).
     """
+    return _geostrophic_velocity_sphere(h, f, grid, gravity)
+
+
+def _geostrophic_velocity_sphere(
+    h: Float[Array, "Ny Nx"],
+    f: Float[Array, "Ny Nx"],
+    grid: SphericalGrid2D,
+    gravity: float,
+    wet_u: Array | None = None,
+    wet_v: Array | None = None,
+) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
+    """Body of :func:`geostrophic_velocity_sphere`.
+
+    With ``wet_u`` / ``wet_v`` given, the face-averaged Coriolis parameter
+    is replaced by ``1`` on dry faces *before* the division, so a dry face
+    never divides by zero (forward or in reverse mode); the caller masks
+    those faces' output afterwards.  With both ``None`` it is exactly the
+    public function.
+    """
     R = grid.R
     dlon = grid.dlon
     dlat = grid.dlat
 
     # u_g at U-points: compact 4-point stencil
     f_on_U = 0.5 * (f[1:-1, 1:-1] + f[1:-1, 2:])
+    if wet_u is not None:
+        # f_on_U[j, i+1/2] = f_on_U[j, i+1/2] if wet_u[j, i+1/2] else 1
+        f_on_U = jnp.where(wet_u[1:-1, 1:-1], f_on_U, 1.0)
     dh_dlat_U = (h[2:, 1:-1] + h[2:, 2:] - h[:-2, 1:-1] - h[:-2, 2:]) / (4.0 * dlat)
     u_g = interior(-gravity / (f_on_U * R) * dh_dlat_U, h)
 
     # v_g at V-points: compact 4-point stencil
     f_on_V = 0.5 * (f[1:-1, 1:-1] + f[2:, 1:-1])
+    if wet_v is not None:
+        # f_on_V[j+1/2, i] = f_on_V[j+1/2, i] if wet_v[j+1/2, i] else 1
+        f_on_V = jnp.where(wet_v[1:-1, 1:-1], f_on_V, 1.0)
     cos_on_V = 0.5 * (grid.cos_lat_T[1:-1, 1:-1] + grid.cos_lat_T[2:, 1:-1])
     dh_dlon_V = (h[1:-1, 2:] + h[2:, 2:] - h[1:-1, :-2] - h[2:, :-2]) / (4.0 * dlon)
     v_g = interior(_safe_div_cos(gravity * dh_dlon_V, cos_on_V, f_on_V * R), h)
