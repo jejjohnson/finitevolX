@@ -147,12 +147,17 @@ class ArakawaJacobian2D(eqx.Module):
     J_full[..., j, i] = J[..., j-1, i-1]   for 1 <= j <= Ny-2, 1 <= i <= Nx-2
     J_full[..., j, i] = 0                  on the ghost ring
 
-    When ``mask`` is set, dry T-cells are zeroed via ``* mask.h``
-    (post-compute, Pattern 1 in ``docs/masks.md``), broadcast over any
-    leading batch axes.  The stencil reads ``f`` and ``g`` at the eight
-    neighbours of each T-cell, so at a coastal cell it sees whatever the
-    fields hold on land; a streamfunction from a masked elliptic solve is
-    zero there.
+    When ``mask`` is set, ``f`` and ``g`` are first zeroed on dry T-cells
+    (the stencil reads the eight neighbours of each T-cell, so a coastal
+    cell would otherwise read land values, ``NaN`` or not; a streamfunction
+    from a masked elliptic solve is zero there anyway), and dry output cells
+    are zeroed last via ``jnp.where(mask.h, ...)`` (Pattern 1 in
+    ``docs/masks.md``), broadcast over any leading batch axes.
+
+    Masking zeroes the Jacobian at dry cells, so the discrete identities
+    ``sum(J) = 0`` and ``sum(g * J) = 0`` are **not** guaranteed for sums
+    over a masked domain -- they hold for the unmasked operator with
+    suitable boundary conditions.
 
     Parameters
     ----------
@@ -195,10 +200,15 @@ class ArakawaJacobian2D(eqx.Module):
             J(f, g) at T-points, zero in the ghost ring and, when
             ``self.mask`` is set, at dry T-cells.
         """
+        if self.mask is not None:
+            # f[..., j, i] = f[..., j, i] if mask.h[j, i] else 0  (same for g)
+            f = jnp.where(self.mask.h, f, 0.0)
+            g = jnp.where(self.mask.h, g, 0.0)
         J = arakawa_jacobian(f, g, self.grid.dx, self.grid.dy)
         shape = jnp.broadcast_shapes(f.shape, g.shape)
         # J_full[..., j, i] = J[..., j-1, i-1]  for 1 <= j <= Ny-2, 1 <= i <= Nx-2
-        out = jnp.zeros(shape, dtype=J.dtype).at[..., 1:-1, 1:-1].set(J)
+        out = jnp.zeros_like(f, dtype=J.dtype, shape=shape)
+        out = out.at[..., 1:-1, 1:-1].set(J)
         if self.mask is not None:
-            out = out * self.mask.h
+            out = jnp.where(self.mask.h, out, 0.0)
         return out

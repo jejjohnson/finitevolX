@@ -25,13 +25,11 @@ from finitevolx import (
     bernoulli_potential,
     enstrophy,
     kinetic_energy,
-    okubo_weiss,
     potential_enstrophy,
     potential_vorticity_multilayer,
     qg_potential_vorticity,
     relative_vorticity_cgrid,
     shear_strain,
-    strain_magnitude_squared,
     stretching_term,
     tensor_strain,
 )
@@ -102,8 +100,10 @@ _CLASSES = {
     "Vorticity2D": Vorticity2D,
 }
 # Methods whose output lives at X-points (corners).
-_X_POINT = {("Strain2D", "shear"), ("Vorticity2D", "enstrophy")} | {
-    ("Vorticity2D", "potential_enstrophy")
+_X_POINT = {
+    ("Strain2D", "shear"),
+    ("Vorticity2D", "enstrophy"),
+    ("Vorticity2D", "potential_enstrophy"),
 }
 
 
@@ -144,7 +144,7 @@ class TestDiagnosticMasks:
 
 
 class TestMatchesFunctional:
-    """With mask=None the classes are bit-identical to the functional forms."""
+    """With mask=None the classes reproduce the functional forms."""
 
     def test_energetics(self):
         grid = make_grid_2d()
@@ -155,28 +155,26 @@ class TestMatchesFunctional:
         np.testing.assert_array_equal(
             op.bernoulli_potential(h, u, v, 9.0), bernoulli_potential(h, u, v, 9.0)
         )
-        np.testing.assert_array_equal(
-            op.available_potential_energy(h, H, G_PRIME),
-            available_potential_energy(h, H, G_PRIME),
-        )
+        # APE: the functional form is pointwise over the whole array; the
+        # class keeps only the interior and zeroes the ghost ring.
+        ape = op.available_potential_energy(h, H, G_PRIME)
+        ref = available_potential_energy(h, H, G_PRIME)
+        # ape[j, i] = ref[j, i] for 1 <= j <= Ny-2, 1 <= i <= Nx-2
+        np.testing.assert_array_equal(ape[1:-1, 1:-1], ref[1:-1, 1:-1])
+        ghost = np.ones(ape.shape, dtype=bool)
+        ghost[1:-1, 1:-1] = False
+        assert np.any(np.asarray(ref)[ghost] != 0.0)
+        np.testing.assert_array_equal(np.asarray(ape)[ghost], 0.0)
 
-    def test_strain(self):
+    def test_strain_pointwise_parts(self):
         grid = make_grid_2d()
         op = Strain2D(grid=grid)
-        interp = Interpolation2D(grid=grid)
         u, v = _args("shear")
-        ss = shear_strain(u, v, grid.dx, grid.dy)
-        sn = tensor_strain(u, v, grid.dx, grid.dy)
-        omega = relative_vorticity_cgrid(u, v, grid.dx, grid.dy)
-        np.testing.assert_array_equal(op.shear(u, v), ss)
-        np.testing.assert_array_equal(op.tensor(u, v), sn)
         np.testing.assert_array_equal(
-            op.magnitude_squared(u, v),
-            strain_magnitude_squared(sn, interp.X_to_T(ss)),
+            op.shear(u, v), shear_strain(u, v, grid.dx, grid.dy)
         )
         np.testing.assert_array_equal(
-            op.okubo_weiss(u, v),
-            okubo_weiss(sn, interp.X_to_T(ss), interp.X_to_T(omega)),
+            op.tensor(u, v), tensor_strain(u, v, grid.dx, grid.dy)
         )
 
     def test_vorticity(self):
@@ -208,6 +206,96 @@ class TestMatchesFunctional:
         )
 
 
+def _strain_reference(u, v, dx, dy):
+    """Loop-based numpy reference for (sigma2, ow) at T-points.
+
+    Every T-point average reads its four corners, including the south / west
+    ghost corners computed from the ghost u / v.
+    """
+    u = np.asarray(u)
+    v = np.asarray(v)
+    Ny, Nx = u.shape
+
+    def corner(j, i, sign):
+        # x[j+1/2, i+1/2] = (v[j+1/2, i+1] - v[j+1/2, i]) / dx
+        #                 + sign * (u[j+1, i+1/2] - u[j, i+1/2]) / dy
+        return (v[j, i + 1] - v[j, i]) / dx + sign * (u[j + 1, i] - u[j, i]) / dy
+
+    sigma2 = np.zeros((Ny, Nx))
+    ow = np.zeros((Ny, Nx))
+    for j in range(1, Ny - 1):
+        for i in range(1, Nx - 1):
+            # sn[j, i] = (u[j, i+1/2] - u[j, i-1/2]) / dx
+            #          - (v[j+1/2, i] - v[j-1/2, i]) / dy
+            sn = (u[j, i] - u[j, i - 1]) / dx - (v[j, i] - v[j - 1, i]) / dy
+            corners = [(j, i), (j - 1, i), (j, i - 1), (j - 1, i - 1)]
+            ss = 0.25 * sum(corner(a, b, 1.0) for a, b in corners)
+            om = 0.25 * sum(corner(a, b, -1.0) for a, b in corners)
+            sigma2[j, i] = sn**2 + ss**2
+            ow[j, i] = sn**2 + ss**2 - om**2
+    return sigma2, ow
+
+
+class TestStrainGhostCorners:
+    """The south / west ghost X-points are built from the ghost u / v."""
+
+    def test_matches_loop_reference(self):
+        grid = make_grid_2d()
+        u, v = _args("shear")
+        sigma2, ow = _strain_reference(u, v, grid.dx, grid.dy)
+        op = Strain2D(grid=grid)
+        np.testing.assert_allclose(op.magnitude_squared(u, v), sigma2, rtol=1e-12)
+        np.testing.assert_allclose(op.okubo_weiss(u, v), ow, rtol=1e-12, atol=1e-12)
+
+    def test_first_row_and_column_use_ghost_velocities(self):
+        """Changing the south ghost u-row changes the first interior row."""
+        grid = make_grid_2d()
+        u, v = _args("shear")
+        op = Strain2D(grid=grid)
+        # u2[0, i] = u[0, i] + 1 (south ghost U-row only)
+        u2 = u.at[0, :].add(1.0)
+        d = np.asarray(op.magnitude_squared(u2, v) - op.magnitude_squared(u, v))
+        assert np.any(d[1, 1:-1] != 0.0)
+        np.testing.assert_array_equal(d[2:, :], 0.0)
+
+
+class TestNaNOnLand:
+    """Land values stored as NaN neither leak into wet cells nor survive."""
+
+    @pytest.mark.parametrize(("name", "method"), CASES)
+    def test_nan_land_inputs(self, name, method):
+        mask = make_mask_2d()
+        op = _op(name, mask)
+        args = _args(method)
+        wet_of = {
+            "u": np.asarray(mask.u),
+            "v": np.asarray(mask.v),
+            "h": np.asarray(mask.h),
+        }
+        # Positional stagger of each leading field argument, per method
+        # (None = not a field, left untouched).
+        staggers = {
+            "bernoulli_potential": ("h", "u", "v"),
+            "available_potential_energy": ("h", "h"),
+            "potential_enstrophy": ("u", "v", "h", "h"),
+            "__call__": ("h",),
+            "stretching": (None, "h"),
+            "multilayer": ("h",),
+        }.get(method, ("u", "v"))
+        # arg[..., j, i] = NaN on dry cells of its stagger
+        nan_args = (
+            tuple(
+                a if s is None else jnp.where(wet_of[s], a, jnp.nan)
+                for s, a in zip(staggers, args, strict=False)
+            )
+            + args[len(staggers) :]
+        )
+        out = np.asarray(getattr(op, method)(*args))
+        out_nan = np.asarray(getattr(op, method)(*nan_args))
+        assert np.all(np.isfinite(out_nan))
+        np.testing.assert_array_equal(out_nan, out)
+
+
 class TestStrainPhysics:
     def test_solid_body_rotation_is_vorticity_dominated(self):
         """u = -y, v = x: no strain, uniform vorticity 2 -> OW = -4 inside."""
@@ -221,10 +309,14 @@ class TestStrainPhysics:
         u = -(j * grid.dy)
         v = i * grid.dx
         op = Strain2D(grid=grid)
-        # ow[j, i] for 2 <= j <= Ny-3, 2 <= i <= Nx-3 (all four corners interior)
-        ow = op.okubo_weiss(u, v)[2:-2, 2:-2]
+        # ow[j, i] for 1 <= j <= Ny-2, 1 <= i <= Nx-2: the south / west ghost
+        # corners are built from the (linear) ghost velocities, so the first
+        # interior row and column are exact too.
+        ow = op.okubo_weiss(u, v)[1:-1, 1:-1]
         np.testing.assert_allclose(ow, -4.0, rtol=1e-12)
-        np.testing.assert_allclose(op.magnitude_squared(u, v)[2:-2, 2:-2], 0.0)
+        np.testing.assert_allclose(
+            op.magnitude_squared(u, v)[1:-1, 1:-1], 0.0, atol=1e-12
+        )
 
 
 class TestQGComposition:

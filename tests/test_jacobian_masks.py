@@ -79,3 +79,22 @@ class TestArakawaJacobian2DShape:
         f = make_h_field_2d()
         out = ArakawaJacobian2D(grid=make_grid_2d(), mask=make_mask_2d())(f, f)
         np.testing.assert_allclose(out, 0.0, atol=1e-12)
+
+
+class TestArakawaJacobian2DNaNOnLand:
+    def test_nan_land_inputs_do_not_leak(self):
+        """NaN land values in f / g give the same output as finite ones."""
+        mask = make_mask_2d()
+        wet = jnp.asarray(mask.h)
+        op = ArakawaJacobian2D(grid=make_grid_2d(), mask=mask)
+        f, g = make_h_field_2d(), make_q_field_2d()
+        out = np.asarray(op(f, g))
+        # f_nan[j, i] = NaN on dry T-cells (same for g)
+        out_nan = np.asarray(op(jnp.where(wet, f, jnp.nan), jnp.where(wet, g, jnp.nan)))
+        assert np.all(np.isfinite(out_nan))
+        np.testing.assert_array_equal(out_nan, out)
+
+    def test_dtype_follows_inputs(self):
+        f = make_h_field_2d().astype(jnp.float32)
+        out = ArakawaJacobian2D(grid=make_grid_2d())(f, f)
+        assert out.dtype == jnp.float32

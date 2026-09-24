@@ -24,6 +24,7 @@ Per issue #209 Q2/Q3, the spherical operators accept a Cartesian
 
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -175,6 +176,22 @@ class TestSphericalGeostrophicVelocityMasks:
         assert np.all(np.isfinite(v_g))
         np.testing.assert_array_equal(u_g[~np.asarray(mask.u)], 0.0)
         np.testing.assert_array_equal(v_g[~np.asarray(mask.v)], 0.0)
+
+    def test_gradient_finite_with_zero_f_on_land(self):
+        """Reverse-mode through dry faces with f = 0 stays finite."""
+        mask = make_mask_2d()
+        grid = make_spherical_grid_2d()
+        op = SphericalDifference2D(grid=grid, mask=mask)
+        h = make_h_field_2d()
+        f = jnp.where(jnp.asarray(mask.h), make_f_field_2d(), 0.0)
+
+        def loss(h, f):
+            u_g, v_g = op.geostrophic_velocity(h, f)
+            return jnp.sum(u_g**2 + v_g**2)
+
+        dh, df = jax.grad(loss, argnums=(0, 1))(h, f)
+        assert np.all(np.isfinite(np.asarray(dh)))
+        assert np.all(np.isfinite(np.asarray(df)))
 
 
 # ---------------------------------------------------------------------------
