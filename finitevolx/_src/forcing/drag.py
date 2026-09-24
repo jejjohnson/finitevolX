@@ -10,7 +10,8 @@ Both operators act on the velocity components at their native faces:
 :func:`~finitevolx.linear_drag_tendency` and
 :func:`~finitevolx.quadratic_drag_tendency`.
 
-For multilayer models apply the 2-D operator to the bottom layer only
+On a 3-D grid the drag acts only on the bottom interior z-level
+(``k = Nz - 2``; ``k = Nz - 1`` is the z-ghost).  For multilayer models apply the 2-D operator to the bottom layer only
 (``drag(u[-1], v[-1], ...)``), or use :func:`~finitevolx.multilayer` to
 drag every layer.
 
@@ -22,6 +23,7 @@ References
 
 from __future__ import annotations
 
+import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from finitevolx._src.forcing._base import AbstractForcing
@@ -30,8 +32,8 @@ from finitevolx._src.forcing.functional import (
     linear_drag_tendency,
     quadratic_drag_tendency,
 )
-from finitevolx._src.grid.cartesian import CartesianGrid2D
-from finitevolx._src.mask import Mask2D
+from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
+from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.interpolation import Interpolation2D
 
@@ -222,3 +224,176 @@ class QuadraticDrag2D(AbstractForcing):
             dv_drag = dv_drag * self.mask.v
 
         return du_drag, dv_drag
+
+
+def _inject_bottom(
+    du_2d: Float[Array, "Ny Nx"],
+    dv_2d: Float[Array, "Ny Nx"],
+    u: Float[Array, "Nz Ny Nx"],
+    v: Float[Array, "Nz Ny Nx"],
+    k_bot: int,
+    mask: Mask3D | None,
+) -> tuple[Float[Array, "Nz Ny Nx"], Float[Array, "Nz Ny Nx"]]:
+    """Embed 2-D bottom tendencies at level ``k_bot`` of zero 3-D arrays."""
+    du = jnp.zeros(u.shape, dtype=jnp.result_type(u, du_2d)).at[k_bot].set(du_2d)
+    dv = jnp.zeros(v.shape, dtype=jnp.result_type(v, dv_2d)).at[k_bot].set(dv_2d)
+    if mask is not None:
+        du = du * mask.u
+        dv = dv * mask.v
+    return du, dv
+
+
+class LinearDrag3D(AbstractForcing):
+    """Linear bottom drag on a 3-D Arakawa C-grid.
+
+    Applies the :class:`LinearDrag2D` stencil to the **bottom interior
+    z-level only** (``k_bot = Nz - 2``; ``k = Nz - 1`` is the z-ghost) and
+    returns zero at every other level:
+
+        du_drag[k_bot, j, i+1/2] = -r_on_u[j, i+1/2] * u[k_bot, j, i+1/2]
+        dv_drag[k_bot, j+1/2, i] = -r_on_v[j+1/2, i] * v[k_bot, j+1/2, i]
+
+    The bottom is the last interior level everywhere; a per-column
+    sea-floor index (e.g. ``Mask3D.k_bottom``) is not used.
+
+    Parameters
+    ----------
+    grid : CartesianGrid3D
+        The underlying 3-D grid.
+    mask : Mask3D or None, optional
+        Optional land/ocean mask.  The inner :class:`LinearDrag2D` is
+        mask-free; the 3-D result is post-multiplied by ``mask.u`` /
+        ``mask.v``.
+
+    Examples
+    --------
+    >>> import jax.numpy as jnp
+    >>> from finitevolx import CartesianGrid3D, LinearDrag3D
+    >>> grid = CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+    >>> drag = LinearDrag3D(grid=grid)
+    >>> u = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+    >>> du_drag, dv_drag = drag(u, u, r=1e-7)
+    """
+
+    grid: CartesianGrid3D
+    mask: Mask3D | None
+    _drag2d: LinearDrag2D
+
+    def __init__(
+        self,
+        grid: CartesianGrid3D,
+        mask: Mask3D | None = None,
+    ) -> None:
+        self.grid = grid
+        self.mask = mask
+        # The inner 2-D op is mask-free; the 3-D wrapper owns the mask.
+        self._drag2d = LinearDrag2D(grid=grid.horizontal_grid())
+
+    def __call__(
+        self,
+        u: Float[Array, "Nz Ny Nx"],
+        v: Float[Array, "Nz Ny Nx"],
+        r: float | Float[Array, "Ny Nx"],
+    ) -> tuple[Float[Array, "Nz Ny Nx"], Float[Array, "Nz Ny Nx"]]:
+        """Linear drag tendencies, non-zero only at the bottom interior level.
+
+        Parameters
+        ----------
+        u : Float[Array, "Nz Ny Nx"]
+            x-velocity at U-points.
+        v : Float[Array, "Nz Ny Nx"]
+            y-velocity at V-points.
+        r : float or Float[Array, "Ny Nx"]
+            Drag coefficient [1/s] — a scalar, or a T-point field (ghost
+            ring filled) interpolated to U/V-points.
+
+        Returns
+        -------
+        tuple[Float[Array, "Nz Ny Nx"], Float[Array, "Nz Ny Nx"]]
+            ``(du_drag, dv_drag)`` at U- and V-points, zero outside
+            ``k = Nz - 2`` and in the ghost ring.  When ``self.mask`` is
+            set, dry faces are zeroed.
+        """
+        k_bot = self.grid.Nz - 2
+        du_2d, dv_2d = self._drag2d(u[k_bot], v[k_bot], r)
+        return _inject_bottom(du_2d, dv_2d, u, v, k_bot, self.mask)
+
+
+class QuadraticDrag3D(AbstractForcing):
+    """Quadratic bottom drag on a 3-D Arakawa C-grid.
+
+    Applies the :class:`QuadraticDrag2D` stencil to the **bottom interior
+    z-level only** (``k_bot = Nz - 2``; ``k = Nz - 1`` is the z-ghost) and
+    returns zero at every other level:
+
+        du_drag[k_bot, j, i+1/2] = -Cd * |u|_on_u * u[k_bot, j, i+1/2] / h_bot_on_u
+        dv_drag[k_bot, j+1/2, i] = -Cd * |u|_on_v * v[k_bot, j+1/2, i] / h_bot_on_v
+
+    The bottom is the last interior level everywhere; a per-column
+    sea-floor index (e.g. ``Mask3D.k_bottom``) is not used.
+
+    Parameters
+    ----------
+    grid : CartesianGrid3D
+        The underlying 3-D grid.
+    mask : Mask3D or None, optional
+        Optional land/ocean mask.  The inner :class:`QuadraticDrag2D` is
+        mask-free; the 3-D result is post-multiplied by ``mask.u`` /
+        ``mask.v``.
+
+    Examples
+    --------
+    >>> import jax.numpy as jnp
+    >>> from finitevolx import CartesianGrid3D, QuadraticDrag3D
+    >>> grid = CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+    >>> drag = QuadraticDrag3D(grid=grid)
+    >>> u = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
+    >>> du_drag, dv_drag = drag(u, u, cd=2.5e-3, h_bot=grid.dz)
+    """
+
+    grid: CartesianGrid3D
+    mask: Mask3D | None
+    _drag2d: QuadraticDrag2D
+
+    def __init__(
+        self,
+        grid: CartesianGrid3D,
+        mask: Mask3D | None = None,
+    ) -> None:
+        self.grid = grid
+        self.mask = mask
+        # The inner 2-D op is mask-free; the 3-D wrapper owns the mask.
+        self._drag2d = QuadraticDrag2D(grid=grid.horizontal_grid())
+
+    def __call__(
+        self,
+        u: Float[Array, "Nz Ny Nx"],
+        v: Float[Array, "Nz Ny Nx"],
+        cd: float | Float[Array, "Ny Nx"],
+        h_bot: float | Float[Array, "Ny Nx"],
+    ) -> tuple[Float[Array, "Nz Ny Nx"], Float[Array, "Nz Ny Nx"]]:
+        """Quadratic drag tendencies, non-zero only at the bottom interior level.
+
+        Parameters
+        ----------
+        u : Float[Array, "Nz Ny Nx"]
+            x-velocity at U-points.
+        v : Float[Array, "Nz Ny Nx"]
+            y-velocity at V-points.
+        cd : float or Float[Array, "Ny Nx"]
+            Dimensionless drag coefficient — a scalar, or a T-point field
+            (ghost ring filled) interpolated to U/V-points.
+        h_bot : float or Float[Array, "Ny Nx"]
+            Bottom-layer thickness [m] — a scalar, or a T-point field
+            (ghost ring filled) interpolated to U/V-points.
+
+        Returns
+        -------
+        tuple[Float[Array, "Nz Ny Nx"], Float[Array, "Nz Ny Nx"]]
+            ``(du_drag, dv_drag)`` at U- and V-points, zero outside
+            ``k = Nz - 2`` and in the ghost ring.  When ``self.mask`` is
+            set, dry faces are zeroed.
+        """
+        k_bot = self.grid.Nz - 2
+        du_2d, dv_2d = self._drag2d(u[k_bot], v[k_bot], cd, h_bot)
+        return _inject_bottom(du_2d, dv_2d, u, v, k_bot, self.mask)

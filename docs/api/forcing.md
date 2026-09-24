@@ -50,3 +50,22 @@ calling them on a single layer, e.g. bottom drag on `u[-1], v[-1]`.
 ::: finitevolx.QuadraticDrag2D
 
 ::: finitevolx.RayleighDamping2D
+
+## 3D operators
+
+Wrappers for `CartesianGrid3D` built on the 2D operators, with an optional
+`Mask3D`.  Each follows one of three vertical patterns:
+
+| Pattern | Operators | Levels written |
+|---------|-----------|----------------|
+| Top injection | `WindStress3D` | top interior level `k = 1` only |
+| Bottom injection | `LinearDrag3D`, `QuadraticDrag3D` | bottom interior level `k = Nz - 2` only |
+| Uniform vmap | `RayleighDamping3D` | every interior level (z-ghosts zeroed) |
+
+::: finitevolx.WindStress3D
+
+::: finitevolx.LinearDrag3D
+
+::: finitevolx.QuadraticDrag3D
+
+::: finitevolx.RayleighDamping3D
