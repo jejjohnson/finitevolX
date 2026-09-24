@@ -193,6 +193,28 @@ class TestSphericalGeostrophicVelocityMasks:
         assert np.all(np.isfinite(np.asarray(dh)))
         assert np.all(np.isfinite(np.asarray(df)))
 
+    def test_gradient_finite_when_face_average_cancels(self):
+        """Wet f = -1 next to a dry cell: the dry face is still guarded."""
+        mask = make_mask_2d()
+        grid = make_spherical_grid_2d()
+        op = SphericalDifference2D(grid=grid, mask=mask)
+        wet = np.asarray(mask.h)
+        # f[j, i] = -1 on wet cells, +1 on dry cells, so every coastal face
+        # averages to f_on_face = 0 if the guard were applied before averaging
+        f = jnp.where(wet, -1.0, 1.0)
+        h = make_h_field_2d()
+
+        def loss(h, f):
+            u_g, v_g = op.geostrophic_velocity(h, f)
+            return jnp.sum(u_g**2 + v_g**2)
+
+        u_g, v_g = op.geostrophic_velocity(h, f)
+        assert np.all(np.isfinite(np.asarray(u_g)))
+        assert np.all(np.isfinite(np.asarray(v_g)))
+        dh, df = jax.grad(loss, argnums=(0, 1))(h, f)
+        assert np.all(np.isfinite(np.asarray(dh)))
+        assert np.all(np.isfinite(np.asarray(df)))
+
 
 # ---------------------------------------------------------------------------
 # SphericalDifference3D
