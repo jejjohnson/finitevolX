@@ -6,15 +6,15 @@ counterparts: the mask is set once at construction and every method zeroes
 the dry cells of its output stagger, following the rule in ``docs/masks.md``
 ("one output -> one mask field, chosen by the output stagger"):
 
-======================  ===============  ==========================
-Method                  Output stagger   Mask field
-======================  ===============  ==========================
-``Energetics2D.*``      T                ``mask.h``
-``Strain2D.shear``      X                ``mask.xy_corner_strict``
-``Strain2D.tensor``     T                ``mask.h``
-``Strain2D.magnitude``  T                ``mask.h``
-``Strain2D.okubo_weiss``T                ``mask.h``
-======================  ===============  ==========================
+==================================  ======  =========================
+Method                              Output  Mask field
+==================================  ======  =========================
+``Energetics2D.*``                  T       ``mask.h``
+``Strain2D.shear``                  X       ``mask.xy_corner_strict``
+``Strain2D.tensor``                 T       ``mask.h``
+``Strain2D.magnitude_squared``      T       ``mask.h``
+``Strain2D.okubo_weiss``            T       ``mask.h``
+==================================  ======  =========================
 
 With ``mask=None`` every method returns exactly what the functional form
 (or the documented composition of functional forms) returns.
