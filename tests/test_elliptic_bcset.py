@@ -28,6 +28,7 @@ def _rhs() -> jnp.ndarray:
 
 
 def _basin_mask() -> jnp.ndarray:
+    # mask[j, i] = 1 for 1 <= j <= NY-2, 1 <= i <= NX-2
     return jnp.zeros((NY, NX)).at[1:-1, 1:-1].set(1.0)
 
 
@@ -118,14 +119,19 @@ class TestInhomogeneousDirichletFaces:
         bc = _dirichlet(south=-0.2, north=0.1, west=0.05, east=0.3)
         psi = fvx.streamfunction_from_vorticity(_rhs(), DX, DY, bc=bc, lambda_=4.0)
         # Wall-adjacent wet cells (inner ring), corners owned by west/east.
+        # psi[1, i]    = south  for 2 <= i <= NX-3  (corners belong to west/east)
         np.testing.assert_allclose(psi[1, 2:-2], -0.2, atol=1e-12)
+        # psi[NY-2, i] = north  for 2 <= i <= NX-3
         np.testing.assert_allclose(psi[-2, 2:-2], 0.1, atol=1e-12)
+        # psi[j, 1]    = west   for 1 <= j <= NY-2  (corners included)
         np.testing.assert_allclose(psi[1:-1, 1], 0.05, atol=1e-12)
+        # psi[j, NX-2] = east   for 1 <= j <= NY-2
         np.testing.assert_allclose(psi[1:-1, -2], 0.3, atol=1e-12)
 
     def test_matches_explicit_known_values(self):
         bc = _dirichlet(north=0.1)
         # West/east (value 0) own the corner cells of the north wall row.
+        # g[NY-2, i] = 0.1 for 2 <= i <= NX-3
         g = jnp.zeros((NY, NX)).at[-2, 2:-2].set(0.1)
         rhs = _rhs()
         psi = fvx.streamfunction_from_vorticity(rhs, DX, DY, bc=bc)
@@ -157,6 +163,7 @@ class TestInhomogeneousDirichletFaces:
         psi = fvx.pv_inversion(
             pv, DX, DY, jnp.array([1.0, 9.0]), bc=_dirichlet(east=0.25)
         )
+        # psi[k, j, NX-2] = east for every layer k and 1 <= j <= NY-2
         np.testing.assert_allclose(psi[:, 1:-1, -2], 0.25, atol=1e-12)
 
 

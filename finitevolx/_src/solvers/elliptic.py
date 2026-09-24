@@ -360,9 +360,13 @@ def _dirichlet_face_values(
     at the corners.  Island coasts, which are not on a face, stay at zero.
     """
     values = jnp.zeros(shape, dtype=dtype)
+    # values[1, i]    = south   (first wet row,     j = 1)
     values = values.at[1, :].set(bc.south.value)
+    # values[Ny-2, i] = north   (last wet row,      j = Ny-2)
     values = values.at[-2, :].set(bc.north.value)
+    # values[j, 1]    = west    (first wet column,  i = 1; overwrites corners)
     values = values.at[:, 1].set(bc.west.value)
+    # values[j, Nx-2] = east    (last wet column,   i = Nx-2; overwrites corners)
     return values.at[:, -2].set(bc.east.value)
 
 
