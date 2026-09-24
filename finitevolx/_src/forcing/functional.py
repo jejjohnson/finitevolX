@@ -10,6 +10,13 @@ field **already at the correct stagger** and is responsible for applying
 Each momentum primitive acts on a single velocity component, so it is
 called once for the U-face and once for the V-face.
 
+Because masking happens afterwards, the inputs must already be finite
+everywhere: a zero thickness on dry cells gives ``0 / 0 = NaN`` in
+:func:`wind_stress_tendency` / :func:`quadratic_drag_tendency`, and
+``NaN * 0`` stays ``NaN``.  Select a safe denominator first (e.g.
+``jnp.where(mask, dz, 1.0)``) and zero dry points with ``jnp.where`` rather
+than by multiplication.
+
 All functions are compatible with ``jax.jit``, ``jax.vmap``, and
 ``jax.grad``, and broadcast scalar coefficients against array fields.
 
@@ -54,7 +61,9 @@ def wind_stress_tendency(
         Reference density [kg/m^3].
     dz_top : float or Float[Array, "..."]
         Top-layer thickness at the same face points [m].  Scalar or a
-        field broadcastable to ``tau_on_face``.
+        field broadcastable to ``tau_on_face``.  Must be non-zero
+        everywhere — replace dry-cell zeros before calling (e.g.
+        ``jnp.where(mask, dz_top, 1.0)``).
 
     Returns
     -------
@@ -123,7 +132,9 @@ def quadratic_drag_tendency(
     cd : float or Float[Array, "..."]
         Dimensionless drag coefficient (typically ``~1e-3``).
     h_bot : float or Float[Array, "..."]
-        Bottom-layer thickness at the same face points [m].
+        Bottom-layer thickness at the same face points [m].  Must be
+        non-zero everywhere — replace dry-cell zeros before calling (e.g.
+        ``jnp.where(mask, h_bot, 1.0)``).
 
     Returns
     -------
