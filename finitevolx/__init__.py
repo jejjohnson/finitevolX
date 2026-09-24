@@ -135,6 +135,7 @@ from finitevolx._src.mask import (
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.barotropic import barotropic_filter
 from finitevolx._src.operators.coriolis import Coriolis2D, Coriolis3D
+from finitevolx._src.operators.diagnostic_operators import Energetics2D, Strain2D
 from finitevolx._src.operators.diagnostics import (
     available_potential_energy,
     bernoulli_potential,
@@ -600,6 +601,8 @@ __all__ = [
     "buoyancy",
     "reduced_gravity",
     # Diagnostics
+    "Energetics2D",
+    "Strain2D",
     "available_potential_energy",
     "bernoulli_potential",
     "enstrophy",
