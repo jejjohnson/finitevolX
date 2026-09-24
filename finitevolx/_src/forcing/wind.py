@@ -127,9 +127,10 @@ class WindStress2D(AbstractForcing):
         Shared with :class:`WindStress3D`, which passes one z-level's masks.
         """
         # tau_x_on_u[j, i+1/2] = 1/2 * (tau_x[j, i] + tau_x[j, i+1])
-        tau_x_on_u = self.interp.T_to_U(tau_x)
+        # (zeroed at dry faces so NaN land stress cannot give NaN gradients)
+        tau_x_on_u = mask_where(self.interp.T_to_U(tau_x), mu)
         # tau_y_on_v[j+1/2, i] = 1/2 * (tau_y[j, i] + tau_y[j+1, i])
-        tau_y_on_v = self.interp.T_to_V(tau_y)
+        tau_y_on_v = mask_where(self.interp.T_to_V(tau_y), mv)
         # Swap in 1 at dry faces so a zero dry-cell thickness cannot give 0/0.
         dz_on_u = safe_denominator(on_face_interior(dz_top, self.interp.T_to_U), mu)
         dz_on_v = safe_denominator(on_face_interior(dz_top, self.interp.T_to_V), mv)
