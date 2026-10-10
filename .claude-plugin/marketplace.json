@@ -1,0 +1,14 @@
+{
+  "name": "finitevolx",
+  "owner": {
+    "name": "jejjohnson"
+  },
+  "description": "Claude Code plugins for finite-volume ocean and atmosphere models in JAX on finitevolX.",
+  "plugins": [
+    {
+      "name": "finitevolx",
+      "source": "./plugins/finitevolx",
+      "description": "Build finite-volume models on finitevolX (Arakawa C-grid stencils and operators, masks, boundary conditions, advection, elliptic solvers, time steppers) instead of re-implementing them: a model-building skill and a reuse reviewer."
+    }
+  ]
+}

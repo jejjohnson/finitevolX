@@ -1,0 +1,11 @@
+{
+  "name": "finitevolx",
+  "description": "Write finite-volume ocean and atmosphere models in JAX on finitevolX — Arakawa C-grids with ghost rings, raw stencils and difference / interpolation operators, WENO / TVD advection, land-sea masks with coastal stencil fallback, boundary conditions, diagnostics, forcing, spectral / CG / multigrid elliptic solvers and SSP time steppers — instead of hand-writing shifted slices, ghost-cell fills, Poisson solvers and Runge–Kutta loops.",
+  "author": {
+    "name": "jejjohnson"
+  },
+  "homepage": "https://jejjohnson.github.io/finitevolX/agents/",
+  "repository": "https://github.com/jejjohnson/finitevolX",
+  "license": "Apache-2.0",
+  "keywords": ["jax", "finite-volume", "arakawa-c-grid", "ocean-modelling", "equinox", "weno", "elliptic-solvers"]
+}
