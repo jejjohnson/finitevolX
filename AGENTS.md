@@ -359,6 +359,26 @@ docstring before changing what it checks.
 | `tests/test_capabilities.py` | `docs/capabilities.md` is current; no name shadows a spectraldiffx / gaussx name with a different object |
 | `pyproject.toml` `filterwarnings = ["error", ...]`, `xfail_strict = true` | Any warning other than a `DeprecationWarning` fails a test; an `xfail` that starts passing fails too |
 
+## Recipes
+
+Step-by-step recipes for the common jobs live as plain Markdown in
+`.claude/skills/<name>/SKILL.md` (Claude Code loads them automatically; any
+agent can read and follow them):
+
+| Job | Recipe |
+|---|---|
+| Add a raw stencil, functional helper or mask-aware class operator (difference, interpolation, vorticity, diffusion, diagnostic, spherical) | `add-stencil-operator` |
+| Add a reconstruction scheme, WENO variant, flux limiter or face flux | `add-advection-scheme` |
+| Add a boundary-condition atom, BC set or ghost-ring filler | `add-boundary-condition` |
+| Add a forcing term (wind, drag, damping, relaxation) | `add-forcing` |
+| Add an elliptic solver path, preconditioner or multigrid option | `add-elliptic-solver` |
+| Add a time integrator (step function and diffrax solver) | `add-time-integrator` |
+| Add or update an example notebook | `add-notebook` |
+| Bump spectraldiffx / gaussx | `bump-upstream-pins` |
+| Verify before a PR | `pre-pr-check` |
+| Review a change | `finitevolx-review` (+ the read-only `.claude/agents/reuse-reviewer.md` and `grid-numerics-reviewer.md`) |
+| Write a squash commit message | `squash-commit` |
+
 ## Working in the repo
 
 Always run Python tools through `uv run` (never the system Python); `git`,
