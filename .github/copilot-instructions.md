@@ -36,5 +36,10 @@ The essentials, in case you only read this file:
   `make capabilities` after a public API change; regenerate the golden
   fixtures (`uv run python tests/fixtures/_gen_golden.py`) only when an
   operator's output changes on purpose.
+- Step-by-step recipes (add a stencil operator, advection scheme, boundary
+  condition, forcing, elliptic solver, time integrator, notebook; bump the
+  upstream pins; pre-PR check; review) are plain Markdown in
+  `.claude/skills/<name>/SKILL.md`, and the two review checklists in
+  `.claude/agents/`; follow them as written.
 - Path-scoped standards live in `.github/instructions/`; code review follows
   [`CODE_REVIEW.md`](../CODE_REVIEW.md).
