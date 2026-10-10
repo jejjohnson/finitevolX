@@ -6,13 +6,13 @@ applyTo: "finitevolx/**/*.py,tests/**/*.py,scripts/**/*.py"
 
 ## Modern Python (3.12+)
 
-- `from __future__ import annotations` at the top of every module
+- `from __future__ import annotations` at the top of every new module
 - Type hints on **all** public functions, methods, and module-level variables
 - Modern union syntax: `X | None` not `Optional[X]`, `X | Y` not `Union[X, Y]`
 - Built-in generics: `list[int]`, `dict[str, Any]` not `List[int]`, `Dict[str, Any]`
 - `pathlib.Path` over `os.path`
 - f-strings for string formatting
-- `dataclasses`, `attrs`, or `equinox.Module` for data containers
+- `equinox.Module` for grids, masks, operators, boundary conditions, forcings and solvers (immutable pytrees; a dataclass is not one); `NamedTuple` for small results such as `CGInfo`
 - `Enum` for fixed sets of constants
 - Context managers (`with` statements) for resource handling
 - Specific exception types (never bare `except:`)
@@ -21,16 +21,21 @@ applyTo: "finitevolx/**/*.py,tests/**/*.py,scripts/**/*.py"
 
 ## Package Preferences
 
+No new runtime dependency without discussion; build on what finitevolX
+already depends on (see "Boundaries" in `AGENTS.md`).
+
 | Purpose | Preferred Package |
 |---------|-------------------|
-| Logging | `loguru` |
-| CLI | `cyclopts` |
-| Data containers | `equinox.Module`, `dataclasses` (stdlib), or `attrs` |
-| Configuration | `hydra-core` / `omegaconf` |
+| Arrays, transforms | `jax` (pure `jnp` slicing for stencils; no `finitediffx` / `kernex`) |
+| Modules / pytrees | `equinox` |
+| Shape annotations | `jaxtyping` |
+| Spectral transforms and solvers | `spectraldiffx` |
+| Structured solves, preconditioners | `gaussx`, `lineax` |
+| Time integration | `diffrax` |
+| Construction-time mask / multigrid precomputation | `numpy`, `scipy` |
+| Example-script CLI and logging (`examples` extra) | `cyclopts`, `loguru` |
 | Path handling | `pathlib` (stdlib) |
-| HTTP | `httpx` |
 | Testing | `pytest` |
-| JAX computations | `jax`, `jaxtyping`, `equinox`, `beartype` |
 
 ## Documentation
 
@@ -38,7 +43,7 @@ applyTo: "finitevolx/**/*.py,tests/**/*.py,scripts/**/*.py"
 - Function/method docstrings for all public APIs (NumPy style)
 - Inline comments explaining *why*, not *what*
 - Scientific algorithms should include Unicode equations in docstrings (e.g. `# σ² = Σ(xᵢ − μ)² / N`)
-- Public classes and functions should include 2–3 example use cases in docstrings
+- Public classes and functions should include an `Examples` section (doctests are not collected, so run each example by hand)
 
 ## finitevolX-Specific Standards
 
@@ -62,8 +67,8 @@ def diff_x_T_to_U(self, h: Float[Array, "Nx"]) -> Float[Array, "Nx"]:
 ```
 
 ### JAX Type Hints
-- Use `jaxtyping` for array shapes: `Float[Array, "Ny Nx"]`
-- Use `beartype` for runtime type checking
+- Use `jaxtyping` for array shapes: `Float[Array, "Ny Nx"]` (documentation
+  only: nothing checks them at run time)
 - All operators inherit from `equinox.Module`
 
 ### Stencil Comments
@@ -98,8 +103,10 @@ BC-owned ghost *output-type* cells for the first interior cell — the caller
 
 ### Advection Write Region
 
-Advection operators use `[2:-2]` / `[2:-2, 2:-2]` (not `[1:-1]`) to avoid
-reading ghost flux cells.  `Advection3D` uses `[1:-1, 2:-2, 2:-2]` since
+With the default `wall="closed"`, advection operators use `[2:-2]` /
+`[2:-2, 2:-2]` (not `[1:-1]`) to avoid reading ghost flux cells
+(`wall="open"` on `Advection1D/2D` writes the full interior and computes the
+wall faces from the ghost ring).  `Advection3D` uses `[1:-1, 2:-2, 2:-2]` since
 the z-axis is independent.  Never change this to `[1:-1, ...]` for the
 horizontal dimensions.
 

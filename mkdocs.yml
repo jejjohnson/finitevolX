@@ -44,6 +44,7 @@ plugins:
 
 nav:
   - Home: index.md
+  - Capability Index: capabilities.md
   - C-Grid Discretization:
       - Theory & Overview: cgrid_discretization.md
       - API Reference: api/grids.md
