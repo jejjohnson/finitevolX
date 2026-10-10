@@ -1,4 +1,4 @@
-.PHONY: help install uv-format uv-lint uv-pre-commit test test-cov typecheck ci docs docs-serve docs-deploy clean version
+.PHONY: help install uv-format uv-lint uv-pre-commit test test-cov typecheck ci docs docs-serve docs-deploy capabilities clean version
 .DEFAULT_GOAL = help
 
 # ANSI Color Codes for pretty terminal output
@@ -99,6 +99,12 @@ docs-deploy: ## Deploy documentation to GitHub Pages
 	@printf "$(YELLOW)>>> Deploying documentation to GitHub Pages...$(RESET)\n"
 	@uv run mkdocs gh-deploy --force
 	@printf "$(GREEN)>>> Documentation deployed successfully.$(RESET)\n"
+
+.PHONY: capabilities
+capabilities: ## Regenerate docs/capabilities.md (every public name, for reuse)
+	@printf "$(YELLOW)>>> Regenerating the capability index...$(RESET)\n"
+	@uv run python scripts/capabilities.py
+	@printf "$(GREEN)>>> docs/capabilities.md is current.$(RESET)\n"
 
 ##@ Utilities
 .PHONY: clean
