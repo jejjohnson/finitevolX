@@ -357,6 +357,7 @@ docstring before changing what it checks.
 | `tests/test_timestepping*.py`, `tests/test_diffrax_solvers.py` | Convergence order and accuracy of the step functions and the diffrax solvers; the pure steps match their diffrax twins (`TestPureFunctionalVsDiffrax`) |
 | `tests/test_scripts.py` | The example models in `scripts/` run stably on small grids |
 | `tests/test_capabilities.py` | `docs/capabilities.md` is current; no name shadows a spectraldiffx / gaussx name with a different object |
+| `tests/test_plugin_skill.py` | The downstream plugin's worked example runs and its stated results hold; every `fvx.X` / `finitevolx.X` the plugin names exists |
 | `pyproject.toml` `filterwarnings = ["error", ...]`, `xfail_strict = true` | Any warning other than a `DeprecationWarning` fails a test; an `xfail` that starts passing fails too |
 
 ## Recipes
@@ -378,6 +379,14 @@ agent can read and follow them):
 | Verify before a PR | `pre-pr-check` |
 | Review a change | `finitevolx-review` (+ the read-only `.claude/agents/reuse-reviewer.md` and `grid-numerics-reviewer.md`) |
 | Write a squash commit message | `squash-commit` |
+
+Downstream users get finitevolX's guidance through the Claude Code plugin
+in `plugins/finitevolx/` (published by `.claude-plugin/marketplace.json`)
+and `docs/llms.txt` (MkDocs copies it to the site root); see
+`docs/agents.md`. When the public API or the headline usage changes, update
+`plugins/finitevolx/skills/finite-volume-models-with-finitevolx/` too:
+`tests/test_plugin_skill.py` runs its worked example and checks that every
+`fvx.X` / `finitevolx.X` it and the plugin reviewer name still exists.
 
 ## Working in the repo
 
