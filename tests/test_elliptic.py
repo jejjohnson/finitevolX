@@ -317,6 +317,81 @@ class TestSolveCG:
             make_spectral_preconditioner(dx, dy, bc="invalid")
 
 
+class TestSolveCGFloat32:
+    """Default tolerances must be reachable in float32 (gaussx gh-639).
+
+    lineax's CG checks ``|r_i| <= atol + rtol |b_i|`` entrywise; with a fixed
+    ``atol = 1e-6`` the zero-``rhs`` cells (land, ghost ring) must reach an
+    absolute residual below float32's rounding floor for an elliptic
+    ``rhs ~ 1/dx²``, so CG never converged (unpreconditioned) or diverged
+    (spectral preconditioner on a 64² basin).
+    """
+
+    @staticmethod
+    def _basin(n: int):
+        dx = 1.0 / n
+        mask = jnp.zeros((n, n), jnp.float32).at[2:-2, 2:-2].set(1.0)
+        j = jnp.arange(n)[:, None]
+        i = jnp.arange(n)[None, :]
+        psi = jnp.sin(jnp.pi * j / n) * jnp.sin(2 * jnp.pi * i / n) * mask
+        psi = psi.astype(jnp.float32)
+
+        def A(x):
+            return masked_laplacian(x, mask, dx, dx, lambda_=0.0)
+
+        return A, psi, mask, dx
+
+    @pytest.mark.parametrize("precondition", [False, True])
+    def test_default_tolerances_converge(self, precondition):
+        A, psi, mask, dx = self._basin(64)
+        rhs = A(psi)  # [Ny, Nx], float32, |rhs| ~ 1/dx²
+        pc = make_spectral_preconditioner(dx, dx, bc="fft") if precondition else None
+        x, info = solve_cg(A, rhs, preconditioner=pc, max_steps=2000)
+        assert x.dtype == jnp.float32
+        assert bool(info.converged)
+        # Effective atol is √ε_f32 · max|rhs| ≈ 3.5e-4 · max|rhs|: the relative
+        # residual lands at that level, and the wet-cell error with it.
+        rel = float(jnp.linalg.norm(A(x) - rhs) / jnp.linalg.norm(rhs))
+        assert rel < 1e-3
+        err = float(jnp.max(jnp.abs((x - psi) * mask)))
+        assert err < 1e-2
+
+    def test_amplitude_invariant(self):
+        """Rescaling the rhs rescales the solution and leaves the iterations."""
+        A, psi, _mask, _dx = self._basin(32)
+        rhs = A(psi)
+        x1, info1 = solve_cg(A, rhs, max_steps=2000)
+        x2, info2 = solve_cg(A, 1e-4 * rhs, max_steps=2000)
+        assert bool(info1.converged) and bool(info2.converged)
+        assert int(info1.iterations) == int(info2.iterations)
+        np.testing.assert_allclose(
+            np.asarray(1e4 * x2), np.asarray(x1), rtol=1e-3, atol=1e-5
+        )
+
+    def test_unconverged_is_reported_not_raised(self):
+        A, psi, _mask, _dx = self._basin(32)
+        _x, info = solve_cg(A, A(psi), max_steps=2)
+        assert not bool(info.converged)
+        assert int(info.iterations) == 2
+
+    def test_float64_default_unchanged(self, periodic_grid):
+        """Float64 keeps the historical atol = 1e-6 with no rescaling."""
+        Ny, Nx, dx, dy = periodic_grid
+        lam = 1.0
+        eigx = fft_eigenvalues(Nx, dx)
+        eigy = fft_eigenvalues(Ny, dy)
+        rhs = jnp.ones((Ny, Nx))
+
+        def A(psi):
+            eig2d = eigy[:, None] + eigx[None, :] - lam
+            return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
+
+        x_default, info_default = solve_cg(A, rhs)
+        x_explicit, info_explicit = solve_cg(A, rhs, atol=1e-6)
+        np.testing.assert_array_equal(np.asarray(x_default), np.asarray(x_explicit))
+        assert int(info_default.iterations) == int(info_explicit.iterations)
+
+
 # ---------------------------------------------------------------------------
 # Nyström preconditioner
 # ---------------------------------------------------------------------------
