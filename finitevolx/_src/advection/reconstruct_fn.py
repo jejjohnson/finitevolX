@@ -26,6 +26,12 @@ from __future__ import annotations
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
+from finitevolx._src.advection.linear import (
+    linear_3pts_left,
+    linear_3pts_right,
+    linear_5pts_left,
+    linear_5pts_right,
+)
 from finitevolx._src.advection.weno import (
     weno_3pts,
     weno_3pts_improved,
@@ -80,12 +86,42 @@ def upwind_1pt(q: Float[Array, "..."], u: Float[Array, "..."]) -> Float[Array, "
     return jnp.where(u >= 0.0, q[..., 1:-1], q[..., 2:])
 
 
+# Pointwise stencils: ``method`` -> (left-biased, right-biased) face value.
+# Left-biased  (positive flow) at face i+1/2 reads cells i-1..i+1 (3pt) / i-2..i+2 (5pt).
+# Right-biased (negative flow) at face i+1/2 reads cells i..i+2   (3pt) / i-1..i+3 (5pt).
+_STENCILS_3PT = {
+    "weno": (weno_3pts, weno_3pts_right),
+    "wenoz": (weno_3pts_improved, weno_3pts_improved_right),
+    "linear": (linear_3pts_left, linear_3pts_right),
+}
+_STENCILS_5PT = {
+    "weno": (weno_5pts, weno_5pts_right),
+    "wenoz": (weno_5pts_improved, weno_5pts_improved_right),
+    "linear": (linear_5pts_left, linear_5pts_right),
+}
+
+
+def _stencil(table: dict, width: int, method: str, side: int):
+    """Look up the (left, right) stencil function; ``side`` 0 = left, 1 = right."""
+    if method not in table:
+        raise ValueError(f"Unknown {width}pt method: {method!r}")
+    return table[method][side]
+
+
 def upwind_3pt(
     q: Float[Array, "..."],
     u: Float[Array, "..."],
     method: str = "weno",
 ) -> Float[Array, "..."]:
     """3-point upwind face value at i+1/2 along the last axis.
+
+    Output ``k`` is the face between cells ``k+1`` and ``k+2`` of ``q``
+    (the east face ``j+1/2`` of interior cell ``j = k+1``), for both flow
+    signs:
+
+    * ``u >= 0``: ``stencil_left(q[j-1], q[j], q[j+1])``
+    * ``u <  0``: ``stencil_right(q[j], q[j+1], q[j+2])``, with 1st-order
+      upwind ``q[N-1]`` at the last face where ``j+2`` does not exist.
 
     Parameters
     ----------
@@ -101,33 +137,14 @@ def upwind_3pt(
     array, shape (..., N-2)
         Face values at interior faces.
     """
-    # Left-biased (positive flow): stencil {q[i-1], q[i], q[i+1]}
-    # faces at 0.5, 1.5, ..., N-2.5  →  N-2 faces from N cells
-    if method == "weno":
-        h_pos = weno_3pts(q[..., :-2], q[..., 1:-1], q[..., 2:])
-    elif method == "wenoz":
-        h_pos = weno_3pts_improved(q[..., :-2], q[..., 1:-1], q[..., 2:])
-    elif method == "linear":
-        # Optimal 3rd-order left-biased: -1/6 q[i-1] + 5/6 q[i] + 1/3 q[i+1]
-        h_pos = (
-            -1.0 / 6.0 * q[..., :-2] + 5.0 / 6.0 * q[..., 1:-1] + 1.0 / 3.0 * q[..., 2:]
-        )
-    else:
-        raise ValueError(f"Unknown 3pt method: {method!r}")
-
-    # Right-biased (negative flow): stencil {q[i], q[i+1], q[i+2]}
-    if method == "weno":
-        h_neg = weno_3pts_right(q[..., :-2], q[..., 1:-1], q[..., 2:])
-    elif method == "wenoz":
-        h_neg = weno_3pts_improved_right(q[..., :-2], q[..., 1:-1], q[..., 2:])
-    elif method == "linear":
-        # Optimal 3rd-order right-biased: 1/3 q[i] + 5/6 q[i+1] - 1/6 q[i+2]
-        h_neg = (
-            1.0 / 3.0 * q[..., :-2] + 5.0 / 6.0 * q[..., 1:-1] - 1.0 / 6.0 * q[..., 2:]
-        )
-    else:
-        raise ValueError(f"Unknown 3pt method: {method!r}")
-
+    left = _stencil(_STENCILS_3PT, 3, method, 0)
+    right = _stencil(_STENCILS_3PT, 3, method, 1)
+    # j = 1..N-2 (N-2 faces):  h[j+1/2] = L(q[j-1], q[j], q[j+1])
+    h_pos = left(q[..., :-2], q[..., 1:-1], q[..., 2:])
+    # j = 1..N-3:              h[j+1/2] = R(q[j], q[j+1], q[j+2])
+    h_neg_int = right(q[..., 1:-2], q[..., 2:-1], q[..., 3:])
+    # j = N-2:                 h[j+1/2] = q[N-1]  (1st-order upwind fallback)
+    h_neg = jnp.concatenate([h_neg_int, q[..., -1:]], axis=-1)
     return jnp.where(u >= 0.0, h_pos, h_neg)
 
 
@@ -137,6 +154,14 @@ def upwind_5pt(
     method: str = "weno",
 ) -> Float[Array, "..."]:
     """5-point upwind face value at i+1/2 along the last axis.
+
+    Output ``k`` is the face between cells ``k+2`` and ``k+3`` of ``q``
+    (the east face ``j+1/2`` of cell ``j = k+2``), for both flow signs:
+
+    * ``u >= 0``: ``stencil_left(q[j-2], ..., q[j+2])``
+    * ``u <  0``: ``stencil_right(q[j-1], ..., q[j+3])``, with the 3-point
+      right-biased stencil ``(q[j], q[j+1], q[j+2])`` at the last face
+      ``j = N-3`` where ``j+3`` does not exist.
 
     Parameters
     ----------
@@ -152,48 +177,18 @@ def upwind_5pt(
     array, shape (..., N-4)
         Face values at deep interior faces (requires 2-cell padding on each side).
     """
-    # Left-biased (positive flow): stencil {q[i-2], q[i-1], q[i], q[i+1], q[i+2]}
-    if method == "weno":
-        h_pos = weno_5pts(
-            q[..., :-4], q[..., 1:-3], q[..., 2:-2], q[..., 3:-1], q[..., 4:]
-        )
-    elif method == "wenoz":
-        h_pos = weno_5pts_improved(
-            q[..., :-4], q[..., 1:-3], q[..., 2:-2], q[..., 3:-1], q[..., 4:]
-        )
-    elif method == "linear":
-        # Optimal 5th-order left-biased
-        h_pos = (
-            1.0 / 30.0 * q[..., :-4]
-            - 13.0 / 60.0 * q[..., 1:-3]
-            + 47.0 / 60.0 * q[..., 2:-2]
-            + 9.0 / 20.0 * q[..., 3:-1]
-            - 1.0 / 20.0 * q[..., 4:]
-        )
-    else:
-        raise ValueError(f"Unknown 5pt method: {method!r}")
-
-    # Right-biased (negative flow): stencil {q[i-1], q[i], q[i+1], q[i+2], q[i+3]}
-    if method == "weno":
-        h_neg = weno_5pts_right(
-            q[..., :-4], q[..., 1:-3], q[..., 2:-2], q[..., 3:-1], q[..., 4:]
-        )
-    elif method == "wenoz":
-        h_neg = weno_5pts_improved_right(
-            q[..., :-4], q[..., 1:-3], q[..., 2:-2], q[..., 3:-1], q[..., 4:]
-        )
-    elif method == "linear":
-        # Optimal 5th-order right-biased
-        h_neg = (
-            -1.0 / 20.0 * q[..., :-4]
-            + 9.0 / 20.0 * q[..., 1:-3]
-            + 47.0 / 60.0 * q[..., 2:-2]
-            - 13.0 / 60.0 * q[..., 3:-1]
-            + 1.0 / 30.0 * q[..., 4:]
-        )
-    else:
-        raise ValueError(f"Unknown 5pt method: {method!r}")
-
+    left = _stencil(_STENCILS_5PT, 5, method, 0)
+    right = _stencil(_STENCILS_5PT, 5, method, 1)
+    right3 = _stencil(_STENCILS_3PT, 3, method, 1)
+    # j = 2..N-3 (N-4 faces):  h[j+1/2] = L(q[j-2], ..., q[j+2])
+    h_pos = left(q[..., :-4], q[..., 1:-3], q[..., 2:-2], q[..., 3:-1], q[..., 4:])
+    # j = 2..N-4:              h[j+1/2] = R(q[j-1], ..., q[j+3])
+    h_neg_int = right(
+        q[..., 1:-4], q[..., 2:-3], q[..., 3:-2], q[..., 4:-1], q[..., 5:]
+    )
+    # j = N-3:                 h[j+1/2] = R3(q[j], q[j+1], q[j+2])
+    h_neg_last = right3(q[..., -3:-2], q[..., -2:-1], q[..., -1:])
+    h_neg = jnp.concatenate([h_neg_int, h_neg_last], axis=-1)
     return jnp.where(u >= 0.0, h_pos, h_neg)
 
 
@@ -243,6 +238,10 @@ def reconstruct(
     For ``num_pts >= 3``, boundary faces where the full stencil does not
     fit are reconstructed with a lower-order fallback (3-point falls back
     to 1st-order upwind; 5-point falls back to 3-point, then 1st-order).
+    Both flow signs reconstruct the same face, the east (north) face of
+    cell ``[j, i]`` at ``i+1/2`` (``j+1/2``); the right-biased stencil for
+    ``u < 0`` is shifted one cell east of the left-biased one, exactly as in
+    :class:`~finitevolx.Reconstruction2D`.
 
     Examples
     --------
@@ -318,19 +317,25 @@ def _reconstruct_last_axis(
         h_face = upwind_3pt(q, vel, method)
         return h_face * vel
 
-    # 5-point interior (faces 2.5 .. N-3.5)
+    # Faces are indexed by the cell j to their west: face j+1/2, j = 1..N-2.
+    # 5-point interior (j = 2..N-3)
     h5 = upwind_5pt(q, vel[..., 1:-1], method)
 
-    # 3-point boundary fallback at first and last interior faces
-    # First face (between cell 0 and 1): use 3pt from cells {0, 1, 2}
-    q_first = q[..., :3]
-    u_first = vel[..., :1]
-    h3_first = upwind_3pt(q_first, u_first, method)
+    left3 = _stencil(_STENCILS_3PT, 3, method, 0)
+    right5 = _stencil(_STENCILS_5PT, 5, method, 1)
 
-    # Last face (between cell N-2 and N-1): use 3pt from cells {N-3, N-2, N-1}
-    q_last = q[..., -3:]
-    u_last = vel[..., -1:]
-    h3_last = upwind_3pt(q_last, u_last, method)
+    # First face (j = 1): positive flow 3pt left (q[0..2]); negative flow has
+    # the full right-biased 5pt stencil (q[0..4]).
+    h_first_pos = left3(q[..., 0:1], q[..., 1:2], q[..., 2:3])
+    h_first_neg = right5(
+        q[..., 0:1], q[..., 1:2], q[..., 2:3], q[..., 3:4], q[..., 4:5]
+    )
+    h3_first = jnp.where(vel[..., :1] >= 0.0, h_first_pos, h_first_neg)
+
+    # Last face (j = N-2): positive flow 3pt left (q[N-3..N-1]); negative flow
+    # has no cell j+2, so 1st-order upwind q[N-1].
+    h_last_pos = left3(q[..., -3:-2], q[..., -2:-1], q[..., -1:])
+    h3_last = jnp.where(vel[..., -1:] >= 0.0, h_last_pos, q[..., -1:])
 
     h_face = jnp.concatenate([h3_first, h5, h3_last], axis=-1)
     return h_face * vel

@@ -1160,3 +1160,121 @@ class TestUpwindFluxFallbackExplicit:
         np.testing.assert_allclose(
             np.asarray(blended[m4]), np.asarray(f_tvd[m4]), rtol=1e-12
         )
+
+
+# ===========================================================================
+# Negative-flow face alignment (issue #293)
+# ===========================================================================
+#
+# ``reconstruct`` returns ``flux[j, i]`` at the east face ``i+1/2`` of cell
+# ``i`` for BOTH flow signs.  The left-biased stencil (u >= 0) is centred on
+# cell ``i``; the right-biased stencil (u < 0) is shifted one cell east,
+# reading cells ``i..i+2`` (3pt) / ``i-1..i+3`` (5pt).  Before the fix the
+# negative branch read the stencil one cell too far west, so every u < 0
+# face was shifted by one cell.
+
+_SCHEMES = [
+    (method, num_pts) for method in ("linear", "weno", "wenoz") for num_pts in (3, 5)
+]
+
+
+class TestReconstructNegativeFlow:
+    @pytest.mark.parametrize(("method", "num_pts"), _SCHEMES)
+    def test_ramp_negative_equals_positive(self, method, num_pts):
+        """q = x (cell averages of a ramp): u=-1 and u=+1 give the same face
+        values, and both are the exact midpoint ``i + 1/2``.
+
+        All sub-stencils of WENO / WENO-Z are exact on a line, so the
+        nonlinear weights do not matter.  The only face where the
+        negative-flow stencil cannot be centred (the last interior face)
+        falls back to 1st-order upwind and is excluded.
+        """
+        Ny, Nx = 6, 14
+        q = jnp.broadcast_to(jnp.arange(Nx, dtype=float), (Ny, Nx))
+        f_pos = reconstruct(q, jnp.ones((Ny, Nx)), 1, method, num_pts)
+        f_neg = reconstruct(q, -jnp.ones((Ny, Nx)), 1, method, num_pts)
+        # flux = h * u, so h_neg = -f_neg; faces i = 1..Nx-3.
+        h_pos = f_pos[1:-1, 1 : Nx - 2]
+        h_neg = -f_neg[1:-1, 1 : Nx - 2]
+        np.testing.assert_allclose(h_neg, h_pos, atol=1e-14)
+        expected = jnp.arange(1, Nx - 2) + 0.5
+        np.testing.assert_allclose(
+            h_pos, jnp.broadcast_to(expected, h_pos.shape), atol=1e-14
+        )
+
+    @pytest.mark.parametrize(("method", "num_pts"), _SCHEMES)
+    def test_ramp_negative_equals_positive_y(self, method, num_pts):
+        """Same ramp check along ``dim=0`` (north faces)."""
+        Ny, Nx = 14, 6
+        q = jnp.broadcast_to(jnp.arange(Ny, dtype=float)[:, None], (Ny, Nx))
+        f_pos = reconstruct(q, jnp.ones((Ny, Nx)), 0, method, num_pts)
+        f_neg = reconstruct(q, -jnp.ones((Ny, Nx)), 0, method, num_pts)
+        np.testing.assert_allclose(
+            -f_neg[1 : Ny - 2, 1:-1], f_pos[1 : Ny - 2, 1:-1], atol=1e-14
+        )
+
+    @pytest.mark.parametrize(("method", "num_pts"), _SCHEMES)
+    def test_mirror_symmetry(self, method, num_pts):
+        """``reconstruct(flip(q), -u) == flip(reconstruct(q, u))`` up to the
+        face shift that flipping implies.
+
+        Flipping maps cell ``i`` to ``i' = Nx-1-i``, so the face ``i+1/2``
+        (between cells ``i`` and ``i+1``) maps to the face between cells
+        ``Nx-2-i`` and ``Nx-1-i``, i.e. ``i'+1/2`` with ``i' = Nx-2-i``.
+        The flux is ``h * u`` and ``u -> -u``, so the face value is
+        ``h'[i'] = -F'[i'] = F[i] = h[i]`` for ``u = +1``.  The mirrored
+        stencils coincide wherever both full stencils fit:
+        faces ``i = 1..Nx-3`` (3pt) and ``i = 2..Nx-3`` (5pt).
+        """
+        Ny, Nx = 6, 16
+        q = jax.random.normal(jax.random.PRNGKey(0), (Ny, Nx))
+        u = jnp.ones((Ny, Nx))
+        f = reconstruct(q, u, 1, method, num_pts)
+        f_flip = reconstruct(q[:, ::-1], -u, 1, method, num_pts)
+        first = 1 if num_pts == 3 else 2
+        i = np.arange(first, Nx - 2)  # 3pt: 1..Nx-3, 5pt: 2..Nx-3
+        i_flip = Nx - 2 - i
+        np.testing.assert_allclose(
+            -f_flip[1:-1, i_flip], f[1:-1, i], atol=1e-13, rtol=1e-13
+        )
+
+    @pytest.mark.parametrize("method", ["weno", "wenoz"])
+    @pytest.mark.parametrize(("num_pts", "cls_name"), [(3, "{m}3_x"), (5, "{m}5_x")])
+    def test_matches_class_path(self, method, num_pts, cls_name):
+        """``reconstruct`` equals ``Reconstruction2D.<method><n>_x`` on every
+        interior face, for both flow signs and a mixed-sign velocity."""
+        Ny, Nx = 8, 16
+        grid = CartesianGrid2D.from_interior(Nx - 2, Ny - 2, 1.0, 1.0)
+        recon = Reconstruction2D(grid=grid)
+        fn = getattr(recon, cls_name.format(m=method))
+        key_q, key_u = jax.random.split(jax.random.PRNGKey(1))
+        q = jax.random.normal(key_q, (Ny, Nx))
+        u_mixed = jax.random.normal(key_u, (Ny, Nx))
+        for u in (jnp.ones((Ny, Nx)), -jnp.ones((Ny, Nx)), u_mixed):
+            ref = fn(q, u)
+            out = reconstruct(q, u, 1, method, num_pts)
+            np.testing.assert_allclose(out, ref, atol=1e-13, rtol=1e-13)
+
+
+class TestUpwindHelpersNegativeFlow:
+    """``upwind_3pt`` / ``upwind_5pt`` target the same face for both signs."""
+
+    @pytest.mark.parametrize("method", ["weno", "wenoz", "linear"])
+    def test_3pt_linear_field_negative(self, method):
+        q = jnp.arange(8, dtype=float)
+        pos = upwind_3pt(q, jnp.ones(6), method)
+        neg = upwind_3pt(q, -jnp.ones(6), method)
+        # output k is the face between cells k+1 and k+2: k + 1.5; the last
+        # negative-flow face is 1st-order upwind (q[N-1] = 7).
+        np.testing.assert_allclose(pos, np.arange(6) + 1.5, atol=1e-14)
+        np.testing.assert_allclose(neg[:-1], pos[:-1], atol=1e-14)
+        assert float(neg[-1]) == 7.0
+
+    @pytest.mark.parametrize("method", ["weno", "wenoz", "linear"])
+    def test_5pt_linear_field_negative(self, method):
+        q = jnp.arange(10, dtype=float)
+        pos = upwind_5pt(q, jnp.ones(6), method)
+        neg = upwind_5pt(q, -jnp.ones(6), method)
+        np.testing.assert_allclose(pos, np.arange(6) + 2.5, atol=1e-14)
+        # last face falls back to the 3pt right-biased stencil (exact on a ramp)
+        np.testing.assert_allclose(neg, pos, atol=1e-14)
