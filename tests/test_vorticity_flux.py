@@ -20,8 +20,6 @@ from finitevolx import (
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.stencils import avg_xfwd_ybwd, avg_y_bwd
 
-jax.config.update("jax_enable_x64", True)
-
 
 @pytest.fixture()
 def grid():
@@ -110,6 +108,7 @@ class TestVorticityFluxUpwind:
         with pytest.raises(ValueError, match="order must be"):
             vorticity_flux_upwind(omega, omega, omega, order=2)
 
+    @pytest.mark.slow
     def test_differentiable(self, grid):
         omega = _rand(8, (grid.Ny, grid.Nx))
         U, V = _rand(9, (grid.Ny, grid.Nx)), _rand(10, (grid.Ny, grid.Nx))
@@ -145,6 +144,7 @@ class TestPVFluxForms:
         )
         return g, q, u, v
 
+    @pytest.mark.slow
     def test_energy_is_corner_product_then_average(self, fields):
         """Periodic reference: fill the corner product's ghosts, then average.
 

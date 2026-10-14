@@ -8,7 +8,6 @@ Every public operator must:
 
 from __future__ import annotations
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -20,9 +19,6 @@ from finitevolx._src.operators.difference import Difference1D, Difference2D
 from finitevolx._src.operators.divergence import Divergence2D, divergence_2d
 from finitevolx._src.operators.interpolation import Interpolation2D
 from finitevolx._src.operators.vorticity import Vorticity2D
-
-jax.config.update("jax_enable_x64", True)
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

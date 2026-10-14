@@ -15,8 +15,6 @@ import pytest
 
 import finitevolx as fvx
 
-jax.config.update("jax_enable_x64", True)
-
 NY, NX = 24, 28
 DX, DY = 1.0 / (NX - 2), 1.0 / (NY - 2)
 # CG runs at rtol=1e-8 by default, so solutions agree to a few 1e-8.
@@ -65,6 +63,7 @@ def _wet_max_err(psi, exact, mask) -> float:
 
 
 class TestManufacturedSolution:
+    @pytest.mark.slow
     @pytest.mark.parametrize("lambda_", [0.0, 4.0])
     def test_cg_basin(self, lambda_):
         mask, exact = _basin_mask(), _exact()
@@ -93,6 +92,7 @@ class TestManufacturedSolution:
         )
         assert _wet_max_err(psi, exact, mask) < 1e-10
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("lambda_", [0.0, 4.0])
     def test_capacitance_basin(self, lambda_):
         mask, exact = _basin_mask(), _exact()
@@ -108,6 +108,7 @@ class TestManufacturedSolution:
         )
         assert _wet_max_err(psi, exact, mask) < 1e-8
 
+    @pytest.mark.slow
     def test_capacitance_island(self):
         mask, exact = _island_mask(), _exact()
         psi = fvx.streamfunction_from_vorticity(
@@ -122,6 +123,7 @@ class TestManufacturedSolution:
         )
         assert _wet_max_err(psi, exact, mask) < 1e-8
 
+    @pytest.mark.slow
     def test_multigrid_preconditioned_cg_island(self):
         """Multigrid enters as the CG preconditioner on the effective domain."""
         mask, exact = _island_mask(), _exact()
@@ -182,6 +184,7 @@ class TestConsistency:
         )
         np.testing.assert_allclose(psi_sp, psi_cg, atol=CG_TOL)
 
+    @pytest.mark.slow
     def test_zero_known_values_is_homogeneous_on_effective_domain(self):
         mask = _basin_mask()
         rhs = _rhs(_exact(), mask, 0.0)
@@ -236,6 +239,7 @@ class TestKnownMask:
 
 
 class TestPVInversion:
+    @pytest.mark.slow
     @pytest.mark.parametrize("method", ["cg", "spectral"])
     def test_array_lambda_per_layer_known_values(self, method):
         mask = _basin_mask()
@@ -249,6 +253,7 @@ class TestPVInversion:
         for k in range(3):
             assert _wet_max_err(psi[k], exact[k], mask) < tol
 
+    @pytest.mark.slow
     def test_array_lambda_broadcast_known_values(self):
         """A single (Ny, Nx) field is shared by every layer."""
         mask, exact = _basin_mask(), _exact()
@@ -258,6 +263,7 @@ class TestPVInversion:
         for k in range(2):
             assert _wet_max_err(psi[k], exact, mask) < 1e-10
 
+    @pytest.mark.slow
     def test_scalar_lambda_batched_matches_single(self):
         mask = _basin_mask()
         rng = np.random.default_rng(2)
@@ -270,6 +276,7 @@ class TestPVInversion:
             )
             np.testing.assert_allclose(psi[b], ref, atol=CG_TOL)
 
+    @pytest.mark.slow
     def test_batched_array_lambda(self):
         """Leading batch dims on top of the layer axis."""
         mask, exact = _basin_mask(), _exact()

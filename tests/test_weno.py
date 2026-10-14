@@ -31,9 +31,6 @@ from finitevolx._src.advection.weno import (
     weno_9pts_right,
 )
 
-jax.config.update("jax_enable_x64", True)
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

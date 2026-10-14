@@ -15,8 +15,6 @@ import pytest
 
 from finitevolx import smooth_abs, smooth_clamp, smooth_max
 
-jax.config.update("jax_enable_x64", True)
-
 
 class TestSmoothAbs:
     def test_matches_abs_away_from_origin(self):

@@ -310,6 +310,7 @@ class TestNaNOnLand:
 class TestGradientsWithNaNOnLand:
     """Reverse mode stays finite with NaN on interior land."""
 
+    @pytest.mark.slow
     def test_energetics_gradients(self):
         mask = make_mask_2d()
         op = Energetics2D(grid=make_grid_2d(), mask=mask)

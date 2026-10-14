@@ -8,9 +8,6 @@ import numpy as np
 
 from finitevolx import imex_ssp2_step, split_explicit_step
 
-jax.config.update("jax_enable_x64", True)
-
-
 # ---------------------------------------------------------------------------
 # IMEX-SSP2
 # ---------------------------------------------------------------------------

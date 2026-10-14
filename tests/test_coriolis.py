@@ -7,8 +7,6 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-jax.config.update("jax_enable_x64", True)
-
 from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
 from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators.coriolis import Coriolis2D, Coriolis3D

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -18,9 +17,6 @@ from finitevolx._src.solvers.elliptic import (
     solve_poisson_dct,
     streamfunction_from_vorticity,
 )
-
-jax.config.update("jax_enable_x64", True)
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -126,6 +122,7 @@ class TestStreamfunctionSpectral:
 
 
 class TestStreamfunctionCG:
+    @pytest.mark.slow
     def test_with_raw_mask(self, rect_mask):
         """CG with raw float mask array."""
         Ny, Nx = rect_mask.shape
@@ -214,6 +211,7 @@ class TestStreamfunctionCapacitance:
         bc_vals = psi[j_b, i_b]
         np.testing.assert_allclose(np.array(bc_vals), 0.0, atol=1e-10)
 
+    @pytest.mark.slow
     def test_with_cgrid_mask_solver(self, cgrid_mask):
         """Capacitance solver built from Mask2D."""
         Ny, Nx = cgrid_mask.h.shape
@@ -330,6 +328,7 @@ class TestPVInversionSpectral:
         psi = pv_inversion(rhs, dx, dy, lambda_=lam, bc="dst", method="spectral")
         np.testing.assert_allclose(np.array(psi), np.array(psi_exact), atol=1e-10)
 
+    @pytest.mark.slow
     def test_multilayer_vmap(self, dirichlet_grid):
         """Array of lambda values — each layer inverted independently."""
         Ny, Nx, dx, dy = dirichlet_grid
@@ -396,6 +395,7 @@ class TestPVInversionCG:
 
 
 class TestPVInversionBatchDims:
+    @pytest.mark.slow
     def test_array_lambda_with_batch_dims(self, dirichlet_grid):
         """Array lambda with leading batch dims: (batch, nl, Ny, Nx)."""
         Ny, Nx, dx, dy = dirichlet_grid

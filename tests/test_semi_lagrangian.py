@@ -9,8 +9,6 @@ import pytest
 
 from finitevolx import semi_lagrangian_step
 
-jax.config.update("jax_enable_x64", True)
-
 
 class TestSemiLagrangianStep:
     """Tests for semi_lagrangian_step."""

@@ -5,6 +5,7 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 import finitevolx as fvx
 from finitevolx._src.solvers.inhomogeneous import (
@@ -12,9 +13,6 @@ from finitevolx._src.solvers.inhomogeneous import (
     SolveDomain,
     boundary_ring,
 )
-
-jax.config.update("jax_enable_x64", True)
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -94,6 +92,7 @@ class TestBoundaryRing:
         ring = boundary_ring(mask)
         assert not jnp.any(ring)
 
+    @pytest.mark.slow
     def test_single_wet_cell(self):
         mask = jnp.zeros((5, 5))
         mask = mask.at[2, 2].set(1.0)
@@ -207,6 +206,7 @@ class TestKnownValueLifting:
         expected = value_lift + jnp.where(eff, 2.0, 0.0)
         np.testing.assert_allclose(psi, expected)
 
+    @pytest.mark.slow
     def test_manufactured_solution_cg(self):
         """Verify the full lifting trick with a manufactured solution."""
         Ny, Nx = 34, 34
@@ -253,6 +253,7 @@ class TestKnownValueLifting:
         max_error = float(jnp.max(error))
         assert max_error < 1e-3, f"Max error {max_error:.2e} exceeds tolerance"
 
+    @pytest.mark.slow
     def test_sparse_obs_pins_values(self):
         """Verify that known_mask pins interior cells correctly."""
         Ny, Nx = 16, 16

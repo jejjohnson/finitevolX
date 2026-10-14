@@ -6,9 +6,6 @@ Covers: coriolis_param, beta_param, coriolis_fn,
 """
 
 import jax
-
-jax.config.update("jax_enable_x64", True)
-
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -180,6 +177,7 @@ class TestStreamfnToSsh:
 
 
 class TestPotentialVorticityMultilayer:
+    @pytest.mark.slow
     def test_output_shape(self, grid2d):
         nl = 3
         psi = jnp.zeros((nl, grid2d.Ny, grid2d.Nx))
@@ -193,6 +191,7 @@ class TestPotentialVorticityMultilayer:
         )
         assert result.shape == (nl, grid2d.Ny, grid2d.Nx)
 
+    @pytest.mark.slow
     def test_ghost_ring_zero(self, grid2d):
         nl = 2
         psi = jnp.ones((nl, grid2d.Ny, grid2d.Nx))
@@ -207,6 +206,7 @@ class TestPotentialVorticityMultilayer:
             np.testing.assert_allclose(result[layer, :, 0], 0.0, atol=1e-10)
             np.testing.assert_allclose(result[layer, :, -1], 0.0, atol=1e-10)
 
+    @pytest.mark.slow
     def test_matches_manual_composition(self, grid2d):
         """Must match multilayer(qg_pv)(psi) - f0 * stretching_term(A, psi)."""
         nl = 2
@@ -231,6 +231,7 @@ class TestPotentialVorticityMultilayer:
 
         np.testing.assert_allclose(result, expected, atol=1e-12)
 
+    @pytest.mark.slow
     def test_single_layer(self, grid2d):
         """Single-layer case: A is 1x1, should match qg_pv - A*psi."""
         f0, beta, y0 = 1.0, 0.0, 0.0

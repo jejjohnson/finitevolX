@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
 from finitevolx._src.diffusion.diffusion import Diffusion2D, Diffusion3D, diffusion_2d
 from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
-
-jax.config.update("jax_enable_x64", True)
 
 
 @pytest.fixture
@@ -278,6 +275,7 @@ class TestDiffusion2DFluxes:
 
 
 class TestDiffusion3DClass:
+    @pytest.mark.slow
     def test_output_shape(self, diff_op3d, grid3d):
         h = jnp.zeros((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         result = diff_op3d(h, kappa=1.0)
@@ -406,6 +404,7 @@ class TestBiharmonicDiffusion2D:
             tend[2:-2, 2:-2], -kappa * lap2[2:-2, 2:-2], rtol=1e-6
         )
 
+    @pytest.mark.slow
     def test_scale_selective_damping(self):
         """Biharmonic tendency for sin(k*x) matches the discrete k^4 eigenvalue.
 

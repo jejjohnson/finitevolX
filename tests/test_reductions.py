@@ -28,9 +28,6 @@ from finitevolx._src.operators.reductions import (
     volume_weights,
 )
 
-jax.config.update("jax_enable_x64", True)
-
-
 R = 6.371e6
 
 
@@ -160,6 +157,7 @@ class TestCartesianArea:
 
 
 class TestSphericalArea:
+    @pytest.mark.slow
     def test_full_sphere_area_sum_approaches_4piR2(self):
         """Integrating 1 over the full sphere approximates 4πR²."""
         grid = SphericalGrid2D.from_interior(
@@ -217,6 +215,7 @@ class TestSphericalArea:
         h = c * jnp.ones((grid.Ny, grid.Nx))
         np.testing.assert_allclose(area_mean(h, grid), c, rtol=1e-10)
 
+    @pytest.mark.slow
     def test_equatorial_limit_matches_cartesian(self):
         """Narrow lat band around equator → spherical ≈ cartesian sum."""
         nx, ny = 32, 4
@@ -239,6 +238,7 @@ class TestSphericalArea:
         s_cart = area_sum(h, cart)
         np.testing.assert_allclose(float(s_sph), float(s_cart), rtol=1e-4)
 
+    @pytest.mark.slow
     def test_alias_spherical_area_sum(self):
         grid = SphericalGrid2D.from_interior(
             16,

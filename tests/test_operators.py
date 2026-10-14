@@ -7,7 +7,6 @@ side.  U-points live at east faces (j, i+1/2), V-points at north faces
 
 from __future__ import annotations
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -18,8 +17,6 @@ from finitevolx._src.operators.diagnostics import (
     kinetic_energy,
 )
 from finitevolx._src.utils.constants import GRAVITY
-
-jax.config.update("jax_enable_x64", True)
 
 
 @pytest.fixture()

@@ -10,8 +10,6 @@ import lineax as lx
 import numpy as np
 import pytest
 
-jax.config.update("jax_enable_x64", True)
-
 from finitevolx._src.solvers.multigrid import (
     MultigridSolver,
     _apply_operator,
@@ -229,6 +227,7 @@ class TestJacobiSmoother:
 
 
 class TestVCycleSolver:
+    @pytest.mark.slow
     def test_poisson_convergence(self, mg_grid_32):
         """Constant-coeff Poisson on a full rectangle: residual decreases.
 
@@ -244,6 +243,7 @@ class TestVCycleSolver:
         rhs_norm = jnp.linalg.norm(rhs)
         assert float(residual / rhs_norm) < 0.1
 
+    @pytest.mark.slow
     def test_helmholtz_convergence(self, mg_grid_32):
         """Helmholtz with lambda > 0 converges well."""
         ny, nx, dx, dy = mg_grid_32
@@ -256,6 +256,7 @@ class TestVCycleSolver:
         rhs_norm = jnp.linalg.norm(rhs)
         assert float(residual / rhs_norm) < 1e-2
 
+    @pytest.mark.slow
     def test_variable_coefficient(self, mg_grid_32):
         """Variable-coefficient problem: residual decreases."""
         ny, nx, dx, dy = mg_grid_32
@@ -280,6 +281,7 @@ class TestVCycleSolver:
         outside = np.array(mask) == 0
         np.testing.assert_allclose(np.array(u)[outside], 0.0, atol=1e-15)
 
+    @pytest.mark.slow
     def test_rectangular_grid(self, mg_grid_rect):
         """Non-square grid works correctly (Helmholtz, λ > 0)."""
         ny, nx, dx, dy = mg_grid_rect
@@ -320,6 +322,7 @@ class TestMultigridPreconditioner:
         out = pc(r)
         assert out.shape == (ny, nx)
 
+    @pytest.mark.slow
     def test_preconditioner_with_cg(self, mg_grid_16):
         """Multigrid-preconditioned CG converges for Helmholtz (lambda > 0)."""
         from finitevolx._src.solvers.iterative import solve_cg
@@ -503,6 +506,7 @@ class TestMultigridPreconditioner:
 
 
 class TestJAXCompat:
+    @pytest.mark.slow
     def test_jit_solve(self, mg_grid_16):
         """eqx.filter_jit produces the same result as eager."""
         ny, nx, dx, dy = mg_grid_16
@@ -519,6 +523,7 @@ class TestJAXCompat:
         u_jit = _solve(solver, rhs)
         np.testing.assert_allclose(np.array(u_eager), np.array(u_jit), atol=1e-12)
 
+    @pytest.mark.slow
     def test_vmap_solve(self, mg_grid_16):
         """jax.vmap(solver) over a batch dimension."""
         ny, nx, dx, dy = mg_grid_16
@@ -542,6 +547,7 @@ class TestJAXCompat:
 
 
 class TestImplicitDifferentiation:
+    @pytest.mark.slow
     def test_grad_through_implicit_solve(self, mg_grid_16):
         """jax.grad works through __call__ (implicit differentiation).
 
@@ -564,6 +570,7 @@ class TestImplicitDifferentiation:
         assert jnp.all(jnp.isfinite(grad_rhs))
         assert float(jnp.linalg.norm(grad_rhs)) > 0
 
+    @pytest.mark.slow
     def test_all_three_forward_match(self, mg_grid_16):
         """All three solve modes produce the same forward solution."""
         ny, nx, dx, dy = mg_grid_16
@@ -580,6 +587,7 @@ class TestImplicitDifferentiation:
         )
         np.testing.assert_allclose(np.array(u_implicit), np.array(u_onestep), atol=1e-6)
 
+    @pytest.mark.slow
     def test_grad_onestep(self, mg_grid_16):
         """One-step differentiation (Bolte et al. 2023) produces finite grads."""
         ny, nx, dx, dy = mg_grid_16
@@ -598,6 +606,7 @@ class TestImplicitDifferentiation:
         assert jnp.all(jnp.isfinite(grad_rhs))
         assert float(jnp.linalg.norm(grad_rhs)) > 0
 
+    @pytest.mark.slow
     def test_onestep_grad_close_to_implicit(self, mg_grid_16):
         """One-step gradient approximates the implicit (IFT) gradient.
 
@@ -626,6 +635,7 @@ class TestImplicitDifferentiation:
         )
         assert rel_error < 1.0
 
+    @pytest.mark.slow
     def test_grad_implicit_is_finite(self, mg_grid_16):
         """Gradient w.r.t. a scalar parameter via implicit diff is finite."""
         ny, nx, dx, dy = mg_grid_16

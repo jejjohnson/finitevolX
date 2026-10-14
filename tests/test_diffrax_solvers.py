@@ -5,7 +5,6 @@ from __future__ import annotations
 import math
 
 import diffrax as dfx
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -24,8 +23,6 @@ from finitevolx import (
     SplitExplicitRKSolver,
     solve_ocean_pde,
 )
-
-jax.config.update("jax_enable_x64", True)
 
 
 def _decay_rhs(t, y, args):
@@ -81,6 +78,7 @@ class TestDiffraxConvergence:
         ],
         ids=["heun", "rk3_ssp", "rk4"],
     )
+    @pytest.mark.slow
     def test_convergence_order(self, solver_cls, expected_order):
         solver = solver_cls()
         exact = math.exp(-1.0)
@@ -151,6 +149,7 @@ class TestSSP_RK104:
         exact = math.exp(-1.0)
         np.testing.assert_allclose(float(sol.ys[0]), exact, rtol=1e-7)
 
+    @pytest.mark.slow
     def test_convergence_order(self):
         """SSP_RK104 should converge at 4th order."""
         solver = SSP_RK104()
@@ -202,6 +201,7 @@ class TestIMEX_SSP2_Diffrax:
 
 
 class TestSaveAt:
+    @pytest.mark.slow
     def test_save_multiple_times(self):
         solver = RK3SSP()
         ts = jnp.linspace(0.0, 1.0, 11)
@@ -240,6 +240,7 @@ class TestSaveAt:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.integration
 class TestSolveOceanPDE:
     def test_basic_usage(self):
         sol = solve_ocean_pde(

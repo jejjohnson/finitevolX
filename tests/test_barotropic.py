@@ -10,12 +10,11 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 from finitevolx import barotropic_filter, build_multigrid_solver, divergence_2d
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.stencils import diff_x_fwd
-
-jax.config.update("jax_enable_x64", True)
 
 
 class TestBarotropicFilterWiring:
@@ -98,6 +97,7 @@ class TestBarotropicFilterWiring:
 
 
 class TestBarotropicFilterIntegration:
+    @pytest.mark.slow
     def test_runs_with_real_multigrid_solver(self):
         Ny = Nx = 16
         solver = build_multigrid_solver(
@@ -122,6 +122,7 @@ class TestBarotropicFilterIntegration:
         assert fu.shape == (Ny, Nx) and fv.shape == (Ny, Nx)
         assert bool(jnp.isfinite(fu).all()) and bool(jnp.isfinite(fv).all())
 
+    @pytest.mark.slow
     def test_differentiable_through_solver(self):
         Ny = Nx = 16
         solver = build_multigrid_solver(

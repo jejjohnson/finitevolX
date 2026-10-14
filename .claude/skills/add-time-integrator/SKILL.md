@@ -72,7 +72,7 @@ pure functional` or `# Time integration — diffrax solvers`),
 ## 5. Verify
 
 ```bash
-uv run pytest -n auto tests/test_timestepping.py tests/test_timestepping_imex.py \
+uv run pytest -n 2 tests/test_timestepping.py tests/test_timestepping_imex.py \
   tests/test_diffrax_solvers.py tests/test_semi_lagrangian.py tests/test_capabilities.py
 ```
 

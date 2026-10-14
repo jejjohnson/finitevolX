@@ -1,15 +1,30 @@
 name: CI Tests
 
+# Tiers (tests/conftest.py, pyproject markers):
+#   fast        unmarked unit tests
+#   integration example scripts / end-to-end runs
+#   slow        convergence sweeps, large grids, solver builds
+# Every PR runs fast + integration on the full OS x Python matrix and the
+# slow tier once (Linux, newest Python); a weekly / manual run executes every
+# tier on the whole matrix.  xdist workers peak at ~2 GB RSS each, so keep
+# -n at 2 on the 7 GB hosted runners (#327).
+
 on:
   push:
     branches:
       - main
+  # no branch filter: stacked PRs (base = another feature branch) are tested too
   pull_request:
-    branches:
-      - main
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   tests:
@@ -35,5 +50,32 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra test
 
-      - name: Run tests
-        run: uv run pytest tests -v
+      - name: Run tests (fast + integration)
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        run: uv run pytest tests -m "not slow" -n 2 --durations=15
+
+      - name: Run tests (every tier)
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: uv run pytest tests -n 2 --durations=25
+
+  slow:
+    name: Run Tests (slow tier)
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --extra test
+
+      - name: Run tests (slow)
+        run: uv run pytest tests -m slow -n 2 --durations=25

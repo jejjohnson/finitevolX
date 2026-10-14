@@ -210,6 +210,7 @@ class TestMinCellWidth:
 
 
 class TestMaxAspect:
+    @pytest.mark.slow
     def test_matches_inverse_cosine_of_extreme_latitude(self):
         """For ``dlon == dlat`` the aspect is ``1 / cos(lat)``."""
         grid = SphericalGrid2D.from_interior(

@@ -44,6 +44,7 @@ class TestAdvection1D:
         # strictly interior (away from ghost edges): flux difference = 0
         np.testing.assert_allclose(result[2:-2], 0.0, atol=1e-10)
 
+    @pytest.mark.slow
     def test_all_methods_run(self, grid1d):
         adv = Advection1D(grid=grid1d)
         h = jnp.ones(grid1d.Nx)
@@ -61,6 +62,7 @@ class TestAdvection1D:
             result = adv(h, u, method=method)
             assert result.shape == (grid1d.Nx,)
 
+    @pytest.mark.slow
     def test_weno_constant_zero_tendency(self):
         grid = CartesianGrid1D.from_interior(16, 1.0)
         adv = Advection1D(grid=grid)
@@ -122,6 +124,7 @@ class TestAdvection2D:
         # strictly interior (away from ghost edges): flux difference = 0
         np.testing.assert_allclose(result[2:-2, 2:-2], 0.0, atol=1e-10)
 
+    @pytest.mark.slow
     def test_all_methods_run(self, grid2d):
         adv = Advection2D(grid=grid2d)
         h = jnp.ones((grid2d.Ny, grid2d.Nx))
@@ -140,6 +143,7 @@ class TestAdvection2D:
             result = adv(h, u, v, method=method)
             assert result.shape == (grid2d.Ny, grid2d.Nx)
 
+    @pytest.mark.slow
     def test_weno_constant_zero_tendency(self):
         grid = CartesianGrid2D.from_interior(16, 16, 1.0, 1.0)
         adv = Advection2D(grid=grid)
@@ -152,6 +156,7 @@ class TestAdvection2D:
                 result[depth:-depth, depth:-depth], 0.0, atol=1e-6
             )
 
+    @pytest.mark.slow
     def test_tvd_methods_run(self, grid2d):
         adv = Advection2D(grid=grid2d)
         h = jnp.ones((grid2d.Ny, grid2d.Nx))
@@ -231,6 +236,7 @@ class TestAdvection3D:
         np.testing.assert_array_equal(result[:, :, 1], 0.0)
         np.testing.assert_array_equal(result[:, :, -2], 0.0)
 
+    @pytest.mark.slow
     def test_tvd_methods_run(self, grid3d):
         adv = Advection3D(grid=grid3d)
         h = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
@@ -240,6 +246,7 @@ class TestAdvection3D:
             result = adv(h, u, v, method=method)
             assert result.shape == (grid3d.Nz, grid3d.Ny, grid3d.Nx)
 
+    @pytest.mark.slow
     def test_weno_methods_run(self, grid3d):
         adv = Advection3D(grid=grid3d)
         h = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
@@ -249,6 +256,7 @@ class TestAdvection3D:
             result = adv(h, u, v, method=method)
             assert result.shape == (grid3d.Nz, grid3d.Ny, grid3d.Nx)
 
+    @pytest.mark.slow
     def test_weno_constant_zero_tendency(self):
         grid = CartesianGrid3D.from_interior(16, 16, 4, 1.0, 1.0, 1.0)
         adv = Advection3D(grid=grid)
@@ -492,6 +500,7 @@ class TestAdvection2DRotationStability:
             ("weno9", 0.5),
         ],
     )
+    @pytest.mark.slow
     def test_rotation_stays_finite(self, rotation_setup, method, min_peak):
         grid, q0, u, v, pbc, dt, nsteps, ng = rotation_setup
         from finitevolx import Advection2D, rk3_ssp_step
@@ -614,6 +623,7 @@ class TestNegativeFlowConvergence:
             ("weno9", 2.5),
         ],
     )
+    @pytest.mark.slow
     def test_convergence_rate_negative_flow(self, method, min_order):
         n1, n2 = 32, 128
         e1 = self._run_1d_advection(n1, method)

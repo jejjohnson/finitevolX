@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-
-jax.config.update("jax_enable_x64", True)
 
 from finitevolx._src.diffusion.momentum import MomentumAdvection2D, MomentumAdvection3D
 from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D

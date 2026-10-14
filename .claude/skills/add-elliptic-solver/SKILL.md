@@ -75,7 +75,7 @@ solver type, a row in `docs/solver_comparison.md`; `make capabilities`.
 ## 5. Verify
 
 ```bash
-uv run pytest -n auto tests/test_elliptic.py tests/test_elliptic_bcset.py \
+uv run pytest -n 2 tests/test_elliptic.py tests/test_elliptic_bcset.py \
   tests/test_elliptic_known_values.py tests/test_solver_wrappers.py \
   tests/test_inhomogeneous.py tests/test_multigrid.py tests/test_tridiagonal.py \
   tests/test_scale_covariance.py tests/test_capabilities.py

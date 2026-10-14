@@ -10,15 +10,11 @@ does not pollute the convergence measurement.
 
 from __future__ import annotations
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 
 from finitevolx._src.grid.cartesian import CartesianGrid1D, CartesianGrid2D
 from finitevolx._src.operators.difference import Difference1D, Difference2D
-
-jax.config.update("jax_enable_x64", True)
-
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -18,9 +18,6 @@ from finitevolx._src.grid.cartesian import CartesianGrid2D
 from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
 from finitevolx._src.mask import Mask2D, Mask3D
 
-jax.config.update("jax_enable_x64", True)
-
-
 R = 6.371e6
 NX_INT, NY_INT = 16, 10
 
@@ -65,6 +62,7 @@ def diff_op3d(grid3d):
 
 
 class TestSphericalDiffusion2D:
+    @pytest.mark.slow
     def test_output_shape(self, diff_op, grid):
         h = jnp.zeros((grid.Ny, grid.Nx))
         out = diff_op(h, kappa=1.0)
@@ -98,6 +96,7 @@ class TestSphericalDiffusion2D:
         out = diff_op(h, kappa=0.0)
         np.testing.assert_allclose(out, 0.0, atol=1e-12)
 
+    @pytest.mark.slow
     def test_matches_cartesian_at_narrow_equatorial_band(self):
         """At the equator with a very thin lat band, cos(lat) ≈ 1 and the
         spherical operator reduces to the Cartesian flux-form diffusion
@@ -167,6 +166,7 @@ class TestSphericalDiffusion2D:
         out = jax.jit(diff_op.__call__)(h, 1.0)
         assert out.shape == (grid.Ny, grid.Nx)
 
+    @pytest.mark.slow
     def test_grad(self, diff_op, grid):
         key = jax.random.PRNGKey(6)
         h = jax.random.normal(key, (grid.Ny, grid.Nx))
@@ -218,6 +218,7 @@ class TestSphericalDiffusion2DMasked:
 
 
 class TestSphericalDiffusion3D:
+    @pytest.mark.slow
     def test_output_shape(self, diff_op3d, grid3d):
         h = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         out = diff_op3d(h, kappa=1.0)
@@ -275,6 +276,7 @@ class TestSphericalDiffusion3D:
         assert fx.shape == (grid3d.Nz, grid3d.Ny, grid3d.Nx)
         assert fy.shape == (grid3d.Nz, grid3d.Ny, grid3d.Nx)
 
+    @pytest.mark.slow
     def test_jit_grad(self, diff_op3d, grid3d):
         key = jax.random.PRNGKey(14)
         h = jax.random.normal(key, (grid3d.Nz, grid3d.Ny, grid3d.Nx))
@@ -325,6 +327,7 @@ class TestSphericalBiharmonicDiffusion2D:
         h = jax.random.normal(key, (grid.Ny, grid.Nx))
         np.testing.assert_allclose(op(h, kappa=0.0), 0.0, atol=1e-12)
 
+    @pytest.mark.slow
     def test_sign_is_dissipative_for_small_scales(self, grid):
         """For a short-wave mode, positive kappa should dissipate.
 

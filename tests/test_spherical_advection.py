@@ -16,9 +16,6 @@ from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
 from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
 from finitevolx._src.mask import Mask2D, Mask3D
 
-jax.config.update("jax_enable_x64", True)
-
-
 R = 6.371e6
 NX_INT, NY_INT = 16, 10
 
@@ -57,6 +54,7 @@ class TestSphericalAdvection2D:
     def op(self, grid):
         return SphericalAdvection2D(grid=grid)
 
+    @pytest.mark.slow
     def test_output_shape(self, op, grid):
         h = jnp.ones((grid.Ny, grid.Nx))
         u = jnp.zeros((grid.Ny, grid.Nx))
@@ -90,6 +88,7 @@ class TestSphericalAdvection2D:
             "mc",
         ],
     )
+    @pytest.mark.slow
     def test_methods_produce_finite_output(self, op, grid, method):
         key = jax.random.PRNGKey(1)
         k1, k2, k3 = jax.random.split(key, 3)
@@ -111,6 +110,7 @@ class TestSphericalAdvection2D:
         np.testing.assert_allclose(out[:, 0], 0.0)
         np.testing.assert_allclose(out[:, -1], 0.0)
 
+    @pytest.mark.slow
     def test_matches_cartesian_at_narrow_equatorial_band(self):
         """Spherical advection at the equator (cos≈1) should match
         Cartesian advection with dx=R·dlon, dy=R·dlat."""
@@ -160,6 +160,7 @@ class TestSphericalAdvection2D:
         assert out.shape == h.shape
         assert jnp.all(jnp.isfinite(out))
 
+    @pytest.mark.slow
     def test_grad(self, op, grid):
         key = jax.random.PRNGKey(5)
         k1, k2, k3 = jax.random.split(key, 3)
@@ -277,6 +278,7 @@ class TestSphericalAdvection3D:
             "mc",
         ],
     )
+    @pytest.mark.slow
     def test_methods_produce_finite_output(self, op, grid3d, method):
         key = jax.random.PRNGKey(15)
         k1, k2, k3 = jax.random.split(key, 3)
@@ -318,6 +320,7 @@ class TestSphericalAdvection3D:
         for k in range(1, grid3d.Nz - 1):
             np.testing.assert_allclose(t_3d[k], t_2d, atol=1e-12)
 
+    @pytest.mark.slow
     def test_matches_cartesian_at_narrow_equatorial_band(self):
         """Narrow lat band around equator → spherical 3D ≈ Cartesian 3D."""
         nx, ny, nz = 16, 6, 3
@@ -372,6 +375,7 @@ class TestSphericalAdvection3D:
         out = op(h, u, v, method="weno3")
         np.testing.assert_allclose(out, 0.0, atol=1e-12)
 
+    @pytest.mark.slow
     def test_jit_grad(self, op, grid3d):
         key = jax.random.PRNGKey(14)
         k1, k2, k3 = jax.random.split(key, 3)

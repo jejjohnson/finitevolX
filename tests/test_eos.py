@@ -15,8 +15,6 @@ from finitevolx._src.operators.eos import (
     reduced_gravity,
 )
 
-jax.config.update("jax_enable_x64", True)
-
 RHO_0 = 1025.0
 ALPHA = 2e-4
 BETA = 7e-4
