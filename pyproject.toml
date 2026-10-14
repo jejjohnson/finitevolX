@@ -31,15 +31,27 @@ dependencies = [
     "scipy>=1.14.0",
     "lineax>=0.1.0",
     "diffrax>=0.6.0",
-    "spectraldiffx>=0.0.13",
-    "gaussx>=0.0.17",
+    "spectraldiffx>=0.1.1",
+    "gaussx>=0.6.5",
 ]
 
 # gaussx provides the shared solver substrate: the Nyström preconditioner and
 # the tridiagonal solve are delegated to it.
 [tool.uv.sources]
-spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "0.0.13" }
-gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.0.17" }
+spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "0.1.1" }
+gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.6.5" }
+
+# spectraldiffx pins its own gaussx git tag (v0.1.0 at spectraldiffx 0.1.1),
+# which uv treats as a conflicting URL for the same package. Override it so
+# finitevolX and spectraldiffx resolve one gaussx. spectraldiffx 0.1.1 still
+# calls gaussx.DiagonalisedOperator, a deprecated alias in v0.6.5 that gaussx
+# 0.7.0 removes: do not move this override to gaussx >= 0.7 before a
+# spectraldiffx release renames that call. Drop the override once a
+# spectraldiffx release pins gaussx >= v0.6.5.
+[tool.uv]
+override-dependencies = [
+    "gaussx @ git+https://github.com/jejjohnson/gaussx@v0.6.5",
+]
 
 [project.urls]
 Repository = "https://github.com/jejjohnson/finitevolX"

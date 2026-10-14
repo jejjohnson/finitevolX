@@ -25,6 +25,11 @@ Usage example
 
 from __future__ import annotations
 
-from gaussx import solve_tridiagonal, solve_tridiagonal_batched
+# gaussx >= 0.6 renamed these (gh-315; the old names go in 0.7.0); finitevolX
+# keeps its public names.
+from gaussx import (
+    tridiagonal_solve as solve_tridiagonal,
+    tridiagonal_solve_batched as solve_tridiagonal_batched,
+)
 
 __all__ = ["solve_tridiagonal", "solve_tridiagonal_batched"]

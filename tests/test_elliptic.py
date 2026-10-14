@@ -540,7 +540,7 @@ class TestCapacitanceSolver:
     def test_no_boundary_raises(self):
         """All-ones mask (no inner boundary) raises ValueError."""
         mask = np.ones((8, 10), dtype=bool)
-        with pytest.raises(ValueError, match="No inner-boundary points"):
+        with pytest.raises(ValueError, match="no inner boundary"):
             build_capacitance_solver(mask, dx=0.1, dy=0.1)
 
 

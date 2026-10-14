@@ -656,7 +656,7 @@ current).
 
 <!-- upstream -->
 
-Listed at spectraldiffx 0.0.13, gaussx 0.0.17.
+Listed at spectraldiffx 0.1.1, gaussx 0.6.5.
 
 ## Upstream: `spectraldiffx`
 
@@ -670,10 +670,12 @@ Spectral transforms (DCT / DST / FFT), the rectangular spectral Poisson / Helmho
 | `CapacitanceSolver` | class | Spectral Poisson/Helmholtz solver for masked irregular domains. |
 | `ChebyshevDerivative1D` | class | 1D Chebyshev derivative operator using the precomputed differentiation matrix. |
 | `ChebyshevDerivative2D` | class | 2D Chebyshev derivative operators on [−Lx, Lx] × [−Ly, Ly]. |
+| `ChebyshevDerivative3D` | class | 3D Chebyshev derivative operators on [−Lz, Lz] × [−Ly, Ly] × [−Lx, Lx]. |
 | `ChebyshevFilter1D` | class | 1D Chebyshev spectral filter for smoothing and numerical stabilisation. |
 | `ChebyshevFilter2D` | class | 2D Chebyshev spectral filter on [−Lx, Lx] × [−Ly, Ly]. |
 | `ChebyshevGrid1D` | class | 1D Chebyshev grid on the domain [-L, L]. |
 | `ChebyshevGrid2D` | class | 2D Chebyshev grid on [-Lx, Lx] × [-Ly, Ly]. |
+| `ChebyshevGrid3D` | class | 3D Chebyshev grid on [-Lz, Lz] × [-Ly, Ly] × [-Lx, Lx]. |
 | `ChebyshevHelmholtzSolver1D` | class | 1D Chebyshev-collocation Helmholtz/Poisson solver with Dirichlet or Neumann BCs. |
 | `ChebyshevHelmholtzSolver2D` | class | 2D Chebyshev-collocation Helmholtz/Poisson solver with Dirichlet BCs. |
 | `ChebyshevPoissonSolver1D` | class | 1D Chebyshev Poisson solver: d²u/dx² = f on [−L, L]. |
@@ -710,8 +712,11 @@ Spectral transforms (DCT / DST / FFT), the rectangular spectral Poisson / Helmho
 | `SphericalPoissonSolver` | class | Spectral Poisson solver on the sphere:  ∇²φ = f. |
 | `SphericalVorticityInversionSolver` | class | Vorticity-inversion solver on the sphere. |
 | `StaggeredDirichletHelmholtzSolver2D` | class | 2D Helmholtz/Poisson solver with Dirichlet BCs on a staggered grid. |
-| `build_capacitance_solver` | function | Pre-compute the capacitance matrix and return a ready-to-use solver. |
+| `build_capacitance_solver` | function | Pre-compute the capacitance factorisation and return a solver. |
 | `cheb_dealias_product` | function | Compute the dealiased pointwise product a·b on a Chebyshev grid. |
+| `chebyshev_antiderivative_coeffs` | function | Indefinite integral of a Chebyshev series, vanishing at x = −L. |
+| `chebyshev_derivative_coeffs` | function | Differentiate a Chebyshev series in coefficient space (last axis). |
+| `chebyshev_integral_coeffs` | function | Definite integral ∫_{−L}^{L} u(x) dx from Chebyshev coefficients. |
 | `clenshaw_curtis_integrate_1d` | function | Integrate a 1D nodal field over [−L, L] using Clenshaw–Curtis. |
 | `clenshaw_curtis_integrate_2d` | function | Integrate a 2D nodal field over [−Lx, Lx] × [−Ly, Ly]. |
 | `clenshaw_curtis_weights` | function | Clenshaw–Curtis quadrature weights on Gauss–Lobatto nodes of [−L, L]. |
@@ -795,148 +800,195 @@ Structured linear algebra and solver strategies. finitevolX delegates the tridia
 | `AbstractLikelihood` | class | Base class for likelihood functions with optional analytical ELL. |
 | `AbstractLogdetStrategy` | class | Protocol for log-determinant strategies. |
 | `AbstractPreconditioner` | class | Protocol for preconditioners producing an approximate inverse. |
+| `AbstractSketch` | class | A random sketching matrix $S \in \mathbb{R}^{d \times m}$, sampled once. |
 | `AbstractSolveStrategy` | class | Protocol for linear solve strategies. |
 | `AbstractSolverStrategy` | class | Protocol for solver strategies that pair solve + logdet. |
 | `AnalyticalPsiStatistics` | type alias | `<class 'gaussx._quadrature._psi_statistics.AnalyticalPsiS...` |
 | `AssumedDensityFilter` | class | KL-optimal Gaussian projection via moment matching. |
 | `AutoSolver` | class | Automatic solver selection based on operator type and size. |
-| `BBMMSolver` | class | Black-Box Matrix-Matrix solver (Gardner et al. 2018). |
+| `BBMMSolver` | class | CG solve and SLQ logdet with BBMM's defaults (Gardner et al. 2018). |
 | `BernoulliLikelihood` | class | Bernoulli likelihood with logit link. |
+| `BinomialLikelihood` | class | Binomial likelihood with logit link. |
 | `BlockDiag` | class | Block diagonal operator ``diag(A₁, A₂, …, Aₖ)``. |
-| `BlockTriDiag` | class | Symmetric block-tridiagonal operator. |
+| `BlockTriDiag` | class | Block-tridiagonal operator with a symmetric off-diagonal band. |
 | `CGSolver` | class | Iterative CG solver with stochastic log-determinant. |
+| `CUR` | class | CUR decomposition $A \approx C\,U\,R$, $C = A_{:,J}$, $R = A_{I,:}$. |
 | `CapacitanceSolver` | class | Solve a base system subject to homogeneous point constraints. |
+| `Chandrupatla` | class | Chandrupatla's hybrid inverse-quadratic / bisection root finder. |
+| `ColumnID` | class | Column interpolative decomposition $A \approx A_{:,J}\,X$. |
 | `ComposedSolver` | class | Mix-and-match solve and logdet from different strategies. |
 | `ConstantSDE` | class | State-space representation of a constant kernel. |
 | `CosineSDE` | class | State-space representation of the cosine kernel. |
+| `CubatureIntegrator` | class | Third-order spherical-radial cubature. |
 | `DAREResult` | class | Result of DARE solver. |
 | `DenseFallbackWarning` | class | Warning emitted when a structured primitive materialises an operator. |
 | `DenseLogdet` | class | Dense log-determinant via gaussx structural dispatch. |
 | `DenseSolver` | class | Dense solver strategy using gaussx structural dispatch. |
-| `EigenProPreconditioner` | class | Spectral correction state for EigenPro kernel SGD. |
+| `DiagonalizedOperator` | class | Linear operator ``A x = V⁻¹(Λ ⊙ V x)`` given by a transform pair. |
+| `EigenDecomposition` | class | Precomputed eigendecomposition ``A = V diag(λ) V⁻¹`` of a square matrix. |
 | `EmissionModel` | class | Observation (emission) model wrapping a linear observation matrix. |
+| `FifthOrderCubatureIntegrator` | class | Fifth-order fully symmetric cubature (McNamee & Stenger). |
 | `FilterState` | class | Output of ``kalman_filter``. |
 | `GaussHermiteIntegrator` | class | Gauss-Hermite quadrature integrator. |
 | `GaussianExpFam` | class | Gaussian in natural (exponential family) parameters. |
 | `GaussianLikelihood` | class | Gaussian likelihood ``log N(y \| f, noise_var * I)``. |
 | `GaussianSites` | class | Time-varying Gaussian likelihood sites in natural parameterization. |
+| `GaussianSketch` | class | Gaussian sketch: i.i.d. entries $S_{ij} \sim \mathcal{N}(0, 1/d)$. |
 | `GaussianState` | class | Gaussian distribution as (mean, covariance operator) pair. |
 | `HeteroscedasticGaussianLikelihood` | class | Heteroscedastic Gaussian likelihood with input-dependent noise. |
-| `ImplicitCrossKernelOperator` | class | Matrix-free rectangular kernel operator ``K(X, Z) \cdot v``. |
-| `ImplicitKernelOperator` | class | Matrix-free kernel operator: ``(K + sigma^2 I) v`` via sequential scan. |
 | `IndefiniteSLQLogdet` | class | Stochastic ``log\|det(A)\|`` for symmetric (possibly indefinite) operators. |
-| `InfiniteHorizonState` | class | Output of ``infinite_horizon_filter``. |
+| `IntegratedWienerSDE` | class | State-space representation of an integrated Wiener process. |
 | `InterpolatedOperator` | class | Structured Kernel Interpolation: ``K \approx W K_{uu} W^T``. |
-| `JacobiPreconditioner` | class | Diagonal preconditioner ``M^{-1} = diag(1 / diag(A))``. |
-| `KernelOperator` | class | Kernel matrix operator with efficient first-order autodiff. |
+| `JacobiPreconditioner` | class | Diagonal preconditioner ``M^{-1} = diag(1 / \|diag(A)\|)``. |
+| `KeyedSolver` | class | Bind a PRNG key to a strategy's stochastic log-determinant (gh-384). |
 | `Kronecker` | class | Kronecker product operator ``A₁ ⊗ A₂ ⊗ … ⊗ Aₖ``. |
 | `KroneckerSum` | class | Kronecker sum ``A \oplus B = A \otimes I_b + I_a \otimes B``. |
 | `KroneckerSumSqrt` | class | Symmetric square root of ``A \oplus B`` via per-factor eigenvectors. |
 | `LOOResult` | class | Result of leave-one-out cross-validation. |
-| `LOVECache` | class | Cached Lanczos factorization for fast predictive variance. |
+| `LOVECache` | class | Cached rank-``k`` Lanczos approximation of ``K^{-1}``. |
 | `LSMRSolver` | class | LSMR iterative least-squares solver (Fong & Saunders 2011). |
+| `LinearizedSDE` | class | Linear surrogate $dx = (A_t x + b_t)\,dt + Q_t^{1/2}\,dW$ of an SDE. |
+| `LineaxSolver` | class | A lineax solver as a gaussx solve strategy. |
 | `LowRankUpdate` | class | Low-rank update operator ``L + U diag(d) Vᵀ``. |
 | `LowerBlockTriDiag` | class | Lower triangular block-bidiagonal Cholesky factor. |
 | `MINRESSolver` | class | MINRES solver for symmetric (possibly indefinite) systems. |
 | `MaskedOperator` | class | Row/column-masked view of a base operator. |
 | `MaternSDE` | class | State-space representation of the Matern kernel. |
+| `MomentMatchResult` | class | Tilted log-normaliser and its derivatives w.r.t. the cavity mean. |
 | `MonteCarloIntegrator` | class | Monte Carlo moment matching: sample, propagate, compute moments. |
-| `NystromPreconditioner` | class | Low-rank approximate inverse from randomized operator probing. |
+| `NegativeBinomialLikelihood` | class | Negative-binomial likelihood with log link (NB2, a gamma-Poisson mixture). |
+| `NystromLogdet` | class | Nyström-preconditioned log-determinant of $A + \mu I$ (Wenger et al., 2022). |
+| `NystromPreconditioner` | class | Randomized Nyström preconditioner for ``A + μ I``. |
 | `OperatorPreconditioner` | class | Use an externally supplied approximate inverse as a preconditioner. |
+| `OrthonormalSketch` | class | Gaussian sketch with orthonormal rows, $S S^\top = I_d$. |
 | `PartialCholeskyPreconditioner` | class | Preconditioner from a pivoted partial Cholesky factor. |
 | `PeriodicSDE` | class | State-space representation of the periodic (MacKay) kernel. |
 | `PoissonLikelihood` | class | Poisson likelihood with log link. |
 | `PreconditionedCGSolver` | class | CG solver with pivoted partial Cholesky preconditioner. |
-| `PredictionCache` | class | Cached training solve for amortized predictions. |
-| `ProductOperator` | class | Lazy matmul ``(A B) v = A (B v)``. |
+| `PredictionCache` | class | Cached training solve (and factor) for amortized predictions. |
 | `ProductSDE` | class | Product of two SDE kernels via Kronecker composition. |
 | `PropagationResult` | class | Output of uncertainty propagation through a nonlinear function. |
 | `QuasiPeriodicSDE` | class | Quasi-periodic kernel: product of Matern and Periodic SDE. |
 | `RootDecomposition` | class | Tall factor ``R`` with ``R Rᵀ ≈ A`` semantics. |
+| `RowSamplingSketch` | class | Weighted row-sampling sketch. |
 | `SDEKernel` | class | Abstract base class for state-space kernel representations. |
-| `SDEParams` | class | Continuous-time SDE parameters for a stationary kernel. |
+| `SDEParams` | class | Continuous-time SDE parameters for a linear SDE. |
 | `SLQLogdet` | class | Stochastic log-determinant via Lanczos quadrature (SLQ). |
+| `SLRResult` | class | Linear-Gaussian surrogate produced by statistical linear regression. |
+| `SRHTSketch` | class | Subsampled randomized Hadamard transform sketch. |
 | `SVDLowRankUpdate` | class | Deprecated subclass of `LowRankUpdate` with ``orthonormal=True``. |
-| `ScaledOperator` | class | Lazy scalar multiply ``(c A) v = c (A v)``. |
+| `SketchAndPrecondLSMR` | class | Sketch-and-precondition LSMR for tall least squares (Rokhlin & Tygert, 2008). |
 | `SoftmaxLikelihood` | class | Softmax (categorical) likelihood for multi-class classification. |
+| `SparseCholeskyFactor` | class | Sparse Cholesky factor ``P Q Pᵀ = L Lᵀ`` on a static symbolic pattern. |
+| `SparseCholeskySolver` | class | Exact ``solve`` / ``logdet`` / ``diag_inv`` through a sparse Cholesky factor. |
+| `SparseOperator` | class | Sparse matrix with a static `SparsityPattern` and traced values. |
+| `SparseSignSketch` | class | Sparse sign sketch (sparse Johnson-Lindenstrauss transform). |
+| `SparsityPattern` | class | Static, hashable sparsity pattern of a ``(m, n)`` matrix. |
+| `SpectralFunction` | class | ``f(B)`` for a symmetric ``B`` with a factored eigenbasis. |
 | `StudentTLikelihood` | class | Student-t likelihood for robust regression. |
-| `SumKronecker` | class | Sum of Kronecker products ``Σ_k A_k \otimes B_k``. |
-| `SumKroneckerSqrt` | class | Lazy Lanczos square-root operator for ``SumKronecker`` covariances. |
-| `SumOperator` | class | Lazy sum ``(A + B + …) v = A v + B v + …``. |
+| `SumKronecker` | class | Deprecated alias for `SumOfKroneckers`. |
+| `SumKroneckerSqrt` | class | Deprecated alias for `SumOfKroneckersSqrt` (gh-297). |
+| `SumOfKroneckers` | class | Sum of Kronecker products ``Σ_k A_k \otimes B_k``. |
+| `SumOfKroneckersSqrt` | class | Lazy Lanczos square-root operator for ``SumOfKroneckers`` covariances. |
 | `SumSDE` | class | Sum of SDE kernels via block-diagonal composition. |
+| `SymbolicCholesky` | class | Symbolic Cholesky factor of a symmetric sparsity pattern. |
 | `TaylorIntegrator` | class | 1st or 2nd order Taylor expansion for uncertainty propagation. |
 | `Toeplitz` | class | Symmetric Toeplitz matrix from its first column. |
 | `ToeplitzCholesky` | class | Circulant-embedding sample factor for a symmetric positive Toeplitz matrix. |
+| `UDLDecomposition` | class | Banded factorisation $\Lambda = U \tilde{D} U^{\top}$ of a `BlockTriDiag`. |
 | `UnscentedIntegrator` | class | Unscented transform: deterministic sigma points. |
 | `UpperBlockTriDiag` | class | Upper triangular block-bidiagonal (transpose of LowerBlockTriDiag). |
 | `add_jitter` | function | Add diagonal jitter for numerical stability: ``A + eps * I``. |
+| `ar1_precision` | function | Precision of a stationary AR(1) process with marginal precision ``τ``. |
+| `as_diagonalized` | function | Express ``operator`` as one `DiagonalizedOperator`, if possible. |
 | `as_linear_operator` | function | Wrap a raw ``matvec`` callable as a tagged lineax operator. |
-| `base_conditional` | function | Gaussian conditional distribution via Schur complement. |
-| `batched_kernel_matvec` | function | Compute ``K(X, Z) @ v`` in memory-efficient batches. |
-| `batched_kernel_rmatvec` | function | Compute ``K(X, Z)^T @ u`` in memory-efficient batches. |
+| `base_conditional` | function | Deprecated: use `sparse_conditional` (note ``K_xz = K_mn.T``). |
+| `besag_structure` | function | Validate a graph Laplacian as a Besag (ICAR) structure matrix. |
 | `block_diagonal_tag` | constant | `block_diagonal_tag` |
 | `block_tridiagonal_tag` | constant | `block_tridiagonal_tag` |
 | `blr_diag_update` | function | Diagonal natural parameter BLR update step. |
 | `blr_full_update` | function | Full-rank natural parameter BLR update step. |
-| `build_prediction_cache` | function | Solve ``A alpha = y`` and cache the result. |
+| `build_prediction_cache` | function | Solve ``K_y alpha = y`` and cache the result. |
+| `bym2_precision` | function | Joint precision of the BYM2 pair ``(b, u*)`` (Riebler et al., 2016). |
 | `cavity_distribution` | function | Compute EP cavity distribution by removing a site. |
 | `cavity_from_marginal` | function | Compute cavity distribution by removing a site from the marginal. |
-| `center_kernel` | function | Center a kernel matrix: ``H K H``. |
-| `centering_operator` | function | Centering matrix ``H = I - (1/n) \mathbf{1}\mathbf{1}^T``. |
 | `cholesky` | function | Compute Cholesky factor L such that A = L L^T. |
 | `cholesky_logdet` | function | Compute log\|A\| from Cholesky factor L where A = L Lᵀ. |
+| `circulant` | function | (Block-)circulant operator from its first column. |
+| `circulant_from_symbol` | function | (Block-)circulant operator from its DFT symbol. |
 | `collapsed_elbo` | function | Collapsed ELBO (Titsias bound) for sparse GP regression. |
+| `column_id` | function | Randomized column interpolative decomposition (Voronin & Martinsson, 2017). |
 | `compute_psi_statistics` | function | Compute Ψ statistics, dispatching to analytical or numerical. |
 | `conditional` | function | Compute ``p(x_A \| x_B = b)`` from a joint Gaussian ``p(x_A, x_B)``. |
-| `conditional_interpolate` | function | Interpolated marginal at time ``t`` given posteriors at ``t^-`` and ``t^+``. |
+| `conditional_interpolate` | function | Two-filter fusion at ``t`` from a filtered state and a backward message. |
 | `conditional_variance` | function | Predictive variance: Schur complement diagonal plus optional variational correction. |
 | `cost_expectation` | function | Compute ``E[Cost(f(x), target)]`` where ``x ~ N(mu, Sigma)``. |
 | `cov_transform` | function | Covariance propagation through a linear map: ``J @ Sigma @ J^T``. |
 | `create_grid` | function | Create a regular grid from per-dimension sizes and bounds. |
 | `cubature_points` | function | Spherical-radial cubature points and weights. |
 | `cubic_interpolation_weights` | function | Compute cubic interpolation indices and weights for SKI. |
+| `cur` | function | Randomized CUR decomposition (Voronin & Martinsson, 2017, §4). |
 | `cvi_update_sites` | function | Natural gradient update for CVI sites. |
 | `damped_natural_update` | function | Damped update in natural parameter space. |
-| `dare` | function | Discrete Algebraic Riccati Equation solver. |
+| `dare` | function | Steady-state Kalman filter covariance and gain (the filtering DARE). |
 | `diag` | function | Extract the diagonal of an operator as a 1D array. |
 | `diag_conditional_variance` | function | Diagonal of Schur complement: ``diag(K_XX - A K_ZX)``. |
 | `diag_inv` | function | Compute the diagonal of the inverse of a linear operator. |
 | `diagonal_tag` | constant | `diagonal_tag` |
+| `discrepancy_step_size` | function | Adaptive EKI tempering step: the data misfit controller. |
 | `discrete_lyapunov_solve` | function | Solve the discrete Lyapunov equation ``P - G P G^T = Q``. |
-| `dist_kl_divergence` | function | KL divergence ``KL(p \|\| q)`` between two multivariate normals. |
+| `discretize_mfd` | function | Discretise a linear SDE by matrix-fraction decomposition. |
+| `discretize_mfd_sequence` | function | Vectorised `gaussx.discretize_mfd` over a vector of time steps. |
 | `eig` | function | Compute eigenvalues and eigenvectors. |
-| `eigenpro_correction` | function | Compute the EigenPro eigenspace correction for one SGD mini-batch. |
-| `eigenpro_preconditioner` | function | Build an EigenPro spectral preconditioner from a kernel operator. |
-| `eigenpro_step_size` | function | Return the EigenPro preconditioned step size for a batch size. |
+| `eigh_generalized` | function | Solve $A v = \lambda B v$ for symmetric $A$ and symmetric PSD $B$. |
 | `eigvals` | function | Compute eigenvalues only. |
+| `eki_step` | function | One ensemble Kalman inversion (EKI) update. |
 | `elbo` | function | Evidence lower bound (ELBO). |
+| `enkf_analysis` | function | Stochastic (perturbed-observation) ensemble Kalman analysis step. |
 | `ensemble_covariance` | function | Empirical covariance from an ensemble as a low-rank operator. |
 | `ensemble_cross_covariance` | function | Cross-covariance between two ensemble sets. |
 | `ensemble_kalman_gain` | function | Kalman gain from an ensemble and its image in observation space. |
-| `ep_tilted_moments` | function | Compute tilted distribution moments via Gauss-Hermite quadrature. |
-| `expectation_to_meanvar` | function | Convert expectation parameters to mean/variance (Cholesky). |
+| `ep_tilted_moments` | function | Moments of the scalar EP tilted distribution, elementwise over a batch. |
+| `estimate_spectral_bounds` | function | Estimate $(\lambda_{\min}, \lambda_{\max})$ of a symmetric operator. |
+| `etkf_transform` | function | Ensemble Transform Kalman Filter (ETKF) analysis weights. |
+| `euclidean_distance` | function | Pairwise Euclidean distances ``\|\|a_i - b_j\|\|``. |
+| `expectation_to_mean_chol` | function | Convert expectation parameters to mean/variance (Cholesky). |
 | `expectation_to_natural` | function | Convert expectation parameters to natural parameters. |
 | `expectations_to_ssm` | function | Convert expectation parameters back to SSM marginals. |
 | `expected_log_likelihood` | function | Unified expected log-likelihood with analytical dispatch. |
-| `fisher_info` | function | Fisher information matrix ``F(eta) = nabla^2 A(eta)``. |
+| `fem_matrices` | function | Lumped mass ``C̃`` and stiffness ``G`` of P1 elements on a triangle mesh. |
+| `fem_projector` | function | Observation matrix ``A`` of P1 interpolation: ``(A w)_k = Σ_i ψ_i(s_k) w_i``. |
+| `fifth_order_cubature_points` | function | Fifth-order fully symmetric cubature points and weights. |
+| `fisher_info` | function | Fisher information with respect to the mean, $F_\mu = \Sigma^{-1}$. |
+| `frobenius_norm` | function | Compute the Frobenius norm ``\|\|A\|\|_F`` with structural dispatch. |
+| `gaspari_cohn` | function | Gaspari-Cohn (1999) fifth-order compactly-supported taper. |
 | `gauss_hermite_points` | function | Gauss-Hermite quadrature points and weights. |
-| `gauss_kl` | function | KL divergence ``KL[q(u) \|\| p(u)]`` between Gaussian distributions. |
-| `gauss_newton_precision` | function | Gauss-Newton precision matrix ``J^T J``. |
+| `gauss_kl` | function | KL(first ‖ second): ``KL[q(u) \|\| p(u)]`` with ``p(u) = N(0, K)``. |
+| `gauss_newton_precision` | function | Gauss-Newton precision matrix ``J^T J``, optionally plus a prior. |
 | `gaussian_entropy` | function | Entropy of a multivariate normal ``N(mu, Sigma)``. |
 | `gaussian_expected_log_lik` | function | Expected log-likelihood ``E_q[log N(y \| f, R)]``. |
+| `gaussian_kl` | function | KL(first ‖ second): ``KL(p \|\| q)`` between two multivariate normals. |
 | `gaussian_log_prob` | function | Multivariate normal log-probability. |
+| `generalized_variance_scale` | function | Generalized variance of an intrinsic GMRF (Sørbye & Rue, 2014). |
 | `ggn_diagonal` | function | Generalized Gauss-Newton diagonal approximation. |
 | `gradient_expectation` | function | Compute ``E[nabla f(x)]`` via Stein's lemma. |
+| `grid_coupling_indices` | function | Flat indices of masked-out grid cells adjacent to the masked-in region. |
 | `grid_data` | function | Expand a grid to the full Cartesian product of grid points. |
-| `hsic` | function | Biased HSIC estimator. |
+| `hadamard_transform` | function | Unnormalized Walsh-Hadamard transform along the last axis. |
+| `haversine_distance` | function | Pairwise great-circle (haversine) distances on a sphere. |
 | `hutchinson_hessian_diag` | function | Stochastic Hessian diagonal via Hutchinson with Rademacher probes. |
-| `implicit_cross_kernel` | function | Create a matrix-free rectangular cross-kernel operator. |
+| `iid_precision` | function | Precision ``τ I`` of ``n`` independent effects with variance ``1/τ``. |
 | `infinite_horizon_filter` | function | Infinite-horizon Kalman filter with fixed steady-state gain. |
 | `infinite_horizon_smoother` | function | Infinite-horizon RTS smoother with fixed steady-state gain. |
+| `inflate_multiplicative` | function | Multiplicative ensemble inflation about the mean. |
+| `inflate_rtpp` | function | Relaxation to prior perturbations (RTPP; Zhang et al. 2004). |
+| `inflate_rtps` | function | Relaxation to prior spread (RTPS; Whitaker & Hamill 2012). |
 | `inv` | function | Return a lazy inverse operator A^{-1}. |
+| `inv_quad_logdet` | function | Joint inverse-quadratic and log-determinant via shared BBMM CG. |
 | `is_block_diagonal` | function | Check whether *operator* carries the block-diagonal tag. |
 | `is_block_tridiagonal` | function | Check whether *operator* carries the block-tridiagonal tag. |
 | `is_diagonal` | function | Returns whether an operator is marked as diagonal. |
+| `is_eigen_reducible` | function | Whether a sum of Kronecker products has the exact two-term reduction. |
 | `is_kronecker` | function | Check whether *operator* carries the Kronecker tag. |
 | `is_kronecker_sum` | function | Check whether *operator* carries the Kronecker sum tag. |
 | `is_low_rank` | function | Check whether *operator* carries the low-rank tag. |
@@ -949,89 +1001,139 @@ Structured linear algebra and solver strategies. finitevolX delegates the tridia
 | `kalman_filter` | function | Kalman filter forward pass via ``jax.lax.scan``. |
 | `kalman_gain` | function | Compute Kalman gain ``K = P @ H^T @ (H @ P @ H^T + R)^{-1}``. |
 | `kernel_expectations` | function | Compute kernel expectations Psi_0, Psi_1, Psi_2 for uncertain inputs. |
-| `kl_divergence` | function | KL divergence ``KL(q \|\| p)`` via the Bregman-divergence form on natural parameters. |
-| `kl_standard_normal` | function | KL divergence ``KL(N(m, S) \|\| N(0, I))``. |
+| `kl_divergence` | function | KL(first ‖ second): ``KL(q \|\| p)`` via the Bregman form on natural parameters. |
+| `kl_standard_normal` | function | KL(first ‖ second): ``KL(N(m, S) \|\| N(0, I))``. |
 | `kronecker_mll` | function | Exact marginal log-likelihood for a Kronecker-structured GP. |
 | `kronecker_posterior_predictive` | function | Posterior mean and variance for a Kronecker GP at test points. |
 | `kronecker_sum_sample` | function | Sample from ``𝒩(0, A ⊕ B)`` using per-factor eigendecompositions. |
+| `kronecker_sum_solve` | function | Solve a shifted Kronecker-sum system in tensor (unvectorized) form. |
 | `kronecker_sum_tag` | constant | `kronecker_sum_tag` |
 | `kronecker_tag` | constant | `kronecker_tag` |
 | `leave_one_out_cv` | function | LOO-CV via the bordered-system identity. |
 | `linear_solve` | function | Solve ``A x = b`` through the unified front door. |
+| `linearize_sde` | function | Optimal linear drift of a nonlinear SDE along a Gaussian path. |
+| `localization_matrix` | function | Pairwise Gaspari-Cohn taper ``rho(dist(a_i, b_j); c)``. |
+| `localized_kalman_gain` | function | Ensemble Kalman gain with Hadamard (Schur-product) localization. |
 | `log_likelihood_expectation` | function | Compute ``E[log p(y_{obs} \| f(x))]`` where ``x ~ N(mu, Sigma)``. |
 | `log_marginal_likelihood` | function | GP log marginal likelihood. |
 | `log_partition` | function | Log-partition function ``A(eta)``. |
 | `logdet` | function | Compute log \|det(A)\| with structural dispatch. |
-| `love_cache` | function | Precompute Lanczos factorization of ``K^{-1}`` for fast variance. |
-| `love_variance` | function | Fast predictive variance using a LOVE cache. |
+| `love_cache` | function | Precompute a Lanczos approximation of ``K^{-1}`` for fast variance. |
+| `love_residual` | function | Relative solve residual of a LOVE cache for one cross-covariance. |
+| `love_variance` | function | Approximate ``k_*^\top K^{-1} k_*`` from a LOVE cache. |
+| `love_variance_error_bound` | function | Upper bound on the variance over-estimate of a LOVE cache. |
 | `low_rank_plus_diag` | function | Construct ``diag(diag) + U diag(d) Vᵀ``. |
 | `low_rank_plus_identity` | function | Construct ``scale * I + U diag(d) Vᵀ``. |
 | `low_rank_tag` | constant | `low_rank_tag` |
 | `lower_triangular_tag` | constant | `lower_triangular_tag` |
+| `masked_moment_inputs` | function | Make masked observation channels inert in a moment-matched update. |
+| `matern_spde_params` | function | SPDE parameters ``(κ, τ, α)`` of a Matérn field. |
 | `matheron_update` | function | Posterior samples via Matheron's-rule correction. |
+| `mean_chol_to_expectation` | function | Convert mean/variance (Cholesky) to expectation parameters. |
+| `mean_chol_to_natural` | function | Convert mean/variance (Cholesky) to natural parameters. |
 | `mean_cov_to_natural` | function | Convert mean/covariance to natural parameters (operator form). |
 | `mean_expectation` | function | Compute ``E[f(x)]`` where ``x ~ N(mu, Sigma)``. |
-| `meanvar_to_expectation` | function | Convert mean/variance (Cholesky) to expectation parameters. |
-| `meanvar_to_natural` | function | Convert mean/variance (Cholesky) to natural parameters. |
-| `mmd_squared` | function | Biased squared Maximum Mean Discrepancy. |
+| `meanfield_kalman_filter` | function | Mean-field Kalman filter over ``L = D // block_size`` state blocks. |
+| `meanfield_rts_smoother` | function | Mean-field RTS smoother over ``L = D // block_size`` state blocks. |
+| `mixture_quantile` | function | Invert a CDF at one or more quantile levels by bracketed root finding. |
+| `mixture_quantile_gaussian_approx` | function | Quantiles of the Gaussian matched to an ensemble's first two moments. |
+| `moment_match` | function | EP moment matching: tilted log-normaliser and its first two derivatives. |
+| `moment_transform` | function | Moment triple of ``(x, fn(x))`` for ``x`` Gaussian. |
 | `natural_to_expectation` | function | Convert natural parameters to expectation parameters. |
+| `natural_to_mean_chol` | function | Convert natural parameters to mean/variance (Cholesky). |
 | `natural_to_mean_cov` | function | Convert natural parameters to mean/covariance (operator form). |
-| `natural_to_meanvar` | function | Convert natural parameters to mean/variance (Cholesky). |
 | `naturals_to_ssm` | function | Convert natural parameters back to SSM parameters. |
 | `negative_semidefinite_tag` | constant | `negative_semidefinite_tag` |
 | `newton_update` | function | Convert a Newton step to natural pseudo-likelihood parameters. |
-| `nystrom_operator` | function | Nystrom low-rank kernel approximation. |
+| `nonlinear_kalman_filter` | function | Moment-matched nonlinear Kalman filter. |
+| `nonlinear_kalman_predict` | function | One moment-matched predict step. |
+| `nonlinear_kalman_update` | function | One moment-matched update step. |
+| `nonlinear_rts_smoother` | function | Moment-matched nonlinear Rauch-Tung-Striebel smoother. |
+| `nonlinear_rts_step` | function | One moment-matched RTS backward step. |
 | `oilmm_back_project` | function | Back-project latent GP predictions to the observation space. |
 | `oilmm_project` | function | Project multi-output data to independent latent GPs via OILMM. |
 | `pairwise_marginals` | function | Joint p(x_k, x_{k+1}) for each consecutive pair. |
-| `parallel_kalman_filter` | function | Parallel Kalman filter via `associative_scan`. |
-| `parallel_rts_smoother` | function | Parallel RTS smoother via reverse `associative_scan`. |
+| `parallel_kalman_filter` | function | Parallel Kalman filter via `jax.lax.associative_scan`. |
+| `parallel_rts_smoother` | function | Parallel RTS smoother via reverse `jax.lax.associative_scan`. |
 | `positive_semidefinite_tag` | constant | `positive_semidefinite_tag` |
 | `predict_mean` | function | Predictive mean: ``mu* = K_*f @ alpha``. |
-| `predict_variance` | function | Predictive variance: ``sigma^2* = k_** - diag(K_*f K_y^{-1} K_f*)``. |
+| `predict_variance` | function | Predictive variance ``sigma^2_* = k_** - diag(K_*f K_y^{-1} K_f*)``. |
 | `process_noise_covariance` | function | Compute process noise from stationary covariance. |
+| `product_operator` | function | Lazy matmul ``(A B) v = A (B v)``. |
 | `project` | function | Compute A_X = K_XZ @ K_ZZ^{-1} via Cholesky solve. |
+| `pseudo_logdet` | function | Log pseudo-determinant: the log of the product of the non-zero eigenvalues. |
+| `qb` | function | Randomized QB factorisation $A \approx QB$ with $B = Q^\top A$. |
 | `quadratic_form` | function | Compute ``x^T A^{-1} x`` via a single solve. |
-| `rff_operator` | function | Random Fourier Features kernel approximation. |
+| `randomized_eigh` | function | Partial eigendecomposition of a symmetric operator by Rayleigh-Ritz. |
+| `randomized_nystrom` | function | Randomized Nyström approximation $\hat A = U\hat\Lambda U^\top$ of a PSD $A$. |
+| `randomized_svd` | function | Truncated SVD $A \approx U \operatorname{diag}(s) V^\top$ by randomized QB. |
+| `range_finder` | function | Orthonormal basis $Q$ for the dominant range of $A$. |
 | `riemannian_psd_correction` | function | Riemannian gradient correction for PSD precision updates. |
 | `root_decomposition` | function | Compute a tall factor ``R`` such that ``R Rᵀ ≈ A``. |
 | `root_inv_decomposition` | function | Compute a tall factor ``R⁻`` such that ``R⁻ (R⁻)ᵀ ≈ A⁻¹``. |
+| `rp_cholesky` | function | Randomly pivoted partial Cholesky of a PSD matrix ``A``. |
+| `rts_interpolate` | function | Smoothed marginal at an unobserved ``t`` from filtered and smoothed states. |
 | `rts_smoother` | function | Rauch-Tung-Striebel backward smoother. |
+| `rw1_structure` | function | Structure matrix ``R = D₁ᵀ W D₁`` of a first-order random walk. |
+| `rw2_structure` | function | Structure matrix ``R = D₂ᵀ D₂`` of a second-order random walk. |
 | `safe_cholesky` | function | Cholesky decomposition with adaptive jitter for near-singular matrices. |
+| `sample_joint_conditional` | function | Joint draws of a partitioned Gaussian, and conditional draws from them. |
+| `sample_mvn` | function | Draw samples from $\mathcal{N}(\mu, K)$, dispatching on $K$'s structure. |
 | `sandwich` | function | Return ``A @ P @ A.T`` exploiting compatible operator structure. |
+| `scaled_operator` | function | Lazy scalar multiply ``(c A) v = c (A v)``. |
 | `schur_complement` | function | Schur complement: ``K_XX - K_XZ @ K_ZZ^{-1} @ K_ZX``. |
 | `sde_autocovariance` | function | Compute the stationary autocovariance of an SDE kernel. |
+| `sde_kl_divergence` | function | Drift path-KL between a linear and a nonlinear SDE along a Gaussian path. |
+| `selected_inverse` | function | The band of ``Σ = Q⁻¹`` for a symmetric positive-definite `BlockTriDiag`. |
 | `sigma_points` | function | Unscented transform sigma points and weights. |
 | `site_mean_var_from_natural` | function | Convert per-site natural parameters to mean/variance. |
 | `site_natural_from_tilted` | function | Compute site natural parameters from tilted and cavity moments. |
 | `sites_to_precision` | function | Convert Gaussian sites to a block-tridiagonal precision. |
+| `sketch_and_solve` | function | Approximate least squares from a sketch. |
 | `solve` | function | Solve ``A x = b`` with structural dispatch. |
 | `solve_columns` | function | Solve A X = B column-by-column via vmap. |
 | `solve_matrix` | function | Solve ``A X = B`` with a single factorization on the matrix RHS. |
 | `solve_rows` | function | Solve A x = bᵢ for each row bᵢ of a matrix via vmap. |
-| `solve_tridiagonal` | function | Solve a tridiagonal system ``A x = d``. |
-| `solve_tridiagonal_batched` | function | Solve independent tridiagonal systems over leading batch dimensions. |
+| `sparse_cholesky` | function | Sparse Cholesky factorisation of a symmetric positive-definite operator. |
+| `sparse_conditional` | function | Sparse-GP conditional ``q(f_x) = \int p(f_x \| u) q(u) du``. |
+| `spde_precision` | function | SPDE precision ``Q_α = τ² K (C̃⁻¹K)^{α−1}`` with ``K = κ²C̃ + G``. |
+| `spde_precision_grid` | function | SPDE precision on a regular grid: a function of a Kronecker sum. |
 | `spingp_log_likelihood` | function | Log marginal likelihood via sparse inverse GP formulation. |
 | `spingp_posterior` | function | Posterior mean and precision via SpInGP. |
 | `sqrt` | function | Compute matrix square root S such that S @ S = A. |
+| `sqrt_inv_matmul` | function | Compute $A^{-1/2} b$ via contour-integral quadrature. |
+| `sqrt_matmul` | function | Compute $A^{1/2} b$ via contour-integral quadrature. |
 | `ssm_to_expectations` | function | Convert SSM marginals to expectation parameters. |
 | `ssm_to_naturals` | function | Convert SSM parameters to natural parameters. |
-| `stable_rbf_kernel` | function | RBF (squared exponential) kernel with mixed-precision stability. |
 | `stable_squared_distances` | function | Squared Euclidean distances with mixed-precision stability. |
+| `statistical_linear_regression` | function | Moment-match a nonlinear conditional to a linear-Gaussian surrogate. |
 | `submatrix` | function | Extract ``A[row_idx, col_idx]`` without forming the full matrix. |
 | `sufficient_stats` | function | Compute sufficient statistics ``T(x) = [x, x x^T]``. |
-| `sumkronecker_sample` | function | Sample from ``𝒩(0, op)`` with matrix-free Lanczos square roots. |
+| `sum_of_kroneckers_sample` | function | Sample from ``𝒩(0, op)`` with matrix-free Lanczos square roots. |
+| `sum_operator` | function | Lazy sum ``(A + B + …) v = A v + B v + …``. |
+| `sumkronecker_sample` | function | Deprecated alias for `sum_of_kroneckers_sample` (gh-297). |
 | `svd` | function | Compute the singular value decomposition ``A = U diag(s) V^T``. |
 | `svd_low_rank_plus_diag` | function | Construct ``diag(diag) + U diag(S) Vᵀ`` from a truncated SVD. |
 | `svgp_variance_adjustment` | function | Compute the SVGP variance adjustment operator. |
+| `symbolic_cholesky` | function | Symbolic analysis of a sparse Cholesky factorisation (host, cached). |
 | `symmetric_tag` | constant | `symmetric_tag` |
-| `to_expectation` | function | Convert natural to expectation parameters. |
-| `to_natural` | function | Convert expectation to natural parameters. |
+| `symmetrize` | function | Symmetrize the trailing two axes: ``0.5 * (X + X^T)``. |
+| `theta_design` | function | Integration points and log-weights over hyperparameters $\theta$. |
+| `tikhonov_augment` | function | Observation augmentation for Tikhonov-regularised EKI (TEKI). |
+| `to_expectation` | function | Deprecated alias of `to_mean_cov`. |
+| `to_mean_cov` | function | Convert natural parameters to the mean and covariance. |
+| `to_natural` | function | Deprecated alias of `gaussx.mean_cov_to_natural`. |
 | `toeplitz_sample` | function | Sample from ``𝒩(0, Toeplitz(column))`` via FFT circulant embedding. |
 | `trace` | function | Compute the trace of an operator. |
+| `trace_and_diag` | function | Jointly estimate the trace and diagonal from one probe pass. |
 | `trace_correction` | function | Trace term in Titsias collapsed ELBO. |
 | `trace_product` | function | Trace of a matrix product: ``tr(A @ B)`` with structural dispatch. |
+| `tridiagonal_solve` | function | Solve a tridiagonal system ``A x = d``. |
+| `tridiagonal_solve_batched` | function | Solve independent tridiagonal systems over leading batch dimensions. |
 | `tridiagonal_tag` | constant | `tridiagonal_tag` |
+| `udl_decomposition` | function | Factorise a symmetric block-tridiagonal precision as $U \tilde{D} U^{\top}$. |
+| `udl_from_ssm_params` | function | Build the `UDLDecomposition` of a Gauss-Markov chain's precision. |
+| `udl_to_ssm_params` | function | Read the equivalent Gauss-Markov chain off a `UDLDecomposition`. |
 | `uncertain_bgplvm_predict` | function | Multi-output uncertain GP prediction for BGPLVM. |
 | `uncertain_gp_predict` | function | Predictive mean and variance for GP with uncertain inputs. |
 | `uncertain_gp_predict_mc` | function | Monte Carlo GP prediction with uncertain inputs. |
@@ -1041,7 +1143,7 @@ Structured linear algebra and solver strategies. finitevolX delegates the tridia
 | `unwhiten` | function | Unwhiten variational mean: ``m = L @ m_tilde``. |
 | `unwhiten_covariance` | function | Unwhiten variational covariance: S = L S̃ Lᵀ. |
 | `upper_triangular_tag` | constant | `upper_triangular_tag` |
-| `variational_elbo_gaussian` | function | Titsias collapsed ELBO for Gaussian likelihoods. |
+| `variational_elbo_gaussian` | function | Uncollapsed (SVGP) ELBO for a Gaussian likelihood. |
 | `variational_elbo_mc` | function | Monte Carlo ELBO for non-conjugate likelihoods. |
 | `whiten_covariance` | function | Unwhiten variational covariance: S = L S̃ Lᵀ. |
 | `whitened_svgp_predict` | function | Whitened SVGP prediction: mean and variance at test points. |
