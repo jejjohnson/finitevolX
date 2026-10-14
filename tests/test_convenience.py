@@ -208,9 +208,9 @@ class TestPotentialVorticityMultilayer:
             np.testing.assert_allclose(result[layer, :, -1], 0.0, atol=1e-10)
 
     def test_matches_manual_composition(self, grid2d):
-        """Must match multilayer(qg_pv)(psi) - stretching_term(A, psi)."""
+        """Must match multilayer(qg_pv)(psi) - f0 * stretching_term(A, psi)."""
         nl = 2
-        f0, beta, y0 = 1.0, 1e-11, 0.5
+        f0, beta, y0 = 2.0, 1e-11, 0.5
         y = jnp.broadcast_to(
             jnp.arange(grid2d.Ny, dtype=float)[:, None] * grid2d.dy,
             (grid2d.Ny, grid2d.Nx),
@@ -227,7 +227,7 @@ class TestPotentialVorticityMultilayer:
         qg_pv = multilayer(
             lambda p: qg_potential_vorticity(p, f0, beta, grid2d.dx, grid2d.dy, y, y0)
         )
-        expected = qg_pv(psi) - stretching_term(A, psi)
+        expected = qg_pv(psi) - f0 * stretching_term(A, psi)
 
         np.testing.assert_allclose(result, expected, atol=1e-12)
 

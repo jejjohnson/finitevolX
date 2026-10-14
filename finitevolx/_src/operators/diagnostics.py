@@ -417,8 +417,9 @@ def qg_potential_vorticity(
             psi
         )  # psi: [nl, Ny, Nx] -> q: [nl, Ny, Nx]
 
-        # Cross-layer stretching (A couples layers, cannot be vmapped)
-        q = q - stretching_term(A, psi)
+        # Cross-layer stretching (A couples layers, cannot be vmapped);
+        # A is the raw build_coupling_matrix output, so scale by f0
+        q = q - f0 * stretching_term(A, psi)
 
     Parameters
     ----------
@@ -774,17 +775,25 @@ def potential_vorticity_multilayer(
 ) -> Float[Array, "nl Ny Nx"]:
     """Multi-layer QG potential vorticity.
 
-    q_k = nabla^2(psi_k) / f0 + beta*(y - y0)/f0 - (A . psi)_k
+    q_k = nabla^2(psi_k) / f0 + beta*(y - y0)/f0 - f0 * (A . psi)_k
+
+    This is the MQGeometry form ``nabla^2(psi) - f0^2 A psi + beta (y - y0)``
+    divided by ``f0``.  ``A`` is the raw output of
+    :func:`~finitevolx.build_coupling_matrix` (``1 / (H g')``, units
+    s^2/m^2): ``f0 * A . psi`` is dimensionless like the other two terms,
+    so callers must **not** pre-multiply ``A`` by ``f0``.
 
     Vmaps :func:`qg_potential_vorticity` over the layer axis and
-    subtracts :func:`stretching_term` in a single call.
+    subtracts ``f0 *`` :func:`stretching_term` in a single call.
 
     Parameters
     ----------
     psi : Float[Array, "nl Ny Nx"]
         Streamfunction at T-points for all layers.
     A : Float[Array, "nl nl"]
-        Layer coupling (stretching) matrix.
+        Layer coupling (stretching) matrix, the raw output of
+        :func:`~finitevolx.build_coupling_matrix` (s^2/m^2); the factor
+        ``f0`` is applied here.
     f0 : float
         Reference Coriolis parameter.
     beta : float
@@ -807,7 +816,8 @@ def potential_vorticity_multilayer(
     qg_pv_layer = eqx.filter_vmap(
         lambda p: qg_potential_vorticity(p, f0, beta, dx, dy, y, y0)
     )
-    return qg_pv_layer(psi) - stretching_term(A, psi)
+    # q_k = lap(psi_k)/f0 + beta (y - y0)/f0 - f0 (A psi)_k   [nl, Ny, Nx]
+    return qg_pv_layer(psi) - f0 * stretching_term(A, psi)
 
 
 # ======================================================================

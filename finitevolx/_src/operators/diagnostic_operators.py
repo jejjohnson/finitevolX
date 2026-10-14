@@ -575,14 +575,19 @@ class QGPotentialVorticity2D(eqx.Module):
         """Multi-layer QG potential vorticity.
 
         q[k, j, i] = lap_psi[k, j, i] / f0 + beta * (y[j, i] - y0) / f0
-                   - sum_m A[k, m] * psi[m, j, i]
+                   - f0 * sum_m A[k, m] * psi[m, j, i]
+
+        ``A`` is the raw :func:`~finitevolx.build_coupling_matrix` output
+        (s^2/m^2); ``f0 * A . psi`` is dimensionless, so do not
+        pre-multiply ``A`` by ``f0``.
 
         Parameters
         ----------
         psi : Float[Array, "nl Ny Nx"]
             Streamfunction at T-points for all layers.
         A : Float[Array, "nl nl"]
-            Coupling (stretching) matrix.
+            Coupling (stretching) matrix, the raw ``build_coupling_matrix``
+            output.
         f0 : float
             Reference Coriolis parameter.
         beta : float

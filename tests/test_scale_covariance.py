@@ -61,6 +61,11 @@ from finitevolx._src.grid.cartesian import (
 )
 from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
 from finitevolx._src.mask.cartesian import Mask1D, Mask2D, Mask3D
+from finitevolx._src.operators.diagnostic_operators import QGPotentialVorticity2D
+from finitevolx._src.operators.diagnostics import (
+    potential_vorticity_multilayer,
+    stretching_term,
+)
 from finitevolx._src.operators.difference import (
     Difference1D,
     Difference2D,
@@ -90,6 +95,7 @@ from finitevolx._src.solvers.spectral import (
     solve_poisson_dst,
     solve_poisson_fft,
 )
+from finitevolx._src.vertical.vertical_modes import build_coupling_matrix
 
 NX = NY = 16
 NZ = 4
@@ -1091,6 +1097,71 @@ class TestTheContractsHoldOnAnotherGrid:
     def test_length_rescaling_is_still_exact(self, case):
         """The length half is exact for every scheme, #243 or not."""
         assert_covariant(case, 1e6, 1.0, use_mask=False, shape=ALTERNATE_SHAPE)
+
+
+class TestMultilayerQGStretching:
+    """``q_k = lap(psi_k)/f0 + beta (y - y0)/f0 - f0 (A psi)_k`` (#282).
+
+    ``A = build_coupling_matrix(H, g')`` is in s^2/m^2, so the stretching
+    term needs one factor of ``f0`` to be dimensionless like the other two.
+    """
+
+    H = jnp.array([400.0, 1100.0])
+    GP = jnp.array([9.81, 0.025])
+    F0 = 9.375e-5
+    BETA = 1.75e-11
+
+    def _setup(self):
+        n, length = 18, 1.0e6
+        grid = CartesianGrid2D.from_interior(n, n, Lx=length, Ly=length)
+        x = (jnp.arange(grid.Nx) - 0.5) * grid.dx
+        y1 = (jnp.arange(grid.Ny) - 0.5) * grid.dy
+        yy = jnp.broadcast_to(y1[:, None], (grid.Ny, grid.Nx))
+        wave = jnp.sin(2 * jnp.pi * x[None, :] / length) * jnp.sin(
+            2 * jnp.pi * y1[:, None] / length
+        )
+        psi = 1e4 * jnp.stack([wave, 0.5 * wave**2 + 0.3 * wave])
+        return grid, yy, psi, build_coupling_matrix(self.H, self.GP)
+
+    def test_matches_mqgeometry_divided_by_f0(self):
+        """MQGeometry: q = lap psi - f0^2 A psi + beta (y - y0); here q / f0."""
+        grid, yy, psi, A = self._setup()
+        y0 = 0.5 * grid.Ly
+        got = potential_vorticity_multilayer(
+            psi, A, self.F0, self.BETA, grid.dx, grid.dy, yy, y0
+        )
+        lap = jnp.stack([Difference2D(grid).laplacian(p) for p in psi])
+        mqg = lap - self.F0**2 * stretching_term(A, psi)
+        mqg = mqg.at[:, 1:-1, 1:-1].add(self.BETA * (yy[1:-1, 1:-1] - y0))
+        expected = mqg / self.F0
+        scale = jnp.abs(expected).max()
+        assert float(jnp.abs(got - expected).max() / scale) < 1e-12
+
+    def test_class_form_matches_functional(self):
+        grid, yy, psi, A = self._setup()
+        y0 = 0.5 * grid.Ly
+        got = QGPotentialVorticity2D(grid=grid).multilayer(
+            psi, A, self.F0, self.BETA, yy, y0
+        )
+        ref = potential_vorticity_multilayer(
+            psi, A, self.F0, self.BETA, grid.dx, grid.dy, yy, y0
+        )
+        np.testing.assert_allclose(got, ref, rtol=1e-12)
+
+    def test_stretching_scales_with_f0(self):
+        """Rescaling f0 by 10 rescales the stretching part by exactly 10."""
+        grid, yy, psi, A = self._setup()
+
+        def stretching_part(f0):
+            # beta = 0 and the Laplacian share f0 only as 1/f0, so remove it
+            q = potential_vorticity_multilayer(
+                psi, A, f0, 0.0, grid.dx, grid.dy, yy, 0.0
+            )
+            lap = jnp.stack([Difference2D(grid).laplacian(p) for p in psi]) / f0
+            return lap - q
+
+        ratio = stretching_part(10.0 * self.F0) / stretching_part(self.F0)
+        np.testing.assert_allclose(ratio[:, 1:-1, 1:-1], 10.0, rtol=1e-12)
 
 
 class TestTheCaseMatrixIsPopulated:
