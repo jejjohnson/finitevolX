@@ -269,6 +269,7 @@ from finitevolx._src.solvers.elliptic import (
     DirichletHelmholtzSolver2D,
     MixedBCHelmholtzSolver2D,
     MixedBCHelmholtzSolver3D,
+    # Preconditioners
     NeumannHelmholtzSolver2D,
     RegularNeumannHelmholtzSolver2D,
     SpectralHelmholtzSolver1D,
@@ -296,7 +297,7 @@ from finitevolx._src.solvers.elliptic import (
     dst4_eigenvalues_ps,
     fft_eigenvalues,
     fft_eigenvalues_ps,
-    # Preconditioners
+    make_gaussx_multigrid_preconditioner,
     make_multigrid_preconditioner,
     make_nystrom_preconditioner,
     make_preconditioner,
@@ -777,6 +778,7 @@ __all__ = [
     "build_capacitance_solver",
     # Preconditioners
     "make_multigrid_preconditioner",
+    "make_gaussx_multigrid_preconditioner",
     "make_nystrom_preconditioner",
     "make_preconditioner",
     "make_spectral_preconditioner",

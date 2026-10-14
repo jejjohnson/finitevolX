@@ -14,3 +14,5 @@ on masked Arakawa C-grids.
 ## Preconditioner
 
 ::: finitevolx.make_multigrid_preconditioner
+
+::: finitevolx.make_gaussx_multigrid_preconditioner

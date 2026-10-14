@@ -21,6 +21,12 @@ Available preconditioners
 
 ``make_preconditioner``
     Convenience factory that dispatches to the above based on a string key.
+
+``make_gaussx_multigrid_preconditioner``
+    The same V-cycle, symmetrised (V, then its adjoint), as a
+    ``gaussx.OperatorPreconditioner`` (positive sign convention, flat
+    vectors) for gaussx's CG strategies.  Unlike the other ``make_*``
+    factories it returns a gaussx object, not a 2-D closure.
 """
 
 from __future__ import annotations
@@ -176,6 +182,99 @@ def make_nystrom_preconditioner(
 # ---------------------------------------------------------------------------
 
 
+def make_gaussx_multigrid_preconditioner(
+    mg_solver: MultigridSolver,
+) -> gaussx.OperatorPreconditioner:
+    r"""The multigrid V-cycle as a symmetric gaussx preconditioner.
+
+    Wraps a pre-built :class:`~finitevolx.MultigridSolver` in
+    ``gaussx.OperatorPreconditioner``, so the geometric V-cycle plugs into
+    gaussx's strategies (``gaussx.CGSolver(preconditioner=...)``,
+    ``gaussx.PreconditionedCGSolver``, ``gaussx.linear_solve``).
+
+    gaussx works with positive semidefinite systems, so it solves
+    ``(−A) x = −b`` for finitevolX's negative (semi)definite Helmholtz
+    operator ``A = ∇·(c∇) − λ``. Let ``V(v) = −Vcycle(0, v) ≈ (−A)⁻¹ v``.
+    One V-cycle is **not** symmetric: restriction (mask-normalised 2×2
+    averaging) is not the transpose of prolongation (bilinear), so ``V``
+    differs from ``Vᵀ`` by a few per cent, and CG needs a symmetric positive
+    definite preconditioner. With ``K = −A``, this applies the symmetrised
+    two-step iteration (V, then its adjoint)
+
+    ``M⁻¹ v = V v + Vᵀ v − Vᵀ K V v``,
+
+    with ``Vᵀ`` the exact transpose of the (linear) V-cycle from
+    ``jax.linear_transpose``: two V-cycles and one operator application per
+    use. ``M⁻¹`` is symmetric by construction, and since
+    ``I − M⁻¹K = (I − VᵀK)(I − VK)`` it is positive definite exactly when
+    one V-cycle reduces the error in the energy norm, ``‖I − VK‖_K < 1`` —
+    i.e. when the multigrid itself converges. The default
+    ``build_multigrid_solver`` settings do; a divergent configuration (one
+    smoothing sweep with ``omega`` near 1, almost no coarse solve, high
+    coefficient contrast) makes no symmetric form of the V-cycle positive
+    definite, so check the solver converges on its own first. On the default
+    settings this takes fewer CG steps than either the raw V-cycle or its
+    symmetric part ``½(V + Vᵀ)``.
+
+    The V-cycle runs in the hierarchy's dtype (float64); each application
+    returns the dtype of the vector it was given. The structure comes from
+    the system operator, so pass it when calling the preconditioner directly:
+    ``pc(v, operator)``.
+
+    For finitevolX's own :func:`~finitevolx.solve_cg`, which takes a callable
+    approximating ``A⁻¹`` on 2-D fields, use
+    :func:`make_multigrid_preconditioner` on the same solver.
+
+    Parameters
+    ----------
+    mg_solver : MultigridSolver
+        A pre-built solver from :func:`~finitevolx.build_multigrid_solver`.
+
+    Returns
+    -------
+    gaussx.OperatorPreconditioner
+        Applies ``M⁻¹`` on flat vectors of length ``Ny·Nx`` (row-major).
+
+    Examples
+    --------
+    >>> mg = build_multigrid_solver(mask, dx, dy, lambda_=10.0)
+    >>> neg_A = gaussx.as_linear_operator(
+    ...     lambda v: -A(v.reshape(Ny, Nx)).ravel(),
+    ...     shape=(Ny * Nx, Ny * Nx),
+    ...     positive_semidefinite=True,
+    ... )
+    >>> pc = make_gaussx_multigrid_preconditioner(mg)
+    >>> x = gaussx.CGSolver(preconditioner=pc).solve(neg_A, -rhs.ravel())
+    """
+    from finitevolx._src.solvers.multigrid import _apply_operator
+
+    level0 = mg_solver.levels[0]
+    mask = level0.mask  # [Ny, Nx], the hierarchy's dtype
+    shape = mask.shape
+
+    def _v_cycle(v: Float[Array, " n"]) -> Float[Array, " n"]:
+        # V v = -Vcycle(0, v) ~ K^-1 v with K = -A, [Ny*Nx]; linear in v
+        r = v.reshape(shape)  # [Ny, Nx]
+        return -mg_solver.v_cycle(jnp.zeros_like(r), r).ravel()
+
+    def _k(v: Float[Array, " n"]) -> Float[Array, " n"]:
+        # K v = -A v = -(div(c grad) - lambda) v on the finest level, [Ny*Nx]
+        return -_apply_operator(v.reshape(shape), level0).ravel()
+
+    _v_cycle_t = jax.linear_transpose(
+        _v_cycle, jax.ShapeDtypeStruct((mask.size,), mask.dtype)
+    )
+
+    def _approx_inverse(v: Float[Array, " n"]) -> Float[Array, " n"]:
+        w = v.astype(mask.dtype)  # [Ny*Nx], hierarchy dtype
+        vw = _v_cycle(w)  # V w
+        # M^-1 w = V w + V^T w - V^T K V w = V w + V^T (w - K V w)
+        (vt,) = _v_cycle_t(w - _k(vw))
+        return (vw + vt).astype(v.dtype)
+
+    return gaussx.OperatorPreconditioner(approx_inverse=_approx_inverse)
+
+
 def make_multigrid_preconditioner(
     mg_solver: MultigridSolver,
 ) -> Callable[[Float[Array, "Ny Nx"]], Float[Array, "Ny Nx"]]:
@@ -201,7 +300,8 @@ def make_multigrid_preconditioner(
     -------
     callable
         ``preconditioner(r) -> approx_solution``, where ``r`` has shape
-        ``(Ny, Nx)`` and the output has the same shape.
+        ``(Ny, Nx)`` and the output has the same shape.  For gaussx's
+        solvers, use :func:`make_gaussx_multigrid_preconditioner`.
 
     Examples
     --------
