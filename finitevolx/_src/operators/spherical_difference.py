@@ -175,9 +175,11 @@ class SphericalDifference2D(eqx.Module):
         h_c, h_n, h_s = h[1:-1, 1:-1], h[2:, 1:-1], h[:-2, 1:-1]
         dh_N = (h_n - h_c) / dlat  # (h[2:, 1:-1] - h[1:-1, 1:-1]) / dlat
         dh_S = (h_c - h_s) / dlat  # (h[1:-1, 1:-1] - h[:-2, 1:-1]) / dlat
-        # cos(lat) at V-point latitudes (half-cell north/south)
-        cos_N = 0.5 * (cos_T + self.grid.cos_lat_T[2:, 1:-1])
-        cos_S = 0.5 * (cos_T + self.grid.cos_lat_T[:-2, 1:-1])
+        # cos(lat) at the V-faces, read from the grid (not averaged from T):
+        #   cos_N = cos_lat_V[j]   (north face of cell j)
+        #   cos_S = cos_lat_V[j-1] (south face of cell j)
+        cos_N = self.grid.cos_lat_V[1:-1, 1:-1]
+        cos_S = self.grid.cos_lat_V[:-2, 1:-1]
         d_cos_dh = (cos_N * dh_N - cos_S * dh_S) / dlat
         out = interior(_safe_div_cos(d_cos_dh, cos_T, self.grid.R**2), h)
         if self.mask is not None:
@@ -206,7 +208,7 @@ class SphericalDifference2D(eqx.Module):
         dh_dlat_U[j, i+1/2] = (h[j+1, i] + h[j+1, i+1]
                               - h[j-1, i] - h[j-1, i+1]) / (4 * dlat)
         f_on_V[j+1/2, i]    = 1/2 * (f[j, i] + f[j+1, i])
-        cos_V[j+1/2, i]     = 1/2 * (cos_lat_T[j, i] + cos_lat_T[j+1, i])
+        cos_V[j+1/2, i]     = cos_lat_V[j, i] = cos(lat_T[j] + dlat/2)
         dh_dlon_V[j+1/2, i] = (h[j, i+1] + h[j+1, i+1]
                               - h[j, i-1] - h[j+1, i-1]) / (4 * dlon)
 
