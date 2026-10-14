@@ -207,13 +207,19 @@ _PrecondLike = Callable[[Float[Array, "Ny Nx"]], Float[Array, "Ny Nx"]]
 
 def _resolve_mask_arr(
     mask: _MaskLike | None,
+    dtype: jnp.dtype,
 ) -> Float[Array, "Ny Nx"] | None:
-    """Extract a float mask array from *mask*, or return None."""
+    """Extract a float mask array of *dtype* (the rhs dtype) from *mask*, or None.
+
+    The mask must follow the right-hand side's dtype: a strongly typed
+    float32 mask times a weakly typed float64 field is float32, which would
+    run the whole solve in single precision under x64.
+    """
     if mask is None:
         return None
     if isinstance(mask, Mask2D):
-        return jnp.asarray(mask.xy_corner_strict, dtype=jnp.float32)
-    return mask
+        return jnp.asarray(mask.xy_corner_strict, dtype=dtype)
+    return jnp.asarray(mask, dtype=dtype)
 
 
 def _solve_spectral(
@@ -236,7 +242,7 @@ def _solve_cg_method(
     preconditioner: _PrecondLike | None,
 ) -> Float[Array, "Ny Nx"]:
     """Solve using preconditioned Conjugate Gradient on a masked domain."""
-    mask_arr = _resolve_mask_arr(mask)
+    mask_arr = _resolve_mask_arr(mask, rhs.dtype)
     if mask_arr is None:
         raise ValueError("method='cg' requires a mask (array or Mask2D)")
 
@@ -421,7 +427,7 @@ def _known_value_domain(
         basin = jnp.zeros((ny, nx), dtype=dtype).at[1:-1, 1:-1].set(1.0)
         return SolveDomain(basin)
 
-    mask_arr = _resolve_mask_arr(mask)
+    mask_arr = _resolve_mask_arr(mask, dtype)
     if mask_arr is None:
         raise ValueError(f"known_values with method={method!r} requires a mask")
     if method == "capacitance" and known_mask is not None:
@@ -841,7 +847,7 @@ def pv_inversion(
     )
 
     if method == "cg":
-        mask_arr = _resolve_mask_arr(mask)
+        mask_arr = _resolve_mask_arr(mask, pv.dtype)
         if mask_arr is None:
             raise ValueError("method='cg' requires a mask")
         # With known values the solve runs on the effective domain.

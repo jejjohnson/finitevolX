@@ -40,8 +40,8 @@ def boundary_ring(mask: Float[Array, "Ny Nx"]) -> Bool[Array, "Ny Nx"]:
 
     Parameters
     ----------
-    mask : Float[Array, "Ny Nx"]
-        Binary wet/dry mask (1 = wet, 0 = dry).
+    mask : Float[Array, "Ny Nx"] or Bool[Array, "Ny Nx"]
+        Binary wet/dry mask (1 / True = wet, 0 / False = dry).
 
     Returns
     -------
@@ -93,12 +93,14 @@ class SolveDomain(eqx.Module):
         mask: Float[Array, "Ny Nx"] | Mask2D,
         known_mask: Bool[Array, "Ny Nx"] | None = None,
     ):
+        # Keep the masks boolean: a float32 copy would downcast a weakly
+        # typed float64 field it multiplies (the lifting uses jnp.where).
         if isinstance(mask, Mask2D):
-            mask_arr = jnp.asarray(mask.xy_corner_strict, dtype=jnp.float32)
+            mask_arr = jnp.asarray(mask.xy_corner_strict, dtype=bool)
         else:
-            mask_arr = mask
+            mask_arr = jnp.asarray(mask) > 0.5
 
-        self.wet_mask = mask_arr > 0.5
+        self.wet_mask = mask_arr
         self.boundary_ring = boundary_ring(mask_arr)
 
         if known_mask is not None:
@@ -137,8 +139,7 @@ def lift_rhs(
     wet_mask_f = domain.wet_mask.astype(rhs.dtype)
     A_lift = masked_laplacian(value_lift, wet_mask_f, dx, dy, lambda_)
 
-    eff_mask_f = domain.effective_mask.astype(rhs.dtype)
-    rhs_corrected = (rhs - A_lift) * eff_mask_f
+    rhs_corrected = jnp.where(domain.effective_mask, rhs - A_lift, 0.0)
 
     return rhs_corrected, value_lift
 
@@ -152,8 +153,7 @@ def reconstruct_from_lift(
 
     psi = value_lift + psi_hom restricted to the effective solve domain.
     """
-    eff_f = domain.effective_mask.astype(psi_hom.dtype)
-    return value_lift + psi_hom * eff_f
+    return value_lift + jnp.where(domain.effective_mask, psi_hom, 0.0)
 
 
 class KnownValueLifting(eqx.Module):
