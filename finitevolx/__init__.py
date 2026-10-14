@@ -364,6 +364,10 @@ from finitevolx._src.solvers.inhomogeneous import (
     SolveDomain,
     boundary_ring,
 )
+from finitevolx._src.solvers.linear_operators import (
+    helmholtz_operator,
+    masked_helmholtz_operator,
+)
 from finitevolx._src.solvers.multigrid import (
     MultigridSolver,
     build_multigrid_solver,
@@ -794,6 +798,9 @@ __all__ = [
     "boundary_ring",
     "SolveDomain",
     "KnownValueLifting",
+    # The Helmholtz operator as a gaussx operator
+    "helmholtz_operator",
+    "masked_helmholtz_operator",
     # Multigrid Helmholtz solver
     "MultigridSolver",
     "build_multigrid_solver",

@@ -107,6 +107,7 @@ nav:
       - Pressure Poisson: notebooks/pressure_poisson.py
       - Streamfunction Inversion: notebooks/streamfunction_inversion.py
       - Helmholtz Screening: notebooks/helmholtz_screening.py
+      - SPDE Priors with gaussx: notebooks/spde_prior.py
       - 1-D Advection Schemes: notebooks/advection_1d_schemes.py
       - 2-D Rotating Advection: notebooks/advection_2d_rotation.py
       - 2-D Masked Advection: notebooks/advection_2d_masked.py

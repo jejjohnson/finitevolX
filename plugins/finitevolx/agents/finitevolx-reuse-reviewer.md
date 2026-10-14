@@ -69,6 +69,10 @@ list grouped by module, plus spectraldiffx and gaussx.
      `finitevolx.pv_inversion`, `finitevolx.solve_helmholtz_dst`,
      `finitevolx.solve_cg`, `finitevolx.build_capacitance_solver`,
      `finitevolx.build_multigrid_solver`;
+   - a dense Laplacian / Helmholtz matrix built for a prior covariance,
+     its Cholesky, inverse or log-determinant → `finitevolx.helmholtz_operator`,
+     `finitevolx.masked_helmholtz_operator` with gaussx's structured
+     primitives;
    - a Thomas algorithm → `finitevolx.solve_tridiagonal`;
    - an RK3 / RK4 / Adams–Bashforth / leapfrog loop →
      `finitevolx.rk3_ssp_step`, `finitevolx.rk4_step`,

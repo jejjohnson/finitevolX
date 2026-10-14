@@ -49,13 +49,16 @@ Poisson solver or an RK loop, look it up:
 | Diagnostics | `fvx.Energetics2D`, `fvx.Strain2D`, `fvx.QGPotentialVorticity2D`, `fvx.ArakawaJacobian2D`; `fvx.kinetic_energy`, `fvx.okubo_weiss`, `fvx.arakawa_jacobian`, … |
 | Integrals and means | `fvx.area_sum`, `fvx.area_mean`, `fvx.volume_mean`, `fvx.masked_mean` |
 | Poisson / Helmholtz | `fvx.streamfunction_from_vorticity`, `fvx.pressure_from_divergence`, `fvx.pv_inversion` (`bc="dst"` / `"dct"` / `"fft"`; `method="cg"` / `"capacitance"` on masked domains); `fvx.solve_cg`, `fvx.make_preconditioner`, `fvx.build_capacitance_solver`, `fvx.build_multigrid_solver` |
+| The Laplacian as a linear operator (GP / DA priors, log-determinants, sampling) | `fvx.helmholtz_operator(shape, dx, dy, lambda_, bc)` (a `gaussx.DiagonalizedOperator`: `gaussx.solve` / `logdet` / `sqrt` / `inv`), `fvx.masked_helmholtz_operator(mask, dx, dy, lambda_)` (a `gaussx.MaskedOperator`, capacitance solve); an SPDE / Matérn precision `τ²(κ² − ∇²)^α` from its eigenvalues; `fvx.make_gaussx_multigrid_preconditioner(mg)` for `gaussx.CGSolver` |
 | Forcing | `fvx.WindStress2D`, `fvx.LinearDrag2D`, `fvx.QuadraticDrag2D`, `fvx.RayleighDamping2D`, combined with `fvx.ForcingSum` / `fvx.ForcingProduct` / `fvx.TimeVaryingForcing` |
 | Time stepping | `fvx.rk3_ssp_step(state, rhs_fn, dt)`, `fvx.rk4_step`, `fvx.ab2_step`, `fvx.leapfrog_raf_step`, `fvx.imex_ssp2_step`; diffrax solvers `fvx.RK3SSP`, `fvx.SSP_RK104`, `fvx.IMEX_SSP2` with `fvx.solve_ocean_pde` |
 | Several layers | `fvx.multilayer(op.method)` over `[nl, Ny, Nx]`; vertical modes `fvx.decompose_vertical_modes`, `fvx.layer_to_mode` |
 
 Spectral transforms and solvers come from spectraldiffx (finitevolX
 re-exports them); structured linear algebra (tridiagonal solves, Nyström
-preconditioning) comes from gaussx.
+preconditioning) comes from gaussx, and `fvx.helmholtz_operator` /
+`fvx.masked_helmholtz_operator` hand the grid's own Laplacian back to gaussx
+as a structured operator (never a dense matrix).
 
 ## The rules your code must keep
 
@@ -160,6 +163,7 @@ tendency is exactly zero on every land cell.
 | A wet-face mask `wet[:, :-1] & wet[:, 1:]` | `fvx.Mask2D.from_mask(wet).u` |
 | `scipy.fft.dstn` Poisson solver | `fvx.streamfunction_from_vorticity(zeta, dx, dy, bc="dst")`, `fvx.solve_helmholtz_dst` |
 | A conjugate-gradient loop on a masked basin | `fvx.solve_cg(matvec, rhs, preconditioner=fvx.make_preconditioner("spectral", dx=dx, dy=dy))`, or `fvx.build_multigrid_solver` |
+| A dense `(N, N)` Laplacian matrix for a prior covariance, its Cholesky or log-determinant | `fvx.helmholtz_operator` / `fvx.masked_helmholtz_operator` with `gaussx.solve`, `gaussx.logdet`, `gaussx.sqrt` |
 | A Thomas algorithm for vertical diffusion | `fvx.solve_tridiagonal` |
 | A hand-written RK3 / AB2 / leapfrog loop | `fvx.rk3_ssp_step`, `fvx.ab2_step`, `fvx.leapfrog_raf_step`, or `fvx.RK3SSP` with `fvx.solve_ocean_pde` |
 | `jnp.sum(q * dx * dy)` | `fvx.area_sum(q, grid)` (excludes the ghost ring; `mask=` drops land) |
