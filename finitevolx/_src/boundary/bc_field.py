@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Boundary-condition dispatchers for state dictionaries."""
+
+from __future__ import annotations
 
 import equinox as eqx
 from jaxtyping import Array, Float

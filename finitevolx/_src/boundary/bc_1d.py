@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Single-face boundary condition atoms for 2-D ghost-ring arrays."""
+
+from __future__ import annotations
 
 from typing import Literal
 

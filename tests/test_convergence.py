@@ -181,14 +181,15 @@ class TestConvergence2D:
             result = diff.curl(u, v)
             np.testing.assert_allclose(result[1:-1, 1:-1], 2.0 * c, rtol=1e-5)
 
-    def test_diff_x_first_order_convergence_sin(self):
-        """∂h/∂x for h=sin(kx) converges at O(dx) (first-order accurate).
+    def test_diff_x_T_to_U_second_order_convergence_sin(self):
+        """∂h/∂x for h=sin(kx) converges at O(dx²) at the staggered U-points.
 
-        diff_x_T_to_U is a forward difference (first-order stencil):
+        diff_x_T_to_U is a centred difference about the U-point:
             dh/dx[j, i+1/2] = (h[j, i+1] - h[j, i]) / dx
 
-        When N doubles (dx halves), the error should roughly halve (ratio ≈ 2).
-        We require ratio ≥ 1.8 as a conservative lower bound.
+        It is second-order accurate at its output abscissa x[i] + dx/2, so
+        the exact derivative is evaluated there.  When N doubles the error
+        should drop by 4 (rate = log2(ratio) ≈ 2); we require rate > 1.9.
         """
         L = 2.0 * np.pi
         k = 1.0
@@ -197,13 +198,14 @@ class TestConvergence2D:
         for n in [16, 32]:
             grid = CartesianGrid2D.from_interior(n, n, L, L)
             diff = Difference2D(grid=grid)
-            x = (jnp.arange(grid.Nx, dtype=float) + 0.5) * grid.dx
+            x = (jnp.arange(grid.Nx, dtype=float) + 0.5) * grid.dx  # T-points
+            x_u = x + 0.5 * grid.dx  # U-points: east faces
             h = jnp.broadcast_to(jnp.sin(k * x), (grid.Ny, grid.Nx))
             result = diff.diff_x_T_to_U(h)
-            exact = jnp.broadcast_to(k * jnp.cos(k * x), (grid.Ny, grid.Nx))
+            exact = jnp.broadcast_to(k * jnp.cos(k * x_u), (grid.Ny, grid.Nx))
             errors.append(_max_error(result[2:-2, 2:-2], exact[2:-2, 2:-2]))
 
-        ratio = errors[0] / errors[1]
-        assert ratio >= 1.8, (
-            f"diff_x convergence ratio {ratio:.2f} < 1.8 (expected ~2 for O(dx) first-order)"
+        rate = np.log2(errors[0] / errors[1])
+        assert rate > 1.9, (
+            f"diff_x_T_to_U convergence rate {rate:.2f} < 1.9 (expected ~2)"
         )

@@ -101,7 +101,7 @@ current).
 | `weno_9pts` | function | 9-points non-linear left-biased stencil reconstruction |
 | `weno_9pts_right` | function | 9-points non-linear right-biased stencil reconstruction at face q0+1/2: |
 
-#### bc_1d (`finitevolx._src.boundary.bc_1d`)
+#### Single-face boundary condition atoms for 2-D ghost-ring arrays (`finitevolx._src.boundary.bc_1d`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -115,19 +115,19 @@ current).
 | `Slip1D` | class | Slip boundary condition for tangential velocity at a solid wall. |
 | `Sponge1D` | class | Relax one ghost face toward a background value. |
 
-#### bc_field (`finitevolx._src.boundary.bc_field`)
+#### Boundary-condition dispatchers for state dictionaries (`finitevolx._src.boundary.bc_field`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `FieldBCSet` | class | Dispatch per-face boundary conditions across multiple fields. |
 
-#### bc_set (`finitevolx._src.boundary.bc_set`)
+#### Per-face boundary condition containers for 2-D ghost-ring arrays (`finitevolx._src.boundary.bc_set`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `BoundaryConditionSet` | class | Apply a different boundary condition on each domain face. |
 
-#### boundary (`finitevolx._src.boundary.boundary`)
+#### Boundary condition helpers for finitevolX (`finitevolx._src.boundary.boundary`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -555,7 +555,7 @@ current).
 |---|---|---|
 | `multilayer` | function | Lift a 2D horizontal operator to multilayer/multimode fields. |
 
-#### vertical_modes (`finitevolx._src.vertical.vertical_modes`)
+#### Vertical coupling matrix and layer/mode transforms for multi-layer ocean models (`finitevolx._src.vertical.vertical_modes`)
 
 | Name | Kind | What it does |
 |---|---|---|

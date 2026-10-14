@@ -11,6 +11,6 @@ Finite-difference operators for computing spatial derivatives on staggered Araka
 ## Spherical
 
 `SphericalDifference2D` also provides `geostrophic_velocity(h, f, gravity)`,
-the mask-aware class form of `geostrophic_velocity_sphere`.
+the public (mask-aware) entry point for the spherical geostrophic velocity.
 
 ::: finitevolx.SphericalDifference2D

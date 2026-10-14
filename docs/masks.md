@@ -197,7 +197,7 @@ functional code stays coordinate-and-mask agnostic:
 | Layer | Example | Mask-aware? |
 |---|---|---|
 | Layer 1 — raw stencils | `diff_x_fwd`, `avg_y_bwd`, … in `stencils.py` | **No** |
-| Layer 2 — functional helpers | `_curl_2d`, `divergence_2d`, `diffusion_2d`, `kinetic_energy`, `enstrophy`, `geostrophic_velocity_sphere`, `arakawa_jacobian`, … | **No** |
+| Layer 2 — functional helpers | `_curl_2d`, `divergence_2d`, `diffusion_2d`, `kinetic_energy`, `enstrophy`, `_geostrophic_velocity_sphere` (private), `arakawa_jacobian`, … | **No** |
 | Layer 3 — class operators | `Difference2D`, `Interpolation2D`, `Divergence2D`, `Vorticity2D`, `Coriolis2D`, `Advection2D`, `Diffusion2D`, `MomentumAdvection2D`, `Energetics2D`, `Strain2D`, `QGPotentialVorticity2D`, `ArakawaJacobian2D`, and their `1D` / `3D` / `Spherical*` siblings | **Yes**, via `self.mask` |
 
 The pointwise and stencil diagnostics below have Layer-3 class forms, so
@@ -212,7 +212,7 @@ in a masked domain you don't need to mask them by hand:
 | `enstrophy`, `potential_enstrophy` | `Vorticity2D.enstrophy(u, v)`, `Vorticity2D.potential_enstrophy(u, v, h, f)` |
 | `qg_potential_vorticity`, `stretching_term`, `potential_vorticity_multilayer` | `QGPotentialVorticity2D.__call__`, `.stretching`, `.multilayer` |
 | `arakawa_jacobian` | `ArakawaJacobian2D(grid, mask)` (full-shape output, zero ghost ring) |
-| `geostrophic_velocity_sphere` | `SphericalDifference2D.geostrophic_velocity(h, f, gravity)` |
+| `_geostrophic_velocity_sphere` (private) | `SphericalDifference2D.geostrophic_velocity(h, f, gravity)` |
 
 ```python
 energetics = fvx.Energetics2D(grid=grid, mask=mask)

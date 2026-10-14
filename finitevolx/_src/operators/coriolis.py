@@ -76,7 +76,7 @@ class Coriolis2D(eqx.Module):
     ) -> None:
         self.grid = grid
         self.mask = mask
-        self.interp = Interpolation2D(grid=grid)
+        self.interp = Interpolation2D(grid=grid, mask=mask)
 
     def __call__(
         self,
