@@ -1,9 +1,13 @@
 """Tests for boundary condition helpers."""
 
+from typing import ClassVar
+
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+
+jax.config.update("jax_enable_x64", True)
 
 from finitevolx import (
     BoundaryConditionSet,
@@ -119,24 +123,24 @@ class TestBoundaryConditionAtoms:
         expected = field[:, -2] + 3.0
         np.testing.assert_allclose(result[:, -1], expected)
 
-    def test_neumann_sets_south_ghost_with_negative_outward_direction(self):
+    def test_neumann_sets_south_ghost_from_outward_gradient(self):
         field = (
             jnp.zeros((6, 6))
             .at[1:-1, 1:-1]
             .set(jnp.arange(16, dtype=float).reshape(4, 4))
         )
         result = Neumann1D("south", value=1.5)(field, dx=2.0, dy=3.0)
-        expected = field[1, :] - 4.5
+        expected = field[1, :] + 4.5
         np.testing.assert_allclose(result[0, :], expected)
 
-    def test_neumann_sets_west_ghost_with_negative_outward_direction(self):
+    def test_neumann_sets_west_ghost_from_outward_gradient(self):
         field = (
             jnp.zeros((6, 6))
             .at[1:-1, 1:-1]
             .set(jnp.arange(16, dtype=float).reshape(4, 4))
         )
         result = Neumann1D("west", value=1.5)(field, dx=2.0, dy=3.0)
-        expected = field[:, 1] - 3.0
+        expected = field[:, 1] + 3.0
         np.testing.assert_allclose(result[:, 0], expected)
 
     def test_sponge_relaxes_ghost_face_toward_background(self):
@@ -324,8 +328,8 @@ class TestRobin1D:
         result = Robin1D("south", alpha=alpha, beta=beta, gamma=gamma)(
             field, dx=2.0, dy=3.0
         )
-        # s = beta * sign / spacing = 1.0 * (-1.0) / 3.0
-        s = beta * (-1.0) / 3.0
+        # s = beta / spacing = 1.0 / 3.0 (no face-dependent sign)
+        s = beta / 3.0
         interior = field[1, :]
         expected = (gamma - interior * (alpha / 2.0 - s)) / (alpha / 2.0 + s)
         np.testing.assert_allclose(result[0, :], expected)
@@ -336,7 +340,7 @@ class TestRobin1D:
         result = Robin1D("east", alpha=alpha, beta=beta, gamma=gamma)(
             field, dx=2.0, dy=3.0
         )
-        s = beta * 1.0 / 2.0  # east: sign=+1, spacing=dx=2
+        s = beta / 2.0  # east: spacing=dx=2
         interior = field[:, -2]
         expected = (gamma - interior * (alpha / 2.0 - s)) / (alpha / 2.0 + s)
         np.testing.assert_allclose(result[:, -1], expected)
@@ -388,6 +392,74 @@ class TestRobin1D:
         )
         result = bcs(field, dx=1.0, dy=1.0)
         assert result.shape == field.shape
+
+
+class TestOutwardGradientAnalytic:
+    """Ghost cells reproduce the analytic field phi = x + 2 y on every face.
+
+    The ghost cell lies outward of the interior, so ``value`` is the true
+    outward-normal gradient: -1 (west), +1 (east), -2 (south), +2 (north).
+    """
+
+    NY, NX, DX, DY = 7, 6, 0.5, 0.25
+    OUTWARD: ClassVar[dict[str, float]] = {
+        "south": -2.0,
+        "north": 2.0,
+        "west": -1.0,
+        "east": 1.0,
+    }
+
+    @classmethod
+    def _phi(cls):
+        x = (jnp.arange(cls.NX) - 1) * cls.DX
+        y = (jnp.arange(cls.NY) - 1) * cls.DY
+        return x[None, :] + 2.0 * y[:, None]
+
+    @staticmethod
+    def _ghost(arr, face):
+        return {
+            "south": arr[0, 1:-1],
+            "north": arr[-1, 1:-1],
+            "west": arr[1:-1, 0],
+            "east": arr[1:-1, -1],
+        }[face]
+
+    @pytest.mark.parametrize("face", ["south", "north", "west", "east"])
+    def test_neumann(self, face):
+        phi = self._phi()
+        field = phi.at[0, :].set(0).at[-1, :].set(0).at[:, 0].set(0).at[:, -1].set(0)
+        out = Neumann1D(face, self.OUTWARD[face])(field, self.DX, self.DY)
+        np.testing.assert_allclose(
+            self._ghost(out, face), self._ghost(phi, face), atol=1e-14
+        )
+
+    @pytest.mark.parametrize("face", ["south", "north", "west", "east"])
+    @pytest.mark.parametrize("alpha, beta", [(0.0, 1.0), (1.0, 0.5), (2.0, -0.3)])
+    def test_robin(self, face, alpha, beta):
+        phi = self._phi()
+        field = phi.at[0, :].set(0).at[-1, :].set(0).at[:, 0].set(0).at[:, -1].set(0)
+        spacing = self.DY if face in ("south", "north") else self.DX
+        # Interior neighbour one cell inward of the ghost, at tangential index 2.
+        ghost, interior = {
+            "south": (phi[0, 2], phi[1, 2]),
+            "north": (phi[-1, 2], phi[-2, 2]),
+            "west": (phi[2, 0], phi[2, 1]),
+            "east": (phi[2, -1], phi[2, -2]),
+        }[face]
+        # gamma = alpha * phi_face + beta * dphi/dn, from the analytic field.
+        gamma = float(
+            alpha * 0.5 * (ghost + interior) + beta * (ghost - interior) / spacing
+        )
+        out = Robin1D(face, alpha=alpha, beta=beta, gamma=gamma)(
+            field, self.DX, self.DY
+        )
+        got = {
+            "south": out[0, 2],
+            "north": out[-1, 2],
+            "west": out[2, 0],
+            "east": out[2, -1],
+        }[face]
+        np.testing.assert_allclose(float(got), float(ghost), atol=1e-14)
 
 
 class TestExtrapolation1D:

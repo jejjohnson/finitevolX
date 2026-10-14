@@ -38,12 +38,14 @@ $$
 **Neumann** ($\partial\phi/\partial n\big|_{\text{wall}} = g$, outward normal):
 
 $$
-\frac{\phi_1 - \phi_0}{\Delta n} = \pm g
-\implies \phi_0 = \phi_1 \mp g\,\Delta n
+\frac{\phi_0 - \phi_1}{\Delta n} = g
+\implies \phi_0 = \phi_1 + g\,\Delta n
 $$
 
-where the sign depends on the face: $-$ for south/west (outward normal points
-inward in index space), $+$ for north/east.
+where $\phi_0$ is the ghost cell and $\phi_1$ the adjacent interior cell. The
+ghost cell lies outward of the interior on every face, so the same formula
+holds on all four faces: $g$ is the true gradient along the outward normal
+(e.g. $g = -\partial\phi/\partial y$ on the south wall).
 
 **Periodic** ($\phi_0 = \phi_{N-1}$, $\phi_N = \phi_1$):
 
@@ -72,7 +74,7 @@ $$
 Fixes the **outward-normal gradient** $\partial\phi/\partial n = g$:
 
 $$
-\phi_{\text{ghost}} = \phi_{\text{interior}} \mp g\,\Delta n
+\phi_{\text{ghost}} = \phi_{\text{interior}} + g\,\Delta n
 $$
 
 **Physical use cases:**
@@ -152,6 +154,15 @@ gradient:
 
 $$
 a\,\phi_{\text{wall}} + b\,\frac{\partial\phi}{\partial n}\bigg|_{\text{wall}} = g
+$$
+
+With $\phi_{\text{wall}} = (\phi_{\text{ghost}} + \phi_{\text{interior}})/2$ and
+$\partial\phi/\partial n = (\phi_{\text{ghost}} - \phi_{\text{interior}})/\Delta n$
+(outward normal, same on every face), the ghost value is
+
+$$
+\phi_{\text{ghost}} = \frac{g - (a/2 - s)\,\phi_{\text{interior}}}{a/2 + s},
+\qquad s = \frac{b}{\Delta n}
 $$
 
 Used for **sponge-layer** or **radiation** boundary conditions in more

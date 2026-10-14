@@ -27,7 +27,7 @@ in `AGENTS.md`.
      (`interior_or_scalar`, `on_face_interior`, `safe_speed`,
      `safe_denominator`, `mask_where`); `boundary/bc_1d.py`
      (`_adjacent_interior`, `_opposite_interior`, `_normal_spacing`,
-     `_outward_sign`, `_set_face`); `advection/flux.narrow_mask_hierarchy`;
+     `_set_face`); `advection/flux.narrow_mask_hierarchy`;
      `advection/reconstruction._get_limiter`; `mask/utils.py` (`pool_bool`,
      `h_from_pooled`, `dilate_mask`, `count_contiguous`, `make_sponge`);
      `operators/difference.py` (`_curl_2d`, `_divergence_2d`);

@@ -28,11 +28,13 @@ particular coefficients, or a set of existing atoms.
   validation in `__check_init__` (as `Sponge1D` checks `weight`);
   `__call__(self, field, dx, dy)` returns `field` with **one** ghost row /
   column replaced, using the private helpers there (`_adjacent_interior`,
-  `_opposite_interior`, `_normal_spacing`, `_outward_sign`, `_set_face`).
+  `_opposite_interior`, `_normal_spacing`, `_set_face`).
 - Place the condition **at the face**, half a cell from the first interior
   value: Dirichlet sets `ghost = 2 * value - interior`, Neumann
-  `ghost = interior + sign * value * spacing`, with `sign` the outward
-  normal. Write that formula in the docstring and in a comment.
+  `ghost = interior + value * spacing` on every face (the ghost cell lies
+  outward of the interior, so `(ghost - interior) / spacing` is already the
+  outward-normal gradient). Write that formula in the docstring and in a
+  comment.
 - Add the class to the `BoundaryCondition1D` union at the bottom of
   `bc_1d.py` (it types `BoundaryConditionSet`'s fields).
 - **A set factory** is a `@classmethod` on `BoundaryConditionSet`
