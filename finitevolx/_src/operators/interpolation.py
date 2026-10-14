@@ -124,7 +124,7 @@ class Interpolation2D(eqx.Module):
         contain contributions from the input field at the dry input
         cells (``u[dry]`` / ``v[dry]`` / ``q[dry]`` — whatever the
         caller stored there).  This is the accepted convention — see
-        ``tests/test_interpolation_masks.py::TestCrossFaceAudit`` for
+        ``tests/test_interp_div_vort_masks.py::TestCrossFaceAudit`` for
         the pinned semantic.
     """
 

@@ -210,7 +210,8 @@ class SphericalDifference2D(eqx.Module):
         dh_dlon_V[j+1/2, i] = (h[j, i+1] + h[j+1, i+1]
                               - h[j, i-1] - h[j+1, i-1]) / (4 * dlon)
 
-        Class form of :func:`~finitevolx.geostrophic_velocity_sphere`.
+        Mask-aware class form of the private functional helper
+        ``_geostrophic_velocity_sphere`` (not part of the public API).
 
         Parameters
         ----------

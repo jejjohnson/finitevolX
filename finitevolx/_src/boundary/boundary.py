@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Boundary condition helpers for finitevolX.
 
@@ -7,6 +5,8 @@ All arrays have total shape [Ny, Nx].
 Ghost cells occupy the outermost ring: rows 0 and Ny-1, columns 0 and Nx-1.
 The physical interior lives at [1:-1, 1:-1].
 """
+
+from __future__ import annotations
 
 import jax.numpy as jnp
 from jaxtyping import Array, Float

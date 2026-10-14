@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Vertical coupling matrix and layer/mode transforms for multi-layer ocean models.
 
 The **A matrix** encodes the coupling between layers through buoyancy (reduced
@@ -43,6 +41,8 @@ References
 - louity/qgsw-pytorch: https://github.com/louity/qgsw-pytorch/blob/main/src/qg.py
 """
 
+from __future__ import annotations
+
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
@@ -65,8 +65,10 @@ def build_coupling_matrix(
     g_prime : Float[Array, "nl"]
         Reduced gravities [m s⁻²].  ``g_prime[i]`` is the reduced gravity at
         the interface *above* layer i (i.e., between layers i-1 and i).
-        The bottom entry ``g_prime[nl-1]`` is the rigid-lid reduced gravity
-        and equals ``g_prime[nl-2]`` for a standard ocean configuration.
+        The top entry ``g_prime[0]`` is the lid / free-surface reduced
+        gravity (the ``1 / (H[0] g_prime[0])`` term of the top row): the full
+        gravity ``g`` for a free surface (e.g. ``[9.81, 0.025]`` in the QG
+        examples), or a large value to approximate a rigid lid.
         All values must be positive.
 
     Returns

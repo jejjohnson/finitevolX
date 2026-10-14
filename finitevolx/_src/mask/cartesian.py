@@ -396,10 +396,12 @@ class Mask2D(eqx.Module):
         Logical inverses of the corresponding masks.
     xy_corner_y_wall : Bool[Array, "Ny Nx"]
         xy-corner cells on a y-direction wall: wet xy_corner cell where
-        at least one y-adjacent v-face is dry.
+        at least one of the two u-faces ``u[j, i]``, ``u[j+1, i]`` meeting
+        at the corner is dry.
     xy_corner_x_wall : Bool[Array, "Ny Nx"]
         xy-corner cells on an x-direction wall: wet xy_corner cell where
-        at least one x-adjacent u-face is dry.
+        at least one of the two v-faces ``v[j, i]``, ``v[j, i+1]`` meeting
+        at the corner is dry.
     xy_corner_convex : Bool[Array, "Ny Nx"]
         xy-corner cells at convex corners (on both x- and y-walls).
     xy_corner_valid : Bool[Array, "Ny Nx"]
@@ -967,9 +969,12 @@ class Mask3D(eqx.Module):
         Logical inverses of the corresponding masks.
     xy_corner_y_wall : Bool[Array, "Nz Ny Nx"]
         xy-corner cells on a y-direction wall: wet xy_corner cell where
-        at least one y-adjacent v-face is dry (per z-level).
+        at least one of the two u-faces meeting at the corner is dry
+        (per z-level).
     xy_corner_x_wall : Bool[Array, "Nz Ny Nx"]
-        xy-corner cells on an x-direction wall (per z-level).
+        xy-corner cells on an x-direction wall: wet xy_corner cell where
+        at least one of the two v-faces meeting at the corner is dry
+        (per z-level).
     xy_corner_convex : Bool[Array, "Nz Ny Nx"]
         xy-corner cells at convex corners (on both walls).
     xy_corner_valid : Bool[Array, "Nz Ny Nx"]

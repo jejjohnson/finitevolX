@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Per-face boundary condition containers for 2-D ghost-ring arrays."""
+
+from __future__ import annotations
 
 import equinox as eqx
 from jaxtyping import Array, Float
