@@ -96,7 +96,11 @@ $\Delta t$ than fully explicit treatment of stiff terms.
 
 finitevolX provides **IMEX-SSP2(2,2,2)**: a 2nd-order method where the
 explicit part is SSP and the implicit part is A-stable (SDIRK with
-$\gamma = 1 - 1/\sqrt{2}$).
+$\gamma = 1 - 1/\sqrt{2}$). It is the Pareschi–Russo SSP2(2,2,2) scheme:
+stage 1 solves $Y_1 = y_n + \gamma\,\Delta t\,F_I(Y_1)$; stage 2 solves
+$Y_2 = y_n + \Delta t\,F_E(Y_1) + (1-2\gamma)\Delta t\,F_I(Y_1)
++ \gamma\,\Delta t\,F_I(Y_2)$; the update averages both stages,
+$y_{n+1} = y_n + \tfrac{\Delta t}{2}\sum_{i=1}^{2}\left[F_E(Y_i) + F_I(Y_i)\right]$.
 
 ### Split-Explicit
 
