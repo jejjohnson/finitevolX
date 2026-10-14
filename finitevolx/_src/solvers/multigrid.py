@@ -33,12 +33,14 @@ which wraps a single V-cycle as a preconditioner closure compatible with
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Literal
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float
+from jaxtyping import Array, Float, Int
 import numpy as np
+from scipy import ndimage
 
 from finitevolx._src.mask import Mask2D
 
@@ -179,6 +181,52 @@ def _interpolate_coeff_to_faces(
     return cx, cy
 
 
+def _compute_wall_coefficient(
+    coeff: np.ndarray,
+    mask: np.ndarray,
+    bc: str,
+    dx: float,
+    dy: float,
+) -> np.ndarray:
+    """Diagonal sink from the wet–dry faces of the Dirichlet operator.
+
+    With ``bc="dirichlet"`` the value at a dry neighbour (land, or outside
+    the array) is taken as 0, so the face between a wet cell ``(j, i)`` and
+    a dry neighbour keeps its coefficient and contributes
+    ``c_f (0 - u[j, i]) / h**2`` — the :func:`masked_laplacian` stencil with
+    dry neighbours zero.  Those terms only touch the diagonal::
+
+        wall[j, i] = sum over the faces of (j, i) with a dry neighbour of
+                     c[j, i] / h**2          (h = dx for x-faces, dy for y-faces)
+
+    The face coefficient is the wet cell's own ``c`` (the dry side has none).
+    With ``bc="neumann"`` those faces carry no flux and ``wall = 0``.
+
+    Parameters
+    ----------
+    coeff : ndarray, shape (Ny, Nx)
+        Cell-centre coefficient, zero on dry cells.
+    mask : ndarray, shape (Ny, Nx)
+        Cell-centre mask (1 = wet).
+    bc : {"dirichlet", "neumann"}
+        Wall condition.
+    dx, dy : float
+        Grid spacings.
+
+    Returns
+    -------
+    ndarray, shape (Ny, Nx)
+        Wall sink ``wall[j, i] >= 0``, zero on dry cells.
+    """
+    if bc == "neumann":
+        return np.zeros_like(mask)
+    # number of dry 4-neighbours in each direction (outside the array = dry)
+    mp = np.pad(mask, 1)  # [Ny+2, Nx+2], zero ring = dry
+    dry_x = (1.0 - mp[1:-1, :-2]) + (1.0 - mp[1:-1, 2:])  # west + east
+    dry_y = (1.0 - mp[:-2, 1:-1]) + (1.0 - mp[2:, 1:-1])  # south + north
+    return coeff * mask * (dry_x / dx**2 + dry_y / dy**2)
+
+
 def _restrict_coeff(
     coeff: np.ndarray,
     mask_fine: np.ndarray,
@@ -221,6 +269,7 @@ def _restrict_coeff(
 def _compute_inv_diagonal(
     cx: np.ndarray,
     cy: np.ndarray,
+    wall: np.ndarray,
     mask: np.ndarray,
     dx: float,
     dy: float,
@@ -233,7 +282,7 @@ def _compute_inv_diagonal(
 
         diag[j, i] = -(cx[j, i] + cx[j, i-1]) / dx**2
                      -(cy[j, i] + cy[j-1, i]) / dy**2
-                     - lambda
+                     - wall[j, i] - lambda
 
     where ``cx[j, i]`` is the x-face coefficient between ``(j,i)`` and
     ``(j,i+1)`` and ``cx[j, i-1]`` is the face between ``(j,i-1)`` and
@@ -243,6 +292,8 @@ def _compute_inv_diagonal(
     ----------
     cx, cy : ndarray, shape (Ny, Nx)
         Face coefficients (from :func:`_interpolate_coeff_to_faces`).
+    wall : ndarray, shape (Ny, Nx)
+        Dirichlet wall sink (from :func:`_compute_wall_coefficient`).
     mask : ndarray, shape (Ny, Nx)
         Cell-centre mask.
     dx, dy : float
@@ -264,8 +315,8 @@ def _compute_inv_diagonal(
     cy_south = np.zeros_like(cy)
     cy_south[1:, :] = cy[:-1, :]
 
-    # Diagonal = sum of (negative) face contributions minus lambda
-    diag = -(cx + cx_west) / dx**2 - (cy + cy_south) / dy**2 - lambda_
+    # Diagonal = sum of (negative) face contributions, wall sink, minus lambda
+    diag = -(cx + cx_west) / dx**2 - (cy + cy_south) / dy**2 - wall - lambda_
     diag *= mask
 
     # Safe inversion: avoid division by zero outside domain / on land cells.
@@ -301,6 +352,9 @@ class MultigridLevel(eqx.Module):
         Y-direction face coefficient, including face mask.
         ``cy[j, i]`` is the coefficient on the face between cells
         ``(j, i)`` and ``(j+1, i)``.  Zero if either cell is land.
+    wall : Float[Array, "Ny Nx"]
+        Diagonal sink ``sum c_f / h**2`` over the wet–dry faces of each wet
+        cell (dry neighbour = 0, Dirichlet); zero for ``bc="neumann"``.
     dx, dy : float
         Grid spacing at this level (doubles at each coarser level).
     lambda_ : float
@@ -313,6 +367,7 @@ class MultigridLevel(eqx.Module):
     mask: Float[Array, "Ny Nx"]
     cx: Float[Array, "Ny Nx"]
     cy: Float[Array, "Ny Nx"]
+    wall: Float[Array, "Ny Nx"]
     dx: float
     dy: float
     lambda_: float = eqx.field(static=True)
@@ -335,21 +390,24 @@ def _apply_operator(
         (Au)[j,i] =
           (cx[j,i] * (u[j,i+1] - u[j,i]) - cx[j,i-1] * (u[j,i] - u[j,i-1])) / dx^2
         + (cy[j,i] * (u[j+1,i] - u[j,i]) - cy[j-1,i] * (u[j,i] - u[j-1,i])) / dy^2
-        - lambda * u[j,i]
+        - wall[j,i] * u[j,i] - lambda * u[j,i]
 
     This is a discrete approximation of ``div(c grad u) - lambda u``.  The
     ``cx`` / ``cy`` face coefficients already include the face mask, so
-    fluxes across land boundaries are automatically zero.
+    they carry the wet–wet fluxes only.
 
     Boundary treatment
     ~~~~~~~~~~~~~~~~~~
-    Zero normal flux at the domain edges is enforced primarily by the
-    face coefficients ``cx``/``cy``: boundary faces have zero coefficient,
-    so no flux crosses the domain boundary regardless of ghost values.
-    Out-of-bounds neighbours are zero-padded as an implementation
-    convenience (avoids periodic wrapping from ``jnp.roll``).  Unlike
-    ``jnp.roll``, this does not introduce spurious fluxes across
-    opposite edges — the natural choice for bounded ocean basins.
+    The wet–dry faces (land and the array edge) are set by ``wall``:
+
+    * ``bc="dirichlet"``: the dry neighbour's value is 0, so each wet–dry
+      face adds ``c_f (0 - u[j,i]) / h**2``, i.e. ``-wall[j,i] u[j,i]``.
+      With ``c = 1`` this is exactly :func:`masked_laplacian` (dry
+      neighbours zero, no periodic wrap).
+    * ``bc="neumann"``: ``wall = 0``, no flux crosses a wet–dry face.
+
+    Out-of-bounds neighbours are zero-padded, so nothing wraps across
+    opposite edges.
 
     Implementation note
     ~~~~~~~~~~~~~~~~~~~
@@ -402,7 +460,46 @@ def _apply_operator(
         cy * (u_north - u_m) - cy_south * (u_m - u_south)
     ) / dy2
 
-    return (lap - level.lambda_ * u_m) * level.mask
+    return (lap - (level.wall + level.lambda_) * u_m) * level.mask
+
+
+def _project_zero_mean(
+    u: Float[Array, "Ny Nx"],
+    mask: Float[Array, "Ny Nx"],
+    labels: Int[Array, "Ny Nx"],
+    counts: Float[Array, " n"],
+) -> Float[Array, "Ny Nx"]:
+    """Remove the wet mean of *u* on each connected wet component.
+
+    The Neumann operator at ``lambda = 0`` annihilates a constant on every
+    connected wet component, so ``A u = rhs`` is solvable only for a
+    zero-mean ``rhs`` and fixes ``u`` up to those constants.  This
+    orthogonal projection (symmetric, idempotent) imposes the zero-mean
+    gauge::
+
+        u[j, i] <- u[j, i] - mean(u over the component of (j, i))
+
+    Parameters
+    ----------
+    u : Float[Array, "Ny Nx"]
+        Field to project.
+    mask : Float[Array, "Ny Nx"]
+        Wet mask.
+    labels : Int[Array, "Ny Nx"]
+        Component label of each cell (0 = dry, 1..n wet components).
+    counts : Float[Array, " n"]
+        Wet-cell count per label (``counts[0]`` is unused, set to 1).
+
+    Returns
+    -------
+    Float[Array, "Ny Nx"]
+        Projected field, zero on dry cells.
+    """
+    u_m = u * mask
+    # per-component sum, [n_components + 1]
+    sums = jax.ops.segment_sum(u_m.ravel(), labels.ravel(), counts.shape[0])
+    mean = (sums / counts)[labels]  # [Ny, Nx]
+    return (u_m - mean) * mask
 
 
 def _weighted_jacobi(
@@ -677,6 +774,14 @@ class MultigridSolver(eqx.Module):
         Jacobi relaxation weight (typically 0.8-0.95).
     n_cycles : int
         Number of V-cycles per solve.
+    bc : {"dirichlet", "neumann"}
+        Wall condition on the wet–dry faces the hierarchy was built with
+        (see :func:`build_multigrid_solver`).
+    null_labels, null_counts : Array or None
+        Connected-component labels and wet counts of the finest mask, set
+        only for ``bc="neumann"`` with ``lambda_ = 0``, where the operator
+        is singular; the solve then returns the zero-mean solution on each
+        component (and projects ``rhs`` onto the solvable, zero-mean part).
     """
 
     levels: tuple[MultigridLevel, ...]
@@ -686,6 +791,9 @@ class MultigridSolver(eqx.Module):
     n_coarse: int = eqx.field(static=True, default=50)
     omega: float = eqx.field(static=True, default=0.95)
     n_cycles: int = eqx.field(static=True, default=5)
+    bc: str = eqx.field(static=True, default="dirichlet")
+    null_labels: Array | None = None
+    null_counts: Array | None = None
 
     # -- Public API ----------------------------------------------------------
 
@@ -846,6 +954,30 @@ class MultigridSolver(eqx.Module):
         """
         level = self.levels[level_idx]
 
+        # Singular Neumann problem (lambda = 0): solve in the zero-mean gauge.
+        # Projecting the input and output of the finest cycle keeps the
+        # V-cycle linear and symmetric (P V P with P an orthogonal projection).
+        if level_idx == 0 and self.null_labels is not None:
+            rhs = self._project(rhs)
+            u = self._project(self._v_cycle_from(u, rhs, level_idx, level))
+            return u
+        return self._v_cycle_from(u, rhs, level_idx, level)
+
+    def _project(self, u: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+        """Zero-mean projection on each wet component (Neumann, lambda = 0)."""
+        assert self.null_labels is not None and self.null_counts is not None
+        return _project_zero_mean(
+            u, self.levels[0].mask, self.null_labels, self.null_counts
+        )
+
+    def _v_cycle_from(
+        self,
+        u: Float[Array, "Ny Nx"],
+        rhs: Float[Array, "Ny Nx"],
+        level_idx: int,
+        level: MultigridLevel,
+    ) -> Float[Array, "Ny Nx"]:
+        """One V-cycle at *level_idx* without the zero-mean projection."""
         # --- Coarsest level: iterated Jacobi as the bottom solver ---
         # The grid is small (typically 8x8 to 16x16), so many Jacobi
         # iterations are cheap and sufficient for convergence.
@@ -914,6 +1046,7 @@ def build_multigrid_solver(
     n_coarse: int = 50,
     omega: float = 0.95,
     n_cycles: int = 5,
+    bc: Literal["dirichlet", "neumann"] = "dirichlet",
 ) -> MultigridSolver:
     r"""Build a multigrid solver with precomputed level hierarchies.
 
@@ -942,18 +1075,37 @@ def build_multigrid_solver(
     with frozen JAX arrays.  All subsequent calls (forward solves,
     gradients, JIT compilation) use the precomputed hierarchy.
 
+    Boundary condition
+    ~~~~~~~~~~~~~~~~~~
+    ``bc`` sets what happens on every face between a wet cell and a dry
+    one (land, or outside the array), on every level:
+
+    * ``"dirichlet"`` (default): ``u = 0`` on the dry neighbour, the face
+      keeps its coefficient.  With ``coeff=None`` the finest-level operator
+      is exactly :func:`~finitevolx.masked_laplacian` with dry neighbours
+      zero — the streamfunction problem, ``psi = 0`` on the wall / coast
+      X nodes of ``Mask2D.xy_corner_strict``.  Non-singular for every
+      ``lambda_ >= 0``.
+    * ``"neumann"``: zero flux through wet–dry faces — the pressure /
+      free-surface problem at T points (pass ``mask.h``).  At
+      ``lambda_ = 0`` the operator is singular (a constant per connected
+      wet component); the solver then projects ``rhs`` and the solution
+      onto zero mean on each component.
+
     Parameters
     ----------
     mask : array, shape (Ny, Nx), or Mask2D
         Domain mask (1 = fluid, 0 = land).  ``None`` is *not* accepted;
         pass ``np.ones((Ny, Nx))`` for a rectangular domain.
-        When an :class:`Mask2D` is passed, the ``psi``
-        staggering mask is extracted automatically.
+        When a :class:`Mask2D` is passed, the ψ mask
+        ``xy_corner_strict`` is extracted (pair it with the default
+        ``bc="dirichlet"``); for a T-point problem pass ``mask.h``.
     dx, dy : float
         Fine-grid spacings (metres or non-dimensional).
     lambda_ : float
         Helmholtz parameter (>= 0).  Use 0.0 for pure Poisson (Laplacian
-        only).  For QG PV inversion, ``lambda_ = 1 / Rd**2``.
+        only).  For QG PV inversion (``bc="dirichlet"``),
+        ``lambda_ = 1 / Rd**2``.
     coeff : array, shape (Ny, Nx), or None
         Spatially varying coefficient ``c(x, y)`` at cell centres.
         ``None`` -> constant coefficient = 1 everywhere (reduces to the
@@ -977,6 +1129,8 @@ def build_multigrid_solver(
     n_cycles : int
         Number of V-cycles applied per solve.  5 cycles typically reduce
         the residual by 3-5 orders of magnitude.  Default: 5.
+    bc : {"dirichlet", "neumann"}
+        Condition on wet–dry faces (see above).  Default: ``"dirichlet"``.
 
     Returns
     -------
@@ -986,8 +1140,12 @@ def build_multigrid_solver(
     Raises
     ------
     ValueError
-        If grid dimensions are not divisible by ``2**(n_levels - 1)``.
+        If grid dimensions are not divisible by ``2**(n_levels - 1)``, or
+        ``bc`` is not ``"dirichlet"`` or ``"neumann"``.
     """
+    if bc not in ("dirichlet", "neumann"):
+        raise ValueError(f"bc must be 'dirichlet' or 'neumann'; got {bc!r}")
+
     # --- Extract mask as a NumPy float64 array ---
     if isinstance(mask, Mask2D):
         mask_np = np.asarray(mask.xy_corner_strict, dtype=np.float64)
@@ -1025,9 +1183,13 @@ def build_multigrid_solver(
         # cx[j,i] = face coeff between (j,i) and (j,i+1), zero if either is land.
         # cy[j,i] = face coeff between (j,i) and (j+1,i), zero if either is land.
         cx, cy = _interpolate_coeff_to_faces(cur_coeff, cur_mask)
+        # Dirichlet: wet-dry faces keep c and see u = 0 beyond them (diagonal)
+        wall = _compute_wall_coefficient(cur_coeff, cur_mask, bc, cur_dx, cur_dy)
 
         # Precompute 1/diag(A) for the Jacobi smoother at this level
-        inv_diag = _compute_inv_diagonal(cx, cy, cur_mask, cur_dx, cur_dy, lambda_)
+        inv_diag = _compute_inv_diagonal(
+            cx, cy, wall, cur_mask, cur_dx, cur_dy, lambda_
+        )
 
         # Store as frozen JAX arrays
         levels.append(
@@ -1035,6 +1197,7 @@ def build_multigrid_solver(
                 mask=jnp.array(cur_mask),
                 cx=jnp.array(cx),
                 cy=jnp.array(cy),
+                wall=jnp.array(wall),
                 dx=cur_dx,
                 dy=cur_dy,
                 lambda_=float(lambda_),
@@ -1051,6 +1214,15 @@ def build_multigrid_solver(
             cur_dx *= 2.0  # grid spacing doubles at each coarser level
             cur_dy *= 2.0
 
+    # --- Neumann at lambda = 0: constants per wet component are the null space
+    null_labels = null_counts = None
+    if bc == "neumann" and lambda_ == 0.0:
+        labels, n_comp = ndimage.label(mask_np > 0)  # 4-connectivity, 0 = dry
+        counts = np.bincount(labels.ravel(), minlength=n_comp + 1).astype(np.float64)
+        counts[0] = 1.0  # dry label: never used as a divisor of wet values
+        null_labels = jnp.asarray(labels)
+        null_counts = jnp.asarray(counts)
+
     return MultigridSolver(
         levels=tuple(levels),
         n_levels=n_levels,
@@ -1059,4 +1231,7 @@ def build_multigrid_solver(
         n_coarse=n_coarse,
         omega=omega,
         n_cycles=n_cycles,
+        bc=bc,
+        null_labels=null_labels,
+        null_counts=null_counts,
     )

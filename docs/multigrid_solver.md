@@ -94,18 +94,40 @@ c_{x,j,i} = \tfrac{1}{2}\bigl(c_{j,i} + c_{j,i+1}\bigr) \cdot m_{x,j,i}
 $$
 
 where $m_{x,j,i} = 1$ only when both cells $(j,i)$ and $(j,i+1)$ are
-wet (inside the mask).  This ensures the operator respects irregular domain
-boundaries.
+wet (inside the mask).  Faces between a wet and a dry cell are set by the
+boundary condition below.
 
 ### Boundary Conditions
 
-Zero normal flux at domain edges is enforced by the face coefficients:
-boundary faces have zero coefficient, so no flux crosses the domain
-boundary.  Out-of-bounds neighbours are zero-padded as an implementation
-convenience (avoids periodic wrapping from `jnp.roll`), but the actual
-BC is determined by the zeroed face coefficients, **not** the ghost
-values.  This means **no periodic wrapping** at the domain edges — the
-natural choice for bounded ocean basins.
+`build_multigrid_solver(..., bc=...)` sets the condition on every face
+between a wet cell and a dry one (land, or outside the array), on every
+level:
+
+| `bc` | Wet–dry face | Use for |
+|---|---|---|
+| `"dirichlet"` (default) | keeps its coefficient; the dry neighbour's value is $0$ | the streamfunction $\psi$ at X points (QG PV inversion), $\psi = 0$ on the coast |
+| `"neumann"` | zero coefficient: no flux | pressure / free surface at T points (pass `mask.h`) |
+
+With `bc="dirichlet"` and `coeff=None` the finest-level operator is exactly
+`masked_laplacian` with dry neighbours zero: for $\psi$ on
+`Mask2D.xy_corner_strict` the wall sits on the dry X nodes next to the wet
+ones (index $0$ and $N-2$ on a rectangle built with `from_interior`). The
+wet–dry faces only add to the diagonal,
+
+$$
+(Au)_{j,i} \mathrel{-}= \Bigl(\sum_{\text{wet–dry faces}} \frac{c_{j,i}}{h^2}\Bigr)\, u_{j,i},
+$$
+
+with $h = \Delta x$ or $\Delta y$ and $c_{j,i}$ the wet cell's coefficient.
+The operator is negative definite for every $\lambda \ge 0$.
+
+With `bc="neumann"` the operator annihilates a constant on each connected
+wet component, so at $\lambda = 0$ it is singular. The solver then works in
+the zero-mean gauge: it projects the right-hand side onto its solvable
+(zero-mean) part and returns the zero-mean solution on each component.
+
+Out-of-bounds neighbours are zero-padded, so nothing wraps periodically
+across opposite edges.
 
 ---
 
