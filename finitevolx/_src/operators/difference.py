@@ -27,6 +27,7 @@ from finitevolx._src.grid.cartesian import (
 from finitevolx._src.mask import Mask1D, Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.stencils import (
+    _neighbours,
     diff_x_bwd,
     diff_x_bwd_1d,
     diff_x_bwd_3d,
@@ -156,7 +157,11 @@ class Difference1D(eqx.Module):
             ``self.mask`` is set, the output is zeroed at dry T-cells
             via ``* self.mask.h``.
         """
-        out = interior((diff_x_fwd_1d(h) - diff_x_bwd_1d(h)) / self.grid.dx**2, h)
+        # Each offset is sliced once (see `_Neighbours2D` for why); the
+        # arithmetic is unchanged:
+        #   (h_e - h_c) - (h_c - h_w)  ≡  diff_x_fwd_1d(h) - diff_x_bwd_1d(h)
+        h_c, h_e, h_w = h[1:-1], h[2:], h[:-2]  # h[i], h[i+1], h[i-1]  [Nx-2]
+        out = interior(((h_e - h_c) - (h_c - h_w)) / self.grid.dx**2, h)
         if self.mask is not None:
             out = out * self.mask.h
         return out
@@ -445,9 +450,13 @@ class Difference2D(eqx.Module):
             Laplacian at T-points.  When ``self.mask`` is set, the
             output is zeroed at dry T-cells via ``* mask.h``.
         """
-        # nabla2_h[j, i] = d^2h/dx^2 + d^2h/dy^2
-        d2x = (diff_x_fwd(h) - diff_x_bwd(h)) / self.grid.dx**2
-        d2y = (diff_y_fwd(h) - diff_y_bwd(h)) / self.grid.dy**2
+        # nabla2_h[j, i] = d^2h/dx^2 + d^2h/dy^2, with each offset sliced
+        # once (see `_Neighbours2D`); same arithmetic as
+        #   d2x = (diff_x_fwd(h) - diff_x_bwd(h)) / dx**2
+        #   d2y = (diff_y_fwd(h) - diff_y_bwd(h)) / dy**2
+        nb = _neighbours(h)  # c, e, w, n, s views, each [Ny-2, Nx-2]
+        d2x = ((nb.e - nb.c) - (nb.c - nb.w)) / self.grid.dx**2
+        d2y = ((nb.n - nb.c) - (nb.c - nb.s)) / self.grid.dy**2
         out = interior(d2x + d2y, h)
         if self.mask is not None:
             out = out * self.mask.h
@@ -650,7 +659,20 @@ class Difference3D(eqx.Module):
             the same T-point output stagger, so the mask is already
             baked into each addend).
         """
-        return self.diff_x_U_to_T(u) + self.diff_y_V_to_T(v)
+        # One fused stencil instead of two full-size outputs plus an add:
+        #   self.diff_x_U_to_T(u) + self.diff_y_V_to_T(v)
+        # gives the same values (the zero ghost rings add to zero and, for a
+        # 0/1 mask, a*m + b*m == (a + b)*m exactly).
+        # du[k, j, i] = (u[k, j, i+1/2] - u[k, j, i-1/2]) / dx
+        #             + (v[k, j+1/2, i] - v[k, j-1/2, i]) / dy   [Nz-2, Ny-2, Nx-2]
+        # `interior` takes the dtype of u and the values, i.e. result_type(u, v).
+        out = interior(
+            diff_x_bwd_3d(u) / self.grid.dx + diff_y_bwd_3d(v) / self.grid.dy,
+            u,
+        )
+        if self.mask is not None:
+            out = out * self.mask.h
+        return out
 
     def laplacian(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Horizontal Laplacian at T-points over all z-levels.
@@ -669,8 +691,12 @@ class Difference3D(eqx.Module):
             Laplacian at T-points.  When ``self.mask`` is set, the
             output is zeroed at dry T-cells via ``* mask.h``.
         """
-        d2x = (diff_x_fwd_3d(h) - diff_x_bwd_3d(h)) / self.grid.dx**2
-        d2y = (diff_y_fwd_3d(h) - diff_y_bwd_3d(h)) / self.grid.dy**2
+        # Each offset is sliced once (see `_Neighbours2D`); same arithmetic as
+        #   d2x = (diff_x_fwd_3d(h) - diff_x_bwd_3d(h)) / dx**2
+        #   d2y = (diff_y_fwd_3d(h) - diff_y_bwd_3d(h)) / dy**2
+        nb = _neighbours(h[1:-1])  # z-interior levels, views [Nz-2, Ny-2, Nx-2]
+        d2x = ((nb.e - nb.c) - (nb.c - nb.w)) / self.grid.dx**2
+        d2y = ((nb.n - nb.c) - (nb.c - nb.s)) / self.grid.dy**2
         out = interior(d2x + d2y, h)
         if self.mask is not None:
             out = out * self.mask.h

@@ -81,6 +81,7 @@ from jaxtyping import Array, Bool, Float
 from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
 from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
+from finitevolx._src.operators.stencils import _materialize
 
 
 def _check_diffusion_wall(wall: str, mask: object) -> None:
@@ -165,13 +166,71 @@ def _diffusion_2d_impl(
 
     ``wall`` selects the domain-wall face treatment (see :class:`Diffusion2D`).
     """
-    flux_x, flux_y = _diffusion_2d_fluxes_impl(h, kappa, dx, dy, mu, mv, wall=wall)
+    if wall not in ("closed", "open"):
+        raise ValueError(f"wall must be 'closed' or 'open'; got {wall!r}")
+    kappa_arr = jnp.asarray(kappa)
+    has_kappa_field = kappa_arr.ndim >= 2
+
+    # Same face fluxes and divergence as
+    #   flux_x, flux_y = _diffusion_2d_fluxes_impl(h, kappa, dx, dy, mu, mv, wall)
+    #   du = (flux_x[1:-1, 1:-1] - flux_x[1:-1, :-2]) / dx
+    #   dv = (flux_y[1:-1, 1:-1] - flux_y[:-2, 1:-1]) / dy
+    # but only the faces the divergence reads are computed, and the zero
+    # wall faces enter as a `pad` of the result instead of a full-size
+    # `zeros().at[...].set(...)` buffer: the whole tendency (and its VJP)
+    # then fuses into one pass with no intermediate flux arrays.
+    if wall == "open":
+        # all east faces i+1/2, i = 0..Nx-2 (west/east wall faces read the
+        # ghost ring); κ at the source (western / southern) T-cell
+        fx = (
+            (kappa_arr[1:-1, :-1] if has_kappa_field else kappa_arr)
+            * (h[1:-1, 1:] - h[1:-1, :-1])
+            / dx
+        )  # [Ny-2, Nx-1]
+        fy = (
+            (kappa_arr[:-1, 1:-1] if has_kappa_field else kappa_arr)
+            * (h[1:, 1:-1] - h[:-1, 1:-1])
+            / dy
+        )  # [Ny-1, Nx-2]
+        # the flux buffers were h-typed (`zeros_like(h).at[...].set(...)`
+        # casts): keep that, so a float64 kappa does not promote float32 h
+        fx, fy = fx.astype(h.dtype), fy.astype(h.dtype)
+        if mu is not None:
+            fx = fx * mu[1:-1, :-1]
+        if mv is not None:
+            fy = fy * mv[:-1, 1:-1]
+        # flux at the east / west face of every interior cell
+        fx_e, fx_w = fx[:, 1:], fx[:, :-1]  # [Ny-2, Nx-2]
+        fy_n, fy_s = fy[1:, :], fy[:-1, :]  # [Ny-2, Nx-2]
+    else:
+        # interior faces only, i+1/2 for i = 1..Nx-3; the wall faces are 0
+        fx = (
+            (kappa_arr[1:-1, 1:-2] if has_kappa_field else kappa_arr)
+            * (h[1:-1, 2:-1] - h[1:-1, 1:-2])
+            / dx
+        )  # [Ny-2, Nx-3]
+        fy = (
+            (kappa_arr[1:-2, 1:-1] if has_kappa_field else kappa_arr)
+            * (h[2:-1, 1:-1] - h[1:-2, 1:-1])
+            / dy
+        )  # [Ny-3, Nx-2]
+        fx, fy = fx.astype(h.dtype), fy.astype(h.dtype)  # h-typed, as above
+        if mu is not None:
+            fx = fx * mu[1:-1, 1:-2]
+        if mv is not None:
+            fy = fy * mv[1:-2, 1:-1]
+        # flux at the east / west face of every interior cell; the closed
+        # walls (east face of the last column, west face of the first) are 0
+        fx_e = jnp.pad(fx, ((0, 0), (0, 1)))  # [Ny-2, Nx-2]
+        fx_w = jnp.pad(fx, ((0, 0), (1, 0)))
+        fy_n = jnp.pad(fy, ((0, 1), (0, 0)))  # [Ny-2, Nx-2]
+        fy_s = jnp.pad(fy, ((1, 0), (0, 0)))
 
     # Step 3: Tendency at T-points (divergence of flux)
     # dh[j, i] = (flux_x[j, i+1/2] - flux_x[j, i-1/2]) / dx
     #           + (flux_y[j+1/2, i] - flux_y[j-1/2, i]) / dy
-    du = (flux_x[1:-1, 1:-1] - flux_x[1:-1, :-2]) / dx
-    dv = (flux_y[1:-1, 1:-1] - flux_y[:-2, 1:-1]) / dy
+    du = (fx_e - fx_w) / dx
+    dv = (fy_n - fy_s) / dy
     out = interior(du + dv, h)
 
     if mh is not None:
@@ -645,7 +704,9 @@ class BiharmonicDiffusion2D(eqx.Module):
         # Ghost ring of lap1 is zero (Dirichlet-0 BC on intermediate field).
         # Inner _harm is mask=None so the intermediate Laplacian is *not*
         # zeroed at dry cells — see class docstring for why.
-        lap1 = self._harm(h, kappa=1.0)
+        # _materialize: the second pass reads lap1 at four offsets; keep it as
+        # one buffer rather than letting XLA recompute it per offset.
+        lap1 = _materialize(self._harm(h, kappa=1.0))
         # Second Laplacian pass: nabla^2(nabla^2 h) = nabla^4 h
         lap2 = self._harm(lap1, kappa=1.0)
         out = -kappa * lap2
@@ -733,7 +794,9 @@ class BiharmonicDiffusion3D(eqx.Module):
             When ``self.mask`` is set, the final output is post-multiplied
             by ``mask.h``.
         """
-        lap1 = self._harm(h, kappa=1.0)
+        # _materialize: the second pass reads lap1 at four offsets; keep it as
+        # one buffer rather than letting XLA recompute it per offset.
+        lap1 = _materialize(self._harm(h, kappa=1.0))
         lap2 = self._harm(lap1, kappa=1.0)
         out = -kappa * lap2
         if self.mask is not None:

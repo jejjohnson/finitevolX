@@ -230,6 +230,15 @@ apply BCs to intermediate fields before chaining operators.
   `Spherical*` classes that share the raw stencils.
 - **Comment every stencil with its half-index formula** and track shapes in
   comments (`# [Ny, Nx]`).
+- **Write stencils that lower to one fused pass**, forward and VJP: slice
+  each offset once (bind the views, or `_neighbours(h)` for the 3x3
+  neighbourhood) instead of re-slicing per sub-expression; don't build a
+  full-size `zeros().at[...].set()` intermediate only to slice it again
+  (compute the faces you need and `pad` the result); `_materialize` an
+  intermediate the next stencil reads at several offsets. Keep the
+  composed form's arithmetic and name it in a comment so readers see the
+  equivalence. `docs/performance.md` has the rules and the measurements;
+  benchmark with `scripts/benchmark_operators.py`.
 
 ### 3. Masks
 
@@ -353,6 +362,7 @@ docstring before changing what it checks.
 | `tests/test_dtype_behavior.py` | float32 and float64 agree; outputs are finite on extreme inputs |
 | `tests/test_open_walls.py`, conservation tests in `test_advection.py`, `test_jacobian.py`, `test_momentum.py`, `test_diagnostics.py` | Mass / energy / enstrophy conservation of the flux-form and Arakawa schemes, including `wall="open"` |
 | `tests/test_stencils.py`, `tests/test_ghost.py`, `tests/test_grid.py`, `tests/test_cgrid_mask.py` | Raw stencil slices, the ghost-ring helpers, grid and mask construction |
+| `tests/test_stencil_lowering.py` | The performance rewrites equal their composed forms, and their VJPs have one `pad` per distinct offset (a JAX-level check, no timing) |
 | `tests/test_elliptic*.py`, `tests/test_multigrid.py`, `tests/test_solver_wrappers.py`, `tests/test_inhomogeneous.py` | Solvers against analytic solutions, preconditioner benefit, BC-set dispatch, known-value lifting |
 | `tests/test_timestepping*.py`, `tests/test_diffrax_solvers.py` | Convergence order and accuracy of the step functions and the diffrax solvers; the pure steps match their diffrax twins (`TestPureFunctionalVsDiffrax`) |
 | `tests/test_scripts.py` | The example models in `scripts/` run stably on small grids |
