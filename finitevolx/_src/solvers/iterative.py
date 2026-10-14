@@ -19,6 +19,7 @@ from collections.abc import Callable
 import math
 from typing import NamedTuple
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
@@ -37,9 +38,10 @@ class CGInfo(NamedTuple):
     iterations: int
     """Number of PCG iterations performed."""
     residual_norm: float
-    """L2 norm of the final residual ``A(x) - rhs``."""
+    """L2 norm of the explicit final residual ``rhs - A(x)``."""
     converged: bool
-    """True if the solver converged within the requested tolerances."""
+    """True if lineax reported success *and* the explicit residual satisfies
+    ``max|rhs - A(x)| <= atol + rtol max|rhs|``."""
 
 
 # ---------------------------------------------------------------------------
@@ -71,9 +73,10 @@ def solve_cg(
     The operator ``A`` is assumed to be *negative definite*, which is
     the case for the Helmholtz operator ``(nabla^2 - lambda)`` when
     ``lambda > 0``.  Note that ``lambda < 0`` yields an indefinite operator
-    and will cause CG to fail; use ``lambda = 0`` only if the operator is
-    strictly negative semidefinite via the mask (e.g. the masked Laplacian
-    with homogeneous Dirichlet BCs on a non-trivial domain).
+    and can make CG stall (``info.converged`` is then ``False``); use
+    ``lambda = 0`` only if the operator is strictly negative semidefinite
+    via the mask (e.g. the masked Laplacian with homogeneous Dirichlet BCs
+    on a non-trivial domain).
     The preconditioner, if supplied, should approximate ``A^{-1}``
     (the negative-definite inverse).  The required sign-flip for
     ``lineax.CG`` is handled internally.
@@ -101,12 +104,36 @@ def solve_cg(
     max_steps : int or None
         Maximum CG iterations.  ``None`` means unlimited.  Default: 500.
     throw : bool
-        Raise when CG does not converge.  Default ``False``: the iterate is
-        returned and ``info.converged`` reports the failure, so check it.
+        Raise when CG does not converge (as ``info.converged`` defines it),
+        through :func:`equinox.error_if`, so it also works under ``jit``.
+        Default ``False``: the iterate is returned and ``info.converged``
+        reports the failure, so check it.
 
     Notes
     -----
-    lineax's CG stops when every entry satisfies
+    **Convergence.**  ``max_steps`` exhaustion never raises unless
+    ``throw=True``.  ``info.converged`` is checked against the explicit
+    residual of the *un-preconditioned* system, ``r = rhs - A(x)``:
+    ``max|r_i| <= atol + rtol max|rhs_i|`` with the ``atol`` / ``rtol`` the
+    solve used (``s · √ε`` for the rescaled float32 solve).  lineax alone
+    reports success when CG stalls, e.g. after 0–1 iterations on an
+    indefinite operator (``lambda_ < 0``) or with a preconditioner of the
+    wrong sign; this check reports ``converged=False`` there.
+
+    **Masks.**  The returned ``x`` can be non-zero outside the mask: a
+    preconditioner that ignores the mask (the spectral ones) leaks into the
+    dry points, which the masked operator then never sees.  Multiply by the
+    mask before using ``x``; the wrappers (:func:`streamfunction_from_vorticity`,
+    :func:`pressure_from_divergence`, :func:`pv_inversion`) do.
+
+    **Gradients.**  The solve is differentiable with respect to anything
+    ``matvec`` and ``rhs`` close over (``lambda_``, ``dx``, …), through
+    lineax's implicit derivative.  ``x0`` and the preconditioner do not
+    change the converged solution, so their gradient is stopped; that is
+    what lets a preconditioner built from the same ``lambda_`` / ``dx``
+    stay in a differentiated solve.
+
+    **Tolerances.**  lineax's CG stops when every entry satisfies
     ``|r_i| <= atol + rtol |rhs_i|``.  Where ``rhs_i = 0`` (land, the ghost
     ring, quiet regions) that is ``|r_i| <= atol`` with an *absolute*
     ``atol``.  A fixed ``1e-6`` sits at float32's rounding floor once
@@ -155,17 +182,45 @@ def solve_cg(
         options["preconditioner"] = lx.FunctionLinearOperator(
             _lx_precond, zero, tags=[lx.positive_semidefinite_tag]
         )
+    # lineax refuses tangents through ``options``.  Neither the initial guess
+    # nor the preconditioner changes the converged solution x = A⁻¹ b, so its
+    # derivative (implicit function theorem, through ``operator``) needs no
+    # tangent from them: stop the gradient of their closed-over arrays
+    # (e.g. ``lambda_`` / ``dx`` captured by a spectral preconditioner).
+    options = jax.tree_util.tree_map(
+        lambda leaf: jax.lax.stop_gradient(leaf) if eqx.is_array(leaf) else leaf,
+        options,
+    )
 
+    # throw=False: max_steps / breakdown are reported through `converged`.
     sol = lx.linear_solve(
-        operator, rhs_solve, solver=solver, options=options, throw=throw
+        operator, rhs_solve, solver=solver, options=options, throw=False
     )
 
     x_out = sol.value if scale is None else sol.value * scale
-    res_norm = jnp.linalg.norm(matvec(x_out) - rhs)
+    # Explicit residual of the un-preconditioned system, r = b - A x  [Ny, Nx].
+    # lineax's own success flag is not enough: it also exits "successfully"
+    # on a stalled residual (indefinite A, wrong-sign preconditioner).
+    residual = rhs - matvec(x_out)
+    # ‖r‖∞ ≤ atol' + rtol ‖b‖∞, implied by lineax's entrywise stopping rule
+    # |r_i| ≤ atol + rtol |b_i| (atol' = s · atol on the rescaled system).
+    atol_eff = atol if scale is None else atol * scale
+    tol = atol_eff + rtol * jnp.max(jnp.abs(rhs), initial=0.0)
+    converged = (sol.result == lx.RESULTS.successful) & (
+        jnp.max(jnp.abs(residual), initial=0.0) <= tol
+    )
+    if throw:
+        x_out = eqx.error_if(
+            x_out,
+            jnp.logical_not(converged),
+            "solve_cg did not converge: max_steps reached, or the residual "
+            "|b - A x| exceeds atol + rtol |b| (an indefinite operator, e.g. "
+            "lambda_ < 0, or a preconditioner of the wrong sign).",
+        )
     info = CGInfo(
         iterations=sol.stats["num_steps"],
-        residual_norm=res_norm,
-        converged=sol.result == lx.RESULTS.successful,
+        residual_norm=jnp.linalg.norm(residual),
+        converged=converged,
     )
     return x_out, info
 

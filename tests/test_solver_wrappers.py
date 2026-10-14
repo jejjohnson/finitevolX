@@ -155,7 +155,7 @@ class TestStreamfunctionCG:
         )
         mask_arr = jnp.array(rect_mask, dtype=float)
         psi = streamfunction_from_vorticity(
-            rhs, dx, dy, method="cg", mask=mask_arr, lambda_=-1.0
+            rhs, dx, dy, method="cg", mask=mask_arr, lambda_=1.0
         )
         # Should be zero outside mask
         outside = np.array(psi * (1 - mask_arr))
@@ -170,7 +170,7 @@ class TestStreamfunctionCG:
             jnp.arange(Nx, dtype=float)[None, :] * jnp.pi / Nx
         )
         psi = streamfunction_from_vorticity(
-            rhs, dx, dy, method="cg", mask=cgrid_mask, lambda_=-1.0
+            rhs, dx, dy, method="cg", mask=cgrid_mask, lambda_=1.0
         )
         assert psi.shape == (Ny, Nx)
         # Should be zero outside the psi mask
@@ -395,7 +395,7 @@ class TestPVInversionCG:
         rhs = jnp.sin(jnp.arange(Ny, dtype=float)[:, None] * jnp.pi / Ny) * jnp.cos(
             jnp.arange(Nx, dtype=float)[None, :] * jnp.pi / Nx
         )
-        psi = pv_inversion(rhs, dx, dy, lambda_=-1.0, method="cg", mask=mask_arr)
+        psi = pv_inversion(rhs, dx, dy, lambda_=1.0, method="cg", mask=mask_arr)
         outside = np.array(psi * (1 - mask_arr))
         np.testing.assert_allclose(outside, 0.0, atol=1e-12)
 
