@@ -409,7 +409,9 @@ Always run Python tools through `uv run` (never the system Python); `git`,
 
 ```bash
 make install              # uv sync --all-extras + pre-commit hooks
-make test                 # uv run pytest tests (every test)
+make test                 # fast tier: pytest -m "not slow and not integration" -n 2
+make test-all             # every tier (what make ci and the weekly CI run do)
+make test-slow            # slow tier only;  make test-integration: integration tier only
 make test-cov             # the same with coverage (reports/coverage.xml)
 make uv-lint              # ruff check . + ruff format --check . + ty (mirrors CI)
 make uv-format            # ruff format . && ruff check --fix .
@@ -423,22 +425,36 @@ make uv-pre-commit        # every pre-commit hook on every file
 
 Run one test from the repo root (the `tests` package imports
 `tests.fixtures`): `uv run pytest tests/test_difference.py -k T_to_U -v`.
-The suite is large: `uv run pytest tests -n auto` (pytest-xdist, in the
-`test` extra) is much faster locally.
+Use `-n 2` (pytest-xdist, in the `test` extra), not `-n auto`: a worker
+peaks at ~2 GB RSS, and more workers get OOM-killed on 8 GB machines and on
+the hosted runners (they show up as "worker 'gwN' crashed").
 
 ### Test tiers
 
-- There are **no markers**: no `slow`, no `integration`. CI (`ci.yml`) runs
-  `uv run pytest tests -v` on Ubuntu and macOS, Python 3.12 and 3.13, after
-  `uv sync --extra test`. Keep each new test small (grids of 8–32 interior
-  cells) so the suite stays fast.
+- Every test is in one tier (markers registered in `pyproject.toml`,
+  `--strict-markers`, rules in `tests/conftest.py`):
+  - **fast** (unmarked): unit tests, well under a second each — the default
+    lane (`make test`);
+  - **`@pytest.mark.slow`**: anything over ~1 s on a quiet 2-core machine
+    (convergence sweeps, large grids, gradients of high-order schemes,
+    solver builds);
+  - **`@pytest.mark.integration`**: end-to-end runs (the `scripts/` models,
+    the plugin's worked example, full time integrations).
+  A test is never both. Keep each new test small (grids of 8–32 interior
+  cells) so it lands in the fast tier; mark it `slow` only when the size is
+  the point, and check with `--durations=20`.
+- CI (`ci.yml`) runs fast + integration on Ubuntu and macOS, Python 3.12 and
+  3.13 (`-m "not slow" -n 2`), the slow tier once on Ubuntu / 3.13, and
+  every tier on the whole matrix weekly and on demand. PRs are tested
+  whatever their base branch, so stacked PRs get CI too.
 - One test class per operator and dimension, with pytest fixtures for the
   grids; analytic checks (constant → 0, linear → constant, convergence
   order, conservation) plus golden outputs for mask-aware operators.
-- There is no `conftest.py`. Most test modules (and `tests/fixtures/`)
-  call `jax.config.update("jax_enable_x64", True)` at import, so a full run
-  is in float64; a new module that needs float64 must do the same rather
-  than rely on another module being collected first.
+- `tests/conftest.py` enables x64 for the whole session, so every test runs
+  in float64 regardless of collection order or xdist worker; do **not**
+  call `jax.config.update("jax_enable_x64", ...)` in a test module. A test
+  about float32 behaviour builds float32 inputs explicitly (dtypes follow
+  the input). Standalone scripts and notebooks still enable x64 themselves.
 - `filterwarnings = "error"`: fix a warning rather than silencing it, or
   filter it in the one test that expects it.
 
@@ -454,7 +470,9 @@ The suite is large: `uv run pytest tests -n auto` (pytest-xdist, in the
 
 All of these must pass, from the repo root:
 
-1. `make test` (or `uv run pytest tests -n auto`): zero failures.
+1. `make test-all` (or `uv run pytest tests -n 2`): zero failures. While
+   iterating, `make test` (fast tier) plus the slow tests of the files you
+   touched is enough; run every tier before pushing.
 2. `uv run ruff check .`: the **entire** repo, including `tests/` and
    `scripts/` (CI runs `ruff check .`; a subdirectory misses their import
    sorting). `docs/` and `notebooks/` are excluded by the ruff config.

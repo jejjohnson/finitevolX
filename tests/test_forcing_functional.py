@@ -14,8 +14,6 @@ from finitevolx import (
     wind_stress_tendency,
 )
 
-jax.config.update("jax_enable_x64", True)
-
 
 class TestWindStressTendency:
     def test_scalar_normalization(self):

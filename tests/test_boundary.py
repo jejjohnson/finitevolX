@@ -7,8 +7,6 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-jax.config.update("jax_enable_x64", True)
-
 from finitevolx import (
     BoundaryConditionSet,
     Dirichlet1D,
@@ -424,6 +422,7 @@ class TestOutwardGradientAnalytic:
             "east": arr[1:-1, -1],
         }[face]
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("face", ["south", "north", "west", "east"])
     def test_neumann(self, face):
         phi = self._phi()

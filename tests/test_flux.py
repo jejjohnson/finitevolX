@@ -206,6 +206,7 @@ class TestUpwindFluxRectangular:
         )
         np.testing.assert_allclose(result[1:-1, 1:-1], -4.0, rtol=1e-5)
 
+    @pytest.mark.slow
     def test_all_ocean_x_matches_weno5_x(self):
         """On an all-ocean mask, upwind_flux must equal Reconstruction2D.weno5_x."""
         # Large enough grid for interior cells to qualify for WENO5 (stencil size 6)
@@ -222,6 +223,7 @@ class TestUpwindFluxRectangular:
         # Interior cells (depth ≥ 3 from ghost) should match WENO5 exactly
         np.testing.assert_allclose(result[1:-1, 3:-3], expected[1:-1, 3:-3], rtol=1e-5)
 
+    @pytest.mark.slow
     def test_all_ocean_y_matches_weno5_y(self):
         """On an all-ocean mask, upwind_flux must equal Reconstruction2D.weno5_y."""
         grid = CartesianGrid2D.from_interior(12, 12, 1.0, 1.0)
@@ -300,6 +302,7 @@ class TestUpwindFluxMaskedDomain:
             )
             assert diffs.item(), f"Expected fallback for sign={sign}"
 
+    @pytest.mark.slow
     def test_island_x_finite_everywhere(self, island_mask):
         grid = CartesianGrid2D.from_interior(18, 18, 1.0, 1.0)
         recon = Reconstruction2D(grid=grid)
@@ -433,6 +436,7 @@ class TestAdvection2DMasked:
         result = adv(h, u, v, method="weno5")
         assert jnp.all(jnp.isfinite(result)).item()
 
+    @pytest.mark.slow
     def test_nan_on_land_does_not_corrupt(self):
         """NaN values on land cells must not propagate into wet-cell fluxes."""
         Ny, Nx = 12, 12
@@ -466,6 +470,7 @@ class TestAdvection2DMasked:
         r2 = adv_none(h, u, v, method="weno5")
         np.testing.assert_array_equal(r1, r2)
 
+    @pytest.mark.slow
     def test_non_dispatchable_method_with_all_ocean_matches_unmasked(self):
         """Methods like weno7 take the unmasked code path; for an all-ocean
         mask the post-compute ``* mask.h`` is a no-op and the output must
@@ -489,6 +494,7 @@ class TestAdvection2DMasked:
 class TestAdvection3DMasked:
     """Verify Advection3D works with the mask class field (Mask3D)."""
 
+    @pytest.mark.slow
     def test_rectangular_weno3_runs(self):
         Nz, Ny, Nx = 3, 10, 10
         grid = CartesianGrid3D.from_interior(Nx - 2, Ny - 2, Nz - 2, 1.0, 1.0, 1.0)
@@ -501,6 +507,7 @@ class TestAdvection3DMasked:
         assert result.shape == (Nz, Ny, Nx)
         assert jnp.all(jnp.isfinite(result)).item()
 
+    @pytest.mark.slow
     def test_rectangular_weno5_runs(self):
         Nz, Ny, Nx = 3, 14, 14
         grid = CartesianGrid3D.from_interior(Nx - 2, Ny - 2, Nz - 2, 1.0, 1.0, 1.0)
@@ -525,6 +532,7 @@ class TestAdvection3DMasked:
         assert result.shape == (Nz, Ny, Nx)
         assert jnp.all(jnp.isfinite(result)).item()
 
+    @pytest.mark.slow
     def test_coastal_fallback_finite(self):
         """3D masked domain with land barrier — result must be finite."""
         Nz, Ny, Nx = 3, 10, 10

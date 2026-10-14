@@ -65,7 +65,7 @@ forcing section of `docs/spatial_operators.md`, `make capabilities`.
 ## 5. Verify
 
 ```bash
-uv run pytest -n auto tests/test_forcing_functional.py tests/test_forcing_2d.py \
+uv run pytest -n 2 tests/test_forcing_functional.py tests/test_forcing_2d.py \
   tests/test_forcing_3d.py tests/test_forcing_base.py tests/test_relaxation.py \
   tests/test_capabilities.py
 ```

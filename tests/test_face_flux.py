@@ -25,9 +25,6 @@ from finitevolx import (
 )
 from finitevolx._src.operators._ghost import interior
 
-jax.config.update("jax_enable_x64", True)
-
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -87,6 +84,7 @@ class TestUvCenterFluxBasic:
         np.testing.assert_allclose(fe[1:-1, 1:-1], C, atol=1e-12)
         np.testing.assert_allclose(fn[1:-1, 1:-1], C, atol=1e-12)
 
+    @pytest.mark.slow
     def test_zero_velocity(self, periodic_grid):
         """Zero velocity gives zero flux."""
         grid, Ny, Nx = periodic_grid
@@ -97,6 +95,7 @@ class TestUvCenterFluxBasic:
         np.testing.assert_allclose(fe, 0.0, atol=1e-15)
         np.testing.assert_allclose(fn, 0.0, atol=1e-15)
 
+    @pytest.mark.slow
     def test_ghost_ring_zero(self, periodic_grid):
         """Ghost ring of face flux must be zero."""
         grid, Ny, Nx = periodic_grid
@@ -280,6 +279,7 @@ class TestMaskedFlux:
         mask = Mask2D.from_mask(h_mask)
         return grid, mask, Ny, Nx
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("method", ["weno3", "weno5", "wenoz5", "minmod"])
     def test_masked_runs(self, masked_setup, method):
         grid, mask, Ny, Nx = masked_setup
@@ -366,6 +366,7 @@ class TestConservation:
 class TestAccuracy:
     """Scientific accuracy of face fluxes."""
 
+    @pytest.mark.slow
     def test_higher_order_more_accurate_smooth_field(self, large_grid):
         """On smooth data, higher-order methods should give more accurate fluxes."""
         grid, Ny, Nx = large_grid
@@ -433,6 +434,7 @@ class TestJaxCompat:
         np.testing.assert_allclose(fe, fe_ref, atol=1e-14)
         np.testing.assert_allclose(fn, fn_ref, atol=1e-14)
 
+    @pytest.mark.slow
     def test_grad(self, periodic_grid):
         """Gradient through uv_center_flux should be computable."""
         grid, Ny, Nx = periodic_grid

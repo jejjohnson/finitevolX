@@ -5,14 +5,12 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 from finitevolx._src.solvers.tridiagonal import (
     solve_tridiagonal,
     solve_tridiagonal_batched,
 )
-
-jax.config.update("jax_enable_x64", True)
-
 
 # ---------------------------------------------------------------------------
 # solve_tridiagonal (single system)
@@ -61,6 +59,7 @@ class TestSolveTridiagonal:
         x = solve_tridiagonal(a, b, c, d)
         assert x.shape == (n,)
 
+    @pytest.mark.slow
     def test_roundtrip_random(self):
         """Solve A x = d, then verify A @ x ≈ d for a random system."""
         key = jax.random.PRNGKey(42)
@@ -148,6 +147,7 @@ class TestSolveTridiagonalBatched:
             x_i = solve_tridiagonal(a[i], b[i], c[i], d[i])
             np.testing.assert_allclose(np.array(x[i]), np.array(x_i), atol=1e-14)
 
+    @pytest.mark.slow
     def test_two_batch_dims(self):
         """Batched solve over (Ny, Nx) horizontal grid."""
         Ny, Nx, Nz = 3, 4, 6
@@ -159,6 +159,7 @@ class TestSolveTridiagonalBatched:
         x = solve_tridiagonal_batched(a, b, c, d)
         assert x.shape == (Ny, Nx, Nz)
 
+    @pytest.mark.slow
     def test_batched_matches_loop(self):
         """Batched result matches looping over columns."""
         key = jax.random.PRNGKey(7)

@@ -61,6 +61,7 @@ def _periodic_y(f):
 
 
 # ── closed default is unchanged ─────────────────────────────────────────────
+@pytest.mark.slow
 def test_advection_default_is_closed(grid3d):
     op = Advection3D(grid=grid3d)
     rng = np.random.default_rng(0)
@@ -73,6 +74,7 @@ def test_advection_default_is_closed(grid3d):
     np.testing.assert_array_equal(np.asarray(default), np.asarray(closed))
 
 
+@pytest.mark.slow
 def test_diffusion_default_is_closed(grid3d):
     op = Diffusion3D(grid=grid3d)
     rng = np.random.default_rng(1)
@@ -83,6 +85,7 @@ def test_diffusion_default_is_closed(grid3d):
     )
 
 
+@pytest.mark.slow
 def test_closed_freezes_wall_ring_open_updates_it(grid3d):
     """Closed leaves the wall-adjacent interior ring at zero; open fills it."""
     op = Advection3D(grid=grid3d)
@@ -130,6 +133,7 @@ def test_advection_open_is_exactly_conservative_2d(grid2d):
         np.testing.assert_allclose(total, expected, rtol=1e-6, atol=1e-6)
 
 
+@pytest.mark.slow
 def test_advection_periodic_conserves_mass_2d(grid2d):
     """Fully-periodic uniform advection conserves interior mass over time."""
     op = Advection2D(grid=grid2d)
@@ -256,6 +260,7 @@ def test_diffusion_dirichlet_wall_flux(grid2d):
     np.testing.assert_allclose(np.asarray(opened[2:-2, 2:-2]), 0.0, atol=1e-6)
 
 
+@pytest.mark.slow
 def test_diffusion_periodic_conserves_mass_3d(grid3d):
     op = Diffusion3D(grid=grid3d)
     rng = np.random.default_rng(7)

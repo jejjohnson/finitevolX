@@ -34,6 +34,10 @@ _NAME = re.compile(r"(?<![\w./])(fvx|finitevolx)\.([A-Za-z_]\w*)")
 _BLOCKS = re.compile(r"```python\n(.*?)```", re.S)
 
 
+# End-to-end: runs the example as a user would (integration tier).
+pytestmark = pytest.mark.integration
+
+
 def test_worked_example_runs_and_its_claims_hold():
     (block,) = [b for b in _BLOCKS.findall(SKILL.read_text()) if "grad_perp" in b]
     ns: dict = {}

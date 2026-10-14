@@ -105,6 +105,12 @@ dev = [
 filterwarnings = ["error", "ignore::DeprecationWarning"]
 testpaths = ["finitevolx", "tests"]
 xfail_strict = true
+addopts = "--strict-markers"
+# Tiers (see tests/conftest.py).  Unmarked tests are the fast tier.
+markers = [
+    "slow: correct but expensive (> ~1 s): convergence sweeps, large grids, high-order gradients, solver builds",
+    "integration: end-to-end runs (example scripts, plugin worked example, full time integrations)",
+]
 
 [tool.ruff]
 fix = false

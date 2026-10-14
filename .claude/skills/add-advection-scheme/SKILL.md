@@ -72,7 +72,7 @@ docstrings and in `docs/advection.md`, then `make capabilities`.
 ## 5. Verify
 
 ```bash
-uv run pytest -n auto tests/test_weno.py tests/test_limiters.py tests/test_reconstruction.py \
+uv run pytest -n 2 tests/test_weno.py tests/test_limiters.py tests/test_reconstruction.py \
   tests/test_reconstruction_pipeline.py tests/test_advection.py tests/test_advection_masks.py \
   tests/test_flux.py tests/test_spherical_advection.py tests/test_open_walls.py \
   tests/test_scale_covariance.py tests/test_capabilities.py

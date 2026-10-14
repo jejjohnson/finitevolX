@@ -16,9 +16,6 @@ from finitevolx._src.grid.cartesian import CartesianGrid2D
 from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
 from finitevolx._src.mask import Mask2D, Mask3D
 
-jax.config.update("jax_enable_x64", True)
-
-
 R = 6.371e6
 NX_INT, NY_INT = 14, 10
 
@@ -57,6 +54,7 @@ class TestSphericalMomentumAdvection2D:
     def madv(self, grid):
         return SphericalMomentumAdvection2D(grid=grid)
 
+    @pytest.mark.slow
     def test_output_shapes(self, madv, grid):
         u = jnp.zeros((grid.Ny, grid.Nx))
         v = jnp.zeros((grid.Ny, grid.Nx))
@@ -149,6 +147,7 @@ class TestSphericalMomentumAdvection2D:
         assert jnp.all(jnp.isfinite(du))
         assert jnp.all(jnp.isfinite(dv))
 
+    @pytest.mark.slow
     def test_grad(self, madv, grid):
         key = jax.random.PRNGKey(4)
         k1, k2 = jax.random.split(key)
@@ -217,6 +216,7 @@ class TestSphericalMomentumAdvection3D:
     def madv(self, grid3d):
         return SphericalMomentumAdvection3D(grid=grid3d)
 
+    @pytest.mark.slow
     def test_output_shapes(self, madv, grid3d):
         shape = (grid3d.Nz, grid3d.Ny, grid3d.Nx)
         u = jnp.zeros(shape)
@@ -274,6 +274,7 @@ class TestSphericalMomentumAdvection3D:
         np.testing.assert_allclose(du, 0.0, atol=1e-12)
         np.testing.assert_allclose(dv, 0.0, atol=1e-12)
 
+    @pytest.mark.slow
     def test_jit_grad(self, madv, grid3d):
         key = jax.random.PRNGKey(11)
         k1, k2 = jax.random.split(key)

@@ -177,6 +177,7 @@ class TestSphericalGeostrophicVelocityMasks:
         np.testing.assert_array_equal(u_g[~np.asarray(mask.u)], 0.0)
         np.testing.assert_array_equal(v_g[~np.asarray(mask.v)], 0.0)
 
+    @pytest.mark.slow
     def test_gradient_finite_with_zero_f_on_land(self):
         """Reverse-mode through dry faces with f = 0 stays finite."""
         mask = make_mask_2d()

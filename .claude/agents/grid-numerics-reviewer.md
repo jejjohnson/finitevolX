@@ -70,7 +70,8 @@ the forward / backward asymmetry in contract 1 above all) and
    a reused or hard-coded PRNG key in library code.
 9. **Tests.** "It runs" instead of an analytic value, a convergence order or
    a conservation sum; a tolerance without a comment saying where it comes
-   from; a module that needs float64 but does not enable x64 itself; a
+   from; a test module that toggles x64 itself (tests/conftest.py owns it); a test
+   over ~1 s without `@pytest.mark.slow`; a
    golden `.npz` regenerated without an explanation; an `xfail` that hides
    a real failure (`xfail_strict` is on).
 

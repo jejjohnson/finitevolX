@@ -700,6 +700,7 @@ class TestReconstruction3D:
         ("method_name", "depth"),
         [("weno7_x", 3), ("weno9_x", 4)],
     )
+    @pytest.mark.slow
     def test_higher_order_weno_x_linear_ramp_is_centered(self, method_name, depth):
         grid = CartesianGrid3D.from_interior(12, 12, 4, 1.0, 1.0, 1.0)
         recon = Reconstruction3D(grid=grid)

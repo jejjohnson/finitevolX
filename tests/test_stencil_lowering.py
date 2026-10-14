@@ -45,8 +45,6 @@ from finitevolx._src.operators.stencils import (
     diff_y_fwd_3d,
 )
 
-jax.config.update("jax_enable_x64", True)
-
 NY, NX = 9, 12  # total shape incl. ghost ring; deliberately non-square
 
 
@@ -79,6 +77,7 @@ def _vjp_pads(fn, *xs):
 
 
 class TestNeighbours:
+    @pytest.mark.slow
     @pytest.mark.parametrize("shape", [(NY, NX), (3, NY, NX), (2, 3, NY, NX)])
     def test_views_match_slices(self, shape):
         h = _field(*shape)
@@ -157,6 +156,7 @@ class TestSameValues:
         ref = interior(d2x + d2y, h)
         np.testing.assert_array_equal(fvx.Difference2D(self.g2).laplacian(h), ref)
 
+    @pytest.mark.slow
     def test_laplacian_3d(self):
         h = _field(5, NY, NX)
         d2x = (diff_x_fwd_3d(h) - diff_x_bwd_3d(h)) / self.g3.dx**2
@@ -207,6 +207,7 @@ class TestSameValues:
         out = fvx.Diffusion2D(self.g2)(h, kappa, wall=wall)
         np.testing.assert_array_equal(out, ref)
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("wall", ["closed", "open"])
     @pytest.mark.parametrize("kappa_kind", ["field", "numpy_scalar"])
     def test_diffusion_2d_keeps_float32_with_float64_kappa(self, wall, kappa_kind):
@@ -229,6 +230,7 @@ class TestSameValues:
         assert out.dtype == jnp.float32
         np.testing.assert_array_equal(out, ref)
 
+    @pytest.mark.slow
     def test_spherical_diffusion_keeps_float32_with_float64_kappa(self):
         gs = fvx.SphericalGrid2D.from_interior(
             NX - 2, NY - 2, lon_range=(0.0, 30.0), lat_range=(-20.0, 20.0)

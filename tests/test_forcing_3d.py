@@ -28,8 +28,6 @@ from tests.fixtures.inputs import (
     make_v_field_3d,
 )
 
-jax.config.update("jax_enable_x64", True)
-
 
 @pytest.fixture
 def grid():
@@ -201,6 +199,7 @@ class TestTransforms3D:
         du, _ = jax.jit(lambda u: drag(u, u, 0.5))(_field3d(grid))
         np.testing.assert_allclose(du[1, 1:-1, 1:-1], -0.5)
 
+    @pytest.mark.slow
     def test_grad_wrt_per_level_rate(self, grid):
         q = _field3d(grid)
         damp = RayleighDamping3D(grid)
@@ -252,6 +251,7 @@ class TestMaskNaNSafety3D:
 
         assert bool(jnp.isfinite(jax.grad(loss)(h_bot)).all())
 
+    @pytest.mark.slow
     def test_grad_wrt_coefficients_finite_with_nan_land(self):
         grid, mask = make_grid_3d(), make_mask_3d()
         mu, mv, mh = (np.asarray(m) for m in (mask.u, mask.v, mask.h))

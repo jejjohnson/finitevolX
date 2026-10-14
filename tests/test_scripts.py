@@ -18,6 +18,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 
 
+# End-to-end: runs the example as a user would (integration tier).
+pytestmark = pytest.mark.integration
+
+
 def load_script_module(module_name: str, script_name: str):
     """Load a script as an importable module for smoke testing.
 

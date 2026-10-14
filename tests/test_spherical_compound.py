@@ -1,9 +1,6 @@
 """Tests for spherical compound operators."""
 
 import jax
-
-jax.config.update("jax_enable_x64", True)
-
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -96,6 +93,7 @@ class TestSphericalVorticity2D:
         result = vort_op.relative_vorticity(u, v)
         np.testing.assert_allclose(result, 0.0, atol=1e-10)
 
+    @pytest.mark.slow
     def test_masked_pv_grad_finite_and_forward_unchanged(self, grid):
         """Masked PV has finite reverse-mode gradients (#287)."""
         m = np.ones((grid.Ny, grid.Nx), bool)

@@ -26,12 +26,9 @@ gradient or flux divergence, 2 for a Laplacian, 4 for a biharmonic, and
 import ast
 import pathlib
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-
-jax.config.update("jax_enable_x64", True)
 
 from finitevolx._src.advection.advection import (
     Advection1D,
@@ -703,6 +700,7 @@ class TestScaleCovariance:
     @pytest.mark.parametrize(
         "case", [c for c in CASES + ADVECTION_CASES if c.masked], ids=repr
     )
+    @pytest.mark.slow
     def test_masked_cells_stay_zero_on_both_sides(self, case):
         """Zeroed by the mask, and still zeroed after rescaling.
 
@@ -1079,6 +1077,7 @@ class TestTheContractsHoldOnAnotherGrid:
     does not change #243's amplitude dependence.
     """
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("case", CASES + LINEAR_ADVECTION_CASES, ids=repr)
     def test_combined_rescaling(self, case):
         assert_covariant(case, 1e6, 1e-2, use_mask=False, shape=ALTERNATE_SHAPE)
@@ -1094,6 +1093,7 @@ class TestTheContractsHoldOnAnotherGrid:
     @pytest.mark.parametrize(
         "case", WENO_ADVECTION_CASES + TVD_ADVECTION_CASES, ids=repr
     )
+    @pytest.mark.slow
     def test_length_rescaling_is_still_exact(self, case):
         """The length half is exact for every scheme, #243 or not."""
         assert_covariant(case, 1e6, 1.0, use_mask=False, shape=ALTERNATE_SHAPE)
@@ -1123,6 +1123,7 @@ class TestMultilayerQGStretching:
         psi = 1e4 * jnp.stack([wave, 0.5 * wave**2 + 0.3 * wave])
         return grid, yy, psi, build_coupling_matrix(self.H, self.GP)
 
+    @pytest.mark.slow
     def test_matches_mqgeometry_divided_by_f0(self):
         """MQGeometry: q = lap psi - f0^2 A psi + beta (y - y0); here q / f0."""
         grid, yy, psi, A = self._setup()

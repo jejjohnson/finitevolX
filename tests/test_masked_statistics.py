@@ -249,6 +249,7 @@ class TestTransformsAndGradients:
 
         assert np.isfinite(np.asarray(jax.grad(total)(poisoned))).all()
 
+    @pytest.mark.slow
     def test_grad_of_std_is_finite_on_a_constant_field(self):
         """The ``eps`` floor keeps ``d/dx sqrt(var)`` finite at zero variance."""
         constant = jnp.ones((NSAMPLE, NY, NX))
@@ -332,6 +333,7 @@ class TestTheFloorIsHonouredWhateverItsSize:
         samples = jnp.full((8, 4, 4), 2.0, dtype=jnp.float32)
         assert float(jnp.min(masked_std(samples, axis=0))) == pytest.approx(1e-8)
 
+    @pytest.mark.slow
     def test_a_constant_field_still_has_a_finite_gradient(self):
         """The reason the variance is lifted before the sqrt."""
 

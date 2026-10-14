@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -14,8 +13,6 @@ from finitevolx import (
     Neumann1D,
     Periodic1D,
 )
-
-jax.config.update("jax_enable_x64", True)
 
 NY, NX = 20, 24
 DX, DY = 0.05, 0.04
@@ -52,6 +49,7 @@ def _neumann(value=0.0):
 
 
 class TestTransformDispatch:
+    @pytest.mark.slow
     def test_closed_is_dst(self):
         rhs = _rhs()
         psi = fvx.streamfunction_from_vorticity(
@@ -60,6 +58,7 @@ class TestTransformDispatch:
         ref = fvx.streamfunction_from_vorticity(rhs, DX, DY, bc="dst", lambda_=2.0)
         np.testing.assert_array_equal(psi, ref)
 
+    @pytest.mark.slow
     def test_zero_neumann_is_dct(self):
         rhs = _rhs() - jnp.mean(_rhs())
         p = fvx.pressure_from_divergence(rhs, DX, DY, bc=_neumann())
@@ -74,6 +73,7 @@ class TestTransformDispatch:
         ref = fvx.streamfunction_from_vorticity(rhs, DX, DY, bc="fft", lambda_=3.0)
         np.testing.assert_array_equal(psi, ref)
 
+    @pytest.mark.slow
     def test_pv_inversion_array_lambda(self):
         pv = jnp.stack([_rhs(), 2.0 * _rhs()])
         lambdas = jnp.array([1.0, 4.0])
@@ -83,6 +83,7 @@ class TestTransformDispatch:
 
 
 class TestMaskExtraction:
+    @pytest.mark.slow
     def test_cg_uses_bc_mask(self):
         mask = _basin_mask()
         rhs = _rhs() * mask
@@ -115,6 +116,7 @@ class TestMaskExtraction:
 
 
 class TestInhomogeneousDirichletFaces:
+    @pytest.mark.slow
     def test_face_values_pin_wall_rows(self):
         bc = _dirichlet(south=-0.2, north=0.1, west=0.05, east=0.3)
         psi = fvx.streamfunction_from_vorticity(_rhs(), DX, DY, bc=bc, lambda_=4.0)
@@ -158,6 +160,7 @@ class TestInhomogeneousDirichletFaces:
         ref = fvx.streamfunction_from_vorticity(rhs, DX, DY, known_values=g)
         np.testing.assert_array_equal(psi, ref)
 
+    @pytest.mark.slow
     def test_pv_inversion_face_values(self):
         pv = jnp.stack([_rhs(), _rhs()])
         psi = fvx.pv_inversion(

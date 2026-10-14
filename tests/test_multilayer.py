@@ -9,15 +9,12 @@ Covers:
 
 from __future__ import annotations
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
 import finitevolx as fvx
 from finitevolx import multilayer
-
-jax.config.update("jax_enable_x64", True)
 
 
 @pytest.fixture

@@ -69,7 +69,7 @@ the face-centred condition holds (e.g. `0.5 * (ghost + interior) == value`).
 ## 5. Verify
 
 ```bash
-uv run pytest -n auto tests/test_boundary.py tests/test_boundary_helpers.py \
+uv run pytest -n 2 tests/test_boundary.py tests/test_boundary_helpers.py \
   tests/test_elliptic_bcset.py tests/test_open_walls.py tests/test_capabilities.py
 ```
 

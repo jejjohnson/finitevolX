@@ -30,9 +30,6 @@ from finitevolx._src.solvers.elliptic import (
     solve_poisson_fft,
 )
 
-jax.config.update("jax_enable_x64", True)
-
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -238,6 +235,7 @@ class TestSpectralReexports:
 
 
 class TestSolveCG:
+    @pytest.mark.slow
     def test_helmholtz_fft_exact(self, periodic_grid):
         """CG with spectral preconditioner solves Helmholtz on periodic grid."""
         Ny, Nx, dx, dy = periodic_grid
@@ -275,6 +273,7 @@ class TestSolveCG:
         assert info.iterations >= 0
         assert info.residual_norm >= 0.0
 
+    @pytest.mark.slow
     def test_preconditioner_reduces_iterations(self, periodic_grid):
         """Spectral preconditioner should not require more iters than unpreconditioned."""
         Ny, Nx, dx, dy = periodic_grid
@@ -341,6 +340,7 @@ class TestSolveCGFloat32:
 
         return A, psi, mask, dx
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("precondition", [False, True])
     def test_default_tolerances_converge(self, precondition):
         A, psi, mask, dx = self._basin(64)
@@ -356,6 +356,7 @@ class TestSolveCGFloat32:
         err = float(jnp.max(jnp.abs((x - psi) * mask)))
         assert err < 1e-2
 
+    @pytest.mark.slow
     def test_amplitude_invariant(self):
         """Rescaling the rhs rescales the solution and leaves the iterations."""
         A, psi, _mask, _dx = self._basin(32)
@@ -398,6 +399,7 @@ class TestSolveCGFloat32:
 
 
 class TestNystromPreconditioner:
+    @pytest.mark.slow
     def test_output_shape_and_dtype(self, periodic_grid):
         """Preconditioner preserves shape and dtype."""
         Ny, Nx, dx, dy = periodic_grid
@@ -415,6 +417,7 @@ class TestNystromPreconditioner:
         assert out.shape == (Ny, Nx)
         assert out.dtype == r.dtype
 
+    @pytest.mark.slow
     def test_deterministic_with_fixed_key(self, periodic_grid):
         """Same key produces identical preconditioners."""
         Ny, Nx, dx, dy = periodic_grid
@@ -434,6 +437,7 @@ class TestNystromPreconditioner:
         )
         np.testing.assert_allclose(np.array(M1(r)), np.array(M2(r)), atol=1e-14)
 
+    @pytest.mark.slow
     def test_usable_as_cg_preconditioner(self, periodic_grid):
         """Nyström preconditioner can be used with solve_cg and produces correct results."""
         Ny, Nx, dx, dy = periodic_grid
@@ -458,6 +462,7 @@ class TestNystromPreconditioner:
         assert info.converged
         np.testing.assert_allclose(np.array(psi), np.array(psi_exact), atol=1e-6)
 
+    @pytest.mark.slow
     def test_low_rank_converges(self, periodic_grid):
         """Low-rank Nyström preconditioner must still converge (regression #187).
 
@@ -489,6 +494,7 @@ class TestNystromPreconditioner:
         rel_res = float(jnp.linalg.norm(r)) / float(jnp.linalg.norm(rhs))
         assert rel_res < 1e-3, f"Relative residual {rel_res:.2e} too large"
 
+    @pytest.mark.slow
     def test_low_rank_with_masked_laplacian(self):
         """Nyström preconditioner works on masked-domain problems (#187)."""
         Ny, Nx = 32, 32
@@ -582,6 +588,7 @@ def _inner_boundary_indices(mask: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 
 
 class TestCapacitanceSolver:
+    @pytest.mark.slow
     def test_returns_capacitance_solver(self):
         mask = _build_rect_mask(8, 10)
         solver = build_capacitance_solver(mask, dx=0.1, dy=0.1)
@@ -595,6 +602,7 @@ class TestCapacitanceSolver:
         psi = solver(rhs)
         assert psi.shape == (Ny, Nx)
 
+    @pytest.mark.slow
     def test_dirichlet_bc_enforced(self):
         """Solution is zero at all inner-boundary points (capacitance guarantee)."""
         Ny, Nx = 10, 12
@@ -627,6 +635,7 @@ class TestCapacitanceSolver:
 class TestVmapSpectralSolvers:
     """Verify all solvers work under jax.vmap for multi-layer / batched solves."""
 
+    @pytest.mark.slow
     def test_helmholtz_dst_vmap(self, dirichlet_grid):
         """Batched DST Helmholtz: each layer matches the single-layer solve."""
         Ny, Nx, dx, dy = dirichlet_grid
@@ -649,6 +658,7 @@ class TestVmapSpectralSolvers:
                 np.array(psi_batched[i]), np.array(psi_single), atol=1e-12
             )
 
+    @pytest.mark.slow
     def test_helmholtz_dct_vmap(self, neumann_grid):
         """Batched DCT Helmholtz with per-mode lambda, including lambda=0."""
         Ny, Nx, dx, dy = neumann_grid
@@ -720,6 +730,7 @@ class TestVmapSpectralSolvers:
                 np.array(psi_batched[i]), np.array(psi_single), atol=1e-12
             )
 
+    @pytest.mark.slow
     def test_poisson_dct_vmap(self, neumann_grid):
         """Batched DCT Poisson."""
         Ny, Nx, dx, dy = neumann_grid
@@ -793,6 +804,7 @@ class TestVmapCapacitanceSolver:
                 np.array(psi_batched[l]), np.array(psi_single), atol=1e-10
             )
 
+    @pytest.mark.slow
     def test_batched_bc_enforced(self):
         """Boundary condition is enforced for every batch element."""
         Ny, Nx = 10, 12

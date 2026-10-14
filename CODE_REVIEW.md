@@ -137,7 +137,9 @@ order); review what they cannot see.
   convergence order, or a conservation sum; not just "runs".
 - Small grids; random inputs from a pinned key; a non-obvious tolerance
   says where it comes from.
-- A module that needs float64 enables x64 itself; goldens regenerated only
+- Tests run in float64 via `tests/conftest.py` (no per-module x64 toggles);
+  a test over ~1 s is marked `slow`, an end-to-end run `integration`;
+  goldens regenerated only
   for an intended change, with the diff explained.
 
 ### 9. Modern Python and dependencies

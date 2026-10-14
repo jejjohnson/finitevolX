@@ -1,4 +1,4 @@
-.PHONY: help install uv-format uv-lint uv-pre-commit test test-cov typecheck ci docs docs-serve docs-deploy capabilities clean version
+.PHONY: help install uv-format uv-lint uv-pre-commit test test-all test-slow test-integration test-cov typecheck ci docs docs-serve docs-deploy capabilities clean version
 .DEFAULT_GOAL = help
 
 # ANSI Color Codes for pretty terminal output
@@ -50,9 +50,23 @@ uv-pre-commit: ## Run all pre-commit hooks
 
 ##@ Testing
 .PHONY: test
-test: ## Test code using pytest.
-	@printf "$(YELLOW)>>> Launching test suite...$(RESET)\n"
-	@uv run pytest tests
+test: ## Fast tier: unit tests (not slow, not integration), 2 workers
+	@printf "$(YELLOW)>>> Launching the fast tier...$(RESET)\n"
+	@uv run pytest tests -m "not slow and not integration" -n 2
+	@printf "$(GREEN)>>> Fast tier passed.$(RESET)\n"
+
+.PHONY: test-slow
+test-slow: ## Slow tier only (convergence sweeps, large grids, solver builds)
+	@uv run pytest tests -m slow -n 2
+
+.PHONY: test-integration
+test-integration: ## Integration tier only (example scripts, end-to-end runs)
+	@uv run pytest tests -m integration
+
+.PHONY: test-all
+test-all: ## Every tier (what CI runs on main); ~2 GB per xdist worker, keep -n small
+	@printf "$(YELLOW)>>> Launching the whole suite...$(RESET)\n"
+	@uv run pytest tests -n 2
 	@printf "$(GREEN)>>> All tests passed.$(RESET)\n"
 
 .PHONY: test-cov
@@ -79,7 +93,7 @@ ci: ## Run all CI checks locally (lint + format + typecheck + tests)
 	@printf "$(BLUE)>>> [3/4] Type check...$(RESET)\n"
 	@uv run ty check $(PKGROOT)
 	@printf "$(BLUE)>>> [4/4] Tests...$(RESET)\n"
-	@uv run pytest tests
+	@uv run pytest tests -n 2
 	@printf "$(GREEN)>>> All CI checks passed.$(RESET)\n"
 
 ##@ Documentation

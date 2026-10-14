@@ -5,10 +5,9 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 from finitevolx import rusanov_flux
-
-jax.config.update("jax_enable_x64", True)
 
 
 class TestRusanovFlux:
@@ -59,6 +58,7 @@ class TestRusanovFlux:
         g = jax.grad(lambda s: rusanov_flux(q, jnp.array([[s]]), axis=-1).sum())(0.0)
         assert jnp.isfinite(g)
 
+    @pytest.mark.slow
     def test_jit_and_grad_compatible(self):
         q = jax.random.normal(jax.random.PRNGKey(0), (8, 8))
         a = jax.random.normal(jax.random.PRNGKey(1), (8, 7))

@@ -78,7 +78,7 @@ step-by-step.
 ## 5. Verify
 
 ```bash
-uv run pytest -n auto tests/test_<family>.py tests/test_<family>_masks.py \
+uv run pytest -n 2 tests/test_<family>.py tests/test_<family>_masks.py \
   tests/test_stencils.py tests/test_scale_covariance.py tests/test_jax_transforms.py \
   tests/test_capabilities.py
 ```

@@ -27,8 +27,6 @@ from tests.fixtures.inputs import (
     make_v_field_2d,
 )
 
-jax.config.update("jax_enable_x64", True)
-
 
 @pytest.fixture
 def grid():
@@ -152,6 +150,7 @@ class TestQuadraticDrag2D:
         du, _ = QuadraticDrag2D(grid)(_ones(grid), _ones(grid, 0.0), cd, h_bot)
         np.testing.assert_allclose(du[1:-1, 3], -2.0 / 2.0)
 
+    @pytest.mark.slow
     def test_grad_finite_at_rest(self, grid):
         drag = QuadraticDrag2D(grid)
 

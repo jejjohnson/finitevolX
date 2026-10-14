@@ -34,9 +34,6 @@ from finitevolx import (
     upwind_flux,
 )
 
-jax.config.update("jax_enable_x64", True)
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -296,6 +293,7 @@ class TestUpwind1pt:
 
 
 class TestUpwind3pt:
+    @pytest.mark.slow
     def test_constant_field_all_methods(self):
         """Constant scalar → face value = constant for all methods."""
         C = 3.0
@@ -350,6 +348,7 @@ class TestReconstructBasic:
         Ny, Nx = 10, 10
         return Ny, Nx
 
+    @pytest.mark.slow
     def test_constant_scalar_x(self, uniform_grid):
         """Constant scalar + uniform velocity → constant flux."""
         Ny, Nx = uniform_grid
@@ -416,6 +415,7 @@ class TestReconstructBasic:
 class TestReconstructAccuracy:
     """Scientific accuracy tests for the reconstruct() dispatcher."""
 
+    @pytest.mark.slow
     def test_higher_order_more_accurate(self):
         """On a smooth field, 5-point should be more accurate than 3-point."""
         Ny, Nx = 20, 20
@@ -438,6 +438,7 @@ class TestReconstructAccuracy:
         assert float(err_5pt) < float(err_3pt)
         assert float(err_3pt) < float(err_1pt)
 
+    @pytest.mark.slow
     def test_convergence_rate_smooth_field(self):
         """Verify that reconstruction error decreases with grid refinement."""
         errors = []
@@ -478,6 +479,7 @@ class TestReconstructAccuracy:
 class TestReconstructNearDiscontinuity:
     """WENO's key property: reduced oscillation near discontinuities."""
 
+    @pytest.mark.slow
     def test_step_function_bounded(self):
         """WENO reconstruction near a step should produce less overshoot than linear."""
         Ny, Nx = 6, 20  # Need enough rows for ghost ring
@@ -512,6 +514,7 @@ class TestReconstructJaxCompat:
         ref = reconstruct(q, u, dim=1, method="weno", num_pts=5)
         np.testing.assert_allclose(result, ref, atol=1e-14)
 
+    @pytest.mark.slow
     def test_vmap_over_batch(self):
         """vmap over a batch dimension."""
         B, Ny, Nx = 4, 10, 10
@@ -532,6 +535,7 @@ class TestReconstructJaxCompat:
         assert jnp.all(jnp.isfinite(result))
         np.testing.assert_allclose(result, results_seq, atol=1e-14)
 
+    @pytest.mark.slow
     def test_grad(self):
         """Gradient should be computable through reconstruct."""
         Ny, Nx = 8, 8
@@ -1051,6 +1055,7 @@ class TestUpwindFluxFallbackExplicit:
             rtol=1e-12,
         )
 
+    @pytest.mark.slow
     def test_three_stencil_hierarchy_blends_correctly(self, coast_grid_and_mask):
         """With the weno5 hierarchy ``(2, 4, 6)``, every wet face-flux
         should be one of: upwind1 (at coast), weno3 (at near-coast),
@@ -1179,6 +1184,7 @@ _SCHEMES = [
 
 
 class TestReconstructNegativeFlow:
+    @pytest.mark.slow
     @pytest.mark.parametrize(("method", "num_pts"), _SCHEMES)
     def test_ramp_negative_equals_positive(self, method, num_pts):
         """q = x (cell averages of a ramp): u=-1 and u=+1 give the same face
@@ -1213,6 +1219,7 @@ class TestReconstructNegativeFlow:
             -f_neg[1 : Ny - 2, 1:-1], f_pos[1 : Ny - 2, 1:-1], atol=1e-14
         )
 
+    @pytest.mark.slow
     @pytest.mark.parametrize(("method", "num_pts"), _SCHEMES)
     def test_mirror_symmetry(self, method, num_pts):
         """``reconstruct(flip(q), -u) == flip(reconstruct(q, u))`` up to the
@@ -1238,6 +1245,7 @@ class TestReconstructNegativeFlow:
             -f_flip[1:-1, i_flip], f[1:-1, i], atol=1e-13, rtol=1e-13
         )
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("method", ["weno", "wenoz"])
     @pytest.mark.parametrize(("num_pts", "cls_name"), [(3, "{m}3_x"), (5, "{m}5_x")])
     def test_matches_class_path(self, method, num_pts, cls_name):

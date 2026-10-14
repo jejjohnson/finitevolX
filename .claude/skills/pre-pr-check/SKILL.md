@@ -14,13 +14,14 @@ honestly: what ran, what passed, what was skipped and why.
 uv run ruff check .                 # entire repo: tests/ and scripts/ too (docs/ is excluded)
 uv run ruff format --check .
 uv run ty check finitevolx          # what CI's lint and typecheck workflows run
-uv run pytest tests -n auto         # every test; CI runs `uv run pytest tests -v`
+uv run pytest tests -n 2            # every tier; -n 2, not auto (~2 GB per worker)
 ```
 
-`make uv-lint` runs the first three; `make ci` runs all four (serially,
-which is slow: prefer `-n auto` for the tests). There are no `slow` /
-`integration` markers, so nothing is skipped by default; CI runs the suite
-on Ubuntu and macOS with Python 3.12 and 3.13.
+`make uv-lint` runs the first three; `make ci` runs all four. The tiers
+(fast / `slow` / `integration`, see `tests/conftest.py`) only matter while
+iterating (`make test` is the fast tier); before a PR run every tier. CI runs
+fast + integration on Ubuntu and macOS with Python 3.12 and 3.13 and the
+slow tier on Ubuntu / 3.13. A new test over ~1 s needs `@pytest.mark.slow`.
 
 ## When an operator's output changed
 

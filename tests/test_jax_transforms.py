@@ -30,9 +30,6 @@ from finitevolx._src.operators.interpolation import (
 )
 from finitevolx._src.operators.vorticity import Vorticity2D
 
-jax.config.update("jax_enable_x64", True)
-
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -382,6 +379,7 @@ class TestPurityAndDeterminism:
 class TestVmapOperators:
     """vmap over a batch of independent fields must agree with a loop."""
 
+    @pytest.mark.slow
     def test_vmap_difference_laplacian_matches_loop(self, grid2d):
         """Laplacian of each field in a batch must match per-field eager calls."""
         diff = Difference2D(grid=grid2d)
@@ -395,6 +393,7 @@ class TestVmapOperators:
 
         np.testing.assert_allclose(vmap_result, loop_results, rtol=1e-7)
 
+    @pytest.mark.slow
     def test_vmap_interpolation_matches_loop(self, grid2d):
         """Interpolation of each field in a batch must match per-field eager calls."""
         interp = Interpolation2D(grid=grid2d)
