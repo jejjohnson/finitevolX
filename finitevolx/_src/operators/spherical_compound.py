@@ -24,6 +24,7 @@ from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators._utils import _safe_div_cos
 from finitevolx._src.operators.interpolation import Interpolation2D
 from finitevolx._src.operators.stencils import (
+    _neighbours,
     diff_x_bwd,
     diff_x_fwd,
 )
@@ -247,12 +248,17 @@ class SphericalLaplacian2D(eqx.Module):
         dlat = self.grid.dlat
         cos_T = self.grid.cos_lat_T[1:-1, 1:-1]
 
+        # Each offset of h is sliced once (see `_Neighbours2D`); same
+        # arithmetic as diff_x_fwd(h) - diff_x_bwd(h) and the original
+        # dh_N / dh_S slices, but the VJP is one fused pass.
+        nb = _neighbours(h)  # c, e, w, n, s views  [Ny-2, Nx-2]
+
         # d²h/dλ²
-        d2h_dlon2 = (diff_x_fwd(h) - diff_x_bwd(h)) / dlon**2
+        d2h_dlon2 = ((nb.e - nb.c) - (nb.c - nb.w)) / dlon**2
 
         # d/dφ(cosφ · dh/dφ)
-        dh_N = (h[2:, 1:-1] - h[1:-1, 1:-1]) / dlat
-        dh_S = (h[1:-1, 1:-1] - h[:-2, 1:-1]) / dlat
+        dh_N = (nb.n - nb.c) / dlat  # (h[2:, 1:-1] - h[1:-1, 1:-1]) / dlat
+        dh_S = (nb.c - nb.s) / dlat  # (h[1:-1, 1:-1] - h[:-2, 1:-1]) / dlat
         cos_V_N = 0.5 * (cos_T + self.grid.cos_lat_T[2:, 1:-1])
         cos_V_S = 0.5 * (cos_T + self.grid.cos_lat_T[:-2, 1:-1])
         d_coslat_dh = (cos_V_N * dh_N - cos_V_S * dh_S) / dlat

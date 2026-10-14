@@ -57,6 +57,7 @@ nav:
       - API Reference: api/vertical_modes.md
   - Raw Stencils:
       - Theory & Overview: stencils.md
+      - Writing Fast Stencils: performance.md
       - API Reference: api/stencils.md
   - Difference Operators:
       - Theory & Overview: difference.md

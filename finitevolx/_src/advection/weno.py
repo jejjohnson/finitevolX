@@ -258,11 +258,19 @@ def _linear_combo(coeffs: tuple[float, ...], stencil: tuple[Array, ...]) -> Arra
 
 
 def _smoothness_indicator(beta_matrix: np.ndarray, stencil: tuple[Array, ...]) -> Array:
-    values = jnp.stack(stencil, axis=0)
-    # Cast the precomputed NumPy matrix to the traced input dtype so WENO
-    # smoothness indicators follow float32/float64 runtime settings.
-    beta_matrix_jax = jnp.asarray(beta_matrix, dtype=values.dtype)
-    return jnp.einsum("i...,ij,j...->...", values, beta_matrix_jax, values)
+    # beta = q^T B q = sum_i q_i * (sum_j B[i, j] * q_j)
+    #
+    # Same quadratic form as
+    #   jnp.einsum("i...,ij,j...->...", jnp.stack(stencil), B, jnp.stack(stencil))
+    # but unrolled over the (at most 5x5) constant matrix, so it lowers to one
+    # fused elementwise pass instead of a stack, a dot and transposes of the
+    # stacked field (WENO-7 advection forward ~11x, WENO-9 ~14x on CPU).  The
+    # coefficients are Python floats (weakly typed), so the result keeps the
+    # input dtype under float32 and float64.
+    return sum(
+        q_i * sum(float(beta_matrix[i, j]) * q_j for j, q_j in enumerate(stencil))
+        for i, q_i in enumerate(stencil)
+    )
 
 
 def _weno_reconstruct(

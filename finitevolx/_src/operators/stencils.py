@@ -19,6 +19,9 @@ Example
 >>> result = interior(scaled, h)  # pad back to full grid shape
 """
 
+from typing import NamedTuple
+
+import jax
 from jaxtyping import Array, Float
 
 # =====================================================================
@@ -596,3 +599,79 @@ def avg_y_bwd_3d(
         Averaged values at interior destination points (T or U).
     """
     return 0.5 * (h[1:-1, 1:-1, 1:-1] + h[1:-1, :-2, 1:-1])
+
+
+# =====================================================================
+# Named neighbour views (one static slice per offset)
+# =====================================================================
+
+
+class _Neighbours2D(NamedTuple):
+    """The 3×3 neighbourhood of every interior point, one slice per offset.
+
+    Each field is ``h[..., 1+dj : Ny-1+dj, 1+di : Nx-1+di]`` — the value at
+    offset ``(dj, di)`` from interior point ``(j, i)`` — with shape
+    ``(..., Ny-2, Nx-2)``, exactly the slices the raw stencils above use:
+
+    ========  ================  ========================
+    field     offset (dj, di)   slice
+    ========  ================  ========================
+    ``c``     ( 0,  0)          ``h[..., 1:-1, 1:-1]``
+    ``e``     ( 0, +1)          ``h[..., 1:-1, 2:]``
+    ``w``     ( 0, -1)          ``h[..., 1:-1, :-2]``
+    ``n``     (+1,  0)          ``h[..., 2:, 1:-1]``
+    ``s``     (-1,  0)          ``h[..., :-2, 1:-1]``
+    ``ne``    (+1, +1)          ``h[..., 2:, 2:]``
+    ``nw``    (+1, -1)          ``h[..., 2:, :-2]``
+    ``se``    (-1, +1)          ``h[..., :-2, 2:]``
+    ``sw``    (-1, -1)          ``h[..., :-2, :-2]``
+    ========  ================  ========================
+
+    Why: a stencil that slices the same offset twice (e.g. ``h[1:-1, 1:-1]``
+    in both ``diff_x_fwd(h)`` and ``diff_x_bwd(h)``) computes the same forward
+    values, but reverse-mode AD transposes *each* slice into its own ``pad``
+    of the cotangent.  Slicing each offset once lets JAX sum the cotangents
+    of that view first, so the VJP is one fused pass with one ``pad`` per
+    offset.  Unused fields cost nothing (XLA drops dead slices).
+    """
+
+    c: Array
+    e: Array
+    w: Array
+    n: Array
+    s: Array
+    ne: Array
+    nw: Array
+    se: Array
+    sw: Array
+
+
+def _neighbours(h: Float[Array, "... Ny Nx"]) -> _Neighbours2D:
+    """Slice the nine 3×3-neighbourhood views of ``h`` once each.
+
+    See :class:`_Neighbours2D` for the offset of each field.  All views have
+    shape ``(..., Ny-2, Nx-2)``.
+    """
+    return _Neighbours2D(
+        c=h[..., 1:-1, 1:-1],
+        e=h[..., 1:-1, 2:],
+        w=h[..., 1:-1, :-2],
+        n=h[..., 2:, 1:-1],
+        s=h[..., :-2, 1:-1],
+        ne=h[..., 2:, 2:],
+        nw=h[..., 2:, :-2],
+        se=h[..., :-2, 2:],
+        sw=h[..., :-2, :-2],
+    )
+
+
+def _materialize(x: Float[Array, "..."]) -> Float[Array, "..."]:
+    """Keep ``x`` as its own buffer instead of fusing it into its consumers.
+
+    Identity on values and derivatives (``jax.lax.optimization_barrier``).
+    Use it on an intermediate field that the *next* stencil reads at several
+    offsets, e.g. the first Laplacian of a biharmonic operator: without it
+    XLA may fuse the producer into each shifted read and recompute it once
+    per offset (measured ~1.5x slower forward on CPU for the biharmonic).
+    """
+    return jax.lax.optimization_barrier(x)

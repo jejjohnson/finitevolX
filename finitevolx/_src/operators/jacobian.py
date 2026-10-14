@@ -23,6 +23,7 @@ from jaxtyping import Array, Float
 from finitevolx._src.grid.cartesian import CartesianGrid2D
 from finitevolx._src.mask import Mask2D
 from finitevolx._src.operators.diagnostic_operators import _sanitize
+from finitevolx._src.operators.stencils import _neighbours
 
 
 def arakawa_jacobian(
@@ -109,29 +110,37 @@ def arakawa_jacobian(
     >>> J.shape
     (10, 8)
     """
+    # Named 3x3 views, one static slice per offset (see `_Neighbours2D`):
+    #   F.e = f[..., 1:-1, 2:]  (f[j, i+1])     F.ne = f[..., 2:, 2:]    (f[j+1, i+1])
+    #   F.w = f[..., 1:-1, :-2] (f[j, i-1])     F.nw = f[..., 2:, :-2]   (f[j+1, i-1])
+    #   F.n = f[..., 2:, 1:-1]  (f[j+1, i])     F.se = f[..., :-2, 2:]   (f[j-1, i+1])
+    #   F.s = f[..., :-2, 1:-1] (f[j-1, i])     F.sw = f[..., :-2, :-2]  (f[j-1, i-1])
+    # The three forms below are the same expressions as the original
+    # slice-per-term code (bitwise-identical forward); slicing each offset
+    # once makes the VJP ~3-4x faster on CPU (one pad per offset).
+    F, G = _neighbours(f), _neighbours(g)  # each view [..., Ny-2, Nx-2]
+
     # J++ (standard centred form)
     # Jpp[j,i] = (df/dx * dg/dy - df/dy * dg/dx)
     # where df/dx ~ (f[j, i+1] - f[j, i-1]) / (2dx), etc.
-    Jpp = (f[..., 1:-1, 2:] - f[..., 1:-1, :-2]) * (
-        g[..., 2:, 1:-1] - g[..., :-2, 1:-1]
-    ) - (f[..., 2:, 1:-1] - f[..., :-2, 1:-1]) * (g[..., 1:-1, 2:] - g[..., 1:-1, :-2])
+    Jpp = (F.e - F.w) * (G.n - G.s) - (F.n - F.s) * (G.e - G.w)
 
     # J+x (advective form)
     # f evaluated at off-centre x-neighbours, g differenced in y at those neighbours
     Jpx = (
-        f[..., 1:-1, 2:] * (g[..., 2:, 2:] - g[..., :-2, 2:])
-        - f[..., 1:-1, :-2] * (g[..., 2:, :-2] - g[..., :-2, :-2])
-        - f[..., 2:, 1:-1] * (g[..., 2:, 2:] - g[..., 2:, :-2])
-        + f[..., :-2, 1:-1] * (g[..., :-2, 2:] - g[..., :-2, :-2])
+        F.e * (G.ne - G.se)
+        - F.w * (G.nw - G.sw)
+        - F.n * (G.ne - G.nw)
+        + F.s * (G.se - G.sw)
     )
 
     # Jx+ (divergence form)
     # g evaluated at off-centre y-neighbours, f differenced in x at those neighbours
     Jxp = (
-        g[..., 2:, 1:-1] * (f[..., 2:, 2:] - f[..., 2:, :-2])
-        - g[..., :-2, 1:-1] * (f[..., :-2, 2:] - f[..., :-2, :-2])
-        - g[..., 1:-1, 2:] * (f[..., 2:, 2:] - f[..., :-2, 2:])
-        + g[..., 1:-1, :-2] * (f[..., 2:, :-2] - f[..., :-2, :-2])
+        G.n * (F.ne - F.nw)
+        - G.s * (F.se - F.sw)
+        - G.e * (F.ne - F.se)
+        + G.w * (F.nw - F.sw)
     )
 
     return (Jpp + Jpx + Jxp) / (12.0 * dx * dy)

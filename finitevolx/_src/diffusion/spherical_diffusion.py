@@ -100,25 +100,36 @@ def _spherical_diffusion_2d_impl(
     # F_lam at U[j, i+1/2] = kappa * (h[j, i+1] - h[j, i]) / (R * cos(lat_U) * dlon)
     dh_dlon_raw = kappa_x * (h[1:-1, 2:-1] - h[1:-1, 1:-2])
     cos_U_face = cos_lat_U[1:-1, 1:-2]
-    flux_x_interior = _safe_div_cos(dh_dlon_raw, cos_U_face, R * dlon)
-    flux_x = jnp.zeros_like(h).at[1:-1, 1:-2].set(flux_x_interior)
+    # cast as the h-typed `zeros_like(h).at[...].set(...)` buffer did
+    flux_x_interior = _safe_div_cos(dh_dlon_raw, cos_U_face, R * dlon).astype(h.dtype)
     if mu is not None:
-        flux_x = flux_x * mu
+        flux_x_interior = flux_x_interior * mu[1:-1, 1:-2]
 
     # Step 2 — north-face flux at V-points.
     # F_phi at V[j+1/2, i] = kappa * (h[j+1, i] - h[j, i]) / (R * dlat)
-    flux_y_interior = kappa_y * (h[2:-1, 1:-1] - h[1:-2, 1:-1]) / (R * dlat)
-    flux_y = jnp.zeros_like(h).at[1:-2, 1:-1].set(flux_y_interior)
+    flux_y_interior = (kappa_y * (h[2:-1, 1:-1] - h[1:-2, 1:-1]) / (R * dlat)).astype(
+        h.dtype
+    )
     if mv is not None:
-        flux_y = flux_y * mv
+        flux_y_interior = flux_y_interior * mv[1:-2, 1:-1]
 
     # Step 3 — tendency at T-points (spherical flux-divergence).
     cos_V_N = cos_lat_V[1:-1, 1:-1]  # north face of cell [j, i]
     cos_V_S = cos_lat_V[:-2, 1:-1]  # south face of cell [j, i]
     cos_T_c = cos_lat_T[1:-1, 1:-1]
 
-    du = (flux_x[1:-1, 1:-1] - flux_x[1:-1, :-2]) / dlon
-    dv = (cos_V_N * flux_y[1:-1, 1:-1] - cos_V_S * flux_y[:-2, 1:-1]) / dlat
+    # Same values as building full-size flux arrays
+    #   flux_x = zeros_like(h).at[1:-1, 1:-2].set(flux_x_interior) (* mu)
+    #   du = (flux_x[1:-1, 1:-1] - flux_x[1:-1, :-2]) / dlon
+    # but the zero closed-wall faces enter as a `pad` of the interior-face
+    # fluxes, so the tendency and its VJP fuse into one pass (see
+    # `diffusion._diffusion_2d_impl`).
+    fx_e = jnp.pad(flux_x_interior, ((0, 0), (0, 1)))  # east face   [Ny-2, Nx-2]
+    fx_w = jnp.pad(flux_x_interior, ((0, 0), (1, 0)))  # west face
+    fy_n = jnp.pad(flux_y_interior, ((0, 1), (0, 0)))  # north face  [Ny-2, Nx-2]
+    fy_s = jnp.pad(flux_y_interior, ((1, 0), (0, 0)))  # south face
+    du = (fx_e - fx_w) / dlon
+    dv = (cos_V_N * fy_n - cos_V_S * fy_s) / dlat
     out = interior(_safe_div_cos(du + dv, cos_T_c, R), h)
 
     if mh is not None:

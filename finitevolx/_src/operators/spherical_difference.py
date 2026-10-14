@@ -154,7 +154,10 @@ class SphericalDifference2D(eqx.Module):
         d²h/dx² = 1/(R² cos²φ) · (h[j,i+1] − 2h[j,i] + h[j,i−1]) / dlon²
         """
         cos_T = self.grid.cos_lat_T[1:-1, 1:-1]
-        d2h = (diff_x_fwd(h) - diff_x_bwd(h)) / self.grid.dlon**2
+        # h_c sliced once (see `_Neighbours2D`); same arithmetic as
+        #   (diff_x_fwd(h) - diff_x_bwd(h)) / dlon**2
+        h_c, h_e, h_w = h[1:-1, 1:-1], h[1:-1, 2:], h[1:-1, :-2]
+        d2h = ((h_e - h_c) - (h_c - h_w)) / self.grid.dlon**2
         out = interior(_safe_div_cos(d2h, cos_T, self.grid.R**2 * cos_T), h)
         if self.mask is not None:
             out = out * self.mask.h
@@ -168,8 +171,10 @@ class SphericalDifference2D(eqx.Module):
         cos_T = self.grid.cos_lat_T[1:-1, 1:-1]
         dlat = self.grid.dlat
         # dh/dlat at half-indices
-        dh_N = (h[2:, 1:-1] - h[1:-1, 1:-1]) / dlat
-        dh_S = (h[1:-1, 1:-1] - h[:-2, 1:-1]) / dlat
+        # h_c sliced once (see `_Neighbours2D`)
+        h_c, h_n, h_s = h[1:-1, 1:-1], h[2:, 1:-1], h[:-2, 1:-1]
+        dh_N = (h_n - h_c) / dlat  # (h[2:, 1:-1] - h[1:-1, 1:-1]) / dlat
+        dh_S = (h_c - h_s) / dlat  # (h[1:-1, 1:-1] - h[:-2, 1:-1]) / dlat
         # cos(lat) at V-point latitudes (half-cell north/south)
         cos_N = 0.5 * (cos_T + self.grid.cos_lat_T[2:, 1:-1])
         cos_S = 0.5 * (cos_T + self.grid.cos_lat_T[:-2, 1:-1])
