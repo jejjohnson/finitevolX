@@ -1,6 +1,9 @@
 """Tests for spherical compound operators."""
 
 import jax
+
+jax.config.update("jax_enable_x64", True)
+
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -9,6 +12,8 @@ from finitevolx._src.grid.spherical import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
+from finitevolx._src.mask.cartesian import Mask2D
+from finitevolx._src.operators.reductions import spherical_area_weights
 from finitevolx._src.operators.spherical_compound import (
     SphericalDivergence2D,
     SphericalDivergence3D,
@@ -18,6 +23,7 @@ from finitevolx._src.operators.spherical_compound import (
     SphericalVorticity3D,
     geostrophic_velocity_sphere,
 )
+from finitevolx._src.operators.spherical_difference import SphericalDifference2D
 from finitevolx._src.operators.vorticity import Vorticity2D
 
 R = 1.0
@@ -90,6 +96,40 @@ class TestSphericalVorticity2D:
         result = vort_op.relative_vorticity(u, v)
         np.testing.assert_allclose(result, 0.0, atol=1e-10)
 
+    def test_masked_pv_grad_finite_and_forward_unchanged(self, grid):
+        """Masked PV has finite reverse-mode gradients (#287)."""
+        m = np.ones((grid.Ny, grid.Nx), bool)
+        m[[0, -1], :] = False
+        m[:, [0, -1]] = False
+        m[3:5, 4:7] = False
+        mask = Mask2D.from_mask(jnp.asarray(m))
+        op = SphericalVorticity2D(grid, mask=mask)
+        ku, kv, kh = jax.random.split(jax.random.PRNGKey(5), 3)
+        shp = (grid.Ny, grid.Nx)
+        u = jax.random.normal(ku, shp)
+        v = jax.random.normal(kv, shp)
+        h = 10.0 + jax.random.uniform(kh, shp)
+        f = jnp.ones(shp)
+
+        def total(u, v, h):
+            return op.potential_vorticity(u, v, h, f).sum()
+
+        for g in jax.grad(total, argnums=(0, 1, 2))(u, v, h):
+            assert bool(jnp.all(jnp.isfinite(g)))
+
+        # Forward values on wet corners equal the unguarded formula.
+        pv = op.potential_vorticity(u, v, h, f)
+        zeta = op.relative_vorticity(u, v)
+        num = zeta + op._interp.T_to_X(f)
+        den = op._interp.T_to_X(h)
+        wet = np.asarray(mask.xy_corner_strict)
+        wet_int = wet.copy()
+        wet_int[[0, -1], :] = False
+        wet_int[:, [0, -1]] = False
+        ref = np.asarray(num / den)
+        np.testing.assert_allclose(np.asarray(pv)[wet_int], ref[wet_int], rtol=1e-14)
+        np.testing.assert_array_equal(np.asarray(pv)[~wet], 0.0)
+
     def test_pv_flux_matches_cartesian(self, vort_op, grid, rng):
         """PV flux methods are coordinate-independent — should match Cartesian."""
         cart_vort = Vorticity2D(grid=grid)
@@ -135,6 +175,47 @@ class TestSphericalLaplacian2D:
         h = 7.0 * jnp.ones((grid.Ny, grid.Nx))
         result = lap_op(h)
         np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
+
+    def test_equals_div_of_grad(self, lap_op, grid):
+        """Lap(h) == Div(Grad h) to roundoff (#288): both read cos_lat_V."""
+        h = jax.random.normal(jax.random.PRNGKey(1), (grid.Ny, grid.Nx))
+        h = h.at[:, 0].set(h[:, -2]).at[:, -1].set(h[:, 1])  # periodic in lon
+        diff = SphericalDifference2D(grid=grid)
+        gu = diff.diff_lon_T_to_U(h)  # [Ny, Nx]
+        # west boundary face U[:, 0] is BC-owned; periodic wrap of the east one
+        gu = gu.at[:, 0].set(gu[:, -2])
+        gv = diff.diff_lat_T_to_V(h)  # [Ny, Nx]
+        # the gradient writes only [1:-1]; fill the south boundary face
+        # V[0] = (h[1] - h[0]) / (R dlat) that the divergence of row 1 reads
+        gv = gv.at[0, :].set((h[1, :] - h[0, :]) / (grid.R * grid.dlat))
+        div_grad = SphericalDivergence2D(grid=grid)(gu, gv)
+        np.testing.assert_allclose(
+            lap_op(h)[1:-1, 1:-1], div_grad[1:-1, 1:-1], rtol=0, atol=1e-12
+        )
+
+    def test_laplacian_merid_equals_div_of_lat_grad(self, grid):
+        """laplacian_merid(h) == Div(0, d_lat h) to roundoff (#288)."""
+        h = jax.random.normal(jax.random.PRNGKey(2), (grid.Ny, grid.Nx))
+        diff = SphericalDifference2D(grid=grid)
+        gv = diff.diff_lat_T_to_V(h)
+        gv = gv.at[0, :].set((h[1, :] - h[0, :]) / (grid.R * grid.dlat))
+        div_gv = SphericalDivergence2D(grid=grid)(jnp.zeros_like(gv), gv)
+        np.testing.assert_allclose(
+            diff.laplacian_merid(h)[1:-1, 1:-1],
+            div_gv[1:-1, 1:-1],
+            rtol=0,
+            atol=1e-12,
+        )
+
+    def test_closed_strip_conservation(self, lap_op, grid):
+        """sum(area * Lap(h)) = 0 with periodic lon and no-flux lat walls."""
+        h = jax.random.normal(jax.random.PRNGKey(3), (grid.Ny, grid.Nx))
+        h = h.at[0, :].set(h[1, :]).at[-1, :].set(h[-2, :])  # zero lat flux
+        h = h.at[:, 0].set(h[:, -2]).at[:, -1].set(h[:, 1])  # periodic in lon
+        area = spherical_area_weights(grid)
+        total = jnp.sum((area * lap_op(h))[1:-1, 1:-1])
+        scale = jnp.sum(jnp.abs(area * lap_op(h))[1:-1, 1:-1])
+        assert abs(float(total)) < 1e-14 * float(scale)
 
 
 # ======================================================================

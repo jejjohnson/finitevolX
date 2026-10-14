@@ -170,6 +170,12 @@ class SphericalVorticity2D(eqx.Module):
         h_on_X = self._interp.T_to_X(h)
         num = zeta[1:-1, 1:-1] + f_on_X[1:-1, 1:-1]
         den = h_on_X[1:-1, 1:-1]
+        if self.mask is not None:
+            # Same guard as Vorticity2D.potential_vorticity: h_on_X is exactly
+            # 0 at dry corners; divide by 1 there so reverse mode never
+            # evaluates 0 * inf (the output is zeroed below anyway).
+            # den[j, i] = den[j, i] if xy_corner_strict[j+1, i+1] else 1
+            den = jnp.where(self.mask.xy_corner_strict[1:-1, 1:-1], den, 1.0)
         pv = jnp.where(den == 0, jnp.nan, num / den)
         out = interior(pv, u)
         if self.mask is not None:
@@ -259,8 +265,10 @@ class SphericalLaplacian2D(eqx.Module):
         # d/dφ(cosφ · dh/dφ)
         dh_N = (nb.n - nb.c) / dlat  # (h[2:, 1:-1] - h[1:-1, 1:-1]) / dlat
         dh_S = (nb.c - nb.s) / dlat  # (h[1:-1, 1:-1] - h[:-2, 1:-1]) / dlat
-        cos_V_N = 0.5 * (cos_T + self.grid.cos_lat_T[2:, 1:-1])
-        cos_V_S = 0.5 * (cos_T + self.grid.cos_lat_T[:-2, 1:-1])
+        # V-face cosines from the grid, as SphericalDivergence2D reads them:
+        #   cos_V_N = cos_lat_V[j] (north face), cos_V_S = cos_lat_V[j-1]
+        cos_V_N = self.grid.cos_lat_V[1:-1, 1:-1]
+        cos_V_S = self.grid.cos_lat_V[:-2, 1:-1]
         d_coslat_dh = (cos_V_N * dh_N - cos_V_S * dh_S) / dlat
 
         lon_term = _safe_div_cos(d2h_dlon2, cos_T, R**2 * cos_T)
@@ -334,7 +342,7 @@ def _geostrophic_velocity_sphere(
     if wet_v is not None:
         # f_on_V[j+1/2, i] = f_on_V[j+1/2, i] if wet_v[j+1/2, i] else 1
         f_on_V = jnp.where(wet_v[1:-1, 1:-1], f_on_V, 1.0)
-    cos_on_V = 0.5 * (grid.cos_lat_T[1:-1, 1:-1] + grid.cos_lat_T[2:, 1:-1])
+    cos_on_V = grid.cos_lat_V[1:-1, 1:-1]  # cos(lat_T[j] + dlat/2)
     dh_dlon_V = (h[1:-1, 2:] + h[2:, 2:] - h[1:-1, :-2] - h[2:, :-2]) / (4.0 * dlon)
     v_g = interior(_safe_div_cos(gravity * dh_dlon_V, cos_on_V, f_on_V * R), h)
 
