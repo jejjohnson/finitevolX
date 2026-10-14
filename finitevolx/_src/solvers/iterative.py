@@ -16,8 +16,10 @@ Dirichlet conditions at the mask boundary.
 from __future__ import annotations
 
 from collections.abc import Callable
+import math
 from typing import NamedTuple
 
+import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 import lineax as lx
@@ -51,8 +53,10 @@ def solve_cg(
     x0: Float[Array, ...] | None = None,
     preconditioner: Callable[[Float[Array, ...]], Float[Array, ...]] | None = None,
     rtol: float = 1e-6,
-    atol: float = 1e-6,
+    atol: float | None = None,
     max_steps: int | None = 500,
+    *,
+    throw: bool = False,
 ) -> tuple[Float[Array, ...], CGInfo]:
     """Preconditioned Conjugate Gradient solver for symmetric linear operators.
 
@@ -89,10 +93,35 @@ def solve_cg(
         When ``None``, no preconditioning is applied (identity).
     rtol : float
         Relative convergence tolerance.  Default: 1e-6.
-    atol : float
-        Absolute convergence tolerance.  Default: 1e-6.
+    atol : float or None
+        Absolute convergence tolerance.  ``None`` (the default) resolves it
+        from the dtype: ``1e-6`` in float64; below float64, the solve runs on
+        the rescaled system ``A y = rhs / s`` with ``s = max|rhs_i|`` and
+        ``atol = √ε``, and returns ``s y``.  See Notes.
     max_steps : int or None
         Maximum CG iterations.  ``None`` means unlimited.  Default: 500.
+    throw : bool
+        Raise when CG does not converge.  Default ``False``: the iterate is
+        returned and ``info.converged`` reports the failure, so check it.
+
+    Notes
+    -----
+    lineax's CG stops when every entry satisfies
+    ``|r_i| <= atol + rtol |rhs_i|``.  Where ``rhs_i = 0`` (land, the ghost
+    ring, quiet regions) that is ``|r_i| <= atol`` with an *absolute*
+    ``atol``.  A fixed ``1e-6`` sits at float32's rounding floor once
+    ``|rhs| ~ 1`` and below it for an elliptic right-hand side of order
+    ``1/dx²``, so float32 CG never meets it: it runs to ``max_steps`` and can
+    diverge with a spectral preconditioner.  Rescaling by ``s = max|rhs_i|``
+    makes the effective ``atol = √ε · max|rhs_i|`` relative to the
+    right-hand side (and unit-agnostic).  ``s`` carries no gradient: it only
+    changes the iteration count.  This is the policy gaussx's CG strategies
+    use (gaussx gh-639).
+
+    In float64 the default stays the historical *absolute* ``atol = 1e-6``,
+    which is not unit-agnostic: a right-hand side far below ``1e-6`` in
+    magnitude (e.g. SI vorticity ``~1e-9``) is "converged" at the zero
+    iterate.  Pass an ``atol`` scaled to the right-hand side in that case.
 
     Returns
     -------
@@ -102,6 +131,9 @@ def solve_cg(
         Named tuple with fields ``iterations``, ``residual_norm``, and
         ``converged``.
     """
+    atol, scale = _cg_atol_and_scale(atol, rhs)
+    rhs_solve = rhs if scale is None else rhs / scale
+
     zero = jnp.zeros_like(rhs)
     # Tag as NSD; caller is responsible for ensuring A is actually negative (semi)definite.
     operator = lx.FunctionLinearOperator(
@@ -111,7 +143,7 @@ def solve_cg(
 
     options: dict = {}
     if x0 is not None:
-        options["y0"] = x0
+        options["y0"] = x0 if scale is None else x0 / scale
     if preconditioner is not None:
         # lineax CG internally negates the NSD operator to make it positive, so it
         # expects a preconditioner that approximates (-A)^{-1} = -A^{-1} (positive).
@@ -124,9 +156,11 @@ def solve_cg(
             _lx_precond, zero, tags=[lx.positive_semidefinite_tag]
         )
 
-    sol = lx.linear_solve(operator, rhs, solver=solver, options=options)
+    sol = lx.linear_solve(
+        operator, rhs_solve, solver=solver, options=options, throw=throw
+    )
 
-    x_out = sol.value
+    x_out = sol.value if scale is None else sol.value * scale
     res_norm = jnp.linalg.norm(matvec(x_out) - rhs)
     info = CGInfo(
         iterations=sol.stats["num_steps"],
@@ -134,6 +168,27 @@ def solve_cg(
         converged=sol.result == lx.RESULTS.successful,
     )
     return x_out, info
+
+
+def _cg_atol_and_scale(
+    atol: float | None, rhs: Float[Array, ...]
+) -> tuple[float, Float[Array, ""] | None]:
+    """Resolve ``atol`` and the right-hand-side scale for :func:`solve_cg`.
+
+    Returns ``(atol, None)`` when ``atol`` is set or ``rhs`` is float64 or
+    wider (``None`` → ``1e-6``, the historical default), else
+    ``(√ε, s)`` with ``s = max|rhs_i|`` (gradient stopped; ``1`` for a zero or
+    non-finite ``rhs``): solve ``A y = rhs / s``, return ``s y``.
+    """
+    if atol is not None:
+        return atol, None
+    finfo = jnp.finfo(rhs.dtype)
+    if finfo.bits >= 64 or rhs.size == 0:
+        return 1e-6, None
+    # s = max_i |rhs_i|, a constant of the solve (it only sets the iteration count)
+    scale = jax.lax.stop_gradient(jnp.max(jnp.abs(rhs)))
+    scale = jnp.where(jnp.isfinite(scale) & (scale > 0), scale, jnp.ones_like(scale))
+    return math.sqrt(float(finfo.eps)), scale
 
 
 # ---------------------------------------------------------------------------

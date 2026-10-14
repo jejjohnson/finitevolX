@@ -280,8 +280,10 @@ apply BCs to intermediate fields before chaining operators.
   operator; a preconditioner approximates its (negative) inverse.
 - Report convergence, don't assume it: `solve_cg` returns `CGInfo`
   (`iterations`, `residual_norm`, `converged`); check `converged` in tests.
-  The `method="cg"` path of the convenience wrappers discards it, so call
-  `solve_cg` directly when convergence matters.
+  `solve_cg` returns rather than raises when CG does not converge
+  (`throw=False`); the `method="cg"` path of the convenience wrappers
+  discards `CGInfo` and raises instead, so call `solve_cg` directly when you
+  want to inspect convergence.
 - Randomised construction takes a `key` (`make_nystrom_preconditioner`).
 - Pre-build what depends only on the geometry (`build_capacitance_solver`,
   `build_multigrid_solver`) and reuse it across right-hand sides.

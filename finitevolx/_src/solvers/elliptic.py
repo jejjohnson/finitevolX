@@ -245,7 +245,9 @@ def _solve_cg_method(
     if preconditioner is None:
         preconditioner = make_spectral_preconditioner(dx, dy, lambda_=lambda_, bc="fft")
 
-    x, _info = solve_cg(_matvec, rhs * mask_arr, preconditioner=preconditioner)
+    x, _info = solve_cg(
+        _matvec, rhs * mask_arr, preconditioner=preconditioner, throw=True
+    )
     return x * mask_arr
 
 
@@ -859,7 +861,9 @@ def pv_inversion(
                 if _precond is not None
                 else make_spectral_preconditioner(dx, dy, lambda_=lam_i, bc="fft")
             )
-            x, _info = solve_cg(_matvec, rhs * solve_mask, preconditioner=pc)
+            x, _info = solve_cg(
+                _matvec, rhs * solve_mask, preconditioner=pc, throw=True
+            )
             return x * solve_mask
 
     elif method == "spectral" and domain is not None:
