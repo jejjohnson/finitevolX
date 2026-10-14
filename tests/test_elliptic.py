@@ -340,6 +340,7 @@ class TestSolveCGFloat32:
 
         return A, psi, mask, dx
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("precondition", [False, True])
     def test_default_tolerances_converge(self, precondition):
         A, psi, mask, dx = self._basin(64)
@@ -355,6 +356,7 @@ class TestSolveCGFloat32:
         err = float(jnp.max(jnp.abs((x - psi) * mask)))
         assert err < 1e-2
 
+    @pytest.mark.slow
     def test_amplitude_invariant(self):
         """Rescaling the rhs rescales the solution and leaves the iterations."""
         A, psi, _mask, _dx = self._basin(32)

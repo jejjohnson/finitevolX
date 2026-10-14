@@ -9,7 +9,6 @@ applies; gaussx's structured primitives then hold exactly.
 from __future__ import annotations
 
 import gaussx
-import jax
 import jax.numpy as jnp
 import lineax as lx
 import numpy as np
@@ -25,8 +24,6 @@ from finitevolx import (
     solve_helmholtz_dst,
     solve_helmholtz_fft,
 )
-
-jax.config.update("jax_enable_x64", True)
 
 NY, NX = 12, 16
 DX, DY = 0.1, 0.25  # anisotropic on purpose
@@ -58,6 +55,7 @@ def _stencil(psi, bc, dx=DX, dy=DY, lam=LAM):
 
 
 class TestHelmholtzOperator:
+    @pytest.mark.slow
     @pytest.mark.parametrize("bc", ["fft", "dst", "dct"])
     def test_solve_matches_spectral_solver(self, bc):
         A = helmholtz_operator((NY, NX), DX, DY, lambda_=LAM, bc=bc)
@@ -75,6 +73,7 @@ class TestHelmholtzOperator:
             np.asarray(out), np.asarray(_stencil(psi, bc)), rtol=1e-10, atol=1e-10
         )
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("bc", ["fft", "dst", "dct"])
     def test_logdet_matches_dense(self, bc):
         A = helmholtz_operator((NY, NX), DX, DY, lambda_=LAM, bc=bc)
@@ -106,6 +105,7 @@ class TestHelmholtzOperator:
         A = helmholtz_operator((NY, NX), DX, DY, lambda_=jnp.asarray(LAM))
         assert not lx.is_negative_semidefinite(A)
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("bc", ["fft", "dst", "dct"])
     def test_float32_in_float32_out(self, bc):
         A = helmholtz_operator((NY, NX), DX, DY, lambda_=LAM, bc=bc)
@@ -122,6 +122,7 @@ class TestHelmholtzOperator:
         with pytest.raises(ValueError, match="bc must be"):
             helmholtz_operator((NY, NX), DX, DY, bc="robin")
 
+    @pytest.mark.slow
     def test_spde_precision_marginal_variance(self):
         """Q = (κ² − ∇²)² built from the operator's eigenvalues gives the
         exact prior marginal variance diag(Q⁻¹), and sqrt(Q)² = Q
@@ -157,6 +158,7 @@ def _basin(shape=(NY, NX)):
 
 
 class TestMaskedHelmholtzOperator:
+    @pytest.mark.slow
     def test_mv_matches_masked_laplacian(self):
         m = _basin()
         A_m = masked_helmholtz_operator(m, DX, DY, lambda_=LAM)
@@ -178,6 +180,7 @@ class TestMaskedHelmholtzOperator:
         y = gaussx.solve(A_m, A_m.mv(x))
         np.testing.assert_allclose(np.asarray(y), np.asarray(x), atol=1e-11)
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("edge", [False, True])
     def test_poisson_capacitance_over_singular_base(self, edge):
         """λ = 0: the periodic FFT base is singular, but gaussx borders the

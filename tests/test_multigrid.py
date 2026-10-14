@@ -341,6 +341,7 @@ class TestMultigridPreconditioner:
         _x, info = solve_cg(matvec, rhs, preconditioner=pc, max_steps=100)
         assert info.converged
 
+    @pytest.mark.slow
     def test_is_gaussx_preconditioner(self, mg_grid_16):
         ny, nx, dx, dy = mg_grid_16
         pc = make_gaussx_multigrid_preconditioner(_all_ones_solver(ny, nx, dx, dy))
@@ -367,6 +368,7 @@ class TestMultigridPreconditioner:
         ).T
         return V, K
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("masked", [False, True])
     def test_symmetric_positive_definite(self, masked):
         """CG needs a symmetric positive definite M^-1. One V-cycle V is not
@@ -393,6 +395,7 @@ class TestMultigridPreconditioner:
         np.testing.assert_allclose(M, M.T, rtol=0, atol=1e-12 * np.abs(M).max())
         assert np.linalg.eigvalsh(M).min() > 0.0
 
+    @pytest.mark.slow
     def test_gaussx_cg_matches_solve_cg(self):
         """gaussx.CGSolver with the multigrid preconditioner solves the
         positive system (−A) x = −b on a masked basin to the same answer as
@@ -436,6 +439,7 @@ class TestMultigridPreconditioner:
             atol=1e-9,
         )
 
+    @pytest.mark.slow
     def test_preconditioner_reduces_gaussx_cg_steps(self):
         """The symmetrised V-cycle cuts lineax CG steps on the positive system,
         relative to no preconditioner and to the raw (non-symmetric) V-cycle."""
@@ -468,6 +472,7 @@ class TestMultigridPreconditioner:
         assert n_sym < n_plain // 4
         assert n_sym < n_raw
 
+    @pytest.mark.slow
     def test_follows_vector_dtype(self):
         """The V-cycle runs in the float64 hierarchy, but a float32 system gets
         a float32 operator and a float32 solve, and a direct call returns the
