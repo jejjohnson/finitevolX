@@ -62,6 +62,30 @@ field stored column indices and `_yids` stored row indices.
   library.  Equivalent inline code is available in
   `docs/notebooks/demo_masks.py`.
 
+## [0.0.48](https://github.com/jejjohnson/finitevolX/compare/v0.0.47...v0.0.48) (2026-10-14)
+
+
+### Features
+
+* **solvers:** expose the Helmholtz operator as a structured gaussx operator ([#341](https://github.com/jejjohnson/finitevolX/issues/341)) ([4a61df8](https://github.com/jejjohnson/finitevolX/commit/4a61df8f0a00553ee160a531fdd8d29b5185aa60))
+* **solvers:** expose the multigrid V-cycle as a gaussx preconditioner ([#340](https://github.com/jejjohnson/finitevolX/issues/340)) ([62921dc](https://github.com/jejjohnson/finitevolX/commit/62921dc7df0c9d365b6d82118b35483a75b85f8c))
+
+
+### Bug Fixes
+
+* **advection:** align negative-flow face in functional reconstruct ([#348](https://github.com/jejjohnson/finitevolX/issues/348)) ([7558278](https://github.com/jejjohnson/finitevolX/commit/7558278ae89f5fa9eae97ddfa80c3a9676383172)), closes [#293](https://github.com/jejjohnson/finitevolX/issues/293)
+* **boundary:** use the outward normal on every face for neumann and robin ([#345](https://github.com/jejjohnson/finitevolX/issues/345)) ([449abf5](https://github.com/jejjohnson/finitevolX/commit/449abf52f8671b545ebd2f2de64fd2c80f3527e0)), closes [#285](https://github.com/jejjohnson/finitevolX/issues/285)
+* **diagnostics:** apply f0 to the multilayer qg stretching term ([#346](https://github.com/jejjohnson/finitevolX/issues/346)) ([567a598](https://github.com/jejjohnson/finitevolX/commit/567a5988f987af70ee513a00132636d5e86c2dbd)), closes [#282](https://github.com/jejjohnson/finitevolX/issues/282)
+* **operators:** correct small doc, comment and test mismatches ([#349](https://github.com/jejjohnson/finitevolX/issues/349)) ([2e2eaa1](https://github.com/jejjohnson/finitevolX/commit/2e2eaa161dde1dc4acab3b13f209031408f57991)), closes [#291](https://github.com/jejjohnson/finitevolX/issues/291)
+* **solvers:** make solve_cg's default atol reachable in float32 ([#339](https://github.com/jejjohnson/finitevolX/issues/339)) ([08044e9](https://github.com/jejjohnson/finitevolX/commit/08044e91cfccc9247a38edf9a48044e79636dec2))
+* **spherical:** read grid.cos_lat_V for V-face cosine and guard masked spherical pv ([#350](https://github.com/jejjohnson/finitevolX/issues/350)) ([ccf5540](https://github.com/jejjohnson/finitevolX/commit/ccf55404870d569d6ef9c1e1df737e29bc85dc7a)), closes [#287](https://github.com/jejjohnson/finitevolX/issues/287) [#288](https://github.com/jejjohnson/finitevolX/issues/288)
+* **timestepping:** make imex_ssp2_step second order in the implicit part ([#347](https://github.com/jejjohnson/finitevolX/issues/347)) ([0af059c](https://github.com/jejjohnson/finitevolX/commit/0af059c5b05b16e997f1e674f891c65a28ff9399)), closes [#311](https://github.com/jejjohnson/finitevolX/issues/311)
+
+
+### Performance Improvements
+
+* **operators:** lower stencils to one fused pass and unroll WENO-7/9 indicators ([#337](https://github.com/jejjohnson/finitevolX/issues/337)) ([7debd0a](https://github.com/jejjohnson/finitevolX/commit/7debd0a53159cdaca359ca4401b2f3829fa94c6c))
+
 ## [0.0.47](https://github.com/jejjohnson/finitevolX/compare/v0.0.46...v0.0.47) (2026-09-24)
 
 
