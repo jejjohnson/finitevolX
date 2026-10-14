@@ -448,7 +448,7 @@ current).
 |---|---|---|
 | `Vorticity2D` | class | 2-D vorticity and PV-flux operators. |
 | `Vorticity3D` | class | 3-D vorticity operators (horizontal plane per z-level). |
-| `pv_flux_arakawa_lamb` | function | Arakawa--Lamb (1981) PV flux as a grid-free free function. |
+| `pv_flux_arakawa_lamb` | function | Blend of the energy- and enstrophy-conserving PV fluxes (grid-free). |
 | `vorticity_flux_upwind` | function | Dissipative upwind vortex-force fluxes on a C-grid. |
 
 #### Capacitance matrix solver and convenience wrappers for 2-D elliptic PDEs (`finitevolx._src.solvers.elliptic`)

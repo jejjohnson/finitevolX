@@ -28,6 +28,7 @@ from finitevolx._src.operators.stencils import (
     diff_x_bwd,
     diff_x_fwd,
 )
+from finitevolx._src.operators.vorticity import _pv_flux_corner_product
 
 
 class SphericalDivergence2D(eqx.Module):
@@ -192,12 +193,21 @@ class SphericalVorticity2D(eqx.Module):
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
-        """Energy-conserving PV flux (coordinate-independent)."""
-        q_on_u = self._interp.X_to_U(q)  # already * mask.u under pass-down
-        q_on_v = self._interp.X_to_V(q)  # already * mask.v under pass-down
-        qu = interior(q_on_u[1:-1, 1:-1] * u[1:-1, 1:-1], u)
-        qv = interior(q_on_v[1:-1, 1:-1] * v[1:-1, 1:-1], v)
-        return qu, qv
+        """Energy-conserving PV flux: multiply at X-points, then average.
+
+        Same coordinate-independent form as
+        :meth:`Vorticity2D.pv_flux_energy_conserving` (see there for the
+        formula and which invariant each form conserves).
+        """
+        mask = self.mask
+        return _pv_flux_corner_product(
+            q,
+            u,
+            v,
+            wet_x=None if mask is None else mask.xy_corner_strict,
+            wet_u=None if mask is None else mask.u,
+            wet_v=None if mask is None else mask.v,
+        )
 
     def pv_flux_enstrophy_conserving(
         self,
@@ -205,13 +215,15 @@ class SphericalVorticity2D(eqx.Module):
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
-        """Enstrophy-conserving PV flux (coordinate-independent)."""
-        u_on_q = self._interp.U_to_X(u)  # * mask.xy_corner_strict
-        v_on_q = self._interp.V_to_X(v)  # * mask.xy_corner_strict
-        qu_at_q = interior(q[1:-1, 1:-1] * u_on_q[1:-1, 1:-1], q)
-        qv_at_q = interior(q[1:-1, 1:-1] * v_on_q[1:-1, 1:-1], q)
-        qu = self._interp.X_to_U(qu_at_q)  # * mask.u
-        qv = self._interp.X_to_V(qv_at_q)  # * mask.v
+        """Enstrophy-conserving PV flux: average q to the faces, then multiply.
+
+        Same coordinate-independent form as
+        :meth:`Vorticity2D.pv_flux_enstrophy_conserving`.
+        """
+        q_on_u = self._interp.X_to_U(q)  # already * mask.u under pass-down
+        q_on_v = self._interp.X_to_V(q)  # already * mask.v under pass-down
+        qu = interior(q_on_u[1:-1, 1:-1] * u[1:-1, 1:-1], u)
+        qv = interior(q_on_v[1:-1, 1:-1] * v[1:-1, 1:-1], v)
         return qu, qv
 
     def pv_flux_arakawa_lamb(
@@ -221,7 +233,11 @@ class SphericalVorticity2D(eqx.Module):
         v: Float[Array, "Ny Nx"],
         alpha: float = 1.0 / 3.0,
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
-        """Arakawa-Lamb PV flux: weighted blend of energy and enstrophy."""
+        """Linear blend ``alpha * energy + (1 - alpha) * enstrophy`` PV flux.
+
+        Not the Arakawa-Lamb (1981) scheme despite its name: for
+        0 < alpha < 1 it conserves neither invariant exactly (#283).
+        """
         qu_e, qv_e = self.pv_flux_energy_conserving(q, u, v)
         qu_s, qv_s = self.pv_flux_enstrophy_conserving(q, u, v)
         qu = alpha * qu_e + (1.0 - alpha) * qu_s

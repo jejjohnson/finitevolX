@@ -19,11 +19,9 @@ from finitevolx._src.operators.difference import Difference2D, _curl_2d
 from finitevolx._src.operators.interpolation import Interpolation2D
 from finitevolx._src.operators.stencils import (
     avg_x_bwd,
-    avg_x_fwd,
     avg_xbwd_yfwd,
     avg_xfwd_ybwd,
     avg_y_bwd,
-    avg_y_fwd,
 )
 
 
@@ -240,21 +238,84 @@ class Vorticity2D(eqx.Module):
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
     ) -> tuple:
-        """Energy-conserving PV flux.
+        """Energy-conserving PV flux (Sadourny 1975 E-scheme form).
 
-        Interpolate q and velocity independently to faces, then multiply.
+        Multiply q by the velocity at the X-points (corners), where q lives,
+        then average the product to the faces:
+
+        qu[j, i+1/2] = 1/2 * ( q[j+1/2, i+1/2] * u_on_q[j+1/2, i+1/2]
+                             + q[j-1/2, i+1/2] * u_on_q[j-1/2, i+1/2] )
+        qv[j+1/2, i] = 1/2 * ( q[j+1/2, i+1/2] * v_on_q[j+1/2, i+1/2]
+                             + q[j+1/2, i-1/2] * v_on_q[j+1/2, i-1/2] )
+
+        with ``u_on_q = U_to_X(u)`` and ``v_on_q = V_to_X(v)``.  The corner
+        products are formed on the full arrays, so the first interior row /
+        column reads the south / west ghost corners of the caller's
+        ghost-filled ``q``, ``u``, ``v`` (periodic, free-slip, open, ...).
+
+        The method multiplies q by whatever face fields it is given, so the
+        name refers to the vortex-force use: with the cross-face transport
+        (``du = +q·v``, ``dv = -q·u``, as :class:`MomentumAdvection2D` forms
+        it) this corner-product form conserves total energy for
+        non-divergent flow (Sadourny 1975), while the average-then-multiply
+        form (:meth:`pv_flux_enstrophy_conserving`) conserves potential
+        enstrophy.  Passed ``(q, u, v)`` directly it is a PV *transport*
+        flux (``q·u``, ``q·v``) and neither label applies.
+
+        Parameters
+        ----------
+        q : Float[Array, "Ny Nx"]
+            Potential vorticity at X-points, including the BC-owned south /
+            west ghost corners.
+        u : Float[Array, "Ny Nx"]
+            x-velocity (or x mass flux) at U-points.
+        v : Float[Array, "Ny Nx"]
+            y-velocity (or y mass flux) at V-points.
+
+        Returns
+        -------
+        tuple
+            (qu at U-points, qv at V-points), zero ghost ring.  Under a
+            mask the corner products are zeroed on dry *interior* corners
+            and the outputs multiplied by ``mask.u`` / ``mask.v``.
+        """
+        mask = self.mask
+        return _pv_flux_corner_product(
+            q,
+            u,
+            v,
+            wet_x=None if mask is None else mask.xy_corner_strict,
+            wet_u=None if mask is None else mask.u,
+            wet_v=None if mask is None else mask.v,
+        )
+
+    def pv_flux_enstrophy_conserving(
+        self,
+        q: Float[Array, "Ny Nx"],
+        u: Float[Array, "Ny Nx"],
+        v: Float[Array, "Ny Nx"],
+    ) -> tuple:
+        """Enstrophy-conserving PV flux (Sadourny 1975 Z-scheme form).
+
+        Average q to the faces, then multiply by the face field:
 
         qu[j, i+1/2] = q_on_u[j, i+1/2] * u[j, i+1/2]
         qv[j+1/2, i] = q_on_v[j+1/2, i] * v[j+1/2, i]
+
+        with ``q_on_u = X_to_U(q)`` and ``q_on_v = X_to_V(q)``.  As for
+        :meth:`pv_flux_energy_conserving`, the name refers to the
+        vortex-force use (cross-face transport averaged to each face, as
+        :class:`MomentumAdvection2D` does): this form then conserves
+        potential enstrophy for non-divergent flow (Sadourny 1975).
 
         Parameters
         ----------
         q : Float[Array, "Ny Nx"]
             Potential vorticity at X-points.
         u : Float[Array, "Ny Nx"]
-            x-velocity at U-points.
+            x-velocity (or x mass flux) at U-points.
         v : Float[Array, "Ny Nx"]
-            y-velocity at V-points.
+            y-velocity (or y mass flux) at V-points.
 
         Returns
         -------
@@ -269,45 +330,6 @@ class Vorticity2D(eqx.Module):
         qv = interior(q_on_v[1:-1, 1:-1] * v[1:-1, 1:-1], v)
         return qu, qv
 
-    def pv_flux_enstrophy_conserving(
-        self,
-        q: Float[Array, "Ny Nx"],
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
-    ) -> tuple:
-        """Enstrophy-conserving PV flux.
-
-        Multiply q*u at corners/faces, then interpolate to faces.
-
-        qu[j, i+1/2] = X_to_U(q * U_to_X(u))
-        qv[j+1/2, i] = X_to_V(q * V_to_X(v))
-
-        Parameters
-        ----------
-        q : Float[Array, "Ny Nx"]
-            Potential vorticity at X-points.
-        u : Float[Array, "Ny Nx"]
-            x-velocity at U-points.
-        v : Float[Array, "Ny Nx"]
-            y-velocity at V-points.
-
-        Returns
-        -------
-        tuple
-            (qu at U-points, qv at V-points)
-        """
-        u_on_q = self.interp.U_to_X(u)  # u_on_q[j+1/2, i+1/2]
-        v_on_q = self.interp.V_to_X(v)  # v_on_q[j+1/2, i+1/2]
-        # Multiply at corners
-        # qu_at_q[j+1/2, i+1/2] = q[j+1/2, i+1/2] * u_on_q[j+1/2, i+1/2]
-        qu_at_q = interior(q[1:-1, 1:-1] * u_on_q[1:-1, 1:-1], q)
-        # qv_at_q[j+1/2, i+1/2] = q[j+1/2, i+1/2] * v_on_q[j+1/2, i+1/2]
-        qv_at_q = interior(q[1:-1, 1:-1] * v_on_q[1:-1, 1:-1], q)
-        # Interpolate back to faces
-        qu = self.interp.X_to_U(qu_at_q)  # qu[j, i+1/2]
-        qv = self.interp.X_to_V(qv_at_q)  # qv[j+1/2, i]
-        return qu, qv
-
     def pv_flux_arakawa_lamb(
         self,
         q: Float[Array, "Ny Nx"],
@@ -315,9 +337,15 @@ class Vorticity2D(eqx.Module):
         v: Float[Array, "Ny Nx"],
         alpha: float = 1.0 / 3.0,
     ) -> tuple:
-        """Arakawa-Lamb PV flux: weighted blend of energy and enstrophy.
+        """Linear blend of the energy- and enstrophy-conserving PV fluxes.
 
         flux = alpha * energy_conserving + (1 - alpha) * enstrophy_conserving
+
+        !!! warning "Not the Arakawa-Lamb (1981) scheme"
+            Despite its name this is a linear blend of the two Sadourny
+            forms and, for 0 < alpha < 1, conserves *neither* energy nor
+            enstrophy exactly.  The Arakawa-Lamb (1981) scheme is a
+            distinct eight-point stencil and is not implemented (#283).
 
         Parameters
         ----------
@@ -328,7 +356,7 @@ class Vorticity2D(eqx.Module):
         v : Float[Array, "Ny Nx"]
             y-velocity at V-points.
         alpha : float
-            Blending weight.  Default 1/3 gives Arakawa-Lamb scheme.
+            Weight of the energy-conserving form.  Default 1/3.
 
         Returns
         -------
@@ -341,6 +369,51 @@ class Vorticity2D(eqx.Module):
         qu = alpha * qu_e + (1.0 - alpha) * qu_s
         qv = alpha * qv_e + (1.0 - alpha) * qv_s
         return qu, qv
+
+
+def _pv_flux_corner_product(
+    q: Float[Array, "Ny Nx"],
+    u: Float[Array, "Ny Nx"],
+    v: Float[Array, "Ny Nx"],
+    *,
+    wet_x: Array | None = None,
+    wet_u: Array | None = None,
+    wet_v: Array | None = None,
+) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
+    """Corner-product PV flux: multiply at X-points, then average to faces.
+
+    Same arithmetic as ``X_to_U(q * U_to_X(u))`` / ``X_to_V(q * V_to_X(v))``
+    at every face whose two corners are interior, but the corner products
+    are formed on the full arrays (rows / columns ``0 .. N-2``) instead of
+    through an ``interior()`` intermediate with a zero ghost ring, so the
+    first interior row / column averages with the south / west ghost
+    corner taken from the caller's ghost cells rather than with zero.
+
+    ``wet_x`` zeroes the product on dry *interior* X-corners (ghost corners
+    are BC-owned and pass through); ``wet_u`` / ``wet_v`` multiply the
+    outputs, matching the pass-down masks of :class:`Interpolation2D`.
+    """
+    # pu[j+1/2, i+1/2] = q[j+1/2, i+1/2] * 1/2 (u[j, i+1/2] + u[j+1, i+1/2])
+    #   for 0 <= j <= Ny-2 (south ghost corner row j = 0 included)   [Ny-1, Nx]
+    pu = q[:-1, :] * (0.5 * (u[:-1, :] + u[1:, :]))
+    # pv[j+1/2, i+1/2] = q[j+1/2, i+1/2] * 1/2 (v[j+1/2, i] + v[j+1/2, i+1])
+    #   for 0 <= i <= Nx-2 (west ghost corner column i = 0 included)  [Ny, Nx-1]
+    pv = q[:, :-1] * (0.5 * (v[:, :-1] + v[:, 1:]))
+    if wet_x is not None:
+        wet_x = jnp.asarray(wet_x, dtype=bool)
+        # keep[j, i] = True on the ghost ring, wet_x[j, i] in the interior
+        keep = jnp.ones_like(wet_x).at[1:-1, 1:-1].set(wet_x[1:-1, 1:-1])
+        pu = jnp.where(keep[:-1, :], pu, 0.0)
+        pv = jnp.where(keep[:, :-1], pv, 0.0)
+    # qu[j, i+1/2] = 1/2 (pu[j+1/2, i+1/2] + pu[j-1/2, i+1/2])   [Ny-2, Nx-2]
+    qu = interior(0.5 * (pu[1:, 1:-1] + pu[:-1, 1:-1]), u)
+    # qv[j+1/2, i] = 1/2 (pv[j+1/2, i+1/2] + pv[j+1/2, i-1/2])   [Ny-2, Nx-2]
+    qv = interior(0.5 * (pv[1:-1, 1:] + pv[1:-1, :-1]), v)
+    if wet_u is not None:
+        qu = qu * wet_u
+    if wet_v is not None:
+        qv = qv * wet_v
+    return qu, qv
 
 
 class Vorticity3D(eqx.Module):
@@ -400,20 +473,26 @@ def pv_flux_arakawa_lamb(
     *,
     alpha: float = 1.0 / 3.0,
 ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
-    """Arakawa--Lamb (1981) PV flux as a grid-free free function.
+    """Blend of the energy- and enstrophy-conserving PV fluxes (grid-free).
 
-    Public functional form of :meth:`Vorticity2D.pv_flux_arakawa_lamb` — the
-    energy- and enstrophy-conserving shallow-water vortex-force flux, a
-    weighted blend of the energy-conserving and enstrophy-conserving schemes:
+    Public functional form of :meth:`Vorticity2D.pv_flux_arakawa_lamb`:
 
         flux = alpha * energy_conserving + (1 - alpha) * enstrophy_conserving
 
-    The blend at ``alpha = 1/3`` is the Arakawa--Lamb scheme that conserves
-    both total energy and total potential enstrophy.  This free function
-    reproduces the unmasked :class:`Vorticity2D` method bit for bit using only
-    the C-grid averaging stencils, so it is reachable without constructing a
-    grid or instantiating the class (matching the ``divergence_2d`` style).
+    where the energy-conserving form multiplies q by the velocity at the
+    X-points and averages the product to the faces, and the
+    enstrophy-conserving form averages q to the faces and multiplies there
+    (see :meth:`Vorticity2D.pv_flux_energy_conserving` /
+    :meth:`Vorticity2D.pv_flux_enstrophy_conserving`).  It reproduces the
+    unmasked :class:`Vorticity2D` method bit for bit using only the C-grid
+    averaging stencils, so it is reachable without constructing a grid.
     For masked domains, use :class:`Vorticity2D` with a ``mask=``.
+
+    !!! warning "Not the Arakawa-Lamb (1981) scheme"
+        Despite its name this is a linear blend and, for 0 < alpha < 1,
+        conserves *neither* energy nor enstrophy exactly.  The
+        Arakawa-Lamb (1981) scheme is a distinct eight-point stencil and is
+        not implemented (#283).
 
     Parameters
     ----------
@@ -424,32 +503,21 @@ def pv_flux_arakawa_lamb(
     v : Float[Array, "Ny Nx"]
         y-velocity (or y mass flux) at V-points.
     alpha : float, optional
-        Blending weight.  Default ``1/3`` (Arakawa--Lamb).
+        Weight of the energy-conserving form.  Default ``1/3``.
 
     Returns
     -------
     tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]
         ``(qu, qv)`` — the PV flux at U-points and V-points.
-
-    References
-    ----------
-    Arakawa, A. & Lamb, V. R. (1981). A potential enstrophy and energy
-    conserving scheme for the shallow water equations. *Mon. Wea. Rev.* 109,
-    18--36.
     """
-    # Energy-conserving: interpolate q and velocity to faces independently.
+    # Energy-conserving: multiply at corners (full arrays), then average.
+    qu_e, qv_e = _pv_flux_corner_product(q, u, v)
+
+    # Enstrophy-conserving: average q to the faces, then multiply.
     q_on_u = interior(avg_y_bwd(q), q)  # X_to_U
     q_on_v = interior(avg_x_bwd(q), q)  # X_to_V
-    qu_e = interior(q_on_u[1:-1, 1:-1] * u[1:-1, 1:-1], u)
-    qv_e = interior(q_on_v[1:-1, 1:-1] * v[1:-1, 1:-1], v)
-
-    # Enstrophy-conserving: multiply at corners, then interpolate to faces.
-    u_on_q = interior(avg_y_fwd(u), u)  # U_to_X
-    v_on_q = interior(avg_x_fwd(v), v)  # V_to_X
-    qu_at_q = interior(q[1:-1, 1:-1] * u_on_q[1:-1, 1:-1], q)
-    qv_at_q = interior(q[1:-1, 1:-1] * v_on_q[1:-1, 1:-1], q)
-    qu_s = interior(avg_y_bwd(qu_at_q), qu_at_q)  # X_to_U
-    qv_s = interior(avg_x_bwd(qv_at_q), qv_at_q)  # X_to_V
+    qu_s = interior(q_on_u[1:-1, 1:-1] * u[1:-1, 1:-1], u)
+    qv_s = interior(q_on_v[1:-1, 1:-1] * v[1:-1, 1:-1], v)
 
     qu = alpha * qu_e + (1.0 - alpha) * qu_s
     qv = alpha * qv_e + (1.0 - alpha) * qv_s

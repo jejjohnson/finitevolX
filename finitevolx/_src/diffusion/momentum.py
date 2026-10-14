@@ -45,14 +45,16 @@ class MomentumAdvection2D(eqx.Module):
 
     Three vorticity-flux schemes are available via the ``scheme`` argument:
 
-    * ``'energy'`` — Sadourny (1975) **E-scheme**: interpolate ζ to faces
-      first, then multiply by the cross-face velocity.  Conserves total
-      kinetic energy discretely for non-divergent flow.
-    * ``'enstrophy'`` — Sadourny (1975) **Z-scheme**: interpolate the
-      velocity to corners, multiply by ζ at corners, then interpolate the
-      product to faces.  Conserves potential enstrophy.
-    * ``'al'`` — **Arakawa-Lamb (1981)** blend: ⅓ energy + ⅔ enstrophy.
-      Conserves both energy and enstrophy simultaneously.
+    * ``'energy'`` — Sadourny (1975) **E-scheme**: interpolate the
+      cross-face velocity to the corners, multiply by ζ at the corners, then
+      average the product to the faces.  Conserves total kinetic energy
+      discretely for non-divergent flow.
+    * ``'enstrophy'`` — Sadourny (1975) **Z-scheme**: interpolate ζ and the
+      cross-face velocity to the faces, then multiply.  Conserves potential
+      enstrophy for non-divergent flow.
+    * ``'al'`` — linear blend ⅓ energy + ⅔ enstrophy.  Despite the name this
+      is **not** the Arakawa-Lamb (1981) scheme (a distinct eight-point
+      stencil) and conserves neither invariant exactly (#283).
 
     Parameters
     ----------
@@ -110,13 +112,15 @@ class MomentumAdvection2D(eqx.Module):
         K = interior(0.5 * (u_on_T[1:-1, 1:-1] ** 2 + v_on_T[1:-1, 1:-1] ** 2), u)
         return self.diff.diff_x_T_to_U(K), self.diff.diff_y_T_to_V(K)
 
-    def _vorticity_flux_energy(
+    def _vorticity_flux_enstrophy(
         self,
         zeta: Float[Array, "Ny Nx"],
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
-        """Sadourny E-scheme vorticity flux at (U-points, V-points).
+        """Sadourny Z-scheme (enstrophy-conserving) vorticity flux at (U-, V-points).
+
+        Average ζ and the cross-face velocity to the faces, then multiply.
 
         zv_u[j, i+1/2] = zeta_on_u * v_on_u
         zu_v[j+1/2, i] = zeta_on_v * u_on_v
@@ -129,13 +133,15 @@ class MomentumAdvection2D(eqx.Module):
         zu_v = interior(zeta_on_v[1:-1, 1:-1] * u_on_v[1:-1, 1:-1], v)
         return zv_u, zu_v
 
-    def _vorticity_flux_enstrophy(
+    def _vorticity_flux_energy(
         self,
         zeta: Float[Array, "Ny Nx"],
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
-        """Sadourny Z-scheme vorticity flux at (U-points, V-points).
+        """Sadourny E-scheme (energy-conserving) vorticity flux at (U-, V-points).
+
+        Product at the X-points, then average to the faces.
 
         zv_at_q = zeta * v_on_q at X-points, then avg to U-points
         zu_at_q = zeta * u_on_q at X-points, then avg to V-points
@@ -165,7 +171,7 @@ class MomentumAdvection2D(eqx.Module):
             y-velocity at V-points.
         scheme : str
             Vorticity-flux scheme: ``'energy'`` (default), ``'enstrophy'``,
-            or ``'al'`` (Arakawa-Lamb blend).
+            or ``'al'`` (⅓–⅔ blend; not the Arakawa-Lamb 1981 scheme).
 
         Returns
         -------
@@ -189,7 +195,7 @@ class MomentumAdvection2D(eqx.Module):
         elif scheme == "enstrophy":
             zv_u, zu_v = self._vorticity_flux_enstrophy(zeta, u, v)
         elif scheme == "al":
-            # Arakawa-Lamb: 1/3 energy + 2/3 enstrophy
+            # linear blend: 1/3 energy + 2/3 enstrophy (not Arakawa-Lamb 1981)
             alpha = 1.0 / 3.0
             zv_u_e, zu_v_e = self._vorticity_flux_energy(zeta, u, v)
             zv_u_s, zu_v_s = self._vorticity_flux_enstrophy(zeta, u, v)
@@ -226,7 +232,7 @@ class MomentumAdvection3D(eqx.Module):
 
     * ``'energy'`` — Sadourny (1975) E-scheme (default).
     * ``'enstrophy'`` — Sadourny (1975) Z-scheme.
-    * ``'al'`` — Arakawa-Lamb (1981): ⅓ energy + ⅔ enstrophy.
+    * ``'al'`` — linear ⅓ energy + ⅔ enstrophy blend (not Arakawa-Lamb 1981).
 
     Parameters
     ----------
@@ -283,7 +289,7 @@ class MomentumAdvection3D(eqx.Module):
             y-velocity at V-points.
         scheme : str
             Vorticity-flux scheme: ``'energy'`` (default), ``'enstrophy'``,
-            or ``'al'`` (Arakawa-Lamb blend).
+            or ``'al'`` (⅓–⅔ blend; not the Arakawa-Lamb 1981 scheme).
 
         Returns
         -------

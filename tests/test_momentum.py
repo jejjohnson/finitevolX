@@ -258,3 +258,81 @@ class TestMomentumAdvection3D:
         expected_dv = (1.0 / 3.0) * dv_e + (2.0 / 3.0) * dv_s
         np.testing.assert_allclose(du_al, expected_du, rtol=1e-5, atol=1e-6)
         np.testing.assert_allclose(dv_al, expected_dv, rtol=1e-5, atol=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# Discrete conservation of the vortex-force schemes (#283)
+# ---------------------------------------------------------------------------
+
+
+def _compact_nondivergent_flow(n: int = 36, seed: int = 0):
+    """Random non-divergent (u, v) that vanish within 5 cells of every wall.
+
+    psi lives at X-points; u = -d psi/dy at U-points, v = d psi/dx at
+    V-points, so the C-grid divergence is zero to roundoff.  The compact
+    support keeps every term of the budgets inside MomentumAdvection2D's
+    [2:-2] write region, so the sums below are exact summations by parts.
+    """
+    grid = CartesianGrid2D.from_interior(n - 2, n - 2, 1.0, 1.0)
+    rng = np.random.default_rng(seed)
+    window = np.zeros((n, n))
+    window[6:-6, 6:-6] = 1.0
+    psi = jnp.asarray(rng.standard_normal((n, n)) * window)
+    u = (
+        jnp.zeros((n, n))
+        .at[1:-1, 1:-1]
+        .set(-(psi[1:-1, 1:-1] - psi[:-2, 1:-1]) / grid.dy)
+    )
+    v = (
+        jnp.zeros((n, n))
+        .at[1:-1, 1:-1]
+        .set((psi[1:-1, 1:-1] - psi[1:-1, :-2]) / grid.dx)
+    )
+    return grid, u, v
+
+
+def _budgets(grid, u, v, scheme):
+    """(dKE, dZ, scale) for the momentum-advection tendency."""
+    from finitevolx._src.operators.difference import Difference2D
+
+    madv = MomentumAdvection2D(grid=grid)
+    du, dv = madv(u, v, scheme=scheme)
+    d2 = Difference2D(grid=grid)
+    zeta = d2.curl(u, v)
+    dzeta = d2.curl(du, dv)
+    dke = float(jnp.sum(u * du + v * dv))
+    dz = float(jnp.sum(zeta * dzeta))
+    scale_ke = float(jnp.sum(jnp.abs(u * du) + jnp.abs(v * dv)))
+    scale_z = float(jnp.sum(jnp.abs(zeta * dzeta)))
+    return dke, dz, scale_ke, scale_z
+
+
+class TestVortexForceConservation:
+    """scheme='energy' conserves KE, scheme='enstrophy' conserves enstrophy.
+
+    Non-uniform vorticity matters: for solid-body rotation the two Sadourny
+    forms coincide, which is how the swapped labels went unnoticed (#283).
+    The 1e-12 tolerance is relative to the sum of |terms| (float64 roundoff
+    over ~10^3 terms); the non-conserved invariant is O(1) relative.
+    """
+
+    @pytest.mark.parametrize("seed", [0, 1, 2])
+    def test_energy_scheme_conserves_kinetic_energy(self, seed):
+        grid, u, v = _compact_nondivergent_flow(seed=seed)
+        dke, dz, s_ke, s_z = _budgets(grid, u, v, "energy")
+        assert abs(dke) < 1e-12 * s_ke
+        assert abs(dz) > 1e-6 * s_z  # and does not conserve enstrophy
+
+    @pytest.mark.parametrize("seed", [0, 1, 2])
+    def test_enstrophy_scheme_conserves_enstrophy(self, seed):
+        grid, u, v = _compact_nondivergent_flow(seed=seed)
+        dke, dz, s_ke, s_z = _budgets(grid, u, v, "enstrophy")
+        assert abs(dz) < 1e-12 * s_z
+        assert abs(dke) > 1e-6 * s_ke  # and does not conserve energy
+
+    def test_flow_is_non_divergent(self):
+        from finitevolx._src.operators.difference import Difference2D
+
+        grid, u, v = _compact_nondivergent_flow()
+        div = Difference2D(grid=grid).divergence(u, v)
+        assert float(jnp.abs(div).max()) < 1e-10 * float(jnp.abs(u).max()) / grid.dx
