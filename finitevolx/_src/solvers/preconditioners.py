@@ -98,14 +98,27 @@ def make_nystrom_preconditioner(
     r"""Build a randomized Nyström preconditioner for a symmetric operator.
 
     Delegates the low-rank Nyström construction to
-    :class:`gaussx.NystromPreconditioner`, then adapts it to the finitevolX
+    :func:`gaussx.randomized_nystrom` and :class:`gaussx.NystromPreconditioner`
+    (Frangella, Tropp & Udell, 2023), then adapts it to the finitevolX
     convention: the returned callable operates on 2-D fields and approximates
     ``A^{-1}`` for the symmetric **negative-definite** operator ``A``.
 
-    gaussx works with positive-semidefinite operators, so this probes the PSD
-    operator ``-A`` (obtaining ``(-A)^{-1}``) and negates the result to recover
-    ``A^{-1}``. The resulting callable can be passed straight to
-    :func:`~finitevolx._src.solvers.iterative.solve_cg`.
+    gaussx works with positive-semidefinite operators, so this sketches the
+    PSD operator ``B = -A`` as ``B ≈ U Λ̂ Uᵀ`` (rank ``l``) and applies
+
+    ``M⁻¹ r = -[ U (Λ̂ + μ)⁻¹ Uᵀ r + (r - U Uᵀ r) / (λ̂_l + μ) ]``,
+
+    i.e. the exact inverse on the captured top of the spectrum and a scalar
+    ``1 / (λ̂_l + μ)`` on its complement. ``μ = √ε · λ̂_1`` is a relative
+    regulariser (``ε`` the machine epsilon of the dtype), so the
+    preconditioner rescales with the operator (contract 6) and stays
+    well-defined for a singular ``A`` (e.g. a Neumann Poisson problem).
+
+    The Nyström sketch captures the *largest* eigenvalues of ``-A``. For a
+    Laplacian these are the grid-scale modes, so it deflates the top of the
+    spectrum but leaves the smooth modes (the small eigenvalues that set the
+    condition number) to CG: use ``make_spectral_preconditioner`` or
+    ``make_multigrid_preconditioner`` when iteration count matters.
 
     Parameters
     ----------
@@ -140,13 +153,20 @@ def make_nystrom_preconditioner(
     operator = gaussx.as_linear_operator(
         _neg_flat_matvec, shape=(n, n), positive_semidefinite=True
     )
-    preconditioner = gaussx.NystromPreconditioner.from_operator(
-        operator, rank=rank, key=key
+    # B = -A ≈ U Λ̂ Uᵀ, U: [n, l], Λ̂: [l] descending
+    approx = gaussx.randomized_nystrom(operator, min(rank, n), key=key)
+    eigenvalues = approx.d
+    # μ = √ε · λ̂_1: relative, so it rescales with the operator (no absolute ε)
+    shift = jnp.sqrt(jnp.finfo(eigenvalues.dtype).eps) * eigenvalues[0]
+    preconditioner = gaussx.NystromPreconditioner(
+        basis=approx.U, eigenvalues=eigenvalues, shift=shift
     )
-    minv = preconditioner.as_operator()  # applies (-A)^{-1} on flat vectors
+    # P⁻¹ = (λ̂_l + μ) [U (Λ̂ + μ)⁻¹ Uᵀ + (I - U Uᵀ) / (λ̂_l + μ)]
+    minv = preconditioner.as_operator()
+    scale = eigenvalues[-1] + shift  # undo the (λ̂_l + μ) factor → ≈ (-A)⁻¹
 
     def _preconditioner(r: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
-        return -minv.mv(r.reshape(n)).reshape(Ny, Nx)
+        return -minv.mv(r.reshape(n)).reshape(Ny, Nx) / scale
 
     return _preconditioner
 

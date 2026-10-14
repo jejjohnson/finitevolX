@@ -10,6 +10,9 @@ resolution-markers = [
     "python_full_version < '3.13' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
+[manifest]
+overrides = [{ name = "gaussx", git = "https://github.com/jejjohnson/gaussx?tag=v0.6.5" }]
+
 [[package]]
 name = "appnope"
 version = "0.1.4"
@@ -112,7 +115,7 @@ name = "cffi"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pycparser", marker = "implementation_name != 'PyPy'" },
+    { name = "pycparser" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/eb/56/b1ba7935a17738ae8453301356628e8147c79dbb825bcbc73dc7401f9846/cffi-2.0.0.tar.gz", hash = "sha256:44d1b5909021139fe36001ae048dbdde8214afa20200eda0f64c068cac5d5529", size = 523588, upload-time = "2025-09-08T23:24:04.541Z" }
 wheels = [
@@ -502,21 +505,8 @@ wheels = [
 ]
 
 [[package]]
-name = "finitediffx"
-version = "0.1.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "jax" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/59/7d/24398c0b011bc473a763c830e757d270f14327e64cf8ac27313a57e84f0a/finitediffx-0.1.0.tar.gz", hash = "sha256:52d9e67e551f5cad2b555ddf0ef84ab3f61011172b30b738a07c4776e6f3afbc", size = 20007, upload-time = "2023-07-27T14:07:10.346Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/0d/d3/818f9d6ca330f4aa78e618f24dac8a79c5d0825b00e9927c461a23539bb4/finitediffx-0.1.0-py3-none-any.whl", hash = "sha256:0b4a900453d8c7317f5e6668e47371cfe27020f075dd9890182561ab19e11572", size = 17714, upload-time = "2023-07-27T14:07:08.806Z" },
-]
-
-[[package]]
 name = "finitevolx"
-version = "0.0.46"
+version = "0.0.47"
 source = { editable = "." }
 dependencies = [
     { name = "beartype" },
@@ -579,7 +569,7 @@ requires-dist = [
     { name = "cyclopts", marker = "extra == 'examples'", specifier = ">=2.0.0" },
     { name = "diffrax", specifier = ">=0.6.0" },
     { name = "equinox", specifier = ">=0.11.0" },
-    { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?tag=v0.0.17" },
+    { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?tag=v0.6.5" },
     { name = "jax", specifier = ">=0.4.38" },
     { name = "jaxlib", specifier = ">=0.4.38" },
     { name = "jaxtyping", specifier = ">=0.3.0" },
@@ -603,7 +593,7 @@ requires-dist = [
     { name = "pytest-xdist", marker = "extra == 'test'", specifier = ">=3.5.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.0" },
     { name = "scipy", specifier = ">=1.14.0" },
-    { name = "spectraldiffx", git = "https://github.com/jejjohnson/spectraldiffx.git?tag=0.0.13" },
+    { name = "spectraldiffx", git = "https://github.com/jejjohnson/spectraldiffx.git?tag=0.1.1" },
     { name = "tqdm", marker = "extra == 'examples'", specifier = ">=4.66.0" },
     { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.23" },
     { name = "xarray", marker = "extra == 'examples'", specifier = ">=2025.1.0" },
@@ -652,8 +642,8 @@ wheels = [
 
 [[package]]
 name = "gaussx"
-version = "0.0.17"
-source = { git = "https://github.com/jejjohnson/gaussx?tag=v0.0.17#156f0c77835e2ad59befd4b5d89257f3dfa49b47" }
+version = "0.6.5"
+source = { git = "https://github.com/jejjohnson/gaussx?tag=v0.6.5#12ff91a68da2886478e9b3a1d0d4c0745d74ca41" }
 dependencies = [
     { name = "einx" },
     { name = "equinox" },
@@ -662,6 +652,7 @@ dependencies = [
     { name = "jaxtyping" },
     { name = "lineax" },
     { name = "matfree" },
+    { name = "optimistix" },
 ]
 
 [[package]]
@@ -944,18 +935,6 @@ wheels = [
 ]
 
 [[package]]
-name = "kernex"
-version = "0.2.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "jax" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a0/de/8a338586754fe77efef4d45d2adeee1a8389b433a8b03fee8ba6bf3a04e6/kernex-0.2.1.tar.gz", hash = "sha256:102814a1f35879b1b6f57f2c113768266c566e2e2eed9dc96d4c25a90d5fbed7", size = 26955, upload-time = "2025-11-15T12:08:20.43Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/47/ff/108214af06b6b1259bdd66a7ccb49e370395c648cd2fbfe7872f705d9e40/kernex-0.2.1-py3-none-any.whl", hash = "sha256:5f02f70209765f4c6c01ef9ee80f5d739ee6cc0dda31a5f3a603a53c8081a53d", size = 30819, upload-time = "2025-11-15T12:08:19.187Z" },
-]
-
-[[package]]
 name = "kiwisolver"
 version = "1.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1103,11 +1082,11 @@ wheels = [
 
 [[package]]
 name = "matfree"
-version = "0.5.5"
+version = "0.6.3"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/07/20/7daab1915d09f3618c089db9cf9d645c3da245eeb6236a7281b4759713fe/matfree-0.5.5.tar.gz", hash = "sha256:c478e0ddee7323ec0144fff558459d384a7b9283fd55fd56fc6876bd9701c55b", size = 55624, upload-time = "2025-12-02T09:01:34.401Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c5/28/b5ea302f983eba5ecb6e1ddf8f827fb625972dd3445e1b3ce021ae879acb/matfree-0.6.3.tar.gz", hash = "sha256:50873d853f169e8c7f77fe1648c524ae73e0171e45b65bf6b792a438a5b624dd", size = 75826, upload-time = "2026-10-13T09:07:40.571Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/47/57/1d8c13471272eee62970c9e84e4dbf5dba1278d415b8c2923e4247289574/matfree-0.5.5-py3-none-any.whl", hash = "sha256:9ed7c079ec85c902df6d2c36664faa1b50069284a88ff16f8d55f1f4ba2393d0", size = 34657, upload-time = "2025-12-02T09:01:33.119Z" },
+    { url = "https://files.pythonhosted.org/packages/1b/10/3544e312442c78a9467e4bc9ea1757727dcc535504588d31d99c6591cf27/matfree-0.6.3-py3-none-any.whl", hash = "sha256:b5768db7971ce8d3cef4b2c945ccc95593080cbf6ec041fac3cbb0d815daf0a2", size = 44073, upload-time = "2026-10-13T09:07:38.944Z" },
 ]
 
 [[package]]
@@ -1639,7 +1618,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "ptyprocess" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
@@ -2163,17 +2142,16 @@ wheels = [
 
 [[package]]
 name = "spectraldiffx"
-version = "0.0.13"
-source = { git = "https://github.com/jejjohnson/spectraldiffx.git?tag=0.0.13#a71d28697f1d22f2504d0f213c1d762a0ea3eb2c" }
+version = "0.1.1"
+source = { git = "https://github.com/jejjohnson/spectraldiffx.git?tag=0.1.1#1de770b70dc111f0f735fd589eb1f030a6114dda" }
 dependencies = [
-    { name = "beartype" },
     { name = "equinox" },
-    { name = "finitediffx" },
     { name = "gaussx" },
     { name = "jax" },
     { name = "jaxlib" },
     { name = "jaxtyping" },
-    { name = "kernex" },
+    { name = "numpy" },
+    { name = "scipy" },
 ]
 
 [[package]]
