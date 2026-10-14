@@ -57,6 +57,7 @@ from finitevolx._src.solvers.iterative import (  # noqa: F401
 
 # Re-export from preconditioners module
 from finitevolx._src.solvers.preconditioners import (  # noqa: F401
+    make_gaussx_multigrid_preconditioner,
     make_multigrid_preconditioner,
     make_nystrom_preconditioner,
     make_preconditioner,

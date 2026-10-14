@@ -54,7 +54,9 @@ builds the capability index.
   Poisson / Helmholtz solvers, their eigenvalues and the capacitance solver;
   finitevolX re-exports 78 of its names unchanged. gaussx owns structured
   linear algebra; finitevolX re-exports its tridiagonal solves and builds
-  `make_nystrom_preconditioner` on `gaussx.NystromPreconditioner`. Use their
+  `make_nystrom_preconditioner` on `gaussx.NystromPreconditioner`;
+  `make_gaussx_multigrid_preconditioner` wraps the symmetrised V-cycle in
+  `gaussx.OperatorPreconditioner` for gaussx's CG strategies. Use their
   public APIs only; neither imports finitevolX.
 - **Downstream**: ocean models (e.g. somax) build on the operators and
   rebuild them in nondimensional units, which is why operators must stay

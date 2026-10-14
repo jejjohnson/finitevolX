@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import equinox as eqx
+import gaussx
 import jax
 import jax.numpy as jnp
+import lineax as lx
 import numpy as np
 import pytest
 
@@ -19,7 +21,10 @@ from finitevolx._src.solvers.multigrid import (
     _weighted_jacobi,
     build_multigrid_solver,
 )
-from finitevolx._src.solvers.preconditioners import make_multigrid_preconditioner
+from finitevolx._src.solvers.preconditioners import (
+    make_gaussx_multigrid_preconditioner,
+    make_multigrid_preconditioner,
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -332,6 +337,164 @@ class TestMultigridPreconditioner:
 
         _x, info = solve_cg(matvec, rhs, preconditioner=pc, max_steps=100)
         assert info.converged
+
+    def test_is_gaussx_preconditioner(self, mg_grid_16):
+        ny, nx, dx, dy = mg_grid_16
+        pc = make_gaussx_multigrid_preconditioner(_all_ones_solver(ny, nx, dx, dy))
+        assert isinstance(pc, gaussx.OperatorPreconditioner)
+
+    @staticmethod
+    def _dense(pc, n, dtype=jnp.float64):
+        """Dense M^-1 of the preconditioner through its lineax operator."""
+        system = lx.FunctionLinearOperator(
+            lambda v: v, jax.ShapeDtypeStruct((n,), dtype), tags=[lx.symmetric_tag]
+        )
+        op = pc.as_operator(system)
+        return np.asarray(jax.vmap(op.mv)(jnp.eye(n, dtype=dtype)).T)
+
+    @staticmethod
+    def _dense_raw_and_k(solver, ny, nx):
+        """Dense V = -Vcycle(0, .) and K = -A on the full [Ny*Nx] grid."""
+        level0 = solver.levels[0]
+        fvx_pc = make_multigrid_preconditioner(solver)
+        eye = jnp.eye(ny * nx)
+        V = -np.asarray(jax.vmap(lambda e: fvx_pc(e.reshape(ny, nx)).ravel())(eye)).T
+        K = -np.asarray(
+            jax.vmap(lambda e: _apply_operator(e.reshape(ny, nx), level0).ravel())(eye)
+        ).T
+        return V, K
+
+    @pytest.mark.parametrize("masked", [False, True])
+    def test_symmetric_positive_definite(self, masked):
+        """CG needs a symmetric positive definite M^-1. One V-cycle V is not
+        symmetric (restriction is not the transpose of prolongation); the
+        preconditioner is the symmetrised two-step iteration
+        M^-1 = V + V^T - V^T K V, symmetric to round-off and, for a
+        convergent multigrid (default settings), positive definite on the
+        wet points."""
+        ny, nx = 16, 16
+        dx, dy = 1.0 / nx, 1.0 / ny
+        mask = _circular_mask(ny, nx) if masked else np.ones((ny, nx))
+        solver = build_multigrid_solver(mask, dx, dy, lambda_=1.0)
+        wet = np.asarray(solver.levels[0].mask).ravel().astype(bool)
+        V, K = self._dense_raw_and_k(solver, ny, nx)
+        Vw = V[np.ix_(wet, wet)]
+        # the raw V-cycle is measurably non-symmetric (why this exists)
+        assert np.linalg.norm(Vw - Vw.T) > 1e-3 * np.linalg.norm(Vw)
+
+        M = self._dense(make_gaussx_multigrid_preconditioner(solver), ny * nx)
+        np.testing.assert_allclose(
+            M, V + V.T - V.T @ K @ V, rtol=1e-9, atol=1e-12 * np.abs(M).max()
+        )
+        M = M[np.ix_(wet, wet)]
+        np.testing.assert_allclose(M, M.T, rtol=0, atol=1e-12 * np.abs(M).max())
+        assert np.linalg.eigvalsh(M).min() > 0.0
+
+    def test_gaussx_cg_matches_solve_cg(self):
+        """gaussx.CGSolver with the multigrid preconditioner solves the
+        positive system (−A) x = −b on a masked basin to the same answer as
+        finitevolX's solve_cg."""
+        from finitevolx._src.solvers.iterative import solve_cg
+
+        ny, nx = 32, 32
+        dx, dy = 1.0 / nx, 1.0 / ny
+        lam = 10.0
+        mask = _circular_mask(ny, nx)
+        solver = build_multigrid_solver(mask, dx, dy, lambda_=lam)
+        pc = make_gaussx_multigrid_preconditioner(solver)
+        level0 = solver.levels[0]
+
+        def matvec(u):
+            return _apply_operator(u, level0)
+
+        rng = np.random.default_rng(13)
+        rhs = jnp.array(rng.standard_normal((ny, nx))) * level0.mask
+
+        x_fvx, info = solve_cg(
+            matvec,
+            rhs,
+            preconditioner=make_multigrid_preconditioner(solver),
+            rtol=1e-10,
+            atol=1e-10,
+        )
+        assert info.converged
+
+        neg_A = gaussx.as_linear_operator(
+            lambda v: -matvec(v.reshape(ny, nx)).ravel(),
+            shape=(ny * nx, ny * nx),
+            positive_semidefinite=True,
+        )
+        cg = gaussx.CGSolver(rtol=1e-10, atol=1e-10, max_steps=200, preconditioner=pc)
+        x_gx = cg.solve(neg_A, -rhs.ravel()).reshape(ny, nx)
+        np.testing.assert_allclose(
+            np.asarray(x_gx * level0.mask),
+            np.asarray(x_fvx * level0.mask),
+            rtol=1e-7,
+            atol=1e-9,
+        )
+
+    def test_preconditioner_reduces_gaussx_cg_steps(self):
+        """The symmetrised V-cycle cuts lineax CG steps on the positive system,
+        relative to no preconditioner and to the raw (non-symmetric) V-cycle."""
+        ny, nx = 32, 32
+        dx, dy = 1.0 / nx, 1.0 / ny
+        solver = _all_ones_solver(ny, nx, dx, dy, lambda_=1.0)
+        pc = make_gaussx_multigrid_preconditioner(solver)
+        level0 = solver.levels[0]
+        structure = jax.ShapeDtypeStruct((ny * nx,), jnp.float64)
+        neg_A = lx.FunctionLinearOperator(
+            lambda v: -_apply_operator(v.reshape(ny, nx), level0).ravel(),
+            structure,
+            tags=[lx.positive_semidefinite_tag],
+        )
+        fvx_pc = make_multigrid_preconditioner(solver)
+        raw = lx.FunctionLinearOperator(
+            lambda v: -fvx_pc(v.reshape(ny, nx)).ravel(),
+            structure,
+            tags=[lx.positive_semidefinite_tag],
+        )
+        b = jnp.array(np.random.default_rng(5).standard_normal(ny * nx))
+        cg = lx.CG(rtol=1e-8, atol=1e-8, max_steps=2000)
+
+        def steps(precond):
+            opts = {} if precond is None else {"preconditioner": precond}
+            sol = lx.linear_solve(neg_A, b, cg, options=opts)
+            return int(sol.stats["num_steps"])
+
+        n_plain, n_raw, n_sym = steps(None), steps(raw), steps(pc.as_operator(neg_A))
+        assert n_sym < n_plain // 4
+        assert n_sym < n_raw
+
+    def test_follows_vector_dtype(self):
+        """The V-cycle runs in the float64 hierarchy, but a float32 system gets
+        a float32 operator and a float32 solve, and a direct call returns the
+        vector's dtype (codex review on #340)."""
+        ny, nx = 32, 32
+        dx, dy = 1.0 / nx, 1.0 / ny
+        solver = _all_ones_solver(ny, nx, dx, dy, lambda_=1.0)
+        level0 = solver.levels[0]
+        neg_A = lx.FunctionLinearOperator(
+            lambda v: (
+                -_apply_operator(v.reshape(ny, nx), level0).ravel().astype(jnp.float32)
+            ),
+            jax.ShapeDtypeStruct((ny * nx,), jnp.float32),
+            tags=[lx.positive_semidefinite_tag],
+        )
+        pc = make_gaussx_multigrid_preconditioner(solver)
+        pc_op = pc.as_operator(neg_A)
+        assert pc_op.in_structure() == neg_A.in_structure()
+        b = jnp.asarray(
+            np.random.default_rng(7).standard_normal(ny * nx), dtype=jnp.float32
+        )
+        assert pc(b, neg_A).dtype == jnp.float32
+        sol = lx.linear_solve(
+            neg_A,
+            b,
+            lx.CG(rtol=1e-4, atol=1e-4, max_steps=200),
+            options={"preconditioner": pc_op},
+        )
+        assert sol.value.dtype == jnp.float32
+        assert sol.result == lx.RESULTS.successful
 
 
 # ---------------------------------------------------------------------------
