@@ -35,20 +35,29 @@ def imex_ssp2_step(
     The explicit part is SSP with C = 1; the implicit part is A-stable and
     L-stable (SDIRK with gamma = 1 - 1/sqrt(2)).
 
+    Pareschi & Russo (2005) SSP2(2,2,2), ``gamma = 1 - 1/sqrt(2)``::
+
+        explicit  A_E = [[0, 0], [1, 0]]          b_E = [1/2, 1/2]
+        implicit  A_I = [[gamma, 0], [1-2*gamma, gamma]]   b_I = [1/2, 1/2]
+
     Algorithm (two stages)::
 
         Stage 1:
             Y_1 = y_n + gamma * dt * f_I(Y_1)
-            -> solved via implicit_solve(y_n, gamma * dt)
+            -> implicit_solve(y_n, gamma * dt)
 
         Stage 2:
-            Y_2_star = y_n + dt * f_E(y_n)
+            Y_2_star = y_n + dt * f_E(Y_1) + (1 - 2*gamma) * dt * f_I(Y_1)
             Y_2 = Y_2_star + gamma * dt * f_I(Y_2)
-            -> solved via implicit_solve(Y_2_star, gamma * dt)
+            -> implicit_solve(Y_2_star, gamma * dt)
 
         Update:
-            y_{n+1} = y_n + (dt/2) * [f_E(y_n) + f_E(Y_2)]
+            y_{n+1} = y_n + (dt/2) * [f_E(Y_1) + f_E(Y_2)]
                           + (dt/2) * [f_I(Y_1) + f_I(Y_2)]
+
+    The method is second order in the explicit part, the implicit part and
+    the coupled split (the implicit row ``(1 - 2*gamma, gamma)`` is what gives
+    ``sum_i b_i c_i = 1/2``).
 
     Parameters
     ----------
@@ -72,26 +81,31 @@ def imex_ssp2_step(
     """
     gamma_dt = _GAMMA * dt
 
-    # Stage 1: implicit solve from y_n
+    # Stage 1: Y1 = y_n + gamma dt f_I(Y1)
     y1 = implicit_solve(state, gamma_dt)
+    fe_1 = rhs_explicit(y1)
+    fi_1 = rhs_implicit(y1)
 
-    # Stage 2: explicit predictor then implicit correction
-    fe_0 = rhs_explicit(state)
-    y2_star = jax.tree.map(lambda y, f: y + dt * f, state, fe_0)
+    # Stage 2: Y2* = y_n + dt f_E(Y1) + (1 - 2 gamma) dt f_I(Y1)
+    #          Y2  = Y2* + gamma dt f_I(Y2)
+    y2_star = jax.tree.map(
+        lambda y, fe, fi: y + dt * fe + (1.0 - 2.0 * _GAMMA) * dt * fi,
+        state,
+        fe_1,
+        fi_1,
+    )
     y2 = implicit_solve(y2_star, gamma_dt)
+    fe_2 = rhs_explicit(y2)
+    fi_2 = rhs_implicit(y2)
 
-    # Final update: average explicit and implicit contributions
-    fe_1 = rhs_explicit(y2)
-    fi_0 = rhs_implicit(y1)
-    fi_1 = rhs_implicit(y2)
-
+    # Update: y_{n+1} = y_n + dt/2 (f_E(Y1) + f_E(Y2)) + dt/2 (f_I(Y1) + f_I(Y2))
     return jax.tree.map(
-        lambda y, fe0, fe1, fi0, fi1: (
-            y + 0.5 * dt * (fe0 + fe1) + 0.5 * dt * (fi0 + fi1)
+        lambda y, fe1, fe2, fi1, fi2: (
+            y + 0.5 * dt * (fe1 + fe2) + 0.5 * dt * (fi1 + fi2)
         ),
         state,
-        fe_0,
         fe_1,
-        fi_0,
+        fe_2,
         fi_1,
+        fi_2,
     )

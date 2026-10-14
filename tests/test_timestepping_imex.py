@@ -91,34 +91,39 @@ class TestIMEX_SSP2:
         exact = float(jnp.exp(-1.0))
         np.testing.assert_allclose(float(y), exact, rtol=5e-2)
 
-    def test_mixed_convergence(self):
-        """Verify order ~2 on mixed explicit+implicit split with dt refinement."""
-        exact = float(jnp.exp(-1.0))
+    @staticmethod
+    def _rates(lam_e, lam_i):
+        """Observed orders of y' = (lam_e + lam_i) y on [0, 1], N = 20..160."""
+        exact = np.exp(lam_e + lam_i)
         errors = []
-
-        for dt in [0.02, 0.01, 0.005]:
+        for n in [20, 40, 80, 160]:
+            dt = 1.0 / n
             y = jnp.array(1.0)
-            n_steps = int(round(1.0 / dt))
-
-            def rhs_e(y):
-                return -0.4 * y
-
-            def rhs_i(y):
-                return -0.6 * y
-
-            def solve(rhs, gamma_dt):
-                return rhs / (1.0 + 0.6 * gamma_dt)
-
-            for _ in range(n_steps):
-                y = imex_ssp2_step(y, rhs_e, rhs_i, solve, dt)
+            for _ in range(n):
+                y = imex_ssp2_step(
+                    y,
+                    lambda y: lam_e * y,
+                    lambda y: lam_i * y,
+                    lambda rhs, gdt: rhs / (1.0 - lam_i * gdt),
+                    dt,
+                )
             errors.append(abs(float(y) - exact))
+        return np.log2(np.array(errors[:-1]) / np.array(errors[1:]))
 
-        rate = np.log2(errors[-2] / errors[-1])
-        # IMEX-SSP2 achieves ~1st order on mixed problems due to operator
-        # splitting error; 2nd order is only achieved in the pure limits.
-        assert rate > 0.8, f"IMEX mixed expected order >=1, got {rate:.2f}"
-        # Verify error actually decreases with dt refinement
-        assert errors[-1] < errors[0]
+    def test_mixed_convergence(self):
+        """Second order on a mixed explicit + implicit split (issue #311)."""
+        rates = self._rates(-0.4, -0.6)
+        assert np.all(rates > 1.8), f"mixed rates {rates}"
+
+    def test_implicit_only_convergence(self):
+        """Second order when only the implicit part is active (issue #311)."""
+        rates = self._rates(0.0, -1.0)
+        assert np.all(rates >= 1.9), f"implicit-only rates {rates}"
+
+    def test_explicit_only_convergence(self):
+        """Second order when only the explicit part is active."""
+        rates = self._rates(-1.0, 0.0)
+        assert np.all(rates >= 1.9), f"explicit-only rates {rates}"
 
     def test_pytree_state(self):
         """IMEX works with tuple pytree states."""
