@@ -102,12 +102,34 @@ where $f$ and $h$ are interpolated from T-points to X-points via `T_to_X`.
     $q$ is set to `NaN` where $h = 0$ to avoid division by zero.  Guard
     against this with a minimum thickness clamp before calling the PV operator.
 
-### PV Flux (Energy-Conserving)
+### PV Fluxes
 
-The Sadourny (1975) **energy-conserving** PV-flux form of the vorticity
-advection term moves $(q\,Uh)$ and $(q\,Vh)$ to U/V-points for use in the
-momentum equation.  This scheme conserves total kinetic energy exactly for
-non-divergent flow.
+`Vorticity2D` offers two ways of combining $q$ (at X-points) with a pair of
+face fields $(F_u, F_v)$ at U/V-points:
+
+| Method | Form | U-point value |
+|---|---|---|
+| `pv_flux_energy_conserving` | multiply at the corners, then average | $\overline{q\,\overline{F_u}^{y}}^{y}$ |
+| `pv_flux_enstrophy_conserving` | average $q$ to the face, then multiply | $\overline{q}^{y}\,F_u$ |
+| `pv_flux_arakawa_lamb` | linear blend $\alpha E + (1-\alpha) Z$ | — |
+
+The names refer to the **vortex-force** use (Sadourny 1975): when the
+cross-face transport is used — $+q\,V$ in the $u$-equation, $-q\,U$ in the
+$v$-equation, as `MomentumAdvection2D` forms it — the corner-product form
+conserves total energy and the average-then-multiply form conserves
+potential enstrophy for non-divergent flow.  Passed the same-component
+fields, e.g. `(q, u*h, v*h)`, the methods return the PV *transport* flux
+$(q\,Uh, q\,Vh)$ and neither label applies.
+
+!!! warning "`pv_flux_arakawa_lamb` is not the Arakawa–Lamb (1981) scheme"
+    It is a linear blend of the two Sadourny forms and, for
+    $0 < \alpha < 1$, conserves neither invariant exactly.  The
+    Arakawa–Lamb (1981) scheme is a distinct eight-point stencil and is not
+    implemented (#283).
+
+The corner products are formed on the full arrays, so the first interior
+row and column read the south / west ghost corners of the caller's
+ghost-filled $q$, $u$, $v$: fill them (periodic, free-slip, …) before calling.
 
 ### Usage
 
@@ -123,7 +145,7 @@ zeta = vort.relative_vorticity(u, v)
 # Shallow-water PV at X-points
 q = vort.potential_vorticity(u, v, h, f)
 
-# PV flux for momentum advection
+# PV transport flux (q*Uh, q*Vh) at U/V-points
 qu, qv = vort.pv_flux_energy_conserving(q, u*h, v*h)
 ```
 
@@ -280,18 +302,19 @@ vorticity-flux product interpolated to U-points.
 This form has important discrete conservation properties depending on how
 the vorticity-flux product is evaluated.  Three schemes are available:
 
-| Scheme | Key property | Reference |
-|--------|-------------|-----------|
-| `'energy'` (default) | Conserves total KE for non-divergent flow | Sadourny (1975) E-scheme |
-| `'enstrophy'` | Conserves potential enstrophy | Sadourny (1975) Z-scheme |
-| `'al'` | Conserves both KE and enstrophy | Arakawa & Lamb (1981) |
+| Scheme | Discrete form of $(\zeta\,v)_{\text{on-U}}$ | Key property | Reference |
+|--------|------|-------------|-----------|
+| `'energy'` (default) | $\overline{\zeta\,\overline{v}^{xy}}^{y}$: product at the corners, then average | Conserves total KE for non-divergent flow | Sadourny (1975) E-scheme |
+| `'enstrophy'` | $\overline{\zeta}^{y}\,\overline{v}^{xy}$: average to the face, then multiply | Conserves potential enstrophy | Sadourny (1975) Z-scheme |
+| `'al'` | $\tfrac13 E + \tfrac23 Z$ | Conserves neither exactly | linear blend, **not** Arakawa & Lamb (1981) |
 
 !!! tip "When to use each scheme"
-    - **`'energy'`**: well-tested, used in ROMS and many ocean models.
+    - **`'energy'`**: energy-conserving vortex force, the usual choice for
+      long integrations.
     - **`'enstrophy'`**: preferred when enstrophy conservation matters (e.g.
       turbulence spindown experiments).
-    - **`'al'`**: gold standard for QG-like models; more expensive (computes
-      both E- and Z-schemes then blends).
+    - **`'al'`**: a ⅓–⅔ blend of the two; it is not the Arakawa–Lamb (1981)
+      scheme, which conserves both (not implemented, #283).
 
 ### Usage
 
@@ -308,7 +331,7 @@ du_adv, dv_adv = madv(u, v)
 madv_z = MomentumAdvection2D(grid=grid)
 du_adv, dv_adv = madv_z(u, v, scheme="enstrophy")
 
-# Arakawa-Lamb (both)
+# 1/3 energy + 2/3 enstrophy blend
 du_adv, dv_adv = madv(u, v, scheme="al")
 ```
 

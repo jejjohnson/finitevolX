@@ -120,3 +120,78 @@ class TestVorticityFluxUpwind:
 
         g = jax.grad(loss)(omega)
         assert g.shape == omega.shape and bool(jnp.isfinite(g).all())
+
+
+# ---------------------------------------------------------------------------
+# Which form each PV-flux method computes, and the ghost-corner row (#283, #284)
+# ---------------------------------------------------------------------------
+
+
+def _periodic(a):
+    """Fill the ghost ring periodically (south/north, then west/east)."""
+    a = a.at[0, :].set(a[-2, :]).at[-1, :].set(a[1, :])
+    return a.at[:, 0].set(a[:, -2]).at[:, -1].set(a[:, 1])
+
+
+class TestPVFluxForms:
+    @pytest.fixture()
+    def fields(self):
+        n = 16
+        g = CartesianGrid2D.from_interior(n - 2, n - 2, 1.0, 1.0)
+        key = jax.random.key(0)
+        q, u, v = (
+            _periodic(jax.random.normal(jax.random.fold_in(key, k), (n, n)))
+            for k in range(3)
+        )
+        return g, q, u, v
+
+    def test_energy_is_corner_product_then_average(self, fields):
+        """Periodic reference: fill the corner product's ghosts, then average.
+
+        Before #284 the first interior row / column read a zero ghost corner
+        and came out exactly halved.
+        """
+        from finitevolx import Interpolation2D
+
+        g, q, u, v = fields
+        interp = Interpolation2D(g)
+        ref_qu = interp.X_to_U(_periodic(q * interp.U_to_X(u)))
+        ref_qv = interp.X_to_V(_periodic(q * interp.V_to_X(v)))
+        qu, qv = Vorticity2D(g).pv_flux_energy_conserving(q, u, v)
+        np.testing.assert_allclose(qu, ref_qu, rtol=0, atol=1e-14)
+        np.testing.assert_allclose(qv, ref_qv, rtol=0, atol=1e-14)
+
+    def test_enstrophy_is_average_then_multiply(self, fields):
+        from finitevolx import Interpolation2D
+
+        g, q, u, v = fields
+        interp = Interpolation2D(g)
+        ref_qu = interior(interp.X_to_U(q)[1:-1, 1:-1] * u[1:-1, 1:-1], u)
+        ref_qv = interior(interp.X_to_V(q)[1:-1, 1:-1] * v[1:-1, 1:-1], v)
+        qu, qv = Vorticity2D(g).pv_flux_enstrophy_conserving(q, u, v)
+        np.testing.assert_array_equal(qu, ref_qu)
+        np.testing.assert_array_equal(qv, ref_qv)
+
+    def test_closed_basin_unchanged(self, fields):
+        """With a zero ghost ring on q (closed basin), the corner products on
+        the south / west ghost corners are zero, which is what the old
+        interior()-intermediate assumed: the result equals that composition.
+        """
+        from finitevolx import Interpolation2D
+
+        g, q, u, v = fields
+        q0 = interior(q[1:-1, 1:-1], q)
+        interp = Interpolation2D(g)
+        u_on_q, v_on_q = interp.U_to_X(u), interp.V_to_X(v)
+        ref_qu = interp.X_to_U(interior(q0[1:-1, 1:-1] * u_on_q[1:-1, 1:-1], q0))
+        ref_qv = interp.X_to_V(interior(q0[1:-1, 1:-1] * v_on_q[1:-1, 1:-1], q0))
+        qu, qv = Vorticity2D(g).pv_flux_energy_conserving(q0, u, v)
+        np.testing.assert_allclose(qu, ref_qu, rtol=0, atol=1e-14)
+        np.testing.assert_allclose(qv, ref_qv, rtol=0, atol=1e-14)
+
+    def test_free_function_matches_method(self, fields):
+        g, q, u, v = fields
+        qu, qv = pv_flux_arakawa_lamb(q, u, v, alpha=0.25)
+        ref = Vorticity2D(g).pv_flux_arakawa_lamb(q, u, v, alpha=0.25)
+        np.testing.assert_allclose(qu, ref[0], rtol=0, atol=1e-14)
+        np.testing.assert_allclose(qv, ref[1], rtol=0, atol=1e-14)

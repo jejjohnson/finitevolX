@@ -11,7 +11,7 @@ momentum equations:
 where ``ζ`` is the spherical relative vorticity at X-points (NE
 corners), ``K = ½ (u_T² + v_T²)`` is the kinetic energy at T-points,
 and the vorticity-flux products (ζ·v) / (ζ·u) are computed with one of
-three discrete schemes (Sadourny E/Z, Arakawa–Lamb 1/3–2/3 blend).
+three discrete schemes (Sadourny E/Z and their 1/3–2/3 blend).
 
 The three flux schemes are **coordinate-independent** — they involve
 only interpolation and multiplication.  What changes on a sphere is:
@@ -53,12 +53,13 @@ class SphericalMomentumAdvection2D(eqx.Module):
 
     Three vorticity-flux schemes are available via the ``scheme`` argument:
 
-    * ``'energy'`` — Sadourny (1975) **E-scheme**: interpolate ζ to faces
-      first, then multiply by the cross-face velocity.
-    * ``'enstrophy'`` — Sadourny (1975) **Z-scheme**: interpolate the
-      velocity to corners, multiply by ζ at corners, then interpolate the
-      product to faces.
-    * ``'al'`` — **Arakawa-Lamb (1981)** blend: ⅓ energy + ⅔ enstrophy.
+    * ``'energy'`` — Sadourny (1975) **E-scheme**: interpolate the
+      cross-face velocity to the corners, multiply by ζ at the corners, then
+      average the product to the faces.
+    * ``'enstrophy'`` — Sadourny (1975) **Z-scheme**: interpolate ζ and the
+      cross-face velocity to the faces, then multiply.
+    * ``'al'`` — linear blend ⅓ energy + ⅔ enstrophy (not the Arakawa-Lamb
+      1981 scheme; #283).
 
     Parameters
     ----------
@@ -124,13 +125,15 @@ class SphericalMomentumAdvection2D(eqx.Module):
         K = interior(0.5 * (u_on_T[1:-1, 1:-1] ** 2 + v_on_T[1:-1, 1:-1] ** 2), u)
         return self.diff.diff_lon_T_to_U(K), self.diff.diff_lat_T_to_V(K)
 
-    def _vorticity_flux_energy(
+    def _vorticity_flux_enstrophy(
         self,
         zeta: Float[Array, "Ny Nx"],
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
-        """Sadourny E-scheme vorticity flux at (U-points, V-points)."""
+        """Sadourny Z-scheme (enstrophy-conserving) vorticity flux at (U-, V-points).
+
+        Average ζ and the cross-face velocity to the faces, then multiply."""
         zeta_on_u = self.interp.X_to_U(zeta)
         zeta_on_v = self.interp.X_to_V(zeta)
         v_on_u = self.interp.V_to_U(v)
@@ -139,13 +142,15 @@ class SphericalMomentumAdvection2D(eqx.Module):
         zu_v = interior(zeta_on_v[1:-1, 1:-1] * u_on_v[1:-1, 1:-1], v)
         return zv_u, zu_v
 
-    def _vorticity_flux_enstrophy(
+    def _vorticity_flux_energy(
         self,
         zeta: Float[Array, "Ny Nx"],
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
-        """Sadourny Z-scheme vorticity flux at (U-points, V-points)."""
+        """Sadourny E-scheme (energy-conserving) vorticity flux at (U-, V-points).
+
+        Product at the X-points, then average to the faces."""
         v_on_q = self.interp.V_to_X(v)
         u_on_q = self.interp.U_to_X(u)
         zv_at_q = interior(zeta[1:-1, 1:-1] * v_on_q[1:-1, 1:-1], u)
@@ -168,7 +173,7 @@ class SphericalMomentumAdvection2D(eqx.Module):
             Meridional velocity at V-points.
         scheme : str
             Vorticity-flux scheme: ``'energy'`` (default), ``'enstrophy'``,
-            or ``'al'`` (Arakawa-Lamb blend).
+            or ``'al'`` (⅓–⅔ blend; not the Arakawa-Lamb 1981 scheme).
 
         Returns
         -------

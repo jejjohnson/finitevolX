@@ -518,8 +518,8 @@ vort  = Vorticity2D(grid=grid)
 f     = jnp.zeros((grid.Ny, grid.Nx))           # Coriolis (T-points)
 q     = vort.potential_vorticity(u, v, h, f)   # X-points
 
-# 2. PV flux (Arakawa-Lamb)
-qu, qv = vort.pv_flux_arakawa_lamb(q, u, v)   # U- and V-points
+# 2. PV flux (energy-conserving corner-product form)
+qu, qv = vort.pv_flux_energy_conserving(q, u, v)   # U- and V-points
 
 # 3. Kinetic energy and Bernoulli potential
 from finitevolx._src.operators.diagnostics import bernoulli_potential
