@@ -43,14 +43,6 @@ def _normal_spacing(face: Face, dx: float, dy: float) -> float:
             return dx
 
 
-def _outward_sign(face: Face) -> float:
-    match face:
-        case "south" | "west":
-            return -1.0
-        case "north" | "east":
-            return 1.0
-
-
 def _set_face(
     field: Float[Array, "Ny Nx"], face: Face, values: BoundarySlice
 ) -> Float[Array, "Ny Nx"]:
@@ -118,7 +110,9 @@ class Neumann1D(eqx.Module):
         """Return ``field`` with one Neumann ghost face updated."""
         spacing = _normal_spacing(self.face, dx=dx, dy=dy)
         interior = _adjacent_interior(field, self.face)
-        ghost = interior + (_outward_sign(self.face) * self.value * spacing)
+        # The ghost cell lies outward of the interior on every face, so
+        # dphi/dn = (ghost - interior) / spacing  =>  ghost = interior + g * spacing.
+        ghost = interior + (self.value * spacing)  # [N]
         return _set_face(field, self.face, ghost)
 
 
@@ -236,14 +230,17 @@ class Robin1D(eqx.Module):
     discretisations used by ``Dirichlet1D`` and ``Neumann1D``::
 
         u_wall  = 0.5 * (u_ghost + u_interior)
-        ∂u/∂n   = sign * (u_ghost - u_interior) / spacing
+        ∂u/∂n   = (u_ghost - u_interior) / spacing
+
+    The ghost cell lies outward of the interior cell on every face, so the
+    outward-normal gradient has the same form on all four faces.
 
     Substituting into α·u_wall + β·∂u/∂n = γ and solving for u_ghost:
 
-        s = β · sign / spacing
+        s = β / spacing
         u_ghost = (γ - u_int · (α/2 - s)) / (α/2 + s)
 
-    The denominator ``α/2 + s`` is zero when ``α·spacing = -2·β·sign``.
+    The denominator ``α/2 + s`` is zero when ``α·spacing = -2·β``.
     This is a singular configuration that produces inf/NaN ghost values;
     callers must choose (α, β) such that the denominator is non-zero for
     the given face and grid spacing.
@@ -276,9 +273,8 @@ class Robin1D(eqx.Module):
     ) -> Float[Array, "Ny Nx"]:
         """Return ``field`` with one Robin ghost face updated."""
         spacing = _normal_spacing(self.face, dx=dx, dy=dy)
-        sign = _outward_sign(self.face)
         interior = _adjacent_interior(field, self.face)
-        s = self.beta * sign / spacing
+        s = self.beta / spacing
         ghost = (self.gamma - interior * (self.alpha / 2.0 - s)) / (
             self.alpha / 2.0 + s
         )
