@@ -1,4 +1,4 @@
-"""Tests for boundary_ring, SolveDomain, and KnownValueLifting."""
+"""Tests for coast_ring, boundary_ring, SolveDomain, and KnownValueLifting."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from finitevolx._src.solvers.inhomogeneous import (
     KnownValueLifting,
     SolveDomain,
     boundary_ring,
+    coast_ring,
 )
 
 # ---------------------------------------------------------------------------
@@ -109,6 +110,46 @@ class TestBoundaryRing:
 
 
 # ---------------------------------------------------------------------------
+# coast_ring
+# ---------------------------------------------------------------------------
+
+
+class TestCoastRing:
+    def test_simple_basin_is_ghost_ring_without_corners(self):
+        mask = jnp.array(_basin_mask(6, 8))
+        ring = coast_ring(mask)
+        expected = np.zeros((6, 8), dtype=bool)
+        expected[0, 1:-1] = expected[-1, 1:-1] = True
+        expected[1:-1, 0] = expected[1:-1, -1] = True
+        assert ring.dtype == jnp.bool_
+        np.testing.assert_array_equal(ring, expected)
+
+    def test_x_basin_is_the_cgrid_wall(self):
+        """For psi on a from_interior rectangle: X rows / columns 0 and N-2."""
+        from finitevolx import Mask2D
+
+        m = np.zeros((7, 9), dtype=bool)
+        m[1:-1, 1:-1] = True
+        psi_mask = Mask2D.from_mask(m).xy_corner_strict
+        ring = np.asarray(coast_ring(psi_mask))
+        expected = np.zeros((7, 9), dtype=bool)
+        expected[0, 1:-2] = expected[-2, 1:-2] = True
+        expected[1:-2, 0] = expected[1:-2, -2] = True
+        np.testing.assert_array_equal(ring, expected)
+
+    def test_island_coast(self):
+        mask = jnp.array(_island_mask(10, 10))
+        ring = coast_ring(mask)
+        # The 2x2 island is entirely coast (every land cell touches water).
+        assert jnp.all(ring[5:7, 5:7])
+        assert not jnp.any(ring & (mask > 0.5))
+
+    def test_all_wet_and_all_dry_have_no_coast(self):
+        assert not jnp.any(coast_ring(jnp.ones((6, 8))))
+        assert not jnp.any(coast_ring(jnp.zeros((6, 8))))
+
+
+# ---------------------------------------------------------------------------
 # SolveDomain
 # ---------------------------------------------------------------------------
 
@@ -121,13 +162,17 @@ class TestSolveDomain:
         wet = mask > 0.5
         # all_known and effective_mask are disjoint
         assert not jnp.any(domain.all_known & domain.effective_mask)
-        # their union is the full wet domain
-        np.testing.assert_array_equal(domain.all_known | domain.effective_mask, wet)
+        # their union is the wet domain plus its coast
+        np.testing.assert_array_equal(
+            domain.all_known | domain.effective_mask, wet | coast_ring(mask)
+        )
 
     def test_no_known_mask(self):
         mask = jnp.array(_basin_mask(8, 8))
         domain = SolveDomain(mask)
-        np.testing.assert_array_equal(domain.all_known, domain.boundary_ring)
+        # The values sit on the coast; every wet cell is an unknown.
+        np.testing.assert_array_equal(domain.all_known, domain.coast_ring)
+        np.testing.assert_array_equal(domain.effective_mask, mask > 0.5)
 
     def test_with_known_mask(self):
         mask = jnp.array(_basin_mask(8, 8))
@@ -143,16 +188,17 @@ class TestSolveDomain:
         # And not in effective_mask (removed from solve domain)
         assert not domain.effective_mask[3, 3]
 
-    def test_island_mask_finds_inner_rings(self):
+    def test_island_coast_is_known(self):
         mask = jnp.array(_island_mask(10, 10))
         domain = SolveDomain(mask)
 
-        # Cells adjacent to island are in all_known (via boundary_ring)
+        # The island's coast (its dry cells) is known; its wet neighbours
+        # are unknowns.
         cy, cx = 5, 5
-        assert domain.all_known[cy - 1, cx]
-        assert domain.all_known[cy + 2, cx]
-        # And not in effective_mask
-        assert not domain.effective_mask[cy - 1, cx]
+        assert domain.all_known[cy, cx]
+        assert domain.all_known[cy + 1, cx + 1]
+        assert domain.effective_mask[cy - 1, cx]
+        assert not domain.all_known[cy - 1, cx]
 
     def test_dry_known_mask_harmless(self):
         mask = jnp.array(_basin_mask(8, 8))
@@ -166,7 +212,9 @@ class TestSolveDomain:
         assert not domain.effective_mask[0, 0]
         # Partition still holds
         wet = mask > 0.5
-        np.testing.assert_array_equal(domain.all_known | domain.effective_mask, wet)
+        np.testing.assert_array_equal(
+            domain.all_known | domain.effective_mask, wet | coast_ring(mask)
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -225,11 +273,14 @@ class TestKnownValueLifting:
             2 * jnp.pi * Y
         )
 
-        # Exact RHS: (∇² - λ)ψ
-        rhs_exact = fvx.masked_laplacian(psi_exact, mask, dx, dy, lambda_=lambda_)
+        # Exact RHS: (∇² - λ)ψ on the wet cells, the stencil reading ψ on the coast
+        ones = jnp.ones_like(mask)
+        rhs_exact = (
+            fvx.masked_laplacian(psi_exact, ones, dx, dy, lambda_=lambda_) * mask
+        )
 
-        # Known values at inner ring: exact solution values
-        known_values = jnp.where(domain.boundary_ring, psi_exact, 0.0)
+        # Known values on the coast ring: exact solution values
+        known_values = jnp.where(domain.coast_ring, psi_exact, 0.0)
 
         # Pre-process
         rhs_corrected, value_lift = lifter.preprocess(rhs_exact, known_values)
@@ -248,10 +299,12 @@ class TestKnownValueLifting:
         # Reconstruct
         psi_numerical = lifter.postprocess(psi_hom, value_lift)
 
-        # Check error on effective_mask (interior solve cells)
-        error = jnp.abs(psi_numerical - psi_exact) * eff_mask_f
+        # Check error on the wet cells and the coast; the discrete RHS makes
+        # the lifted solve exact up to CG's rtol / atol (1e-10).
+        keep = domain.effective_mask | domain.coast_ring
+        error = jnp.where(keep, jnp.abs(psi_numerical - psi_exact), 0.0)
         max_error = float(jnp.max(error))
-        assert max_error < 1e-3, f"Max error {max_error:.2e} exceeds tolerance"
+        assert max_error < 1e-8, f"Max error {max_error:.2e} exceeds tolerance"
 
     @pytest.mark.slow
     def test_sparse_obs_pins_values(self):

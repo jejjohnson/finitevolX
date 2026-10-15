@@ -257,10 +257,16 @@ plt.show()
 # with homogeneous Dirichlet boundary conditions $\psi = 0$ on all four
 # basin walls (no-normal-flow).
 #
-# finitevolx provides `solve_helmholtz_dst` for exactly this problem.
-# The DST-I (Type I discrete sine transform) is the correct choice because
-# the ghost-cell convention places $\psi = 0$ at the grid vertices -- the
-# ghost cells themselves encode the Dirichlet condition.
+# finitevolx provides `solve_helmholtz_dst` for this problem.  In this
+# model $\psi$ is a **T-point** field whose ghost ring is zero (the inversion
+# below pads the interior solution with zeros), and DST-I applied to the T interior `[1:-1, 1:-1]`
+# is the exact inverse of the 5-point Laplacian with that zero ghost ring:
+# it places $\psi = 0$ at the ghost-cell centres, half a cell outside the
+# wall faces.  That is a first-order wall position; a face Dirichlet wall
+# for a T-point field is DST-II (`solve_helmholtz_dst2`, ghost = -interior).
+# The convenience wrappers `streamfunction_from_vorticity` / `pv_inversion`
+# solve for an **X-point** $\psi$ (wall nodes `0` and `N-2`), so they are not
+# a drop-in replacement for this T-point formulation.
 #
 # The `lambda_` parameter is $1/L_d^2$, which enters the Helmholtz
 # equation as the screening term that couples the streamfunction to the

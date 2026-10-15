@@ -31,9 +31,11 @@ from collections.abc import Callable
 import numbers
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 import numpy as np
+from scipy import ndimage
 from spectraldiffx import (
     CapacitanceSolver,
     build_capacitance_solver as _build_capacitance_solver_base,
@@ -44,6 +46,7 @@ from finitevolx._src.boundary.bc_set import BoundaryConditionSet
 from finitevolx._src.mask import Mask2D
 from finitevolx._src.solvers.inhomogeneous import (
     SolveDomain,
+    coast_ring,
     lift_rhs,
     reconstruct_from_lift,
 )
@@ -66,7 +69,6 @@ from finitevolx._src.solvers.preconditioners import (  # noqa: F401
 
 # Re-export from spectral module
 from finitevolx._src.solvers.spectral import (  # noqa: F401
-    _HELMHOLTZ_DISPATCH,
     # Types
     BoundaryCondition,
     # Solver classes
@@ -79,7 +81,6 @@ from finitevolx._src.solvers.spectral import (  # noqa: F401
     SpectralHelmholtzSolver2D,
     SpectralHelmholtzSolver3D,
     StaggeredDirichletHelmholtzSolver2D,
-    _spectral_solve,
     # Eigenvalue functions (FD2)
     dct1_eigenvalues,
     # Eigenvalue functions (pseudo-spectral)
@@ -205,11 +206,22 @@ _MaskLike = Float[Array, "Ny Nx"] | Mask2D
 _PrecondLike = Callable[[Float[Array, "Ny Nx"]], Float[Array, "Ny Nx"]]
 
 
+# Where the unknown lives on the C-grid: "X" for the streamfunction
+# (streamfunction_from_vorticity, pv_inversion), "T" for the pressure
+# (pressure_from_divergence).  Every solve path takes it from the wrapper so
+# the three wrappers cannot drift apart.
+
+
 def _resolve_mask_arr(
     mask: _MaskLike | None,
     dtype: jnp.dtype,
+    staggering: str = "X",
 ) -> Float[Array, "Ny Nx"] | None:
     """Extract a float mask array of *dtype* (the rhs dtype) from *mask*, or None.
+
+    A :class:`Mask2D` gives the mask of the unknown's staggering:
+    ``xy_corner_strict`` for ``"X"`` (ψ), ``h`` for ``"T"`` (pressure).  An
+    array mask is used as given.
 
     The mask must follow the right-hand side's dtype: a strongly typed
     float32 mask times a weakly typed float64 field is float32, which would
@@ -218,19 +230,61 @@ def _resolve_mask_arr(
     if mask is None:
         return None
     if isinstance(mask, Mask2D):
-        return jnp.asarray(mask.xy_corner_strict, dtype=dtype)
+        stag_mask = mask.xy_corner_strict if staggering == "X" else mask.h
+        return jnp.asarray(stag_mask, dtype=dtype)
     return jnp.asarray(mask, dtype=dtype)
 
 
+# Spectral solve per (staggering, bc): the interior slice of the [Ny, Nx]
+# array that holds the unknowns, and the transform whose implicit boundary
+# matches the C-grid wall there.  On a ``from_interior`` grid the T cells
+# are [1:-1] with the walls on the faces at 1/2 and N-3/2; X node i sits at
+# i + 1/2, so the walls are the X nodes 0 and N-2 (N-1 is outside).
+#
+#   X, dst : DST-I  on [1:-2, 1:-2]  psi = 0 on the wall nodes 0 and N-2
+#   X, dct : DCT-I  on [0:-1, 0:-1]  d(psi)/dn = 0 reflected about nodes 0, N-2
+#            (the wall nodes are unknowns: the rhs is read there too)
+#   X, fft : FFT    on [1:-1, 1:-1]  periodic, period N-2
+#   T, dct : DCT-II on [1:-1, 1:-1]  dp/dn = 0 on the faces (half a cell out)
+#   T, dst : DST-II on [1:-1, 1:-1]  p = 0 on the faces
+#   T, fft : FFT    on [1:-1, 1:-1]  periodic, period N-2
+#
+# (Which spectraldiffx solver is which transform was checked against dense
+# operators; tests/test_solver_wrappers.py::TestWallPlacement checks the
+# second-order convergence of every combination.)
+_SPECTRAL_STAGGERED: dict[tuple[str, str], tuple[slice, Callable]] = {
+    ("X", "dst"): (slice(1, -2), solve_helmholtz_dst1),
+    ("X", "dct"): (slice(0, -1), solve_helmholtz_dct1),
+    ("X", "fft"): (slice(1, -1), solve_helmholtz_fft),
+    ("T", "dct"): (slice(1, -1), solve_helmholtz_dct2),
+    ("T", "dst"): (slice(1, -1), solve_helmholtz_dst2),
+    ("T", "fft"): (slice(1, -1), solve_helmholtz_fft),
+}
+
+
 def _solve_spectral(
-    rhs: Float[Array, "Ny Nx"],
+    rhs: Float[Array, "... Ny Nx"],
     dx: float,
     dy: float,
-    lambda_: float,
+    lambda_: float | Array,
     bc: str,
-) -> Float[Array, "Ny Nx"]:
-    """Solve using a rectangular spectral solver (DST/DCT/FFT)."""
-    return _spectral_solve(rhs, dx, dy, lambda_, bc)
+    staggering: str,
+) -> Float[Array, "... Ny Nx"]:
+    """Rectangular spectral solve with the wall on the C-grid wall.
+
+    Slices the unknowns of *staggering* out of the full array (see
+    ``_SPECTRAL_STAGGERED``), solves, and embeds the result in zeros: the
+    ghost ring (and, for ψ, the wall nodes) is left at zero.  Contains no
+    Python branch on *lambda_*, so it is safe under ``vmap`` with a traced
+    Helmholtz parameter.
+    """
+    entry = _SPECTRAL_STAGGERED.get((staggering, bc))
+    if entry is None:
+        raise ValueError(f"bc must be 'fft', 'dst', or 'dct'; got {bc!r}")
+    sl, solver = entry
+    # psi[..., j, i] = solver(rhs[..., sl, sl])[j - j0, i - i0] on the slice, 0 elsewhere
+    psi = solver(rhs[..., sl, sl], dx, dy, lambda_)
+    return jnp.zeros_like(rhs).at[..., sl, sl].set(psi.astype(rhs.dtype))
 
 
 def _solve_cg_method(
@@ -240,9 +294,10 @@ def _solve_cg_method(
     lambda_: float,
     mask: _MaskLike | None,
     preconditioner: _PrecondLike | None,
+    staggering: str = "X",
 ) -> Float[Array, "Ny Nx"]:
     """Solve using preconditioned Conjugate Gradient on a masked domain."""
-    mask_arr = _resolve_mask_arr(mask, rhs.dtype)
+    mask_arr = _resolve_mask_arr(mask, rhs.dtype, staggering)
     if mask_arr is None:
         raise ValueError("method='cg' requires a mask (array or Mask2D)")
 
@@ -281,12 +336,13 @@ def _solve_dispatch(
     mask: _MaskLike | None,
     capacitance_solver: CapacitanceSolver | None,
     preconditioner: _PrecondLike | None,
+    staggering: str,
 ) -> Float[Array, "Ny Nx"]:
     """Dispatch an elliptic solve to the selected solver method."""
     if method == "spectral":
-        return _solve_spectral(rhs, dx, dy, lambda_, bc)
+        return _solve_spectral(rhs, dx, dy, lambda_, bc, staggering)
     if method == "cg":
-        return _solve_cg_method(rhs, dx, dy, lambda_, mask, preconditioner)
+        return _solve_cg_method(rhs, dx, dy, lambda_, mask, preconditioner, staggering)
     if method == "capacitance":
         return _solve_capacitance_method(rhs, capacitance_solver)
     raise ValueError(
@@ -310,15 +366,17 @@ def _resolve_bc(
     known_values: Array | None,
     shape: tuple[int, ...],
     dtype: jnp.dtype,
+    staggering: str,
 ) -> tuple[str, _MaskLike | None, Array | None]:
     """Translate ``bc`` into ``(bc_str, mask, known_values)``.
 
     A string passes through unchanged.  A :class:`BoundaryConditionSet`
     selects the spectral transform from its face types (all Dirichlet ->
     ``"dst"``, all zero Neumann -> ``"dct"``, all periodic -> ``"fft"``),
-    supplies ``bc.mask`` to the mask-based methods, and turns non-zero
-    Dirichlet face values into known values on the wall-adjacent inner ring
-    unless ``known_values`` is given (which then wins).
+    supplies ``bc.mask`` to the mask-based methods (``method="spectral"``
+    with a ``bc.mask`` raises), and turns non-zero Dirichlet face values into
+    known values on each face's wall (coast) nodes unless ``known_values``
+    is given (which then wins).
     """
     if not isinstance(bc, BoundaryConditionSet):
         return bc, mask, known_values
@@ -343,8 +401,14 @@ def _resolve_bc(
             f"south/north/west/east = {names}"
         )
 
-    # The spectral path is rectangular, so only mask-based methods take bc.mask.
-    if method != "spectral" and bc.mask is not None:
+    # The spectral path is rectangular: a bc.mask cannot be honoured there.
+    if bc.mask is not None:
+        if method == "spectral":
+            raise ValueError(
+                "method='spectral' solves the rectangle and cannot honour "
+                "bc.mask; use method='cg' or 'capacitance' for a masked domain, "
+                "or drop the mask from the BoundaryConditionSet."
+            )
         if mask is not None:
             raise ValueError("Pass the mask either as bc.mask or as mask=, not both.")
         mask = bc.mask
@@ -354,29 +418,113 @@ def _resolve_bc(
         and known_values is None
         and not all(_is_zero(f.value) for f in faces)
     ):
-        known_values = _dirichlet_face_values(bc, shape[-2:], dtype)
+        if staggering == "T":
+            # Dirichlet1D prescribes the value on the wall *face* (ghost =
+            # 2 v - interior), but the lifting prescribes values at cell
+            # centres: on T points that is the ghost-cell centre, half a cell
+            # outside the face (a silent first-order wall error).  Refuse
+            # rather than move the wall.
+            raise ValueError(
+                "Non-zero Dirichlet1D faces are not supported for the T-point "
+                "pressure solve: the value belongs on the cell face, but known "
+                "values can only be pinned at cell centres (the ghost cells, "
+                "half a cell outside the face).  Pass known_values with "
+                "method='cg' and a mask if values at the ghost-cell centres "
+                "are what you want."
+            )
+        mask_arr = _resolve_mask_arr(mask, dtype, staggering)
+        wet = _x_basin(shape[-2:]) if mask_arr is None else mask_arr > 0.5
+        _check_faces_cover_outer_coast(wet)
+        known_values = _dirichlet_face_values(bc, wet, dtype)
     return bc_str, mask, known_values
 
 
-def _dirichlet_face_values(
-    bc: BoundaryConditionSet, shape: tuple[int, ...], dtype: jnp.dtype
-) -> Float[Array, "Ny Nx"]:
-    """Known-value field holding each Dirichlet face value on its wall row/column.
+def _x_basin(shape: tuple[int, ...]) -> Array:
+    """ψ (X-point) wet mask of a ``from_interior`` rectangle (``Mask2D.xy_corner_strict``).
 
-    The wall-adjacent wet cells of the standard basin are rows 1 / -2 and
-    columns 1 / -2 -- the inner ring.  Faces are written in the
-    BoundaryConditionSet order (south, north, west, east), so west/east win
-    at the corners.  Island coasts, which are not on a face, stay at zero.
+    X node i sits at i + 1/2 in T-index units: nodes 0 and N-2 are on the
+    walls, N-1 is outside the domain, the wet nodes are [1:-2, 1:-2].
     """
-    values = jnp.zeros(shape, dtype=dtype)
-    # values[1, i]    = south   (first wet row,     j = 1)
-    values = values.at[1, :].set(bc.south.value)
-    # values[Ny-2, i] = north   (last wet row,      j = Ny-2)
-    values = values.at[-2, :].set(bc.north.value)
-    # values[j, 1]    = west    (first wet column,  i = 1; overwrites corners)
-    values = values.at[:, 1].set(bc.west.value)
-    # values[j, Nx-2] = east    (last wet column,   i = Nx-2; overwrites corners)
-    return values.at[:, -2].set(bc.east.value)
+    ny, nx = shape[-2], shape[-1]
+    # basin[j, i] = True for 1 <= j <= Ny-3, 1 <= i <= Nx-3
+    return jnp.zeros((ny, nx), dtype=bool).at[1:-2, 1:-2].set(True)
+
+
+def _check_faces_cover_outer_coast(wet: Array) -> None:
+    """Raise if the outer coast of *wet* is not on the four walls.
+
+    A :class:`BoundaryConditionSet` gives one value per face, which is only
+    well defined when every coast node of the outer land (the dry region
+    connected to the array edge) lies on one of the four wall lines around
+    the wet bounding box -- a rectangular basin, islands allowed (their
+    coasts stay at zero).  On a general coastline most coast nodes belong to
+    no face and would silently get zero.  Checked on concrete masks only
+    (construction-time numpy / scipy); a traced mask is not checked.
+    """
+    try:
+        wet_np = np.asarray(wet, dtype=bool)  # [Ny, Nx]
+    except jax.errors.TracerArrayConversionError:
+        return  # traced mask: cannot be labelled
+    coast = np.asarray(coast_ring(jnp.asarray(wet_np)))  # [Ny, Nx]
+    # 4-connected dry components; those touching the array edge are the outer land.
+    labels, _ = ndimage.label(~wet_np)
+    edge = np.unique(
+        np.concatenate([labels[0], labels[-1], labels[:, 0], labels[:, -1]])
+    )
+    outer_coast = coast & np.isin(labels, edge[edge > 0])
+    rows = np.flatnonzero(wet_np.any(axis=1))
+    cols = np.flatnonzero(wet_np.any(axis=0))
+    j, i = np.indices(wet_np.shape)
+    # wall lines: the row / column just outside the wet bounding box
+    on_walls = (
+        (j == rows[0] - 1)
+        | (j == rows[-1] + 1)
+        | (i == cols[0] - 1)
+        | (i == cols[-1] + 1)
+    )
+    n_off = int(np.sum(outer_coast & ~on_walls))
+    if n_off:
+        raise ValueError(
+            "Non-zero Dirichlet1D face values need a basin whose outer coast "
+            "lies on the four walls (a rectangle; islands are allowed and stay "
+            f"at zero), but {n_off} outer coast nodes are on no face.  For a "
+            "general coastline pass known_values on fvx.coast_ring(mask)."
+        )
+
+
+def _dirichlet_face_values(
+    bc: BoundaryConditionSet, wet: Array, dtype: jnp.dtype
+) -> Float[Array, "Ny Nx"]:
+    """Known-value field holding each Dirichlet face value on that face's wall nodes.
+
+    The walls are the coast cells (dry, 4-adjacent to *wet*) on the row just
+    south / north of the wet bounding box and the column just west / east of
+    it.  For ψ on a ``from_interior`` rectangle these are X rows 0 (south)
+    and N-2 (north) and X columns 0 (west) and N-2 (east), i.e. the C-grid
+    wall nodes.  Faces are written in the BoundaryConditionSet order (south,
+    north, west, east), so west/east win where a wall node is on two faces.
+    Island coasts, which are not on a face, stay at zero.
+    """
+    ny, nx = wet.shape[-2], wet.shape[-1]
+    # j[j, i] = j, i[j, i] = i  (broadcast to [Ny, Nx])
+    j = jnp.arange(ny)[:, None]
+    i = jnp.arange(nx)[None, :]
+    wet_rows = jnp.any(wet, axis=1)  # [Ny]
+    wet_cols = jnp.any(wet, axis=0)  # [Nx]
+    # south wall row = first wet row - 1; north wall row = last wet row + 1
+    j_south = jnp.argmax(wet_rows) - 1
+    j_north = ny - jnp.argmax(wet_rows[::-1])
+    # west wall column = first wet column - 1; east = last wet column + 1
+    i_west = jnp.argmax(wet_cols) - 1
+    i_east = nx - jnp.argmax(wet_cols[::-1])
+
+    values = jnp.zeros((ny, nx), dtype=dtype)
+    values = jnp.where(j == j_south, jnp.asarray(bc.south.value, dtype), values)
+    values = jnp.where(j == j_north, jnp.asarray(bc.north.value, dtype), values)
+    values = jnp.where(i == i_west, jnp.asarray(bc.west.value, dtype), values)
+    values = jnp.where(i == i_east, jnp.asarray(bc.east.value, dtype), values)
+    # Only the coast cells carry boundary values.
+    return jnp.where(coast_ring(wet), values, jnp.zeros((), dtype))
 
 
 def _check_method(method: str) -> None:
@@ -394,17 +542,27 @@ def _known_value_domain(
     bc: str,
     mask: _MaskLike | None,
     known_mask: Array | None,
+    staggering: str,
 ) -> SolveDomain:
     """Build the :class:`SolveDomain` for a solve with known values.
 
-    Mask-based methods use the caller's *mask* (required).  The spectral
-    path has no mask: it solves the standard rectangular basin -- dry ghost
-    ring, wet interior -- whose inner ring (rows/columns 1 and -2) carries
-    the known values.  This is the same problem ``method="cg"`` solves with
-    that basin mask, so both methods agree to solver tolerance.
+    Mask-based methods use the caller's *mask* (required); the known values
+    sit on its coast ring (the dry cells adjacent to the wet cells).  The
+    spectral path has no mask: it solves the ψ basin of a ``from_interior``
+    rectangle -- wet X nodes ``[1:-2, 1:-2]`` -- whose coast is the wall
+    nodes (rows / columns 0 and N-2).  This is the same problem
+    ``method="cg"`` solves with the rectangle's ``Mask2D``, so both methods
+    agree to solver tolerance.
     """
     _check_method(method)
     if method == "spectral":
+        if staggering == "T":
+            raise ValueError(
+                "method='spectral' with known_values is not supported for the "
+                "T-point pressure solve: its Dirichlet wall (DST-II) sits on "
+                "the cell faces, while known values are pinned at cell centres "
+                "(the ghost cells).  Use method='cg' with a mask."
+            )
         if bc != "dst":
             raise ValueError(
                 "known_values prescribe Dirichlet data, so method='spectral' "
@@ -422,39 +580,18 @@ def _known_value_domain(
                 "method='spectral' does not support interior known values "
                 "(known_mask); use method='cg'."
             )
-        ny, nx = shape[-2], shape[-1]
-        # basin[j, i] = 1 for 1 <= j <= Ny-2, 1 <= i <= Nx-2  (dry ghost ring)
-        basin = jnp.zeros((ny, nx), dtype=dtype).at[1:-1, 1:-1].set(1.0)
-        return SolveDomain(basin)
+        return SolveDomain(_x_basin(shape))
 
-    mask_arr = _resolve_mask_arr(mask, dtype)
+    mask_arr = _resolve_mask_arr(mask, dtype, staggering)
     if mask_arr is None:
         raise ValueError(f"known_values with method={method!r} requires a mask")
     if method == "capacitance" and known_mask is not None:
         raise ValueError(
             "method='capacitance' does not support known_mask: the capacitance "
-            "solver can only hold its own inner ring at zero.  Use method='cg'."
+            "solver's unknowns are fixed by the mask it was built on.  Use "
+            "method='cg'."
         )
     return SolveDomain(mask_arr, known_mask)
-
-
-def _solve_spectral_basin(
-    rhs: Float[Array, "Ny Nx"],
-    dx: float,
-    dy: float,
-    lambda_: float,
-) -> Float[Array, "Ny Nx"]:
-    """DST solve on the basin's solve domain ``[2:-2, 2:-2]``, zero elsewhere.
-
-    The rectangular-basin solve domain (wet interior minus its inner ring)
-    is itself a rectangle, so homogeneous Dirichlet there is a plain DST.
-    """
-    helmholtz = _HELMHOLTZ_DISPATCH["dst"]
-    # Solve cells: 2 <= j <= Ny-3, 2 <= i <= Nx-3 (inside the known ring 1 / N-2).
-    # (A - lambda) psi[j, i] = rhs[j, i] there, psi = 0 on the ring (DST-I).
-    psi = helmholtz(rhs[2:-2, 2:-2], dx, dy, lambda_)
-    # psi_hom[j, i] = psi[j-2, i-2] on the solve cells, 0 elsewhere
-    return jnp.zeros_like(rhs).at[2:-2, 2:-2].set(psi)
 
 
 def _solve_with_known_values(
@@ -469,20 +606,24 @@ def _solve_with_known_values(
     known_mask: Array | None,
     capacitance_solver: CapacitanceSolver | None,
     preconditioner: _PrecondLike | None,
+    staggering: str,
 ) -> Float[Array, "Ny Nx"]:
     """Inhomogeneous solve: lift, solve homogeneously, reconstruct.
 
     psi = value_lift + psi_hom, where psi_hom solves
-    (A - lambda) psi_hom = f - (A - lambda) value_lift on the solve domain.
+    (A - lambda) psi_hom = f - (A - lambda) value_lift on the solve domain,
+    with psi_hom = 0 on the coast ring and the known_mask cells.
     """
-    domain = _known_value_domain(rhs.shape, rhs.dtype, method, bc, mask, known_mask)
+    domain = _known_value_domain(
+        rhs.shape, rhs.dtype, method, bc, mask, known_mask, staggering
+    )
     rhs_corrected, value_lift = lift_rhs(domain, rhs, known_values, dx, dy, lambda_)
     if method == "spectral":
-        psi_hom = _solve_spectral_basin(rhs_corrected, dx, dy, lambda_)
+        # The ψ basin's solve domain is the rectangle [1:-2, 1:-2] (DST-I).
+        psi_hom = _solve_spectral(rhs_corrected, dx, dy, lambda_, "dst", "X")
     else:
-        # CG solves on the effective domain directly.  A capacitance solver
-        # built on the wet mask already holds that mask's inner ring at zero,
-        # so its unknowns are exactly the effective domain.
+        # CG solves on the effective domain directly; a capacitance solver
+        # must have been built on the same wet mask.
         eff_mask = domain.effective_mask.astype(rhs.dtype)
         psi_hom = _solve_dispatch(
             rhs_corrected,
@@ -494,6 +635,7 @@ def _solve_with_known_values(
             eff_mask,
             capacitance_solver,
             preconditioner,
+            staggering,
         )
     return reconstruct_from_lift(domain, psi_hom, value_lift)
 
@@ -519,7 +661,12 @@ def streamfunction_from_vorticity(
     Three solver methods are available:
 
     * ``"spectral"`` — Direct spectral solver (DST/DCT/FFT) for rectangular
-      domains.  Selected by *bc*.  Default.
+      domains.  Selected by *bc*.  Default.  ψ lives at X points: the
+      unknowns are sliced out of the full array so that the wall is the
+      C-grid wall (``"dst"``: DST-I on ``[1:-2, 1:-2]``, ψ = 0 on the wall
+      nodes ``0`` and ``N-2``; ``"dct"``: DCT-I on ``[0:-1, 0:-1]``;
+      ``"fft"``: ``[1:-1, 1:-1]``), the same wall ``method="cg"`` imposes
+      with a ``Mask2D``.  The other entries of the result are zero.
     * ``"cg"`` — Preconditioned Conjugate Gradient for masked / irregular
       domains.  Requires *mask*.  Uses a spectral preconditioner by default,
       or a custom one via *preconditioner*.
@@ -537,13 +684,19 @@ def streamfunction_from_vorticity(
         Boundary-condition type for the spectral solver (used by
         ``method="spectral"``).
         ``"dst"`` (Dirichlet, ψ = 0 on boundary) is the most common choice
-        for streamfunction inversion.
+        for streamfunction inversion.  With ``"dct"`` (∂ψ/∂n = 0 on the
+        walls) the wall nodes themselves are unknowns, so *zeta* is read
+        there too (X rows / columns 0 and N-2): an operator that writes only
+        ``[1:-1, 1:-1]`` leaves row / column 0 at zero, which costs the
+        second-order accuracy; fill the wall values of *zeta* first.
         A :class:`BoundaryConditionSet` is also accepted.  Its face types
         select the transform (all ``Dirichlet1D`` -> ``"dst"``, all
         ``Neumann1D`` with zero value -> ``"dct"``, all ``Periodic1D`` ->
         ``"fft"``; mixing raises), its ``mask`` is used by the mask-based
-        methods, and non-zero ``Dirichlet1D`` values become
-        ``known_values`` on the wall-adjacent wet cells (explicit
+        methods (``method="spectral"`` with a ``bc.mask`` raises), and
+        non-zero ``Dirichlet1D`` values become ``known_values`` on each
+        face's wall nodes -- the coast cells just outside the wet cells, X
+        rows / columns ``0`` and ``N-2`` of a rectangle (explicit
         ``known_values`` take precedence).  An all-zero Dirichlet set is the
         ordinary homogeneous ``"dst"`` solve.
     lambda_ : float
@@ -565,16 +718,18 @@ def streamfunction_from_vorticity(
         preconditioner (FFT-based) is used automatically.
     known_values : Float[Array, "Ny Nx"] or None
         Prescribed (inhomogeneous Dirichlet) values of the solution, used
-        at the inner boundary ring -- the wet cells adjacent to a dry cell --
-        and at any ``known_mask`` cells; values elsewhere are ignored.  The
-        solution equals ``known_values`` exactly at those cells.  ``None``
-        (default) keeps the homogeneous solve unchanged.  Mask-based methods
-        require *mask*.  For ``method="capacitance"`` build the solver on the
-        same wet *mask*: it holds its own inner ring at zero, which is exactly
-        the lifted ring (use ``base_bc="dst"`` when ``lambda_ == 0``).
+        on the coast ring -- the dry cells adjacent to a wet cell, where
+        ``method="cg"`` puts its ψ = 0 wall (for a ``Mask2D``, the C-grid
+        wall nodes) -- and at any ``known_mask`` cells; values elsewhere are
+        ignored.  The solution equals ``known_values`` exactly at those
+        cells and every other wet cell is solved for.  ``None`` (default)
+        keeps the homogeneous solve unchanged.  Mask-based methods require
+        *mask*.  For ``method="capacitance"`` build the solver on the same
+        wet *mask* (use ``base_bc="dst"`` when ``lambda_ == 0``).
         ``method="spectral"`` requires ``bc="dst"`` and no *mask*: it solves
-        the rectangular basin whose dry ghost ring surrounds the wet
-        interior, matching ``method="cg"`` with that basin mask.
+        the ψ basin of the rectangle (wet X nodes ``[1:-2, 1:-2]``, values
+        on the wall nodes ``0`` and ``N-2``), matching ``method="cg"`` with
+        the rectangle's ``Mask2D``.
     known_mask : Bool[Array, "Ny Nx"] or None
         Extra interior wet cells with known values (e.g. sparse
         observations), pinned alongside the boundary ring.
@@ -586,7 +741,7 @@ def streamfunction_from_vorticity(
         Streamfunction ψ.
     """
     bc, mask, known_values = _resolve_bc(
-        bc, method, mask, known_values, zeta.shape, zeta.dtype
+        bc, method, mask, known_values, zeta.shape, zeta.dtype, "X"
     )
     if known_values is not None:
         return _solve_with_known_values(
@@ -601,9 +756,19 @@ def streamfunction_from_vorticity(
             known_mask,
             capacitance_solver,
             preconditioner,
+            "X",
         )
     return _solve_dispatch(
-        zeta, dx, dy, lambda_, bc, method, mask, capacitance_solver, preconditioner
+        zeta,
+        dx,
+        dy,
+        lambda_,
+        bc,
+        method,
+        mask,
+        capacitance_solver,
+        preconditioner,
+        "X",
     )
 
 
@@ -625,7 +790,11 @@ def pressure_from_divergence(
     divergence of the provisional velocity field must be removed.
 
     Solver selection follows the same three-method dispatch as
-    :func:`streamfunction_from_vorticity`.
+    :func:`streamfunction_from_vorticity`.  p lives at T points: the
+    spectral path solves on the T interior ``[1:-1, 1:-1]`` with the wall
+    on the cell faces (``"dct"``: DCT-II, ∂p/∂n = 0; ``"dst"``: DST-II,
+    p = 0; ``"fft"``: periodic) and returns a zero ghost ring, and a
+    ``Mask2D`` gives its ``h`` mask.
 
     Parameters
     ----------
@@ -637,11 +806,15 @@ def pressure_from_divergence(
         Boundary-condition type for the spectral solver.
         ``"dct"`` (Neumann, ∂p/∂n = 0) is the standard choice for
         pressure with solid walls.  A :class:`BoundaryConditionSet` is
-        accepted as in :func:`streamfunction_from_vorticity`.
+        accepted as in :func:`streamfunction_from_vorticity`, except that
+        non-zero ``Dirichlet1D`` faces raise: a T-point Dirichlet value
+        belongs on the face, which known values (pinned at cell centres)
+        cannot reach.
     method : {"spectral", "cg", "capacitance"}
         Solver method.  Default: ``"spectral"``.
     mask : Float[Array, "Ny Nx"] or Mask2D or None
-        Domain mask.  Required for ``method="cg"``.
+        Domain mask.  Required for ``method="cg"``.  A :class:`Mask2D` gives
+        its T-point mask ``h``.
     capacitance_solver : CapacitanceSolver or None
         Pre-built capacitance solver.  Required for
         ``method="capacitance"``.
@@ -649,16 +822,14 @@ def pressure_from_divergence(
         Custom preconditioner for ``method="cg"``.
     known_values : Float[Array, "Ny Nx"] or None
         Prescribed (inhomogeneous Dirichlet) values of the solution, used
-        at the inner boundary ring -- the wet cells adjacent to a dry cell --
-        and at any ``known_mask`` cells; values elsewhere are ignored.  The
-        solution equals ``known_values`` exactly at those cells.  ``None``
-        (default) keeps the homogeneous solve unchanged.  Mask-based methods
-        require *mask*.  For ``method="capacitance"`` build the solver on the
-        same wet *mask*: it holds its own inner ring at zero, which is exactly
-        the lifted ring (use ``base_bc="dst"`` when ``lambda_ == 0``).
-        ``method="spectral"`` requires ``bc="dst"`` and no *mask*: it solves
-        the rectangular basin whose dry ghost ring surrounds the wet
-        interior, matching ``method="cg"`` with that basin mask.
+        on the coast ring -- the dry cells adjacent to a wet cell; for p at
+        T points that is the ghost ring, so the values sit at the ghost-cell
+        centres, half a cell outside the wall faces -- and at any
+        ``known_mask`` cells; values elsewhere are ignored.  The solution
+        equals ``known_values`` exactly at those cells.  ``None`` (default)
+        keeps the homogeneous solve unchanged.  Mask-based methods require
+        *mask*.  ``method="spectral"`` raises: its T-point Dirichlet wall
+        (DST-II) is on the faces, not at the ghost-cell centres.
     known_mask : Bool[Array, "Ny Nx"] or None
         Extra interior wet cells with known values (e.g. sparse
         observations), pinned alongside the boundary ring.
@@ -670,7 +841,7 @@ def pressure_from_divergence(
         Pressure field p.
     """
     bc, mask, known_values = _resolve_bc(
-        bc, method, mask, known_values, div_u.shape, div_u.dtype
+        bc, method, mask, known_values, div_u.shape, div_u.dtype, "T"
     )
     if known_values is not None:
         return _solve_with_known_values(
@@ -685,9 +856,19 @@ def pressure_from_divergence(
             known_mask,
             capacitance_solver,
             preconditioner,
+            "T",
         )
     return _solve_dispatch(
-        div_u, dx, dy, 0.0, bc, method, mask, capacitance_solver, preconditioner
+        div_u,
+        dx,
+        dy,
+        0.0,
+        bc,
+        method,
+        mask,
+        capacitance_solver,
+        preconditioner,
+        "T",
     )
 
 
@@ -751,7 +932,7 @@ def pv_inversion(
         Streamfunction ψ, same shape as *pv*.
     """
     bc, mask, known_values = _resolve_bc(
-        bc, method, mask, known_values, pv.shape, pv.dtype
+        bc, method, mask, known_values, pv.shape, pv.dtype, "X"
     )
     lam = jnp.asarray(lambda_)
     kv = None if known_values is None else jnp.broadcast_to(known_values, pv.shape)
@@ -773,6 +954,7 @@ def pv_inversion(
                 known_mask,
                 capacitance_solver,
                 preconditioner,
+                "X",
             )
 
         if pv.ndim == 2:
@@ -795,6 +977,7 @@ def pv_inversion(
                 mask,
                 capacitance_solver,
                 preconditioner,
+                "X",
             )
         # Flatten leading dims, solve each, reshape
         shape = pv.shape
@@ -811,6 +994,7 @@ def pv_inversion(
                 mask,
                 capacitance_solver,
                 preconditioner,
+                "X",
             )
 
         out = eqx.filter_vmap(_solve_one)(flat)
@@ -828,10 +1012,10 @@ def pv_inversion(
             f"pv.shape[-3]={pv.shape[-3]} does not match lambda_ length {nl}"
         )
 
-    # Solve each layer with its own lambda.
-    # We call the Helmholtz solver directly (not _solve_dispatch) because
-    # lam_i is a JAX tracer inside vmap and Python-level ``if lam == 0``
-    # branches in _spectral_solve would fail.
+    # Solve each layer with its own lambda.  lam_i is a JAX tracer inside
+    # vmap, so the per-layer solves below call the tracer-safe building
+    # blocks (masked_laplacian + solve_cg, or _solve_spectral, which has no
+    # Python branch on lambda) with the same X staggering as _solve_dispatch.
     if method == "capacitance":
         raise ValueError(
             "method='capacitance' does not support array-valued lambda_; "
@@ -843,11 +1027,11 @@ def pv_inversion(
     domain = (
         None
         if kv is None
-        else _known_value_domain(pv.shape, pv.dtype, method, bc, mask, known_mask)
+        else _known_value_domain(pv.shape, pv.dtype, method, bc, mask, known_mask, "X")
     )
 
     if method == "cg":
-        mask_arr = _resolve_mask_arr(mask, pv.dtype)
+        mask_arr = _resolve_mask_arr(mask, pv.dtype, "X")
         if mask_arr is None:
             raise ValueError("method='cg' requires a mask")
         # With known values the solve runs on the effective domain.
@@ -873,22 +1057,16 @@ def pv_inversion(
             )
             return x * solve_mask
 
-    elif method == "spectral" and domain is not None:
-
-        def _solve_layer(
-            rhs: Float[Array, "Ny Nx"], lam_i: float
-        ) -> Float[Array, "Ny Nx"]:
-            return _solve_spectral_basin(rhs, dx, dy, lam_i)
-
     elif method == "spectral":
-        _helmholtz = _HELMHOLTZ_DISPATCH.get(bc)
-        if _helmholtz is None:
+        # With known values the ψ basin's solve domain is the DST-I rectangle.
+        layer_bc = bc if domain is None else "dst"
+        if ("X", layer_bc) not in _SPECTRAL_STAGGERED:
             raise ValueError(f"bc must be 'fft', 'dst', or 'dct'; got {bc!r}")
 
         def _solve_layer(
             rhs: Float[Array, "Ny Nx"], lam_i: float
         ) -> Float[Array, "Ny Nx"]:
-            return _helmholtz(rhs, dx, dy, lam_i)
+            return _solve_spectral(rhs, dx, dy, lam_i, layer_bc, "X")
 
     else:
         raise ValueError(

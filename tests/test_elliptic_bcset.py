@@ -10,6 +10,7 @@ import finitevolx as fvx
 from finitevolx import (
     BoundaryConditionSet,
     Dirichlet1D,
+    Mask2D,
     Neumann1D,
     Periodic1D,
 )
@@ -27,6 +28,16 @@ def _rhs() -> jnp.ndarray:
 def _basin_mask() -> jnp.ndarray:
     # mask[j, i] = 1 for 1 <= j <= NY-2, 1 <= i <= NX-2
     return jnp.zeros((NY, NX)).at[1:-1, 1:-1].set(1.0)
+
+
+def _basin_mask2d() -> Mask2D:
+    """Mask2D of the rectangle: psi (X) wet on [1:-2, 1:-2], walls at 0 and N-2."""
+    return Mask2D.from_mask(np.asarray(_basin_mask(), dtype=bool))
+
+
+def _laplacian(psi: jnp.ndarray, lambda_: float) -> jnp.ndarray:
+    """Unmasked 5-point (A - lambda) psi: reads the wall values as they are."""
+    return fvx.masked_laplacian(psi, jnp.ones_like(psi), DX, DY, lambda_=lambda_)
 
 
 def _dirichlet(south=0.0, north=0.0, west=0.0, east=0.0, mask=None):
@@ -105,14 +116,16 @@ class TestMaskExtraction:
                 mask=mask,
             )
 
-    def test_spectral_ignores_bc_mask(self):
-        """The spectral path is rectangular; bc.mask only feeds mask methods."""
-        rhs = _rhs()
-        psi = fvx.streamfunction_from_vorticity(
-            rhs, DX, DY, bc=BoundaryConditionSet.closed(mask=_basin_mask())
-        )
-        ref = fvx.streamfunction_from_vorticity(rhs, DX, DY, bc="dst")
-        np.testing.assert_array_equal(psi, ref)
+    def test_spectral_rejects_bc_mask(self):
+        """The spectral path is rectangular: a bc.mask raises (#303)."""
+        with pytest.raises(ValueError, match=r"cannot honour bc\.mask"):
+            fvx.streamfunction_from_vorticity(
+                _rhs(), DX, DY, bc=BoundaryConditionSet.closed(mask=_basin_mask())
+            )
+        with pytest.raises(ValueError, match=r"cannot honour bc\.mask"):
+            fvx.streamfunction_from_vorticity(
+                _rhs(), DX, DY, bc=_dirichlet(north=1.0, mask=_basin_mask2d())
+            )
 
 
 class TestInhomogeneousDirichletFaces:
@@ -120,29 +133,29 @@ class TestInhomogeneousDirichletFaces:
     def test_face_values_pin_wall_rows(self):
         bc = _dirichlet(south=-0.2, north=0.1, west=0.05, east=0.3)
         psi = fvx.streamfunction_from_vorticity(_rhs(), DX, DY, bc=bc, lambda_=4.0)
-        # Wall-adjacent wet cells (inner ring), corners owned by west/east.
-        # psi[1, i]    = south  for 2 <= i <= NX-3  (corners belong to west/east)
-        np.testing.assert_allclose(psi[1, 2:-2], -0.2, atol=1e-12)
-        # psi[NY-2, i] = north  for 2 <= i <= NX-3
-        np.testing.assert_allclose(psi[-2, 2:-2], 0.1, atol=1e-12)
-        # psi[j, 1]    = west   for 1 <= j <= NY-2  (corners included)
-        np.testing.assert_allclose(psi[1:-1, 1], 0.05, atol=1e-12)
-        # psi[j, NX-2] = east   for 1 <= j <= NY-2
-        np.testing.assert_allclose(psi[1:-1, -2], 0.3, atol=1e-12)
+        # The values sit on the psi wall nodes (the coast of the X basin
+        # [1:-2, 1:-2]); the corner nodes are not on the coast.
+        # psi[0, i]    = south  for 1 <= i <= NX-3
+        np.testing.assert_allclose(psi[0, 1:-2], -0.2, atol=1e-12)
+        # psi[NY-2, i] = north  for 1 <= i <= NX-3
+        np.testing.assert_allclose(psi[-2, 1:-2], 0.1, atol=1e-12)
+        # psi[j, 0]    = west   for 1 <= j <= NY-3
+        np.testing.assert_allclose(psi[1:-2, 0], 0.05, atol=1e-12)
+        # psi[j, NX-2] = east   for 1 <= j <= NY-3
+        np.testing.assert_allclose(psi[1:-2, -2], 0.3, atol=1e-12)
 
     def test_matches_explicit_known_values(self):
         bc = _dirichlet(north=0.1)
-        # West/east (value 0) own the corner cells of the north wall row.
-        # g[NY-2, i] = 0.1 for 2 <= i <= NX-3
-        g = jnp.zeros((NY, NX)).at[-2, 2:-2].set(0.1)
+        # g[NY-2, i] = 0.1 for 1 <= i <= NX-3  (the north wall nodes)
+        g = jnp.zeros((NY, NX)).at[-2, 1:-2].set(0.1)
         rhs = _rhs()
         psi = fvx.streamfunction_from_vorticity(rhs, DX, DY, bc=bc)
         ref = fvx.streamfunction_from_vorticity(rhs, DX, DY, known_values=g)
         np.testing.assert_array_equal(psi, ref)
 
     def test_cg_with_bc_mask_matches_spectral(self):
-        mask = _basin_mask()
-        rhs = _rhs() * mask
+        mask = _basin_mask2d()
+        rhs = _rhs()
         psi_cg = fvx.streamfunction_from_vorticity(
             rhs, DX, DY, bc=_dirichlet(north=0.1, mask=mask), method="cg"
         )
@@ -166,8 +179,79 @@ class TestInhomogeneousDirichletFaces:
         psi = fvx.pv_inversion(
             pv, DX, DY, jnp.array([1.0, 9.0]), bc=_dirichlet(east=0.25)
         )
-        # psi[k, j, NX-2] = east for every layer k and 1 <= j <= NY-2
-        np.testing.assert_allclose(psi[:, 1:-1, -2], 0.25, atol=1e-12)
+        # psi[k, j, NX-2] = east for every layer k and 1 <= j <= NY-3
+        np.testing.assert_allclose(psi[:, 1:-2, -2], 0.25, atol=1e-12)
+
+    @pytest.mark.parametrize("method", ["spectral", "cg"])
+    def test_all_four_faces_on_mask2d_wall(self, method):
+        """#303: every face value lands on its wall nodes, none is dropped.
+
+        Before, north / east were written on row / column N-2, which is dry
+        in ``xy_corner_strict``, and silently dropped by the lifting.
+        """
+        mask = _basin_mask2d()
+        wet = jnp.asarray(mask.xy_corner_strict)
+        lam = 4.0
+        faces = {"south": -0.2, "north": 1.0, "west": 0.5, "east": 2.0}
+        kw = {"mask": mask} if method == "cg" else {}
+        bc = _dirichlet(**faces, **kw)
+        rhs = _rhs()
+        psi = fvx.streamfunction_from_vorticity(
+            rhs, DX, DY, bc=bc, lambda_=lam, method=method
+        )
+        # The coast ring carries the requested values exactly (set by the lift).
+        np.testing.assert_allclose(psi[0, 1:-2], faces["south"], atol=1e-12)
+        np.testing.assert_allclose(psi[-2, 1:-2], faces["north"], atol=1e-12)
+        np.testing.assert_allclose(psi[1:-2, 0], faces["west"], atol=1e-12)
+        np.testing.assert_allclose(psi[1:-2, -2], faces["east"], atol=1e-12)
+        # PDE residual on the solve domain (every wet node), the stencil
+        # reading the wall values: exact for the spectral solve (round-off),
+        # CG's default rtol / atol (1e-6) for cg.
+        res = jnp.where(wet, _laplacian(psi, lam) - rhs, 0.0)
+        tol = 1e-10 if method == "spectral" else CG_TOL * 10
+        assert float(jnp.max(jnp.abs(res))) < tol
+
+    def test_pressure_rejects_nonzero_dirichlet_faces(self):
+        """T-point Dirichlet sits on the faces; the lift cannot put it there."""
+        with pytest.raises(ValueError, match="T-point pressure"):
+            fvx.pressure_from_divergence(_rhs(), DX, DY, bc=_dirichlet(north=1.0))
+
+    def test_curved_coast_raises(self):
+        """Face values on a non-rectangular coast would mostly land on no face."""
+        yy, xx = np.mgrid[0:NY, 0:NX]
+        m = (xx - NX / 2) ** 2 / (0.4 * NX) ** 2 + (yy - NY / 2) ** 2 / (
+            0.4 * NY
+        ) ** 2 < 1
+        mask = Mask2D.from_mask(m)
+        with pytest.raises(ValueError, match="outer coast nodes are on no face"):
+            fvx.streamfunction_from_vorticity(
+                jnp.zeros((NY, NX)),
+                DX,
+                DY,
+                bc=_dirichlet(1.0, 1.0, 1.0, 1.0, mask=mask),
+                method="cg",
+            )
+
+    def test_island_in_rectangle_is_accepted(self):
+        """Islands do not touch the outer land: their coast stays at zero."""
+        m = np.asarray(_basin_mask(), dtype=bool).copy()
+        m[8:12, 10:14] = False
+        mask = Mask2D.from_mask(m)
+        psi = fvx.streamfunction_from_vorticity(
+            jnp.zeros((NY, NX)),
+            DX,
+            DY,
+            bc=_dirichlet(1.0, 1.0, 1.0, 1.0, mask=mask),
+            method="cg",
+        )
+        wet = np.asarray(mask.xy_corner_strict) > 0.5
+        coast = np.asarray(fvx.coast_ring(wet))
+        island_coast = coast.copy()
+        island_coast[[0, NY - 2], :] = False
+        island_coast[:, [0, NX - 2]] = False
+        assert island_coast.any()
+        np.testing.assert_array_equal(np.asarray(psi)[island_coast], 0.0)
+        np.testing.assert_allclose(np.asarray(psi)[coast & ~island_coast], 1.0)
 
 
 class TestErrors:

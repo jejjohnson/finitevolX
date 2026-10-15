@@ -36,7 +36,8 @@
 # The C-grid divergence at T-points uses backward differences of face
 # velocities, while the pressure gradient uses forward differences.  Their
 # composition $\nabla \cdot \nabla p$ gives exactly the 5-point Laplacian,
-# which the spectral DST solver inverts.
+# which the spectral DST-II solver inverts when $p = 0$ sits on the wall
+# faces.
 
 # %%
 from pathlib import Path
@@ -147,30 +148,52 @@ plt.show()
 # Because the C-grid divergence and gradient operators compose to the exact
 # 5-point Laplacian, the corrected velocity is **discretely** divergence-free.
 #
-# **Solver choice:** finitevolX's ghost cells (set to zero) impose $p = 0$ at
-# the array boundary.  This matches the DST-I (regular Dirichlet) spectral
-# solver, which assumes the function vanishes at the grid vertices.
+# **Where the wall is:** pressure lives at T points (cell centres), and the
+# walls are the cell faces half a cell outside the first / last interior
+# T point.  A `Dirichlet1D` boundary condition puts $p = 0$ **on the face**
+# by mirroring the interior into the ghost cell (`ghost = -interior`), and
+# that is exactly the DST-II (staggered Dirichlet) spectral solver, which
+# `fvx.pressure_from_divergence(..., bc="dst")` applies to the T interior of
+# the full array.  The wall-face normal velocities `u[:, 0]` (west) and
+# `v[0, :]` (south) are boundary-owned: no forward operator writes them, so
+# we fill them from the same gradient.
 
 # %%
 diff_op = fvx.Difference2D(grid)
 div_op = fvx.Divergence2D(grid)
 
-# --- Construct a known divergent velocity field ---
-# We define a divergent potential φ at T-points, then compute u = ∂φ/∂x
-# (at U-points) and v = ∂φ/∂y (at V-points) using C-grid differences.
-# This guarantees ∇·u = ∇²φ in the discrete sense.
-j_idx = jnp.arange(Ny)[:, None]
-i_idx = jnp.arange(Nx)[None, :]
+# p = 0 on every wall face: Dirichlet1D(value=0) sets ghost = -interior.
+wall = fvx.BoundaryConditionSet.closed()
 
-# Potential that vanishes on ghost ring (matching DST-I BCs)
-phi = jnp.sin(jnp.pi * i_idx / (Nx - 1)) * jnp.sin(jnp.pi * j_idx / (Ny - 1))
-phi = phi + 0.3 * jnp.sin(2 * jnp.pi * i_idx / (Nx - 1)) * jnp.sin(
-    jnp.pi * j_idx / (Ny - 1)
-)
+
+def gradient(f):
+    """(∂f/∂x at U, ∂f/∂y at V) on every face, the wall faces included.
+
+    f's ghost ring must be filled.  The forward differences write U[1:-1, 1:-1]
+    and V[1:-1, 1:-1]; the west / south wall faces U[:, 0] and V[0, :] are
+    boundary-owned, so we add them:
+    u[j, 1/2] = (f[j, 1] - f[j, 0]) / dx,  v[1/2, i] = (f[1, i] - f[0, i]) / dy.
+    """
+    u = diff_op.diff_x_T_to_U(f)  # [Ny, Nx]
+    v = diff_op.diff_y_T_to_V(f)  # [Ny, Nx]
+    u = u.at[1:-1, 0].set((f[1:-1, 1] - f[1:-1, 0]) / dx)
+    v = v.at[0, 1:-1].set((f[1, 1:-1] - f[0, 1:-1]) / dy)
+    return u, v
+
+
+# --- Construct a known divergent velocity field ---
+# A divergent potential φ at T-points (x = (i - 1/2) dx) that vanishes on the
+# wall faces x = 0, Lx and y = 0, Ly; then u = ∂φ/∂x at U-points and
+# v = ∂φ/∂y at V-points.  This guarantees ∇·u = ∇²φ in the discrete sense.
+x_t = (jnp.arange(Nx) - 0.5) * dx  # [Nx]
+y_t = (jnp.arange(Ny) - 0.5) * dy  # [Ny]
+X_t, Y_t = x_t[None, :], y_t[:, None]
+phi = jnp.sin(jnp.pi * X_t / Lx) * jnp.sin(jnp.pi * Y_t / Ly)
+phi = phi + 0.3 * jnp.sin(2 * jnp.pi * X_t / Lx) * jnp.sin(jnp.pi * Y_t / Ly)
+phi = wall(phi, dx, dy)  # the sines already mirror; this makes the wall explicit
 
 # Divergent velocity: u = ∂φ/∂x at U-points, v = ∂φ/∂y at V-points
-u = diff_op.diff_x_T_to_U(phi)
-v = diff_op.diff_y_T_to_V(phi)
+u, v = gradient(phi)
 
 # Divergence at T-points
 div_uv = div_op(u, v)
@@ -178,16 +201,15 @@ print(f"max |∇·u| = {float(jnp.abs(div_uv[1:-1, 1:-1]).max()):.4e}")
 
 # %%
 # --- Solve ∇²p = ∇·u and project ---
+# Pass the full array: the wrapper solves the T interior [1:-1, 1:-1] with
+# p = 0 on the faces (DST-II) and returns a zero ghost ring.
+p_full = fvx.pressure_from_divergence(div_uv, dx, dy, bc="dst")
+p_full = wall(p_full, dx, dy)  # fill the ghost ring: p = 0 on the faces
+p_interior = p_full[1:-1, 1:-1]
 rhs = div_uv[1:-1, 1:-1]
-p_interior = solve_poisson_dst(rhs, dx, dy)
 
-# Pad back to full grid (ghost = 0 = Dirichlet BC)
-p_full = jnp.zeros((Ny, Nx))
-p_full = p_full.at[1:-1, 1:-1].set(p_interior)
-
-# Pressure gradient at U/V points
-dp_dx = diff_op.diff_x_T_to_U(p_full)
-dp_dy = diff_op.diff_y_T_to_V(p_full)
+# Pressure gradient at U/V points (wall faces included)
+dp_dx, dp_dy = gradient(p_full)
 
 # Corrected velocity
 u_corr = u - dp_dx
@@ -255,41 +277,47 @@ plt.show()
 # ![Pressure Poisson: divergence, pressure, and projection](../../images/pressure_poisson/projection.png)
 
 # %% [markdown]
-# The projection removes divergence to **machine precision** because the
-# spectral DST-I solver exactly inverts the same discrete Laplacian stencil
-# that the C-grid divergence and gradient operators compose to.
+# The projection removes divergence to **machine precision** and recovers
+# φ exactly, because the DST-II solve inverts the same discrete Laplacian
+# that the C-grid divergence and gradient compose to with $p = 0$ on the
+# wall faces.
 
 # %% [markdown]
 # ## 3. DST-I vs DST-II: Which Solver?
 #
-# The DST-I solver assumes grid points at **vertices** (including the
-# boundary), while DST-II assumes **cell centres** with the boundary at
-# a half-grid offset.
+# Both solvers take the T interior as their unknowns; they differ in where
+# the zero sits:
 #
-# finitevolX's ghost-cell convention (ghost = 0) places the Dirichlet
-# condition at the grid vertex, matching DST-I.  Models that define
-# cell-centred grids without ghost cells should use DST-II.
+# * **DST-II** puts $p = 0$ on the cell **faces**, half a cell outside the
+#   first / last T point (`ghost = -interior`): the C-grid wall, and what
+#   `Dirichlet1D` imposes.
+# * **DST-I** puts $p = 0$ on the virtual nodes one step outside, i.e. at the
+#   ghost-cell **centres** (`ghost = 0`): a wall half a cell too far out.
+#
+# Each is the exact inverse of its own discrete operator, so the Laplacian
+# residual alone cannot tell them apart; the distance to φ (which vanishes
+# on the faces) can.
 
 # %%
-p_dst1 = solve_poisson_dst(rhs, dx, dy)    # DST-I: correct for ghost=0
-p_dst2 = solve_poisson_dst2(rhs, dx, dy)   # DST-II: staggered alternative
+p_dst1 = solve_poisson_dst(rhs, dx, dy)    # DST-I: p = 0 at the ghost centres
+p_dst2 = solve_poisson_dst2(rhs, dx, dy)   # DST-II: p = 0 on the faces
 
 diff = jnp.abs(p_dst1 - p_dst2)
 print(f"max |p_DST-I - p_DST-II| = {float(diff.max()):.4e}")
 print(f"relative diff = {float(diff.max() / jnp.abs(p_dst1).max()):.4e}")
 
-# Check which one actually inverts the discrete Laplacian exactly
-laplacian_p1 = diff_op.laplacian(
-    jnp.zeros((Ny, Nx)).at[1:-1, 1:-1].set(p_dst1)
-)
+# Each inverts the Laplacian with its own ghost convention
+laplacian_p1 = diff_op.laplacian(jnp.zeros((Ny, Nx)).at[1:-1, 1:-1].set(p_dst1))
 laplacian_p2 = diff_op.laplacian(
-    jnp.zeros((Ny, Nx)).at[1:-1, 1:-1].set(p_dst2)
+    wall(jnp.zeros((Ny, Nx)).at[1:-1, 1:-1].set(p_dst2), dx, dy)
 )
 
 err_dst1 = float(jnp.abs(laplacian_p1[1:-1, 1:-1] - rhs).max())
 err_dst2 = float(jnp.abs(laplacian_p2[1:-1, 1:-1] - rhs).max())
-print(f"Laplacian residual (DST-I):  {err_dst1:.4e}")
-print(f"Laplacian residual (DST-II): {err_dst2:.4e}")
+print(f"Laplacian residual (DST-I, ghost = 0):          {err_dst1:.4e}")
+print(f"Laplacian residual (DST-II, ghost = -interior): {err_dst2:.4e}")
+print(f"max |p_DST-I  - φ| = {float(jnp.abs(p_dst1 - phi[1:-1, 1:-1]).max()):.4e}")
+print(f"max |p_DST-II - φ| = {float(jnp.abs(p_dst2 - phi[1:-1, 1:-1]).max()):.4e}")
 
 # %%
 fig, axes = plt.subplots(1, 3, figsize=(16, 4.5))
@@ -301,14 +329,14 @@ axes[0].imshow(
     aspect="auto", vmin=-vmax, vmax=vmax,
     extent=[0, Lx / 1e6, 0, Ly / 1e6],
 )
-axes[0].set_title("DST-I (regular) — correct for ghost=0")
+axes[0].set_title("DST-I — p = 0 at the ghost centres")
 
 axes[1].imshow(
     np.asarray(p_dst2), origin="lower", cmap="RdBu_r",
     aspect="auto", vmin=-vmax, vmax=vmax,
     extent=[0, Lx / 1e6, 0, Ly / 1e6],
 )
-axes[1].set_title("DST-II (staggered)")
+axes[1].set_title("DST-II — p = 0 on the faces")
 
 im = axes[2].imshow(
     np.asarray(diff), origin="lower", cmap="hot_r",
@@ -331,11 +359,9 @@ plt.show()
 # ![DST-I vs DST-II comparison](../../images/pressure_poisson/dst1_vs_dst2.png)
 
 # %% [markdown]
-# The DST-I solver produces a solution whose discrete Laplacian matches
-# the RHS to machine precision — confirming it is the exact inverse for
-# the C-grid stencil with ghost=0 boundary conditions.  DST-II gives a
-# slightly different solution because it enforces the Dirichlet condition
-# at a half-grid offset.
+# DST-II recovers φ to machine precision: its wall is the C-grid wall.
+# DST-I solves a slightly larger basin (the wall half a cell further out),
+# a first-order error that does not shrink faster than $\Delta x$.
 
 # %% [markdown]
 # ## 4. Module Class Interface
@@ -358,12 +384,16 @@ print(f"max |module - DST-II| = {float(jnp.abs(p_module - p_dst2).max()):.2e}")
 # the correct spectral solver based on the `bc` parameter.
 
 # %%
-p_convenience = fvx.pressure_from_divergence(rhs, dx, dy, bc="dst")
-print(f"max |convenience - DST-I| = {float(jnp.abs(p_convenience - p_dst1).max()):.2e}")
+# Pass the full [Ny, Nx] array: the wrapper slices the T interior itself.
+p_convenience = fvx.pressure_from_divergence(div_uv, dx, dy, bc="dst")
+print(
+    "max |convenience - DST-II| = "
+    f"{float(jnp.abs(p_convenience[1:-1, 1:-1] - p_dst2).max()):.2e}"
+)
 
 # %% [markdown]
 # Here we pass `bc="dst"` (Dirichlet) to match the manufactured test where
-# $\phi = 0$ on the boundary.  Note that the library default is `bc="dct"`
+# $\phi = 0$ on the wall faces.  Note that the library default is `bc="dct"`
 # (Neumann, $\partial p / \partial n = 0$), which is the standard choice for
 # pressure with solid walls in most ocean models.
 
@@ -373,9 +403,9 @@ print(f"max |convenience - DST-I| = {float(jnp.abs(p_convenience - p_dst1).max()
 # | Concept | Detail |
 # |---------|--------|
 # | **Pressure location** | T-points (cell centres) on the C-grid |
-# | **Correct solver** | DST-I for finitevolX's ghost-cell convention (ghost=0 → vertex Dirichlet) |
-# | **DST-II alternative** | For cell-centred grids without ghost cells (half-grid offset BCs) |
+# | **Correct solver** | DST-II: $p = 0$ on the wall faces (`Dirichlet1D`, ghost = −interior) |
+# | **DST-I** | $p = 0$ at the ghost-cell centres (ghost = 0): the wall half a cell too far out |
 # | **Projection** | $\mathbf{u}^* = \mathbf{u} - \nabla p$ removes divergence to machine precision |
 # | **C-grid advantage** | $\partial p/\partial x$ at U-points, $\partial p/\partial y$ at V-points — no interpolation |
 # | **Module class** | `StaggeredDirichletHelmholtzSolver2D` wraps DST-II for equinox workflows |
-# | **Convenience** | `fvx.pressure_from_divergence(rhs, dx, dy)` — defaults to DCT (Neumann) |
+# | **Convenience** | `fvx.pressure_from_divergence(div_u, dx, dy)` on the full array — defaults to DCT (Neumann, on the faces) |

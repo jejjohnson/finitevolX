@@ -234,25 +234,34 @@ plt.show()
 #
 # finitevolX provides convenience wrappers that dispatch to the spectral
 # solvers.  `pv_inversion` solves $(∇^2 - \lambda)\psi = q$ and supports
-# multi-layer batching.
+# multi-layer batching.  It solves for an **X-point** $\psi$ on the full
+# `[Ny, Nx]` C-grid array: X node `i` sits at $x = i\,\Delta x$, the wet
+# nodes `[1:-2, 1:-2]` are the unknowns (DST-I) and $\psi = 0$ on the wall
+# nodes `0` and `N-2`.
 
 # %%
 grid = fvx.CartesianGrid2D.from_interior(nx, ny, Lx, Ly)
 
-# Existing API (uses DST-I internally — regular grid)
-psi_fvx = fvx.pv_inversion(q, dx, dy, lambda_=lam_compare, bc="dst")
+# q sampled at the X points of the full array
+x_X = jnp.arange(nx + 2)[None, :] * dx
+y_X = jnp.arange(ny + 2)[:, None] * dy
+q_X = amplitude * jnp.exp(-((x_X - x0) ** 2 + (y_X - y0) ** 2) / (2 * sigma**2))
+psi_fvx = fvx.pv_inversion(q_X, dx, dy, lambda_=lam_compare, bc="dst")
 
-# Direct staggered solver (correct for T-point PV)
+# Direct staggered solver on the T-point PV (walls on the cell faces)
 psi_direct = eqx.filter_jit(solver_dir)(q)
 
-diff_api = jnp.abs(psi_fvx - psi_direct)
-print(f"max |pv_inversion(DST-I) - DST-II| = {float(diff_api.max()):.4e}")
+# Average the X-point solution to the T points before comparing
+psi_fvx_T = fvx.Interpolation2D(grid).X_to_T(psi_fvx)[1:-1, 1:-1]
+diff_api = jnp.abs(psi_fvx_T - psi_direct)
+print(f"max |pv_inversion (X, DST-I) - T-point DST-II| = {float(diff_api.max()):.4e}")
 print(f"relative diff = {float(diff_api.max() / jnp.abs(psi_direct).max()):.4e}")
 
 # %% [markdown]
-# The $O(dx^2)$ difference arises because `pv_inversion(bc="dst")` dispatches
-# to DST-I (regular Dirichlet) while the module class uses DST-II (staggered
-# Dirichlet).  For T-point data, DST-II is more appropriate.
+# Both solve the same basin — the X-point wall nodes and the T-point cell
+# faces are both on $x = 0, L_x$ — so the two placements agree to the
+# $O(dx^2)$ discretisation error.  Use `pv_inversion` for an X-point
+# $\psi$ and the staggered DST-II solver for a T-point $\psi$.
 
 # %% [markdown]
 # ## 6. JAX Ecosystem: JIT, vmap, grad
@@ -380,5 +389,5 @@ for method in ["module", "functional"]:
 # | **Dirichlet** | $\psi = 0$ on walls (no-normal-flow basin) |
 # | **Neumann** | $\partial\psi/\partial n = 0$ (free-slip walls) |
 # | **Module class** | `StaggeredDirichletHelmholtzSolver2D(dx, dy, alpha)` |
-# | **Convenience** | `fvx.pv_inversion(q, dx, dy, lambda_)` dispatches to DST-I |
+# | **Convenience** | `fvx.pv_inversion(q, dx, dy, lambda_)`: X-point ψ on the full array (DST-I on `[1:-2, 1:-2]`) |
 # | **JAX compat** | JIT, vmap, grad all work out of the box |
