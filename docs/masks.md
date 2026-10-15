@@ -375,7 +375,7 @@ implementation.
 
 `Advection1D` / `Advection2D` / `Advection3D` are the special case
 where "mask as field" matters for performance, not just ergonomics.
-When constructed with a mask, `__init__` pre-builds the `(2, 4, 6)`
+When constructed with a mask, `__init__` pre-builds the `(2, 4, 6, 8, 10)`
 adaptive stencil hierarchy via `mask.get_adaptive_masks(...)` — once,
 up-front — and stores the result on the operator.  Every subsequent
 call then uses the cached hierarchy, narrowed at dispatch time (by the
@@ -383,7 +383,7 @@ call then uses the cached hierarchy, narrowed at dispatch time (by the
 reconstruction method needs:
 
 ```python
-adv = fvx.Advection2D(grid=grid, mask=mask)  # builds (2,4,6) hierarchies
+adv = fvx.Advection2D(grid=grid, mask=mask)  # builds (2,4,6,8,10) hierarchies
 
 # First call uses the cached hierarchies; no get_adaptive_masks recomputation.
 dh_dt = adv(h, u, v, method="weno5")

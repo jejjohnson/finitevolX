@@ -4,10 +4,15 @@ Advection operators for Arakawa C-grids.
 Computes -div(h * u_vec) at T-points using face-value reconstruction.
 
 When a :class:`~finitevolx.Mask1D` / :class:`~finitevolx.Mask2D` /
-:class:`~finitevolx.Mask3D` is supplied at construction, the flux
-computation automatically falls back to a lower-order stencil near
-irregular boundaries, using :func:`~finitevolx.upwind_flux` as the
-unified dispatch mechanism.
+:class:`~finitevolx.Mask3D` is supplied at construction, every method is
+land-safe: dry inputs are zeroed with ``jnp.where`` before any stencil
+reads them, the upwind reconstructions fall back to a lower-order stencil
+near irregular boundaries (using :func:`~finitevolx.upwind_flux` as the
+unified dispatch mechanism), and the face fluxes on every dry face
+(wet→dry and dry→dry, ``mask.u`` / ``mask.v`` false) are zeroed before the
+divergence, as in :class:`~finitevolx.Diffusion2D`.  The wet tendencies
+therefore never depend on the values stored on land, and no mass crosses
+the coastline.
 
 The adaptive stencil hierarchy is pre-built in ``__init__`` for every
 dimension and direction, so ``__call__`` pays only the cost of
@@ -39,20 +44,26 @@ from finitevolx._src.operators._ghost import interior
 # TVD limiter names supported by the advection operators.
 _TVD_LIMITERS = frozenset({"minmod", "van_leer", "superbee", "mc"})
 
-# Methods that support mask-based stencil dispatch via upwind_flux.
-_MASK_DISPATCHABLE = frozenset({"weno3", "weno5", "wenoz5"}) | _TVD_LIMITERS
+# Methods whose masked face flux is blended from stencil-width tiers by
+# ``upwind_flux``: every upwind-biased reconstruction.  ``naive`` (centred,
+# reads only the two cells adjacent to the face) needs no tiers: zeroing the
+# dry-face fluxes is enough to make it land-safe.
+_MASK_DISPATCHABLE = (
+    frozenset(
+        {"upwind1", "upwind2", "upwind3", "weno3", "weno5", "wenoz5", "weno7", "weno9"}
+    )
+    | _TVD_LIMITERS
+)
 
-# Kept for backwards-compat within this module (Advection2D/3D used to
-# have separate 2-D / 3-D dispatchable sets).  They now reference the
-# same unified set.
-_MASK_DISPATCHABLE_2D = _MASK_DISPATCHABLE
-_MASK_DISPATCHABLE_3D = _MASK_DISPATCHABLE
+# The set ``uv_center_flux`` / ``uv_node_flux`` dispatch on (unchanged by
+# #296, which made the advection *operators* land-safe).
+_MASK_DISPATCHABLE_2D = frozenset({"weno3", "weno5", "wenoz5"}) | _TVD_LIMITERS
 
 # Pre-built adaptive-hierarchy sizes — the widest set any dispatchable
-# method needs in one direction.  Specific methods may use a subset;
-# ``narrow_mask_hierarchy`` folds the unused tiers into the largest
-# requested one at dispatch time.
-_HIERARCHY_SIZES: tuple[int, ...] = (2, 4, 6)
+# method needs in one direction (size 10 = WENO9's 9-cell stencil).
+# Specific methods may use a subset; ``narrow_mask_hierarchy`` folds the
+# unused tiers into the largest requested one at dispatch time.
+_HIERARCHY_SIZES: tuple[int, ...] = (2, 4, 6, 8, 10)
 
 # Supported lateral-wall treatments (see the ``wall`` argument on the
 # advection operators).
@@ -108,6 +119,56 @@ def _wall_upwind_flux(
     return jnp.where(vel_wall >= 0.0, q_lo, q_hi) * vel_wall
 
 
+def _tier_funcs(recon: object, method: str, axis: str) -> dict[int, Callable]:
+    """Stencil-width tiers ``{size: reconstruction}`` for one direction.
+
+    Size ``s`` is the tier :meth:`~finitevolx.Mask2D.get_adaptive_masks`
+    assigns to an upwind cell with ``s // 2`` contiguous wet cells on each
+    side (itself included), i.e. a centred footprint of ``s - 1`` cells:
+    upwind1 needs 1 (size 2), upwind2 / upwind3 / WENO3 / the TVD limiters
+    3 (size 4), WENO5 5 (size 6), WENO7 7 (size 8), WENO9 9 (size 10).  Each
+    method falls back through the narrower tiers of its own family, so the
+    chosen stencil never reads a dry cell.
+
+    Parameters
+    ----------
+    recon : Reconstruction1D, Reconstruction2D or Reconstruction3D
+        The reconstruction engine.
+    method : str
+        Mask-dispatchable method name (see ``_MASK_DISPATCHABLE``).
+    axis : {"x", "y"}
+        Direction (selects ``recon.<scheme>_x`` or ``recon.<scheme>_y``).
+
+    Raises
+    ------
+    ValueError
+        If *method* has no tiers (or the engine lacks the stencil, e.g.
+        ``upwind2`` on :class:`Reconstruction3D`).
+    """
+
+    def rec(name: str) -> Callable:
+        fn = getattr(recon, f"{name}_{axis}", None)
+        if fn is None:
+            raise ValueError(f"Unknown method: {method!r}")
+        return fn
+
+    if method in _TVD_LIMITERS:
+        tvd = rec("tvd")
+        return {
+            2: rec("upwind1"),
+            4: lambda q, vel, _lim=method: tvd(q, vel, limiter=_lim),
+        }
+    if method == "wenoz5":
+        return {2: rec("upwind1"), 4: rec("wenoz3"), 6: rec("wenoz5")}
+    if method in ("upwind2", "upwind3"):
+        return {2: rec("upwind1"), 4: rec(method)}
+    weno_ladder = ("upwind1", "weno3", "weno5", "weno7", "weno9")
+    if method in weno_ladder:
+        top = weno_ladder.index(method)
+        return {2 * (k + 1): rec(weno_ladder[k]) for k in range(top + 1)}
+    raise ValueError(f"Method {method!r} does not support mask-based stencil dispatch")
+
+
 def _rec_funcs_for_method_1d(
     recon: Reconstruction1D, method: str
 ) -> tuple[dict[int, Callable], tuple[int, ...]]:
@@ -120,25 +181,8 @@ def _rec_funcs_for_method_1d(
     stencil_sizes : tuple[int, ...]
         Stencil sizes used (for matching against the pre-built hierarchy).
     """
-    if method == "weno5":
-        return (
-            {2: recon.upwind1_x, 4: recon.weno3_x, 6: recon.weno5_x},
-            (2, 4, 6),
-        )
-    if method == "weno3":
-        return (
-            {2: recon.upwind1_x, 4: recon.weno3_x},
-            (2, 4),
-        )
-    if method in _TVD_LIMITERS:
-        return (
-            {
-                2: recon.upwind1_x,
-                4: lambda q, u, _lim=method: recon.tvd_x(q, u, limiter=_lim),
-            },
-            (2, 4),
-        )
-    raise ValueError(f"Method {method!r} does not support mask-based stencil dispatch")
+    rfx = _tier_funcs(recon, method, "x")
+    return rfx, tuple(sorted(rfx))
 
 
 def _rec_funcs_for_method_2d(
@@ -155,38 +199,9 @@ def _rec_funcs_for_method_2d(
     stencil_sizes : tuple[int, ...]
         Stencil sizes used (for ``get_adaptive_masks``).
     """
-    if method == "weno5":
-        return (
-            {2: recon.upwind1_x, 4: recon.weno3_x, 6: recon.weno5_x},
-            {2: recon.upwind1_y, 4: recon.weno3_y, 6: recon.weno5_y},
-            (2, 4, 6),
-        )
-    if method == "wenoz5":
-        return (
-            {2: recon.upwind1_x, 4: recon.wenoz3_x, 6: recon.wenoz5_x},
-            {2: recon.upwind1_y, 4: recon.wenoz3_y, 6: recon.wenoz5_y},
-            (2, 4, 6),
-        )
-    if method == "weno3":
-        return (
-            {2: recon.upwind1_x, 4: recon.weno3_x},
-            {2: recon.upwind1_y, 4: recon.weno3_y},
-            (2, 4),
-        )
-    # TVD limiters
-    if method in _TVD_LIMITERS:
-        return (
-            {
-                2: recon.upwind1_x,
-                4: lambda q, u, _lim=method: recon.tvd_x(q, u, limiter=_lim),
-            },
-            {
-                2: recon.upwind1_y,
-                4: lambda q, v, _lim=method: recon.tvd_y(q, v, limiter=_lim),
-            },
-            (2, 4),
-        )
-    raise ValueError(f"Method {method!r} does not support mask-based stencil dispatch")
+    rfx = _tier_funcs(recon, method, "x")
+    rfy = _tier_funcs(recon, method, "y")
+    return rfx, rfy, tuple(sorted(rfx))
 
 
 def _rec_funcs_for_method_3d(
@@ -196,36 +211,11 @@ def _rec_funcs_for_method_3d(
 
     Shares the same tier structure as :func:`_rec_funcs_for_method_2d`
     but uses the native 3-D reconstruction primitives from
-    :class:`Reconstruction3D`.
-
-    Note: ``Reconstruction3D`` does not expose ``wenoz5_*`` as of this
-    branch, so ``wenoz5`` falls back to ``weno5`` in 3-D.
+    :class:`Reconstruction3D` (which has no ``upwind2`` / ``upwind3``).
     """
-    if method == "weno5":
-        return (
-            {2: recon.upwind1_x, 4: recon.weno3_x, 6: recon.weno5_x},
-            {2: recon.upwind1_y, 4: recon.weno3_y, 6: recon.weno5_y},
-            (2, 4, 6),
-        )
-    if method == "weno3":
-        return (
-            {2: recon.upwind1_x, 4: recon.weno3_x},
-            {2: recon.upwind1_y, 4: recon.weno3_y},
-            (2, 4),
-        )
-    if method in _TVD_LIMITERS:
-        return (
-            {
-                2: recon.upwind1_x,
-                4: lambda q, u, _lim=method: recon.tvd_x(q, u, limiter=_lim),
-            },
-            {
-                2: recon.upwind1_y,
-                4: lambda q, v, _lim=method: recon.tvd_y(q, v, limiter=_lim),
-            },
-            (2, 4),
-        )
-    raise ValueError(f"Method {method!r} does not support mask-based stencil dispatch")
+    rfx = _tier_funcs(recon, method, "x")
+    rfy = _tier_funcs(recon, method, "y")
+    return rfx, rfy, tuple(sorted(rfx))
 
 
 class Advection1D(eqx.Module):
@@ -236,15 +226,15 @@ class Advection1D(eqx.Module):
     grid : CartesianGrid1D
         The underlying 1-D grid.
     mask : Mask1D or None, optional
-        Optional land/ocean mask.  When provided and ``__call__`` is
-        invoked with a mask-dispatchable method (WENO3/5, any TVD
-        limiter), ``upwind_flux`` is used with the pre-built adaptive
-        stencil hierarchy, falling back to lower-order stencils near
-        coastlines.  For non-dispatchable methods (``naive``,
-        ``upwind1/2/3``, ``weno7``, ``weno9``) the unmasked code path
-        runs and the final tendency is post-multiplied by ``mask.h``
-        so dry T-cells stay exactly zero.  ``None`` (default) matches
-        the pre-existing unmasked behaviour bit for bit.
+        Optional land/ocean mask; every method is then land-safe.  Dry
+        inputs are zeroed with ``jnp.where`` (so ``NaN`` on land cannot
+        leak), the upwind-biased methods go through ``upwind_flux`` with
+        the pre-built adaptive stencil hierarchy (falling back to
+        narrower stencils near coastlines, so no chosen stencil reads a
+        dry cell), the face fluxes on dry faces (``mask.u`` false) are
+        zeroed before the divergence (no flux through the coast), and
+        dry T-cells are exactly zero.  ``None`` (default) matches the
+        unmasked behaviour bit for bit.
     """
 
     grid: CartesianGrid1D
@@ -286,9 +276,9 @@ class Advection1D(eqx.Module):
             Velocity at U-points.
         method : str
             Reconstruction method: ``'naive'``, ``'upwind1'``, ``'upwind2'``,
-            ``'upwind3'``, ``'weno3'``, ``'weno5'``, ``'weno7'``, ``'weno9'``,
-            or a flux-limiter TVD scheme: ``'minmod'``, ``'van_leer'``,
-            ``'superbee'``, ``'mc'``.
+            ``'upwind3'``, ``'weno3'``, ``'weno5'``, ``'wenoz5'``,
+            ``'weno7'``, ``'weno9'``, or a flux-limiter TVD scheme:
+            ``'minmod'``, ``'van_leer'``, ``'superbee'``, ``'mc'``.
         wall : {"closed", "open"}, default "closed"
             Lateral-boundary treatment.  ``"closed"`` (default, unchanged)
             writes the tendency only on the strict interior ``[2:-2]`` and
@@ -308,6 +298,11 @@ class Advection1D(eqx.Module):
             Advective tendency at T-points.
         """
         _validate_wall(wall, self.mask)
+        if self.mask is not None:
+            # Zero the dry inputs before any stencil reads them, so land
+            # values (even NaN) reach neither the output nor its gradient.
+            h = jnp.where(self.mask.h, h, 0.0)  # [Nx]
+            u = jnp.where(self.mask.u, u, 0.0)  # [Nx]
         # ── masked path: route through upwind_flux with adaptive stencils ─
         if self._mask_hierarchy_x is not None and method in _MASK_DISPATCHABLE:
             rfx, sizes = _rec_funcs_for_method_1d(self.recon, method)
@@ -326,6 +321,8 @@ class Advection1D(eqx.Module):
             fe = self.recon.weno3_x(h, u)
         elif method == "weno5":
             fe = self.recon.weno5_x(h, u)
+        elif method == "wenoz5":
+            fe = self.recon.wenoz5_x(h, u)
         elif method == "weno7":
             fe = self.recon.weno7_x(h, u)
         elif method == "weno9":
@@ -334,6 +331,10 @@ class Advection1D(eqx.Module):
             fe = self.recon.tvd_x(h, u, limiter=method)
         else:
             raise ValueError(f"Unknown method: {method!r}")
+        if self.mask is not None:
+            # No flux through a dry face: fe[i+1/2] = 0 unless both h[i]
+            # and h[i+1] are wet (mask.u), as in Diffusion2D.
+            fe = jnp.where(self.mask.u, fe, 0.0)  # [Nx]
 
         out = jnp.zeros_like(h)
         # dh[i] = -(fe[i+1/2] - fe[i-1/2]) / dx
@@ -351,7 +352,7 @@ class Advection1D(eqx.Module):
             # scheme, avoiding the ghost-ring entries fe[0] and fe[-1].
             out = out.at[2:-2].set(-(fe[2:-2] - fe[1:-3]) / self.grid.dx)
         if self.mask is not None:
-            out = out * self.mask.h
+            out = jnp.where(self.mask.h, out, 0.0)
         return out
 
 
@@ -363,17 +364,19 @@ class Advection2D(eqx.Module):
     grid : CartesianGrid2D
         The underlying 2-D grid.
     mask : Mask2D or None, optional
-        Optional land/ocean mask.  When provided, the ``(2, 4, 6)``
-        adaptive stencil hierarchies for both directions are
-        pre-built once in ``__init__`` and reused on every call —
-        this is the main reason the API moved from a per-call
-        keyword to a class field.  For mask-dispatchable methods
-        (WENO3/5, WENOz5, any TVD limiter), ``upwind_flux`` is used
-        with the stored hierarchy narrowed to the method's stencil
-        sizes.  For non-dispatchable methods the unmasked code path
-        runs and the final tendency is post-multiplied by ``mask.h``.
-        ``None`` (default) matches the pre-existing unmasked
-        behaviour bit for bit.
+        Optional land/ocean mask; every method is then land-safe.  The
+        ``(2, 4, 6, 8, 10)`` adaptive stencil hierarchies for both
+        directions are pre-built once in ``__init__`` and reused on
+        every call — this is the main reason the API moved from a
+        per-call keyword to a class field.  Dry inputs are zeroed with
+        ``jnp.where`` (so ``NaN`` on land cannot leak); the
+        upwind-biased methods (everything but ``naive``) go through
+        ``upwind_flux`` with the stored hierarchy narrowed to the
+        method's stencil sizes, so no chosen stencil reads a dry cell;
+        the face fluxes on dry faces (``mask.u`` / ``mask.v`` false) are
+        zeroed before the divergence, as in :class:`Diffusion2D`, so no
+        mass crosses the coast; and dry T-cells are exactly zero.
+        ``None`` (default) matches the unmasked behaviour bit for bit.
     """
 
     grid: CartesianGrid2D
@@ -446,6 +449,12 @@ class Advection2D(eqx.Module):
             Advective tendency at T-points.
         """
         _validate_wall(wall, self.mask)
+        if self.mask is not None:
+            # Zero the dry inputs before any stencil reads them, so land
+            # values (even NaN) reach neither the output nor its gradient.
+            h = jnp.where(self.mask.h, h, 0.0)  # [Ny, Nx]
+            u = jnp.where(self.mask.u, u, 0.0)  # [Ny, Nx]
+            v = jnp.where(self.mask.v, v, 0.0)  # [Ny, Nx]
         # ── masked path: route through upwind_flux with pre-built hier. ──
         mh_x = self._mask_hierarchy_x
         mh_y = self._mask_hierarchy_y
@@ -488,6 +497,12 @@ class Advection2D(eqx.Module):
             fn = self.recon.tvd_y(h, v, limiter=method)
         else:
             raise ValueError(f"Unknown method: {method!r}")
+        if self.mask is not None:
+            # No flux through a dry face: fe[j, i+1/2] = 0 unless h[j, i] and
+            # h[j, i+1] are both wet (mask.u), fn[j+1/2, i] likewise with
+            # mask.v — the Diffusion2D face-flux masking.
+            fe = jnp.where(self.mask.u, fe, 0.0)  # [Ny, Nx]
+            fn = jnp.where(self.mask.v, fn, 0.0)  # [Ny, Nx]
 
         # dh[j, i] = -( (fe[j, i+1/2] - fe[j, i-1/2])/dx
         #             + (fn[j+1/2, i] - fn[j-1/2, i])/dy )
@@ -521,7 +536,7 @@ class Advection2D(eqx.Module):
                 ghost=2,
             )
         if self.mask is not None:
-            out = out * self.mask.h
+            out = jnp.where(self.mask.h, out, 0.0)
         return out
 
 
@@ -533,14 +548,15 @@ class Advection3D(eqx.Module):
     grid : CartesianGrid3D
         The underlying 3-D grid.
     mask : Mask3D or None, optional
-        Optional 3-D land/ocean mask.  Pre-builds native 3-D adaptive
-        stencil hierarchies ``(2, 4, 6)`` in both horizontal directions
-        in ``__init__``.  For mask-dispatchable methods (WENO3/5, any
-        TVD limiter), ``upwind_flux`` is used with the stored 3-D
-        hierarchies narrowed to the method's stencil sizes — the z
-        axis is treated as a batch dimension throughout.  For
-        non-dispatchable methods the unmasked code path runs and the
-        final tendency is post-multiplied by ``mask.h``.
+        Optional 3-D land/ocean mask; every method is then land-safe.
+        Pre-builds native 3-D adaptive stencil hierarchies
+        ``(2, 4, 6, 8, 10)`` in both horizontal directions in
+        ``__init__``.  As in :class:`Advection2D`, dry inputs are zeroed
+        with ``jnp.where``, the upwind-biased methods go through
+        ``upwind_flux`` with the stored 3-D hierarchies narrowed to the
+        method's stencil sizes — the z axis is treated as a batch
+        dimension throughout — and the face fluxes on dry faces
+        (``mask.u`` / ``mask.v`` false) are zeroed before the divergence.
 
         Pivoted from ``Mask2D`` to ``Mask3D`` per issue #209 Q4 for
         type-uniformity with the rest of the 3-D operator suite.  A
@@ -594,8 +610,10 @@ class Advection3D(eqx.Module):
             y-velocity at V-points.
         method : str
             Reconstruction method: ``'naive'``, ``'upwind1'``, ``'weno3'``,
-            ``'weno5'``, ``'weno7'``, ``'weno9'``, or a flux-limiter TVD
-            scheme: ``'minmod'``, ``'van_leer'``, ``'superbee'``, ``'mc'``.
+            ``'weno5'``, ``'wenoz5'``, ``'weno7'``, ``'weno9'``, or a
+            flux-limiter TVD scheme: ``'minmod'``, ``'van_leer'``,
+            ``'superbee'``, ``'mc'``.  (``upwind2`` / ``upwind3`` are 1-D /
+            2-D only: :class:`Reconstruction3D` has no such stencils.)
         wall : {"closed", "open"}, default "closed"
             Lateral-boundary treatment for the horizontal plane.
             ``"closed"`` (default, unchanged) writes the horizontal tendency
@@ -617,6 +635,12 @@ class Advection3D(eqx.Module):
             Advective tendency at T-points.
         """
         _validate_wall(wall, self.mask)
+        if self.mask is not None:
+            # Zero the dry inputs before any stencil reads them, so land
+            # values (even NaN) reach neither the output nor its gradient.
+            h = jnp.where(self.mask.h, h, 0.0)  # [Nz, Ny, Nx]
+            u = jnp.where(self.mask.u, u, 0.0)  # [Nz, Ny, Nx]
+            v = jnp.where(self.mask.v, v, 0.0)  # [Nz, Ny, Nx]
         # ── masked path: route through upwind_flux with pre-built 3-D hier. ──
         mh_x = self._mask_hierarchy_x
         mh_y = self._mask_hierarchy_y
@@ -640,6 +664,9 @@ class Advection3D(eqx.Module):
         elif method == "weno5":
             fe = self.recon.weno5_x(h, u)
             fn = self.recon.weno5_y(h, v)
+        elif method == "wenoz5":
+            fe = self.recon.wenoz5_x(h, u)
+            fn = self.recon.wenoz5_y(h, v)
         elif method == "weno7":
             fe = self.recon.weno7_x(h, u)
             fn = self.recon.weno7_y(h, v)
@@ -651,6 +678,10 @@ class Advection3D(eqx.Module):
             fn = self.recon.tvd_y(h, v, limiter=method)
         else:
             raise ValueError(f"Unknown method: {method!r}")
+        if self.mask is not None:
+            # No flux through a dry face (mask.u / mask.v false).
+            fe = jnp.where(self.mask.u, fe, 0.0)  # [Nz, Ny, Nx]
+            fn = jnp.where(self.mask.v, fn, 0.0)  # [Nz, Ny, Nx]
 
         out = jnp.zeros_like(h)
         # dh[k, j, i] = -( (fe[k,j,i+1/2] - fe[k,j,i-1/2])/dx
@@ -691,5 +722,5 @@ class Advection3D(eqx.Module):
                 )
             )
         if self.mask is not None:
-            out = out * self.mask.h
+            out = jnp.where(self.mask.h, out, 0.0)
         return out
