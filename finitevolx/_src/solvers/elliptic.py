@@ -516,8 +516,22 @@ _BCLike = str | BoundaryConditionSet
 
 
 def _is_zero(value: object) -> bool:
-    """True only for a concrete real zero; arrays and tracers count as non-zero."""
-    return isinstance(value, numbers.Real) and value == 0
+    """True only for a concrete real zero; tracers count as non-zero.
+
+    Accepts Python / numpy numbers and concrete (non-traced) numpy or JAX
+    arrays whose entries are all zero, e.g. ``jnp.array(0.0)``.  A tracer
+    (a value under ``jit`` / ``vmap``) cannot be inspected, so it is treated
+    as non-zero.
+    """
+    if isinstance(value, numbers.Real):
+        return bool(value == 0)
+    if not isinstance(value, (np.ndarray, np.generic, jax.Array)):
+        return False
+    try:
+        arr = np.asarray(value)  # raises for a tracer
+    except jax.errors.TracerArrayConversionError:
+        return False
+    return arr.dtype.kind in "iuf" and not arr.any()
 
 
 def _resolve_bc(
@@ -589,9 +603,7 @@ def _resolve_bc(
                 "Non-zero Dirichlet1D faces are not supported for the T-point "
                 "pressure solve: the value belongs on the cell face, but known "
                 "values can only be pinned at cell centres (the ghost cells, "
-                "half a cell outside the face).  Pass known_values with "
-                "method='cg' and a mask if values at the ghost-cell centres "
-                "are what you want."
+                "half a cell outside the face)."
             )
         mask_arr = _resolve_mask_arr(mask, dtype, staggering)
         wet = _x_basin(shape[-2:]) if mask_arr is None else mask_arr > 0.5

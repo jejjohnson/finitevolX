@@ -21,18 +21,6 @@
 # shows how the same algorithm is packaged in finitevolX.  Every claim made
 # along the way is checked numerically in the cell that follows it.
 #
-# !!! warning "The convention changed (#300, #303)"
-#     This tutorial derives the *inner-ring* convention (known values on the
-#     wet cells next to land), which finitevolX used before.  The library now
-#     puts the known values on the **coast ring** — the dry cells next to
-#     water, where `masked_laplacian` and `method="cg"` put their wall (for ψ,
-#     the C-grid wall nodes) — and solves for every wet cell: see
-#     `fvx.coast_ring` and the
-#     [usage guide](../elliptic_solvers_usage.md#known-boundary-values-inhomogeneous-dirichlet).
-#     The algebra of Parts 1-3 is unchanged with $K$ = coast ring; Part 4 and
-#     the API cells of Parts 5-7 describe the old convention and are being
-#     rewritten.
-#
 # **The problem.**  Given a right-hand side $f$ and prescribed boundary data
 # $g$, find $\psi$ with
 #
@@ -56,7 +44,7 @@
 # | 1. Continuous theory | Why can a non-zero boundary be traded for a modified right-hand side? |
 # | 2. Discrete setting | Which grid cells are unknowns, which are data, and what is the matrix? |
 # | 3. From scratch | The whole algorithm in ~30 lines of NumPy, checked against a dense solve. |
-# | 4. Why the *inner* ring | The one convention that makes the stencil and the mask agree. |
+# | 4. Why the *coast* ring | The one convention that puts the data on the wall every solver uses. |
 # | 5. Solvers | CG, spectral, capacitance, multigrid — what each needs. |
 # | 6. The finitevolX API | `known_values`, `known_mask`, `SolveDomain`, `KnownValueLifting`, `bc=`. |
 # | 7. Verification | Second-order convergence on a manufactured solution. |
@@ -134,9 +122,8 @@ IMG_DIR.mkdir(parents=True, exist_ok=True)
 #
 # ### 2.1 Grid and stencil
 #
-# Fields live at cell centres of an $N_y \times N_x$ array, indexed
-# `psi[j, i]` (row $j$ is $y$, column $i$ is $x$).  The discrete operator is
-# the 5-point stencil
+# Fields are `[Ny, Nx]` arrays indexed `psi[j, i]` (row $j$ is $y$, column
+# $i$ is $x$).  The discrete operator is the 5-point stencil
 #
 # ```
 # (A psi)[j, i] = (psi[j, i+1] - 2 psi[j, i] + psi[j, i-1]) / dx^2
@@ -146,7 +133,11 @@ IMG_DIR.mkdir(parents=True, exist_ok=True)
 #
 # which is second-order accurate for $\nabla^2 - \lambda$.  In finitevolX it
 # is `fvx.masked_laplacian(psi, mask, dx, dy, lambda_)`, which first zeroes
-# `psi` outside `mask` and then applies the stencil.
+# `psi` outside `mask` and then applies the stencil: a dry neighbour reads
+# as $\psi = 0$.  **That dry neighbour is the wall** — the homogeneous
+# Dirichlet condition every finitevolX solver imposes.  For ψ on the C-grid
+# (X points, `Mask2D.xy_corner_strict`) those dry neighbours are exactly
+# the wall nodes of the basin.
 #
 # ### 2.2 Index sets
 #
@@ -157,20 +148,21 @@ IMG_DIR.mkdir(parents=True, exist_ok=True)
 # |--------|------|------------|------------|
 # | $W$ | wet cells | `mask == 1` | `domain.wet_mask` |
 # | $D$ | dry cells | `mask == 0` | `~domain.wet_mask` |
-# | $R$ | inner boundary ring | $\{c \in W : \mathcal{N}(c) \cap D \ne \emptyset\}$ | `fvx.boundary_ring(mask)` |
+# | $C$ | coast ring | $\{c \in D : \mathcal{N}(c) \cap W \ne \emptyset\}$ | `fvx.coast_ring(mask)` |
 # | $O$ | observed cells | user-supplied, restricted to $W$ | `known_mask & wet` |
-# | $K$ | known cells | $R \cup O$ | `domain.all_known` |
-# | $E$ | effective (solve) cells | $W \setminus K$ | `domain.effective_mask` |
+# | $K$ | known cells | $C \cup O$ | `domain.all_known` |
+# | $E$ | effective (solve) cells | $W \setminus O$ | `domain.effective_mask` |
 #
-# The data $g$ is prescribed on $K$; the unknowns are $\psi$ on $E$.  The
-# property that makes everything work:
+# The data $g$ is prescribed on $K$; the unknowns are $\psi$ on $E$ — every
+# wet cell that is not an observation.  The property that makes everything
+# work:
 #
-# > **Every stencil neighbour of an effective cell is wet:**
-# > $c \in E \Rightarrow \mathcal{N}(c) \subset W = E \cup K$.
+# > **Every stencil neighbour of an effective cell is an unknown or data:**
+# > $c \in E \Rightarrow \mathcal{N}(c) \subset E \cup K$.
 #
-# (If a neighbour were dry, $c$ would be in the ring $R$, hence in $K$,
-# not $E$.)  So the equations at $E$ only ever touch unknowns in $E$ and data
-# in $K$ — never a dry cell whose value would be meaningless.
+# (A wet neighbour is in $E$ or $O$; a dry neighbour of a wet cell is, by
+# definition, on the coast $C$.)  So the equations at $E$ only ever touch
+# unknowns in $E$ and data in $K$ — never a dry cell that carries nothing.
 #
 # Here is a small basin with an island and two observation points.
 
@@ -186,29 +178,29 @@ obs_small[4, 4] = obs_small[10, 13] = True  # two "tide gauges"
 
 domain_small = fvx.SolveDomain(jnp.array(mask_small), known_mask=jnp.array(obs_small))
 W = np.asarray(domain_small.wet_mask)
-R = np.asarray(domain_small.boundary_ring)
+C = np.asarray(domain_small.coast_ring)
 K = np.asarray(domain_small.all_known)
 E = np.asarray(domain_small.effective_mask)
-O = K & ~R
+O = K & ~C
 
-# Partition check: D, R, O, E are disjoint and cover the grid.
-labels = np.select([~W, R, O, E], [0, 1, 2, 3])
-assert np.all((~W).astype(int) + R + O + E == 1)
-print(f"|W| = {W.sum()},  |R| = {R.sum()},  |O| = {O.sum()},  |E| = {E.sum()}")
+# Partition check: D \ C, C, O, E are disjoint and cover the grid.
+labels = np.select([~W & ~C, C, O, E], [0, 1, 2, 3])
+assert np.all((~W & ~C).astype(int) + C + O + E == 1)
+print(f"|W| = {W.sum()},  |C| = {C.sum()},  |O| = {O.sum()},  |E| = {E.sum()}")
 
-# The key property: every neighbour of an E cell is wet.
-# Pad with "dry" so that padded_dry[j+1, i+1] = dry[j, i]; then the four
+# The key property: no neighbour of an E cell is outside E | K.
+# Pad with "outside" so that padded_out[j+1, i+1] = outside[j, i]; the four
 # shifted slices below have the interior's shape and read one neighbour each:
-#   nbr_dry[j, i] = dry[j+1, i] | dry[j-1, i] | dry[j, i+1] | dry[j, i-1]
-padded_dry = np.pad(~W, 1, constant_values=True)
-nbr_dry = (
-    padded_dry[2:, 1:-1]  # dry[j+1, i]  (north)
-    | padded_dry[:-2, 1:-1]  # dry[j-1, i]  (south)
-    | padded_dry[1:-1, 2:]  # dry[j, i+1]  (east)
-    | padded_dry[1:-1, :-2]  # dry[j, i-1]  (west)
+#   nbr_out[j, i] = out[j+1, i] | out[j-1, i] | out[j, i+1] | out[j, i-1]
+padded_out = np.pad(~(E | K), 1, constant_values=True)
+nbr_out = (
+    padded_out[2:, 1:-1]  # out[j+1, i]  (north)
+    | padded_out[:-2, 1:-1]  # out[j-1, i]  (south)
+    | padded_out[1:-1, 2:]  # out[j, i+1]  (east)
+    | padded_out[1:-1, :-2]  # out[j, i-1]  (west)
 )
-assert not np.any(nbr_dry & E)
-print("Every stencil neighbour of an effective cell is wet: OK")
+assert not np.any(nbr_out & E)
+print("Every stencil neighbour of an effective cell is in E or K: OK")
 
 # %%
 fig, ax = plt.subplots(figsize=(7, 5.5))
@@ -216,12 +208,12 @@ cmap = ListedColormap(["#6b6b6b", "#d95f02", "#7570b3", "#a6cee3"])
 ax.imshow(labels, origin="lower", cmap=cmap, vmin=-0.5, vmax=3.5)
 for j in range(Ny):
     for i in range(Nx):
-        ax.text(i, j, "DROE"[labels[j, i]], ha="center", va="center", fontsize=7)
+        ax.text(i, j, "DCOE"[labels[j, i]], ha="center", va="center", fontsize=7)
 ax.set_xticks(range(Nx))
 ax.set_yticks(range(Ny))
 ax.set_xlabel("i (x)")
 ax.set_ylabel("j (y)")
-ax.set_title("Index sets: D dry, R inner ring, O observed, E effective")
+ax.set_title("Index sets: D dry, C coast ring, O observed, E effective")
 plt.tight_layout()
 fig.savefig(IMG_DIR / "index_sets.png", dpi=150, bbox_inches="tight")
 plt.show()
@@ -229,15 +221,17 @@ plt.show()
 # %% [markdown]
 # ![Index sets on a basin with an island](../../images/inhomogeneous_bcs_tutorial/index_sets.png)
 #
-# The ring $R$ wraps **both** the outer walls and the island coast; the
-# observations $O$ sit inside the wet domain.  Only the light-blue cells $E$
-# are solved for.
+# The coast ring $C$ is dry: it wraps **both** the outer walls and the
+# island, one cell outside the water (the array corners and the island's
+# corners are not on it: no wet cell is 4-adjacent to them).  The
+# observations $O$ sit inside the wet domain.  The light-blue cells $E$ —
+# all the other wet cells — are solved for.
 
 # %% [markdown]
 # ### 2.3 The linear system and its block structure
 #
-# Order the wet cells as $[E, K]$ and write the stencil restricted to wet
-# cells as a matrix $A$.  The equations at the effective cells read
+# Order the cells of $E \cup K$ as $[E, K]$ and write the stencil restricted
+# to them as a matrix $A$.  The equations at the effective cells read
 #
 # $$
 # \begin{pmatrix} A_{EE} & A_{EK} \end{pmatrix}
@@ -255,17 +249,21 @@ plt.show()
 # This is block elimination of known unknowns — nothing is approximated.
 # The correction $A_{EK} g_K$ is non-zero only at effective cells that
 # touch a known cell.  For example, at an effective cell whose **south**
-# neighbour is on the ring:
+# neighbour is on the coast:
 #
 # ```
 #            psi[j+1, i]                    (E, unknown)
 #                 |
 # psi[j, i-1] -- psi[j, i] -- psi[j, i+1]   (E, unknowns)
 #                 |
-#            g[j-1, i]                      (K, data -> moved to RHS)
+#            g[j-1, i]                      (C, dry: data -> moved to RHS)
 #
 #   rhs_corrected[j, i] = f[j, i] - g[j-1, i] / dy^2
 # ```
+#
+# With $g = 0$ the correction vanishes and $A_{EE}$ is exactly
+# `masked_laplacian` on $E$: **the homogeneous solve is the $g = 0$ case**,
+# with no change of domain.
 #
 # Two structural facts matter for choosing a solver:
 #
@@ -284,18 +282,18 @@ dx_s, dy_s, lam_s = 0.3, 0.25, 2.0
 
 
 def dense_operator(mask, dx, dy, lam):
-    """Dense 5-point (A - lambda) restricted to wet cells, with an index map.
+    """Dense 5-point (A - lambda) restricted to the mask's cells, with an index map.
 
     A[k, k]    = -2/dx^2 - 2/dy^2 - lambda
-    A[k, nbr]  = 1/dx^2 (east/west),  1/dy^2 (north/south)  for WET neighbours
+    A[k, nbr]  = 1/dx^2 (east/west),  1/dy^2 (north/south)  for neighbours in mask
     """
-    wet = np.argwhere(mask > 0.5)
-    index = {tuple(c): k for k, c in enumerate(wet)}
-    A = np.zeros((len(wet), len(wet)))
-    for k, (j, i) in enumerate(wet):
+    cells = np.argwhere(mask > 0.5)
+    index = {tuple(c): k for k, c in enumerate(cells)}
+    A = np.zeros((len(cells), len(cells)))
+    for k, (j, i) in enumerate(cells):
         # A[(j,i), (j,i)] = -2/dx^2 - 2/dy^2 - lambda
         A[k, k] = -2.0 / dx**2 - 2.0 / dy**2 - lam
-        # Off-diagonal entries, one per WET neighbour:
+        # Off-diagonal entries, one per neighbour in the mask:
         #   A[(j,i), (j,i+1)] = 1/dx^2   (east)
         #   A[(j,i), (j,i-1)] = 1/dx^2   (west)
         #   A[(j,i), (j+1,i)] = 1/dy^2   (north)
@@ -304,11 +302,12 @@ def dense_operator(mask, dx, dy, lam):
             nbr = (j + dj, i + di)
             if nbr in index:
                 A[k, index[nbr]] += 1.0 / h**2
-    return A, wet
+    return A, cells
 
 
-A, wet_cells = dense_operator(mask_small, dx_s, dy_s, lam_s)
-is_known = np.array([K[j, i] for j, i in wet_cells])
+# A over E | K (the coast cells are dry, but they carry the data)
+A, cells = dense_operator((E | K).astype(float), dx_s, dy_s, lam_s)
+is_known = np.array([K[j, i] for j, i in cells])
 order = np.concatenate([np.where(~is_known)[0], np.where(is_known)[0]])
 A_ord = A[np.ix_(order, order)]
 nE = int((~is_known).sum())
@@ -317,6 +316,16 @@ A_EE = A[np.ix_(~is_known, ~is_known)]
 print(f"A symmetric:            {np.allclose(A, A.T)}")
 print(f"A_EE eigenvalues < 0:   {np.all(np.linalg.eigvalsh(A_EE) < 0)}")
 print(f"cond(A_EE) = {np.linalg.cond(A_EE):.1f}")
+
+# A_EE is masked_laplacian on E (dry neighbours read as zero).
+eff_j = jnp.asarray(E, dtype=float)
+cols = []
+for k in range(nE):
+    e_k = np.zeros((Ny, Nx))
+    e_k[tuple(cells[~is_known][k])] = 1.0
+    out = fvx.masked_laplacian(jnp.asarray(e_k), eff_j, dx_s, dy_s, lambda_=lam_s)
+    cols.append(np.asarray(out)[tuple(cells[~is_known].T)])
+print(f"A_EE == masked_laplacian on E: {np.allclose(np.stack(cols, axis=1), A_EE)}")
 
 fig, ax = plt.subplots(figsize=(6, 6))
 ax.spy(A_ord, markersize=1.5)
@@ -331,7 +340,7 @@ for label, (row, col) in {
 }.items():
     ax.text(col, row, label, color="C3", fontsize=14, ha="center", va="center",
             bbox={"facecolor": "white", "alpha": 0.8, "edgecolor": "none"})
-ax.set_title("Sparsity of A, wet cells ordered [E | K]", pad=12)
+ax.set_title("Sparsity of A on E ∪ K, ordered [E | K]", pad=12)
 plt.tight_layout()
 fig.savefig(IMG_DIR / "block_structure.png", dpi=150, bbox_inches="tight")
 plt.show()
@@ -358,28 +367,27 @@ plt.show()
 # ```
 # OFFLINE — once per mask
 #   W[j,i] <- mask[j,i] > 0.5                                   # wet cells
-#   D[j,i] <- not W[j,i]                                        # dry cells
-#   R[j,i] <- W[j,i] and (D[j+1,i] or D[j-1,i]
-#                          or D[j,i+1] or D[j,i-1])             # inner ring
-#   K[j,i] <- R[j,i] or (known_mask[j,i] and W[j,i])            # known cells
-#   E[j,i] <- W[j,i] and not K[j,i]                             # unknowns
+#   C[j,i] <- not W[j,i] and (W[j+1,i] or W[j-1,i]
+#                              or W[j,i+1] or W[j,i-1])         # coast ring (dry)
+#   O[j,i] <- known_mask[j,i] and W[j,i]                        # observations
+#   K[j,i] <- C[j,i] or O[j,i]                                  # known cells
+#   E[j,i] <- W[j,i] and not O[j,i]                             # unknowns
 #   S      <- solver for  A_EE x = b                            # CG / spectral / ...
 #
 # ONLINE — every solve, given f and g
 #   lift[j,i] <- g[j,i] if K[j,i] else 0                        # the crude lift
-#   l[j,i]    <- lift[j,i] * W[j,i]                             # WET mask
-#   (A_W l)[j,i] = (l[j,i+1] - 2 l[j,i] + l[j,i-1]) / dx^2
-#                + (l[j+1,i] - 2 l[j,i] + l[j-1,i]) / dy^2 - lambda l[j,i]
-#   b[j,i]    <- (f[j,i] - (A_W l)[j,i]) if E[j,i] else 0      # corrected RHS
+#   (A lift)[j,i] = (lift[j,i+1] - 2 lift[j,i] + lift[j,i-1]) / dx^2
+#                 + (lift[j+1,i] - 2 lift[j,i] + lift[j-1,i]) / dy^2
+#                 - lambda lift[j,i]                            # NO mask
+#   b[j,i]    <- (f[j,i] - (A lift)[j,i]) if E[j,i] else 0     # corrected RHS
 #   x         <- S(b)                                           # x[j,i] = 0 off E
 #   psi[j,i]  <- lift[j,i] + x[j,i]
 # ```
 #
-# The one subtle line is `A_W lift`: the stencil must be applied with the
-# **wet** mask (so it reads the lift on $K$), whereas the solver works on
-# $E$.  Applying the stencil to the zero-off-$K$ lift and keeping only
-# rows in $E$ produces exactly $A_{EK}\, g_K$, because the lift vanishes on
-# $E$.  Part 4 shows what happens if you get the mask wrong.
+# The one subtle line is `A lift`: the stencil must be applied **without a
+# mask**, so that it reads the lift on the dry coast cells.  Keeping only
+# the rows in $E$ produces exactly $A_{EK}\, g_K$, because the lift
+# vanishes on $E$.  Part 4 shows what happens if you get the mask wrong.
 #
 # ### 3.2 Implementation in plain NumPy
 #
@@ -407,16 +415,18 @@ def solve_known_values_numpy(f, g, mask, known_mask, dx, dy, lam):
     """Inhomogeneous Dirichlet solve by lifting — the pseudocode, verbatim."""
     # OFFLINE
     wet = mask > 0.5
-    # pd[j+1, i+1] = dry[j, i]  (dry padding outside the array)
-    pd = np.pad(~wet, 1, constant_values=True)
-    # ring[j, i] = wet[j, i] & (dry[j+1, i] | dry[j-1, i] | dry[j, i+1] | dry[j, i-1])
-    ring = wet & (pd[2:, 1:-1] | pd[:-2, 1:-1] | pd[1:-1, 2:] | pd[1:-1, :-2])
-    known = ring | (known_mask & wet)
-    eff = wet & ~known
+    # pw[j+1, i+1] = wet[j, i]  (dry padding outside the array)
+    pw = np.pad(wet, 1, constant_values=False)
+    # coast[j, i] = dry[j, i] & (wet[j+1, i] | wet[j-1, i] | wet[j, i+1] | wet[j, i-1])
+    coast = ~wet & (pw[2:, 1:-1] | pw[:-2, 1:-1] | pw[1:-1, 2:] | pw[1:-1, :-2])
+    obs = known_mask & wet
+    known = coast | obs
+    eff = wet & ~obs
     A_EE, eff_cells = dense_operator(eff.astype(float), dx, dy, lam)
     # ONLINE
     lift = np.where(known, g, 0.0)
-    b = (f - stencil(lift, wet.astype(float), dx, dy, lam)) * eff
+    ones = np.ones_like(f)  # no mask: read the lift on the dry coast
+    b = (f - stencil(lift, ones, dx, dy, lam)) * eff
     x = np.zeros_like(f)
     x[tuple(eff_cells.T)] = np.linalg.solve(A_EE, b[tuple(eff_cells.T)])
     return lift + x
@@ -431,19 +441,19 @@ psi_scratch = solve_known_values_numpy(
 )
 
 # Reference 1: block elimination on the full dense matrix (Part 2.3).
-f_w = np.array([f_small[j, i] for j, i in wet_cells])
-g_w = np.array([g_small[j, i] for j, i in wet_cells])
+f_c = np.array([f_small[j, i] for j, i in cells])
+g_c = np.array([g_small[j, i] for j, i in cells])
 psi_E = np.linalg.solve(
     A[np.ix_(~is_known, ~is_known)],
-    f_w[~is_known] - A[np.ix_(~is_known, is_known)] @ g_w[is_known],
+    f_c[~is_known] - A[np.ix_(~is_known, is_known)] @ g_c[is_known],
 )
 psi_block = np.zeros((Ny, Nx))
-psi_block[tuple(wet_cells[is_known].T)] = g_w[is_known]
-psi_block[tuple(wet_cells[~is_known].T)] = psi_E
+psi_block[tuple(cells[is_known].T)] = g_c[is_known]
+psi_block[tuple(cells[~is_known].T)] = psi_E
 print(f"scratch lifting vs block elimination: {np.max(np.abs(psi_scratch - psi_block)):.2e}")
 
-# The defining properties of the answer:
-res = f_small - stencil(psi_scratch, mask_small, dx_s, dy_s, lam_s)
+# The defining properties of the answer (the unmasked stencil reads psi = g on C):
+res = f_small - stencil(psi_scratch, np.ones((Ny, Nx)), dx_s, dy_s, lam_s)
 print(f"max |psi - g| on K:         {np.max(np.abs((psi_scratch - g_small)[K])):.2e}")
 print(f"max |PDE residual| on E:    {np.max(np.abs(res[E])):.2e}")
 print(f"max |PDE residual| on K:    {np.max(np.abs(res[K])):.2e}   (not zero, by design)")
@@ -460,52 +470,77 @@ print(f"max |PDE residual| on K:    {np.max(np.abs(res[K])):.2e}   (not zero, by
 # %% [markdown]
 # ---
 #
-# ## Part 4 — Why the *inner* ring?
+# ## Part 4 — Why the *coast* ring?
 #
-# A natural first attempt (and the one many codes use) places the boundary
-# values on the **dry** cells just outside the ocean — the "outer ring",
-# like ghost cells.  With a masked stencil this silently fails:
-# `masked_laplacian` multiplies its input by the mask *before* applying the
-# stencil, so values stored on dry cells are erased and the correction is
-# identically zero.  The solve then returns the **homogeneous** answer.
+# Every finitevolX solver puts its homogeneous wall in the same place: on
+# the dry cells next to water, which `masked_laplacian` reads as $\psi = 0$.
+# For ψ on the C-grid (`Mask2D.xy_corner_strict`) those are the wall nodes —
+# X rows / columns `0` and `N-2` of a rectangle, the nodes that sit on the
+# physical walls $x = 0, L$.  Putting the known values **there** means:
 #
-# The inner-ring convention avoids this by keeping the data on **wet**
-# cells, which is why two masks appear in the algorithm:
+# * the data sits on the physical boundary, and the scheme stays second
+#   order (Part 7);
+# * $g = 0$ is *exactly* the homogeneous solve — no change of domain;
+# * every wet cell remains an unknown.
+#
+# The alternative some codes use — data on the *wet* cells next to land
+# (the "inner ring", `fvx.boundary_ring`) — moves the wall one cell into the
+# water: with $g = 0$ it solves a basin one cell smaller, an $O(\Delta x)$
+# change of the boundary.
+#
+# Because the data now lives on **dry** cells, two masks appear in the
+# algorithm:
 #
 # | Step | Mask | Why |
 # |------|------|-----|
-# | correction `A_W lift` | wet $W$ | the stencil must *see* the lift on $K \subset W$ |
-# | solve `S(b)` | effective $E$ | known cells are data, not unknowns |
+# | correction `A lift` | none (all ones) | the stencil must *see* the lift on the dry coast $C$ |
+# | solve `S(b)` | effective $E$ | observed cells are data, not unknowns |
 #
-# Using $E$ for the correction would erase the lift (zero correction);
-# using $W$ for the solve would treat known cells as unknowns and overwrite
-# the data.  Both mistakes are demonstrated below.
+# Using the wet mask $W$ for the correction erases the lift (`masked_laplacian`
+# zeroes dry cells first, so the correction is identically zero); using $W$
+# for the solve treats the observations as unknowns and overwrites them.
+# All of this is checked below.
 
 # %%
 f_j, g_j, m_j = jnp.array(f_small), jnp.array(g_small), jnp.array(mask_small)
-# pm[j+1, i+1] = mask[j, i]  (zero padding)
-pm = jnp.pad(m_j, 1)
-# outer ring: dry cells with a wet neighbour,
-#   dry_ring[j, i] = dry[j, i] & (wet[j+1, i] | wet[j-1, i] | wet[j, i+1] | wet[j, i-1])
-dry_ring = np.asarray(
-    pm[2:, 1:-1]  # mask[j+1, i]
-    + pm[:-2, 1:-1]  # mask[j-1, i]
-    + pm[1:-1, 2:]  # mask[j, i+1]
-    + pm[1:-1, :-2]  # mask[j, i-1]
-    > 0
-) & ~W
-outer_lift = jnp.where(dry_ring, g_j, 0.0)
-print(f"outer-ring lift: max |correction| = "
-      f"{float(jnp.max(jnp.abs(fvx.masked_laplacian(outer_lift, m_j, dx_s, dy_s, lam_s)))):.1e}"
-      "   <- the data never reaches the RHS")
+obs_j = jnp.array(obs_small)
+psi_hom = fvx.streamfunction_from_vorticity(
+    f_j, dx_s, dy_s, lambda_=lam_s, method="cg", mask=m_j
+)
+psi_g0 = fvx.streamfunction_from_vorticity(
+    f_j, dx_s, dy_s, lambda_=lam_s, method="cg", mask=m_j,
+    known_values=jnp.zeros_like(g_j),
+)
+print(f"coast ring, g = 0 vs homogeneous solve: {float(jnp.max(jnp.abs(psi_g0 - psi_hom))):.1e}")
 
-eff_j = domain_small.effective_mask.astype(float)
-wrong_corr = fvx.masked_laplacian(jnp.where(K, g_j, 0.0), eff_j, dx_s, dy_s, lam_s)
-print(f"correction with E-mask:  max |correction| = {float(jnp.max(jnp.abs(wrong_corr))):.1e}"
-      "   <- lift erased again")
-right_corr = fvx.masked_laplacian(jnp.where(K, g_j, 0.0), m_j, dx_s, dy_s, lam_s) * eff_j
-print(f"correction with W-mask:  max |correction| = {float(jnp.max(jnp.abs(right_corr))):.1e}"
+# Inner-ring convention: the wet cells next to land become data, so with g = 0
+# the solve runs on W minus that ring -- a smaller basin.
+R = fvx.boundary_ring(m_j)
+psi_inner = fvx.streamfunction_from_vorticity(
+    f_j, dx_s, dy_s, lambda_=lam_s, method="cg", mask=m_j * ~R
+)
+print(f"inner ring, g = 0 vs homogeneous solve: {float(jnp.max(jnp.abs(psi_inner - psi_hom))):.1e}"
+      f"   (max |psi| = {float(jnp.max(jnp.abs(psi_hom))):.2f})")
+
+# The coast part of the lift, seen through the wet mask and without a mask.
+lift_c = jnp.where(C, g_j, 0.0)
+wrong_corr = fvx.masked_laplacian(lift_c, m_j, dx_s, dy_s, lam_s) * eff_j
+print(f"coast correction with W-mask: max |correction| = {float(jnp.max(jnp.abs(wrong_corr))):.1e}"
+      "   <- the lift on the dry coast is erased")
+right_corr = fvx.masked_laplacian(lift_c, jnp.ones_like(m_j), dx_s, dy_s, lam_s) * eff_j
+print(f"coast correction unmasked:    max |correction| = {float(jnp.max(jnp.abs(right_corr))):.1e}"
       "   <- correct")
+
+# Solving on W instead of E: the observed cells become unknowns again.
+lift_j = jnp.where(K, g_j, 0.0)
+b_W = (f_j - fvx.masked_laplacian(lift_j, jnp.ones_like(m_j), dx_s, dy_s, lam_s)) * m_j
+x_W, _ = fvx.solve_cg(
+    lambda v: fvx.masked_laplacian(v, m_j, dx_s, dy_s, lambda_=lam_s), b_W,
+    rtol=1e-12, atol=1e-12,
+)
+psi_W = lift_j + x_W * m_j
+print(f"solve on W: max |psi - g| on the observations = {float(jnp.max(jnp.abs((psi_W - g_j)[O]))):.1e}"
+      "   <- data overwritten")
 
 # %% [markdown]
 # ---
@@ -513,21 +548,22 @@ print(f"correction with W-mask:  max |correction| = {float(jnp.max(jnp.abs(right
 # ## Part 5 — Solvers for $A_{EE}\,x = b$
 #
 # The lifting is solver-agnostic: it only needs *some* way to apply
-# $A_{EE}^{-1}$.  What each solver needs to be told:
+# $A_{EE}^{-1}$, i.e. to solve the homogeneous problem on $E$ with $\psi = 0$
+# on everything around it.  What each solver needs to be told:
 #
 # | Solver | Works on | Build it with | Notes |
 # |--------|----------|---------------|-------|
 # | Conjugate gradient | any mask | operator `masked_laplacian(., E)` | $-A_{EE}$ is SPD; iterations $\sim\sqrt{\kappa}$ |
-# | CG + multigrid preconditioner | any mask | `build_multigrid_solver(E)` as preconditioner | near grid-independent iterations |
-# | Spectral (DST) | rectangle only | nothing | $O(N \log N)$, direct |
-# | Capacitance matrix | any mask, fixed | `build_capacitance_solver(W)` — **wet** mask | direct after an $O(N_b)$ setup |
+# | CG + multigrid preconditioner | any mask | `build_multigrid_solver(E)` as preconditioner | grid-independent iteration count |
+# | Spectral (DST) | ψ rectangle only | nothing | $O(N \log N)$, direct |
+# | Capacitance matrix | any mask, fixed | `build_capacitance_solver(W)` | direct after an $O(N_c)$ setup; no observations |
 #
-# **Spectral.**  If $W$ is the rectangle `[1:-1, 1:-1]`
-# ($1 \le j \le N_y-2$, $1 \le i \le N_x-2$), its ring is the frame of that
-# rectangle (rows/columns $1$ and $N-2$) and $E$ = `[2:-2, 2:-2]`
-# ($2 \le j \le N_y-3$, $2 \le i \le N_x-3$) is again a rectangle.
-# $A_{EE}$ is then the Dirichlet Laplacian on a rectangle, diagonalised by
-# the type-I discrete sine transform $S$:
+# **Spectral.**  For the rectangle's `Mask2D`, the ψ mask
+# `xy_corner_strict` is wet on `[1:-2, 1:-2]` ($1 \le j \le N_y-3$,
+# $1 \le i \le N_x-3$), its coast is X rows / columns $0$ and $N-2$, and
+# without observations $E = W$ is a rectangle.  $A_{EE}$ is then the
+# Dirichlet Laplacian on a rectangle, diagonalised by the type-I discrete
+# sine transform $S$:
 #
 # $$
 # A_{EE} = S^{-1} \Lambda S,
@@ -536,32 +572,31 @@ print(f"correction with W-mask:  max |correction| = {float(jnp.max(jnp.abs(right
 #                -\frac{4}{\Delta y^2}\sin^2\!\frac{\pi l}{2(n_y+1)} - \lambda ,
 # $$
 #
-# so $x = S^{-1}\Lambda^{-1} S\, b$ — exactly, in two FFT-like transforms.
+# with $n = N - 3$ unknowns per direction, so $x = S^{-1}\Lambda^{-1} S\, b$
+# — exactly, in two FFT-like transforms.
 #
-# **Capacitance.**  A capacitance solver built on a mask $M$ enforces
-# $\psi = 0$ on $M$'s own inner ring.  Built on $W$, its unknowns are
-# $W \setminus R = E$ — precisely the lifted system (when there are no
-# observations).  Built on $E$ it would zero $E$'s ring too, removing a
-# second layer of cells.  With observations there is no mask $M$ whose
-# "interior minus inner ring" equals $E$, so capacitance cannot take a
-# `known_mask`.
+# **Capacitance.**  A capacitance solver built on a mask $M$ solves for
+# every cell of $M$ with $\psi = 0$ on $M$'s coast ring — exactly the lifted
+# system when $M = W$ and there are no observations.  Observations would
+# punch holes in $E$ that the precomputed solver does not know about, so
+# capacitance cannot take a `known_mask`.
 #
-# **Multigrid.**  finitevolX's `MultigridSolver` discretises the operator
-# with face coefficients (the Dirichlet condition sits on cell faces), which
-# is not the same matrix as `masked_laplacian`.  It is an excellent
-# *preconditioner* for $A_{EE}$ but a standalone multigrid solve does not
-# reproduce the lifted problem.
+# **Multigrid.**  finitevolX's `MultigridSolver` with its default
+# `bc="dirichlet"` uses the same 5-point operator as `masked_laplacian`
+# (a dry neighbour reads as zero), so built on $E$ it solves the lifted
+# system both as a CG preconditioner and on its own, to the accuracy its
+# V-cycles reach.
 #
-# The cell below solves one problem four ways on a rectangular basin, where
-# all four apply.
+# The cell below solves one problem five ways on a rectangular basin,
+# where all of them apply.
 
 # %%
 Nb = 34
-dxb = dyb = 1.0 / (Nb - 3)
+dxb = dyb = 1.0 / (Nb - 2)  # 32 x 32 cells on the unit square
 lam_b = 4.0
-# mask[j, i] = 1 for 1 <= j, i <= Nb-2   (rectangular basin, dry ghost ring)
-mask_b = jnp.zeros((Nb, Nb)).at[1:-1, 1:-1].set(1.0)
-f_b = jnp.asarray(np.random.default_rng(1).standard_normal((Nb, Nb))) * mask_b
+# ocean at T points: 1 <= j, i <= Nb-2; Mask2D gives the psi mask [1:-2, 1:-2]
+mask_b = fvx.Mask2D.from_mask(np.pad(np.ones((Nb - 2, Nb - 2), dtype=bool), 1))
+f_b = jnp.asarray(np.random.default_rng(1).standard_normal((Nb, Nb)))
 g_b = jnp.asarray(np.random.default_rng(2).standard_normal((Nb, Nb)))
 dom_b = fvx.SolveDomain(mask_b)
 
@@ -571,22 +606,29 @@ psi_cg = fvx.streamfunction_from_vorticity(
 psi_spec = fvx.streamfunction_from_vorticity(
     f_b, dxb, dyb, bc="dst", lambda_=lam_b, known_values=g_b
 )
-cap = fvx.build_capacitance_solver(
-    np.asarray(dom_b.wet_mask), dxb, dyb, lambda_=lam_b, base_bc="dst"
-)
+cap = fvx.build_capacitance_solver(mask_b, dxb, dyb, lambda_=lam_b)
 psi_cap = fvx.streamfunction_from_vorticity(
     f_b, dxb, dyb, lambda_=lam_b, method="capacitance", mask=mask_b,
     capacitance_solver=cap, known_values=g_b,
 )
-mg = fvx.build_multigrid_solver(
-    np.asarray(dom_b.effective_mask, dtype=float), dxb, dyb, lambda_=lam_b
-)
+eff_b = np.asarray(dom_b.effective_mask, dtype=float)
+mg = fvx.build_multigrid_solver(eff_b, dxb, dyb, lambda_=lam_b, n_cycles=10)
 psi_mgcg = fvx.streamfunction_from_vorticity(
     f_b, dxb, dyb, lambda_=lam_b, method="cg", mask=mask_b, known_values=g_b,
     preconditioner=fvx.make_multigrid_preconditioner(mg),
 )
-for name, psi in [("spectral", psi_spec), ("capacitance", psi_cap), ("CG + MG", psi_mgcg)]:
+# Standalone multigrid: lift, solve on E, reconstruct
+lifter_b = fvx.KnownValueLifting(dom_b, dxb, dyb, lam_b)
+b_b, lift_b = lifter_b.preprocess(f_b, g_b)
+psi_mg = lifter_b.postprocess(mg(b_b) * eff_b, lift_b)
+for name, psi in [
+    ("spectral", psi_spec),
+    ("capacitance", psi_cap),
+    ("CG + MG", psi_mgcg),
+    ("MG (10 V)", psi_mg),
+]:
     print(f"{name:12s} vs CG: {float(jnp.max(jnp.abs(psi - psi_cg))):.1e}")
+print(f"max |psi| = {float(jnp.max(jnp.abs(psi_cg))):.2f}   (CG rtol = 1e-6)")
 
 # %% [markdown]
 # ---
@@ -595,17 +637,19 @@ for name, psi in [("spectral", psi_spec), ("capacitance", psi_cap), ("CG + MG", 
 #
 # ### 6.1 One call: `known_values`
 #
-# All three convenience wrappers — `streamfunction_from_vorticity`,
-# `pressure_from_divergence`, `pv_inversion` — accept `known_values`, a full
-# `(Ny, Nx)` field of which only the known cells are read.  The wrapper
-# builds $W, R, K, E$, the lift and the correction, calls the chosen
+# The ψ wrappers — `streamfunction_from_vorticity` and `pv_inversion` —
+# accept `known_values`, a full `(Ny, Nx)` field of which only the known
+# cells are read.  (`pressure_from_divergence` refuses them: its T-point
+# Dirichlet wall is on the cell faces, which a value pinned at a cell
+# centre cannot represent.)  The wrapper
+# builds $W, C, K, E$, the lift and the correction, calls the chosen
 # solver on $E$, and adds the lift back.
 #
 # ```python
 # psi = fvx.streamfunction_from_vorticity(
 #     zeta, dx, dy, lambda_=lam,
 #     method="cg", mask=mask,
-#     known_values=g,            # read on the inner ring (+ known_mask cells)
+#     known_values=g,            # read on the coast ring (+ known_mask cells)
 #     known_mask=obs,            # optional interior observations (CG only)
 # )
 # ```
@@ -618,7 +662,7 @@ for name, psi in [("spectral", psi_spec), ("capacitance", psi_cap), ("CG + MG", 
 #
 # | Pseudocode | finitevolX |
 # |------------|------------|
-# | `W, R, K, E` | `domain = fvx.SolveDomain(mask, known_mask)` |
+# | `W, C, K, E` | `domain = fvx.SolveDomain(mask, known_mask)` |
 # | `lift`, `b` | `b, lift = fvx.KnownValueLifting(domain, dx, dy, lam).preprocess(f, g)` |
 # | `x = S(b)` | *your solver on* `domain.effective_mask` |
 # | `psi = lift + x` | `psi = lifter.postprocess(x, lift)` |
@@ -627,28 +671,29 @@ for name, psi in [("spectral", psi_spec), ("capacitance", psi_cap), ("CG + MG", 
 lifter = fvx.KnownValueLifting(domain_small, dx_s, dy_s, lam_s)
 b, lift = lifter.preprocess(f_j, g_j)
 
-eff_small = domain_small.effective_mask.astype(float)
-A_eff = lambda x: fvx.masked_laplacian(x, eff_small, dx_s, dy_s, lambda_=lam_s)
+A_eff = lambda x: fvx.masked_laplacian(x, eff_j, dx_s, dy_s, lambda_=lam_s)
 x, info = fvx.solve_cg(A_eff, b, rtol=1e-12, atol=1e-12)
-psi_blocks = lifter.postprocess(x * eff_small, lift)
+psi_blocks = lifter.postprocess(x * eff_j, lift)
 
 psi_wrapper = fvx.streamfunction_from_vorticity(
     f_j, dx_s, dy_s, lambda_=lam_s, method="cg", mask=m_j,
-    known_values=g_j, known_mask=jnp.array(obs_small),
+    known_values=g_j, known_mask=obs_j,
 )
-print(f"CG iterations: {info.iterations}")
+print(f"CG iterations: {int(info.iterations)}, converged: {bool(info.converged)}")
 print(f"building blocks vs NumPy scratch: {float(jnp.max(jnp.abs(psi_blocks - psi_scratch))):.1e}")
-print(f"wrapper         vs NumPy scratch: {float(jnp.max(jnp.abs(psi_wrapper - psi_scratch))):.1e}")
+print(f"wrapper         vs NumPy scratch: {float(jnp.max(jnp.abs(psi_wrapper - psi_scratch))):.1e}"
+      "   (CG rtol = 1e-6)")
 
 # %% [markdown]
 # ### 6.3 Boundary conditions as a `BoundaryConditionSet`
 #
 # When the data is "one value per wall", describe it with the same
 # `BoundaryConditionSet` used for time stepping and pass it as `bc=`.
-# Non-zero `Dirichlet1D` values are written onto the wall-adjacent wet
-# cells (rows/columns 1 and −2; west/east own the corners), the set's
-# `mask` is used by the mask-based solvers, and an all-zero set is the
-# ordinary homogeneous solve.
+# Non-zero `Dirichlet1D` values are written onto each face's wall nodes —
+# the coast cells on the row / column just outside the wet cells, X rows /
+# columns `0` and `N-2` of a rectangle (west/east own the shared nodes) —
+# the set's `mask` is used by the mask-based solvers, and an all-zero set is
+# the ordinary homogeneous solve.
 
 # %%
 bcset = fvx.BoundaryConditionSet(
@@ -659,6 +704,7 @@ bcset = fvx.BoundaryConditionSet(
     east=fvx.Dirichlet1D("east", value=-0.1),
 )
 psi_bc = fvx.streamfunction_from_vorticity(f_b, dxb, dyb, lambda_=lam_b, bc=bcset, method="cg")
+# The north wall is X row N-2 and the east wall X column N-2.
 print(f"north wall row: {float(psi_bc[-2, 5]):+.3f}   east wall column: {float(psi_bc[5, -2]):+.3f}")
 
 # %% [markdown]
@@ -667,13 +713,16 @@ print(f"north wall row: {float(psi_bc[-2, 5]):+.3f}   east wall column: {float(p
 # On a larger basin with an island and a smooth, spatially varying $g$:
 
 # %%
-Nd = 64
-dxd = dyd = 1.0 / Nd
-# mask[j, i] = 1 for 1 <= j, i <= Nd-2, then 0 on the island 26 <= j <= 37, 28 <= i <= 39
-mask_d = jnp.zeros((Nd, Nd)).at[1:-1, 1:-1].set(1.0).at[26:38, 28:40].set(0.0)
-yy, xx = jnp.meshgrid(jnp.arange(Nd) / Nd, jnp.arange(Nd) / Nd, indexing="ij")
+Nd = 66
+dxd = dyd = 1.0 / (Nd - 2)  # 64 x 64 cells on the unit square
+# ocean at T points: 1 <= j, i <= Nd-2, minus the island 26 <= j <= 37, 28 <= i <= 39
+ocean_d = np.pad(np.ones((Nd - 2, Nd - 2), dtype=bool), 1)
+ocean_d[26:38, 28:40] = False
+mask_d = fvx.Mask2D.from_mask(ocean_d)
+# X node (j, i) sits at (x, y) = (i dx, j dy)
+yy, xx = jnp.meshgrid(jnp.arange(Nd) * dyd, jnp.arange(Nd) * dxd, indexing="ij")
 g_d = 0.2 * jnp.sin(2 * jnp.pi * yy) + 0.1 * jnp.cos(3 * jnp.pi * xx)
-f_d = -30.0 * jnp.exp(-((xx - 0.3) ** 2 + (yy - 0.7) ** 2) / 0.01) * mask_d
+f_d = -30.0 * jnp.exp(-((xx - 0.3) ** 2 + (yy - 0.7) ** 2) / 0.01)
 
 dom_d = fvx.SolveDomain(mask_d)
 lifter_d = fvx.KnownValueLifting(dom_d, dxd, dyd, 1.0)
@@ -684,11 +733,12 @@ psi_d = fvx.streamfunction_from_vorticity(
 hom_d = (psi_d - lift_d) * dom_d.effective_mask
 
 wet_d = np.asarray(dom_d.wet_mask)
+shown_d = wet_d | np.asarray(dom_d.coast_ring)
 panels = [
-    (np.where(np.asarray(dom_d.all_known), lift_d, np.nan), "lift: g on the ring $R$"),
+    (np.where(np.asarray(dom_d.all_known), lift_d, np.nan), "lift: g on the coast ring $C$"),
     (np.where(np.asarray(dom_d.effective_mask), b_d - f_d, np.nan), "correction $-A_{EK}\\,g_K$"),
-    (np.where(np.asarray(dom_d.effective_mask), hom_d, np.nan), "$\\psi_{hom}$ (0 on the ring)"),
-    (np.where(wet_d, psi_d, np.nan), "$\\psi = $ lift $+ \\psi_{hom}$"),
+    (np.where(np.asarray(dom_d.effective_mask), hom_d, np.nan), "$\\psi_{hom}$ (0 on the coast)"),
+    (np.where(shown_d, psi_d, np.nan), "$\\psi = $ lift $+ \\psi_{hom}$"),
 ]
 fig, axes = plt.subplots(1, 4, figsize=(18, 4.2))
 for ax, (field, title) in zip(axes, panels, strict=True):
@@ -705,7 +755,7 @@ plt.show()
 # ![Lift, correction, homogeneous part and full solution](../../images/inhomogeneous_bcs_tutorial/lift_decomposition.png)
 #
 # The correction (second panel) is non-zero only on the single layer of
-# effective cells touching the ring — the rows of $A_{EK}$ are that sparse.
+# wet cells touching the coast — the rows of $A_{EK}$ are that sparse.
 
 # %% [markdown]
 # ---
@@ -726,11 +776,10 @@ plt.show()
 # f = -2\pi^2 \sin(\pi x)\sin(\pi y) - 0.4\pi^2 \sin(2\pi y) - \lambda\,\psi^\star ,
 # $$
 #
-# and place the grid so the ring cell centres lie **on** $\partial\Omega$:
-# with $n$ intervals of width $h = 1/n$, cell $k$ of the array sits at
-# $x = (k - 1)h$, so the ring (index $1$ and $n+1$) is at $x = 0$ and
-# $x = 1$, and the array has $n + 3$ cells including the dry ghost ring.
-# Feeding $g = \psi^\star$ on the ring, the error should fall like $h^2$.
+# and solve on the C-grid of `from_interior(n, n, 1, 1)`: the arrays are
+# $(n+2)^2$, X node $k$ sits at $x = k h$ with $h = 1/n$, so the wall nodes
+# $k = 0$ and $k = N-2 = n$ are **on** $\partial\Omega$ ($x = 0$ and $x = 1$).
+# Feeding $g = \psi^\star$ there, the error should fall like $h^2$.
 
 # %%
 def exact(x, y):
@@ -745,10 +794,11 @@ def exact_rhs(x, y, lam):
 
 
 lam_m = 4.0
+ns = (8, 16, 32, 64, 128)
 hs, errs = [], []
-for n in (8, 16, 32, 64, 128):
+for n in ns:
     h = 1.0 / n
-    coord = (np.arange(n + 3) - 1) * h  # ring at 0 and 1
+    coord = np.arange(n + 2) * h  # X nodes: wall nodes 0 and n at x = 0, 1
     X, Y = np.meshgrid(coord, coord)
     psi_star = exact(X, Y)
     psi_num = fvx.streamfunction_from_vorticity(
@@ -756,14 +806,14 @@ for n in (8, 16, 32, 64, 128):
         known_values=jnp.array(psi_star),
     )
     wet = np.zeros_like(psi_star, dtype=bool)
-    # wet[j, i] = True for 1 <= j, i <= n+1   (ring at x, y = 0 and 1 included)
-    wet[1:-1, 1:-1] = True
+    # wet X nodes: 1 <= j, i <= n-1  ([1:-2, 1:-2])
+    wet[1:-2, 1:-2] = True
     hs.append(h)
     errs.append(np.max(np.abs((np.asarray(psi_num) - psi_star)[wet])))
 
 # order[k] = log2( err[k] / err[k+1] )   (h halves between k and k+1)
 rates = np.log2(np.array(errs[:-1]) / np.array(errs[1:]))
-for n, e in zip((8, 16, 32, 64, 128), errs, strict=True):
+for n, e in zip(ns, errs, strict=True):
     print(f"n = {n:4d}   max error = {e:.3e}")
 print("observed orders:", np.round(rates, 3))
 
@@ -804,6 +854,7 @@ values_d = g_d
 for j, i in gauges:
     obs_d = obs_d.at[j, i].set(True)
     values_d = values_d.at[j, i].set(0.4)
+assert all(bool(dom_d.wet_mask[j, i]) for j, i in gauges)
 
 psi_obs = fvx.streamfunction_from_vorticity(
     f_d, dxd, dyd, lambda_=1.0, method="cg", mask=mask_d,
@@ -814,8 +865,8 @@ print("psi at gauges:", [round(float(psi_obs[j, i]), 6) for j, i in gauges])
 fig, axes = plt.subplots(1, 3, figsize=(15, 4.2))
 diff = np.where(wet_d, psi_obs - psi_d, np.nan)
 for ax, field, title in [
-    (axes[0], np.where(wet_d, psi_d, np.nan), "boundary data only"),
-    (axes[1], np.where(wet_d, psi_obs, np.nan), "+ 4 gauges pinned to 0.4"),
+    (axes[0], np.where(shown_d, psi_d, np.nan), "boundary data only"),
+    (axes[1], np.where(shown_d, psi_obs, np.nan), "+ 4 gauges pinned to 0.4"),
     (axes[2], diff, "difference"),
 ]:
     im = ax.imshow(field, origin="lower", cmap="RdBu_r")
@@ -842,7 +893,8 @@ plt.show()
 
 # %%
 corr = [
-    fvx.KnownValueLifting(dom_d, dxd, dyd, lam).preprocess(f_d, g_d)[0] - f_d * dom_d.effective_mask
+    fvx.KnownValueLifting(dom_d, dxd, dyd, lam).preprocess(f_d, g_d)[0]
+    - f_d * dom_d.effective_mask
     for lam in (0.0, 100.0)
 ]
 print(f"correction(lambda=0) - correction(lambda=100): {float(jnp.max(jnp.abs(corr[0] - corr[1]))):.1e}")
@@ -853,11 +905,11 @@ pv = jnp.zeros((len(lambdas), Nd, Nd))
 psi_layers = fvx.pv_inversion(
     pv, dxd, dyd, lambda_=lambdas, method="cg", mask=mask_d, known_values=g_d
 )
-ring_d = dom_d.boundary_ring
+coast_d = dom_d.coast_ring
 for k, lam_k in enumerate(lambdas):
     print(
-        f"layer {k}: lambda = {float(lam_k):7.1f}   ring exact: "
-        f"{bool(jnp.allclose(psi_layers[k][ring_d], g_d[ring_d]))}   "
+        f"layer {k}: lambda = {float(lam_k):7.1f}   coast exact: "
+        f"{bool(jnp.allclose(psi_layers[k][coast_d], g_d[coast_d]))}   "
         f"psi at (16, 16) = {float(psi_layers[k][16, 16]):+.4f}"
     )
 
@@ -884,25 +936,26 @@ def solve_step(f, g):
 for t in range(3):
     g_t = g_d * jnp.cos(0.5 * t)
     psi_t = solve_step(f_d, g_t)
-    print(f"t = {t}:  ring matches g(t): {bool(jnp.allclose(psi_t[ring_d], g_t[ring_d]))}")
+    print(f"t = {t}:  coast matches g(t): {bool(jnp.allclose(psi_t[coast_d], g_t[coast_d]))}")
 
 # %% [markdown]
 # ### 8.4 Gradients with respect to the boundary data
 #
 # The map $g \mapsto \psi$ is linear, and JAX differentiates straight
 # through the lifting and the solver.  Take the value at one interior point,
-# $J(g) = \psi_{17,17}$ on a 32-interval square with $f = 0$ and
-# $\lambda = 0$.  Then $\partial J / \partial g$ is the **discrete harmonic
-# measure** of that point: non-negative weights on the ring saying how much
+# $J(g) = \psi_{17,10}$ on a 32-cell square with $f = 0$, using the
+# spectral path (the rectangle's ψ basin, wall nodes on rows / columns
+# `0` and `N-2`).  Then $\partial J / \partial g$ is the **discrete harmonic
+# measure** of that point: non-negative weights on the coast saying how much
 # each boundary value contributes.  For $\lambda = 0$ they must sum to 1
 # (a constant $g \equiv c$ gives $\psi \equiv c$), and for $\lambda > 0$
 # they sum to less than 1 — screening again.
 
 # %%
-Nh = 35
-hh = 1.0 / 32
-# basin mask: mask[j, i] = 1 for 1 <= j, i <= Nh-2
-ring_h = fvx.boundary_ring(jnp.zeros((Nh, Nh)).at[1:-1, 1:-1].set(1.0))
+Nh = 34
+hh = 1.0 / (Nh - 2)
+# psi (X) basin of the rectangle: wet on [1:-2, 1:-2]; its coast is the wall nodes
+coast_h = fvx.coast_ring(jnp.zeros((Nh, Nh)).at[1:-2, 1:-2].set(1.0))
 
 
 def point_value(g, lam):
@@ -917,16 +970,16 @@ for lam in (0.0, 50.0):
     wgt = jax.grad(point_value)(jnp.zeros((Nh, Nh)), lam)
     weights[lam] = wgt
     print(
-        f"lambda = {lam:5.1f}:  sum of weights on ring = {float(wgt[ring_h].sum()):.6f}, "
-        f"min = {float(wgt[ring_h].min()):.2e}, off-ring max |w| = {float(jnp.abs(wgt[~ring_h]).max()):.1e}"
+        f"lambda = {lam:5.1f}:  sum of weights on coast = {float(wgt[coast_h].sum()):.6f}, "
+        f"min = {float(wgt[coast_h].min()):.2e}, off-coast max |w| = {float(jnp.abs(wgt[~coast_h]).max()):.1e}"
     )
 
 fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
 for ax, lam in zip(axes, (0.0, 50.0), strict=True):
-    wgt = np.where(np.asarray(ring_h), np.asarray(weights[lam]), np.nan)
+    wgt = np.where(np.asarray(coast_h), np.asarray(weights[lam]), np.nan)
     im = ax.imshow(wgt, origin="lower", cmap="viridis")
     ax.plot(10, 17, "r*", ms=12)
-    ax.set_title(f"dpsi[17,10] / dg on the ring, lambda = {lam:g}")
+    ax.set_title(f"dpsi[17,10] / dg on the coast, lambda = {lam:g}")
     ax.axis("off")
     fig.colorbar(im, ax=ax, shrink=0.8)
 plt.tight_layout()
@@ -940,9 +993,9 @@ plt.show()
 #
 # * The weights are **non-negative** (a discrete maximum principle) and
 #   concentrate on the walls nearest the point.
-# * The four **corner** ring cells get weight exactly zero: their stencil
-#   neighbours are ring cells, so no effective cell ever reads them and
-#   their data cannot influence the solution.
+# * Only coast nodes carry weight: the four corners of the frame are not on
+#   the coast (no wet node is 4-adjacent to them), so the stencil never
+#   reads them and their data cannot influence the solution.
 #
 # This is the same object a data-assimilation system needs to push an
 # interior misfit back onto the boundary data — obtained here for free
@@ -955,15 +1008,15 @@ plt.show()
 #
 # | Symptom | Cause | Fix |
 # |---------|-------|-----|
-# | Solution ignores the boundary data | Data stored on **dry** cells; `masked_laplacian` erases it | Put data on the inner ring (wet cells); `known_values` does this |
-# | Known cells overwritten | Solver built on the wet mask instead of $E$ | CG / multigrid operators on `domain.effective_mask` |
-# | Capacitance answer off by $O(1)$ | Capacitance built on `effective_mask` (strips two rings) | Build it on the **wet** mask |
-# | Capacitance wrong at $\lambda = 0$ | Default `base_bc="fft"` is singular for Poisson | Use `base_bc="dst"` |
-# | Capacitance + observations raises | No mask gives $E$ as "interior minus ring" | Use `method="cg"` |
+# | Solution ignores the boundary data | Correction computed with `masked_laplacian(lift, W)`: the mask erases the lift on the dry coast | Apply the stencil unmasked; `KnownValueLifting` does |
+# | Observations overwritten | Solver built on the wet mask instead of $E$ | CG / multigrid operators on `domain.effective_mask` |
+# | Wall one cell inside the basin | Data put on the wet cells next to land (`boundary_ring`) | Put it on the coast ring; `known_values` reads only `coast_ring` and `known_mask` cells |
+# | ψ wall in the wrong place | A T-point mask passed for ψ | Pass a `Mask2D` (its `xy_corner_strict` is the ψ mask) |
+# | Capacitance + observations raises | Its unknowns are fixed by the mask it was built on | Use `method="cg"` |
 # | Spectral solve raises with a mask | The spectral path is the rectangular basin only | Use `method="cg"` / `"capacitance"` for other masks |
-# | Spectral result differs from plain `bc="dst"` | With `known_values`, unknowns are `[2:-2, 2:-2]` (ring convention) | Expected; plain `bc="dst"` treats the whole array as unknown |
-# | Standalone multigrid disagrees | Different (face-based) discretisation | Use multigrid as the CG preconditioner |
-# | PDE residual non-zero on the ring | Known cells carry data, not the equation | Expected — check the residual on $E$ only |
+# | Known values raise for `pressure_from_divergence` | A T-point Dirichlet wall is on the cell faces; the lift pins cell centres (the ghost cells, half a cell out) | Solve for ψ, or prescribe pressure through the right-hand side |
+# | Non-zero `Dirichlet1D` faces raise on a `Mask2D` | Its outer coast is not on the four walls | Pass `known_values` on `fvx.coast_ring(mask)` |
+# | PDE residual non-zero on the coast | Known cells carry data, not the equation | Expected — check the residual on $E$ only |
 # | Sign surprises | The operator is $(\nabla^2 - \lambda)$, $\lambda \ge 0$ | Use positive $\lambda = 1/L_d^2$ for screening |
 #
 # ## Summary
@@ -973,9 +1026,11 @@ plt.show()
 # * On a grid the lift can be "data on the known cells, zero elsewhere";
 #   the elimination is exact, and accuracy is set by the stencil alone
 #   (second order).
-# * Keep the data on **wet** cells (the inner ring), apply the correction
-#   with the **wet** mask, solve on the **effective** mask.
-# * finitevolX packages this as `known_values` / `known_mask` on every
-#   elliptic wrapper, `bc=BoundaryConditionSet` for per-wall values, and
+# * Keep the data on the **coast ring** — the dry cells where every solver
+#   puts its wall (for ψ, the C-grid wall nodes) — apply the correction
+#   **unmasked**, and solve on the **effective** mask (every wet cell that
+#   is not an observation).
+# * finitevolX packages this as `known_values` / `known_mask` on the ψ
+#   wrappers, `bc=BoundaryConditionSet` for per-wall values, and
 #   `SolveDomain` + `KnownValueLifting` for your own solvers — all
 #   JIT-compatible and differentiable.

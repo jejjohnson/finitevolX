@@ -111,8 +111,10 @@ runs on the **effective** mask.  Accuracy is set by the stencil alone
 | Spectral (DST) | ψ rectangle only: $E$ is the X basin `[1:-2, 1:-2]` and $K$ its wall nodes (rows / columns `0` and `N-2`) |
 | Capacitance | solver built on the **wet** mask (its unknowns are every wet cell, $\psi = 0$ on the coast); no observed cells |
 
-In finitevolX, pass `known_values=` (and optionally `known_mask=`) to any
-convenience wrapper, or a `BoundaryConditionSet` as `bc=`; see the
+In finitevolX, pass `known_values=` (and optionally `known_mask=`) to
+`streamfunction_from_vorticity` or `pv_inversion`, or a
+`BoundaryConditionSet` as `bc=` (the T-point `pressure_from_divergence`
+refuses known values: its Dirichlet wall is on the cell faces); see the
 [usage guide](elliptic_solvers_usage.md#known-boundary-values-inhomogeneous-dirichlet).
 The [Known Boundary Values tutorial](notebooks/inhomogeneous_bcs_tutorial.py)
 derives all of this from scratch — notation, block structure, pseudocode, a
@@ -169,19 +171,25 @@ is an unknown, as in `masked_laplacian` / CG):
      $L_{\text{rect}}\,g_k = e_{b_k}$ to get Green's function $g_k$.
    - Build the capacitance matrix $C_{k,l} = g_l(b_k)$ and invert it.
 
-2. **Solve** (online, one spectral solve + $O(N_b^2)$ correction):
+2. **Solve** (online, two rectangular solves + an $O(N_b^2)$ correction):
    - Compute the rectangular solution: $u = L_{\text{rect}}^{-1} f$.
    - Enforce $\psi(b_k) = 0$ by solving $C \alpha = u[B]$ for correction
-     coefficients.
-   - Return $\psi = u - \sum_k \alpha_k g_k$.
+     coefficients (the precomputed factorisation of $C$).
+   - Return $\psi = L_{\text{rect}}^{-1}(f - \sum_k \alpha_k e_{b_k})$, a
+     second rectangular solve, so the Green's functions are never stored.
 
-The online cost is dominated by the single spectral solve, making this
-method nearly as fast as a rectangular solver.
+The online cost is two rectangular solves plus the $O(N_b^2)$
+back-substitution: measured on a 2-vCPU CPU it is 5–11× the spectral solve
+on a rectangle, as fast as CG + multigrid at 128² and 2–3.6× faster at 256²
+(see the [Solver Comparison](solver_comparison.md)).
 
-!!! warning "Memory"
-    The Green's function matrix is $O(N_b \times N_y \times N_x)$.
-    For very large $N_b$ (complex coastlines), consider the CG solver
-    instead.
+!!! warning "Setup cost and memory"
+    The solver stores the $N_b \times N_b$ capacitance matrix, and the setup
+    costs $N_b$ rectangular solves plus an $O(N_b^3)$ factorisation.  For a
+    circular basin with an island at 256² ($N_b = 795$) that is 5.8 MiB and
+    about 4 s (9 MiB and 5 s for the 1 020 coast nodes of the 256²
+    rectangle); both grow with the length of the coastline, so for very
+    long coastlines or a mask that changes, use CG + multigrid.
 
 ---
 
@@ -206,11 +214,16 @@ iterations.
 finitevolX provides three preconditioners, each suited to different problem
 characteristics.  The table below ranks them from simplest to most powerful:
 
-| Preconditioner | Setup cost | Per-iteration cost | Constant coeff | Variable coeff | Masked domain |
-|---|---|---|---|---|---|
-| **Spectral** | None | 1 FFT pair | Excellent | Poor | Fair |
-| **Nyström** | $k$ matvecs | $O(kN)$ dot product | Good | Fair | Good |
-| **Multigrid** | Offline hierarchy build | 1 V-cycle ($O(N)$) | Excellent | Excellent | Excellent |
+| Preconditioner | Setup cost | Per-iteration cost | CG iterations, 128² / 256² (measured) |
+|---|---|---|---|
+| **Spectral** (FFT / DST) | None | 1 transform pair | 31–63 (FFT), 15–48 (DST): grows with $N$ |
+| **Nyström** | $k$ matvecs | $O(kN)$ dot product | not measured (low rank: little gain on these problems) |
+| **Multigrid** | Offline hierarchy build (20–60 ms) | 1 V-cycle ($O(N)$) | 5–7, independent of $N$ |
+
+The iteration counts are for a rectangle and a circular basin with an
+island, $\lambda \in \{0, 4\}$, $\max|r| \le 2\times10^{-8}\max|f|$;
+unpreconditioned CG takes 340–760.  The full table is in the
+[Solver Comparison](solver_comparison.md).
 
 #### Spectral Preconditioner
 
@@ -221,7 +234,10 @@ inverse: $M^{-1} r = L_{\text{rect}}^{-1} r$.
 
 - Essentially free — one forward + one inverse transform per iteration
 - No setup cost
-- Exact inverse for rectangular, constant-coefficient problems
+- Exact inverse only when the operator *is* the transform's: it works on
+  the whole array with its wall at the array edge, so even on the ψ basin
+  of a rectangle (wall nodes `0` and `N-2`) CG still needs 15 (DST) to
+  63 (FFT) iterations
 
 **Cons:**
 
@@ -231,8 +247,8 @@ inverse: $M^{-1} r = L_{\text{rect}}^{-1} r$.
 - Cannot handle variable coefficients $c(x,y)$ — it always assumes $c = 1$
 - Effectiveness degrades for highly irregular coastlines
 
-**Best for:** Constant-coefficient problems on rectangular or
-near-rectangular domains.  This is the default and a good first choice.
+**Best for:** a quick, setup-free solve.  It is the wrappers' default
+preconditioner; CG + multigrid needs 3–13× fewer iterations.
 
 #### Nyström Preconditioner
 
@@ -273,19 +289,20 @@ across the grid hierarchy, it provides a spectrally complete approximation.
 - Handles masked/irregular domains natively — masks are coarsened through
   the hierarchy
 - $O(N)$ cost per iteration (geometric series over grid levels)
-- Typically reduces CG iterations from hundreds to 5–10
+- Grid-independent iteration counts: CG + multigrid takes 5–7 iterations at
+  128² and 256² (unpreconditioned CG: 340–760)
+- The V-cycle is symmetric (`n_pre == n_post`), as CG requires
 
 **Cons:**
 
-- Requires an offline build step (`build_multigrid_solver`) that
-  precomputes the level hierarchy
-- Grid dimensions must be divisible by $2^{L-1}$ where $L$ is the number
-  of levels
-- More complex implementation; slightly higher constant factor than
-  spectral
+- Requires an offline build step (`build_multigrid_solver`, NumPy /
+  SciPy) that precomputes the level hierarchy; rebuild it when the mask,
+  coefficient or $\lambda$ changes
+- More complex implementation
 
-**Best for:** Variable-coefficient problems, complex masked domains, or any
-problem where spectral preconditioning converges too slowly.
+**Best for:** masked domains (it is the fastest CG measured) and
+variable-coefficient problems.  Any grid shape coarsens (no divisibility
+constraint).
 
 #### Decision Guide
 
@@ -295,17 +312,14 @@ Is c(x,y) spatially varying?
 │         (spectral and Nyström can't represent variable coefficients well)
 └── No (constant coefficient) ↓
 
-Is the domain nearly rectangular?
-├── Yes → Spectral preconditioner (cheapest, nearly exact)
-└── No (complex mask) ↓
+Can you build the multigrid hierarchy (the operator is the 5-point
+masked Helmholtz operator)?
+├── Yes → Multigrid preconditioner (5–7 iterations, fastest CG)
+└── No ↓
 
-Is the mask moderately complex?
-├── Yes → Multigrid preconditioner
-│         (captures mask effects through coarsened hierarchy)
-└── Operator-only access / quick prototype ↓
-
-Default → Nyström preconditioner (rank 30–100)
-          or Multigrid if you can build the hierarchy
+Is the operator close to the rectangular constant-coefficient one?
+├── Yes → Spectral preconditioner (no setup, 15–63 iterations)
+└── Operator-only access → Nyström preconditioner (rank 30–100)
 ```
 
 #### Factory Function
@@ -355,13 +369,15 @@ Is the domain a full rectangle?
 │         └── Periodic → bc="fft"
 └── No (masked/irregular domain) ↓
 
-Is the coastline simple (small N_b)?
+Fixed mask and λ, many solves, setup affordable (N_b up to ~1000)?
 ├── Yes → Use capacitance method (method="capacitance")
 │         Pre-build with build_capacitance_solver()
-└── No (complex coastline, large N_b) ↓
+└── No (mask or λ changes, very long coastline) ↓
 
 Default → Use CG (method="cg")
-          Optionally with spectral or Nyström preconditioner
+          with preconditioner=make_multigrid_preconditioner(mg)
+          (the default spectral preconditioner needs no setup but
+          3–13× more iterations)
 ```
 
 ---

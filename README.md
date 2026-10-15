@@ -30,7 +30,7 @@
 import finitevolx as fvx
 
 # Build an Arakawa C-grid (64x64 interior + 2-cell ghost ring)
-grid = fvx.ArakawaCGrid2D.from_interior(64, 64, Lx=5.12e6, Ly=5.12e6)
+grid = fvx.CartesianGrid2D.from_interior(64, 64, Lx=5.12e6, Ly=5.12e6)
 
 # Operators are stateless modules
 diff  = fvx.Difference2D(grid)
@@ -40,8 +40,9 @@ vort  = fvx.Vorticity2D(grid)
 # Compute divergence at T-points from staggered velocities
 div_uv = div(u, v)
 
-# Solve the Helmholtz equation (∇² − λ)ψ = q  for streamfunction
-psi = fvx.solve_helmholtz_dst(q, grid.dx, grid.dy, lambda_=1/Ld**2)
+# Solve the Helmholtz equation (∇² − λ)ψ = q, λ = 1/Ld² > 0, for the
+# streamfunction (full [Ny, Nx] array in and out; ψ = 0 on the C-grid walls)
+psi = fvx.pv_inversion(q, grid.dx, grid.dy, lambda_=1/Ld**2, bc="dst")
 
 # Time-step with Heun's method (RK2)
 state_next = fvx.heun_step(tendency_fn, state, dt)
