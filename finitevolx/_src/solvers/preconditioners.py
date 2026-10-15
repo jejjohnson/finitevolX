@@ -50,7 +50,7 @@ if TYPE_CHECKING:
 def make_spectral_preconditioner(
     dx: float,
     dy: float,
-    lambda_: float = 0.0,
+    lambda_: float | Array = 0.0,
     bc: str = "fft",
 ) -> Callable[[Float[Array, "Ny Nx"]], Float[Array, "Ny Nx"]]:
     """Return a spectral-solve preconditioner for PCG.

@@ -113,7 +113,7 @@ def _spectral_solve(
     rhs: Float[Array, "Ny Nx"],
     dx: float,
     dy: float,
-    lambda_: float,
+    lambda_: float | Array,
     bc: str,
 ) -> Float[Array, "Ny Nx"]:
     """Dispatch to the appropriate rectangular spectral solver.

@@ -81,7 +81,18 @@ Solves $\nabla^2 p = \nabla \cdot \mathbf{u}$ (always Poisson, $\lambda = 0$).
 ```python
 # Neumann BCs (∂p/∂n = 0 on the cell faces) — standard for pressure with solid walls
 p = fvx.pressure_from_divergence(div_u, dx, dy, bc="dct")
+
+# The same Neumann wall on a masked basin: zero flux through every coast face
+p = fvx.pressure_from_divergence(div_u, dx, dy, method="cg", mask=mask)
 ```
+
+`bc` is honoured by every method or rejected, never ignored.  With
+`method="cg"`, `bc="dct"` (the default) builds the zero-flux operator at T
+points and returns the zero-mean solution; `bc="dst"` holds p = 0 on the dry
+cells next to the wet ones.  The default preconditioner is the spectral solve
+with the same `bc`.  `method="capacitance"` is Dirichlet on the coast only,
+so it needs `bc="dst"`; `bc="fft"` is for the rectangular spectral solve
+only.
 
 The wrappers know the staggering of what they solve for (ψ at X points,
 p at T points), pass only its unknowns to the transform and return them

@@ -193,7 +193,7 @@ def lift_rhs(
     known_values: Float[Array, "Ny Nx"],
     dx: float,
     dy: float,
-    lambda_: float,
+    lambda_: float | Array,
 ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
     """Functional form of :meth:`KnownValueLifting.preprocess`.
 

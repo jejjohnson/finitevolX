@@ -163,12 +163,19 @@ class TestManufacturedSolution:
         )
         assert _wet_max_err(psi, exact, mask) < CG_TOL
 
-    def test_pressure_cg(self):
+    def test_pressure_cg_raises(self):
+        """T-point Dirichlet sits on the faces; known values pin cell centres."""
         mask, exact = _basin_mask(), _exact()
-        p = fvx.pressure_from_divergence(
-            _rhs(exact, mask, 0.0), DX, DY, method="cg", mask=mask, known_values=exact
-        )
-        assert _wet_max_err(p, exact, mask) < CG_TOL
+        with pytest.raises(ValueError, match="T-point pressure"):
+            fvx.pressure_from_divergence(
+                _rhs(exact, mask, 0.0),
+                DX,
+                DY,
+                bc="dst",
+                method="cg",
+                mask=mask,
+                known_values=exact,
+            )
 
     def test_pressure_spectral_raises(self):
         """T-point spectral Dirichlet is on the faces; known values are not."""
