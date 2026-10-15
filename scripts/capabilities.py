@@ -70,8 +70,11 @@ ALLOWED_SHARED_NAMES: dict[str, str] = {
         " spectraldiffx's is the spectral (spherical-harmonic) grid"
     ),
     "build_capacitance_solver": (
-        "finitevolX's wraps spectraldiffx's to accept a Mask2D as well as a"
-        " boolean array, and returns the same spectraldiffx CapacitanceSolver"
+        "finitevolX's solves every wet cell with psi = 0 on the coast (the"
+        " problem masked_laplacian / method='cg' define, and C-grid wall"
+        " placement for a Mask2D), while spectraldiffx's solves the wet cells"
+        " off the inner ring with psi = 0 on that ring; both return a"
+        " spectraldiffx CapacitanceSolver built on gaussx.MaskedOperator"
     ),
     "CapacitanceSolver": (
         "finitevolX re-exports spectraldiffx's spectral capacitance solver for"

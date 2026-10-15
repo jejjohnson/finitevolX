@@ -239,7 +239,9 @@ class KnownValueLifting(eqx.Module):
 
     The solver's unknowns must be exactly ``domain.effective_mask``, with
     zero on every other cell (``masked_laplacian`` on
-    ``domain.effective_mask``: a CG or multigrid operator built on it).
+    ``domain.effective_mask``: a CG or multigrid operator built on it, or,
+    without a ``known_mask``, a capacitance solver built on
+    ``domain.wet_mask``).
     The known values sit on the coast ring (the dry cells adjacent to the
     wet mask) and on the wet ``known_mask`` cells.
 

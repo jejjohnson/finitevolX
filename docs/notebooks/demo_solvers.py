@@ -469,7 +469,7 @@ plot_triplet(
     "capacitance, direct",
     "solver_basin_cap.png",
 )
-print(f"  Capacitance: {t_cap * 1000:.2f} ms, boundary pts = {int(fvx.boundary_ring(mask_basin_jnp).sum())}")
+print(f"  Capacitance: {t_cap * 1000:.2f} ms, coast pts = {int(fvx.coast_ring(mask_basin_jnp).sum())}")
 
 # %% [markdown]
 # ![Basin: Capacitance solver](../../images/demo_solvers/solver_basin_cap.png)
@@ -990,8 +990,8 @@ psi_full_inhom = fvx.streamfunction_from_vorticity(
     method="cg", mask=mask_basin_jnp, known_values=g_field,
 )
 
-# The capacitance solver is built on the SAME wet mask: it already holds its
-# own inner ring at zero, which is exactly the ring the lift prescribes.
+# The capacitance solver is built on the SAME wet mask: its unknowns are
+# every wet cell with psi = 0 on the coast, the same problem CG solves.
 cap_inhom = fvx.build_capacitance_solver(
     mask_basin.astype(bool), dx, dy, lambda_=lambda_, base_bc="dst"
 )
