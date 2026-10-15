@@ -16,7 +16,7 @@ import finitevolx as fvx
 
 jax.config.update("jax_enable_x64", True)
 
-# 1. Define a grid
+# 1. Define a grid (any shape: odd and N + 2 sizes coarsen fully)
 Ny, Nx = 64, 64
 dx, dy = 1.0 / Nx, 1.0 / Ny
 mask = np.ones((Ny, Nx))  # rectangular domain
@@ -35,7 +35,8 @@ u = solver(rhs)
 ## Building the Solver
 
 `build_multigrid_solver` precomputes the entire level hierarchy offline
-(mask coarsening, face coefficients, operator diagonals).  This is done
+(mask coarsening, transfer weights, Galerkin coarse operators, the exact
+bottom solve).  This is done
 once; the returned solver is then cheap to call repeatedly.
 
 ### Rectangular Domain
@@ -100,19 +101,20 @@ solver = fvx.build_multigrid_solver(
     mask, dx, dy,
     lambda_=10.0,
     n_levels=3,     # number of grid levels (default: auto)
-    n_pre=6,        # pre-smoothing iterations
-    n_post=6,       # post-smoothing iterations
-    n_coarse=50,    # bottom-solver iterations
-    omega=0.95,     # Jacobi relaxation weight
+    n_pre=3,        # pre-smoothing iterations
+    n_post=3,       # post-smoothing iterations (keep equal to n_pre)
+    omega=0.8,      # Jacobi relaxation weight
     n_cycles=5,     # V-cycles per solve
     bc="dirichlet", # or "neumann" (zero flux at the coast)
 )
 ```
 
 !!! tip "Auto level detection"
-    When `n_levels=None` (default), the factory halves both dimensions
-    until either would drop below 8.  For a 64x64 grid this gives 4
-    levels (64 -> 32 -> 16 -> 8).
+    When `n_levels=None` (default), the factory coarsens both dimensions
+    with `n -> (n + 1) // 2` while both stay >= 4.  For a 64x64 grid this
+    gives 5 levels (64 -> 32 -> 16 -> 8 -> 4), for a 34x34 grid
+    (32 interior cells plus the ghost ring) 4 levels (34 -> 17 -> 9 -> 5).
+    The coarsest level is solved exactly.
 
 ---
 
@@ -237,7 +239,7 @@ g_onestep = jax.grad(loss_onestep)(rhs)
 g_unrolled = jax.grad(loss_unrolled)(rhs)
 
 # g_implicit and g_unrolled should agree closely
-# g_onestep may differ by O(rho) ~ 0.1-0.3
+# g_onestep may differ by O(rho), about 0.04 on the default settings
 ```
 
 ---
@@ -275,11 +277,11 @@ u_batch = batch_solve(solver, rhs_batch)  # (3, Ny, Nx)
 
 | Parameter | Default | Effect |
 |---|---|---|
-| `n_cycles` | 5 | More cycles = lower residual, but slower. 3-5 is typical. |
-| `n_pre` / `n_post` | 6 | More smoothing = better convergence rate per cycle, at higher cost. |
-| `n_coarse` | 50 | Enough to solve the (small) coarsest grid accurately. |
-| `omega` | 0.95 | Jacobi weight. Lower (0.6-0.8) for stability, higher for speed. |
-| `n_levels` | auto | More levels = cheaper coarse grids, but grid must be divisible by $2^{L-1}$. |
+| `n_cycles` | 5 | Each cycle reduces the residual by about 0.07 (basins), so 5 cycles give about 3e-7. Neumann on one-cell channels or islands is slower (0.1-0.5): use the V-cycle as a CG preconditioner there. |
+| `n_pre` / `n_post` | 3 | More smoothing = better rate per cycle (0.12 at 2, 0.05 at 4), at higher cost. Keep them equal for a symmetric V-cycle (required by `make_multigrid_preconditioner`). |
+| `omega` | 0.8 | Jacobi weight; 0.8 damps the high-frequency half of the spectrum best. Values near 1 leave the checkerboard mode undamped. |
+| `n_levels` | auto | Any shape, any `n_levels`; fewer levels make the dense bottom solve larger (at most 4096 wet points). |
+| `bc` | `"dirichlet"` | `"neumann"` for zero flux at the coast (T-point pressure / free surface). |
 
 !!! tip "Quick convergence check"
     ```python

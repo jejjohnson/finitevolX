@@ -16,12 +16,23 @@ progressively coarser grids, where those low-frequency modes become
 high-frequency and can be cheaply damped.  The cost per V-cycle is
 O(N) thanks to the geometric sum of grid sizes.
 
+Hierarchy
+---------
+Every grid shape coarsens, odd or even: a dimension of ``n`` points becomes
+``(n + 1) // 2``, coarse point ``J`` sitting on fine point ``2J`` (so a
+standard ``N_interior + 2`` grid gets the same depth as ``N_interior``).
+Prolongation is bilinear interpolation between those nested points,
+restriction is its transpose (full weighting), and every coarse operator is
+the Galerkin product ``A_c = R A P``; the coarsest level is solved exactly
+with an inverse precomputed at build time.  With equal pre- and
+post-smoothing the V-cycle is a symmetric linear operator.
+
 Public API
 ----------
 ``build_multigrid_solver``
     One-time offline precomputation of the multigrid level hierarchy
-    (masks, face coefficients, operator diagonals).  Returns a
-    ``MultigridSolver``.
+    (masks, operator stencils, transfer weights, the bottom inverse).
+    Returns a ``MultigridSolver``.
 ``MultigridSolver``
     Stateless ``equinox.Module`` with three solve modes
     (implicit / one-step / unrolled differentiation).
@@ -40,28 +51,59 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Int
 import numpy as np
-from scipy import ndimage
+from scipy import linalg, sparse
+from scipy.sparse import csgraph
 
 from finitevolx._src.mask import Mask2D
+from finitevolx._src.solvers.iterative import _project_zero_mean, _wet_components
+
+# Stencil offsets (dj, di): the finest operator is 5-point, the Galerkin
+# coarse operators are 9-point.
+_OFFSETS_5 = ((0, 0), (0, -1), (0, 1), (-1, 0), (1, 0))
+_OFFSETS_9 = (
+    (0, 0),
+    (0, -1),
+    (0, 1),
+    (-1, 0),
+    (1, 0),
+    (-1, -1),
+    (-1, 1),
+    (1, -1),
+    (1, 1),
+)
+
+# Largest coarsest level (wet points) the dense bottom inverse is built for.
+_MAX_BOTTOM = 4096
 
 # ---------------------------------------------------------------------------
 # Internal helpers — grid hierarchy construction (numpy, offline)
 # ---------------------------------------------------------------------------
 
 
-def _compute_n_levels(ny: int, nx: int, min_coarse: int = 8) -> int:
-    """Auto-detect the number of multigrid levels by repeated halving.
+def _coarse_size(n: int) -> int:
+    """Number of coarse points over ``n`` fine points: ``(n + 1) // 2``.
 
-    Starting from the fine grid ``(ny, nx)``, halve both dimensions until
-    either would drop below *min_coarse*.  For example, a 64x64 grid with
-    ``min_coarse=8`` yields 4 levels: 64 -> 32 -> 16 -> 8.
+    Coarse point ``J`` sits on fine point ``2J``; an odd fine point ``2J+1``
+    lies between coarse points ``J`` and ``J+1``.
+    """
+    return (n + 1) // 2
+
+
+def _compute_n_levels(ny: int, nx: int, min_coarse: int = 4) -> int:
+    """Auto-detect the number of multigrid levels by repeated coarsening.
+
+    Starting from the fine grid ``(ny, nx)``, coarsen both dimensions with
+    ``n -> (n + 1) // 2`` while neither would drop below *min_coarse*.  Odd
+    sizes coarsen too, so a standard ``N_interior + 2`` grid gets the same
+    depth as ``N_interior``: 34 -> 17 -> 9 -> 5 (4 levels), 130 -> ... -> 5
+    (6 levels), 64 -> 32 -> 16 -> 8 -> 4 (5 levels).
 
     Parameters
     ----------
     ny, nx : int
         Fine-grid dimensions.
     min_coarse : int
-        Minimum allowed coarse-grid dimension.  Default: 8.
+        Minimum allowed coarse-grid dimension.  Default: 4.
 
     Returns
     -------
@@ -69,261 +111,284 @@ def _compute_n_levels(ny: int, nx: int, min_coarse: int = 8) -> int:
         Number of levels (>= 1).  Level 0 is finest, level L-1 is coarsest.
     """
     n = 1
-    while (
-        ny % 2 == 0 and nx % 2 == 0 and ny // 2 >= min_coarse and nx // 2 >= min_coarse
-    ):
-        ny //= 2
-        nx //= 2
+    while _coarse_size(ny) >= min_coarse and _coarse_size(nx) >= min_coarse:
+        ny, nx = _coarse_size(ny), _coarse_size(nx)
         n += 1
     return n
 
 
-def _restrict_mask(mask: np.ndarray, threshold: float = 0.5) -> np.ndarray:
-    """Coarsen a cell-centre mask by 2x via 4-point averaging.
+def _prolongation_1d(n_fine: int) -> sparse.csr_matrix:
+    """1-D linear interpolation between nested points, ``[n_fine, n_coarse]``.
 
-    Each coarse cell is the average of its four constituent fine cells.
-    If the average >= *threshold* (default 0.5, i.e. at least 2 of 4 fine
-    cells are wet), the coarse cell is classified as wet (1.0)::
+    ::
 
-        mask_coarse[J, I] = 1  if  mean(mask_fine[2J:2J+2, 2I:2I+2]) >= 0.5
-
-    Parameters
-    ----------
-    mask : ndarray, shape (Ny, Nx)
-        Fine-grid mask (1 = fluid, 0 = land).  Both Ny and Nx must be even.
-    threshold : float
-        Fraction of wet fine cells required to keep the coarse cell wet.
-
-    Returns
-    -------
-    ndarray, shape (Ny//2, Nx//2)
-        Coarsened mask.
+        v_f[2J]   = v_c[J]
+        v_f[2J+1] = (v_c[J] + v_c[J+1]) / 2      (v_c[n_coarse] = 0)
     """
-    avg = (mask[::2, ::2] + mask[1::2, ::2] + mask[::2, 1::2] + mask[1::2, 1::2]) / 4.0
-    return (avg >= threshold).astype(np.float64)
+    n_coarse = _coarse_size(n_fine)
+    f = np.arange(n_fine)
+    rows = [f, f[1::2]]
+    cols = [f // 2, f[1::2] // 2 + 1]
+    vals = [np.where(f % 2 == 0, 1.0, 0.5), np.full(f[1::2].size, 0.5)]
+    rows, cols, vals = (np.concatenate(a) for a in (rows, cols, vals))
+    keep = cols < n_coarse  # the last odd point of an even n has no right partner
+    return sparse.csr_matrix(
+        (vals[keep], (rows[keep], cols[keep])), shape=(n_fine, n_coarse)
+    )
 
 
-def _compute_face_masks(
-    mask: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Derive x-face and y-face masks from a cell-centre mask.
-
-    On a cell-centred grid, *face* values live between adjacent cell centres.
-    A face is active (mask = 1) only when **both** cells it connects are wet.
-
-    Face layout (x-direction)::
-
-        cell (j, i)  --face_cx[j, i]-->  cell (j, i+1)
-
-    Face layout (y-direction)::
-
-        cell (j, i)  --face_cy[j, i]-->  cell (j+1, i)
-
-    Parameters
-    ----------
-    mask : ndarray, shape (Ny, Nx)
-        Cell-centre mask (1 = fluid, 0 = land).
-
-    Returns
-    -------
-    mask_cx : ndarray, shape (Ny, Nx)
-        X-direction face mask.  ``mask_cx[j, i] = mask[j, i] * mask[j, i+1]``.
-        The last column ``mask_cx[:, -1]`` is always 0 (no right neighbour).
-    mask_cy : ndarray, shape (Ny, Nx)
-        Y-direction face mask.  ``mask_cy[j, i] = mask[j, i] * mask[j+1, i]``.
-        The last row ``mask_cy[-1, :]`` is always 0 (no lower neighbour).
-    """
-    # x-face: active between (j, i) and (j, i+1)
-    mask_cx = np.zeros_like(mask)
-    mask_cx[:, :-1] = mask[:, :-1] * mask[:, 1:]
-    # y-face: active between (j, i) and (j+1, i)
-    mask_cy = np.zeros_like(mask)
-    mask_cy[:-1, :] = mask[:-1, :] * mask[1:, :]
-    return mask_cx, mask_cy
-
-
-def _interpolate_coeff_to_faces(
-    coeff: np.ndarray,
-    mask: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Interpolate a cell-centre coefficient ``c(x,y)`` to face coefficients.
-
-    The face coefficient is the arithmetic mean of the two adjacent cell
-    values, multiplied by the face mask (so faces bordering land are zero)::
-
-        cx[j, i] = 0.5 * (coeff[j, i] + coeff[j, i + 1]) * mask_cx[j, i]
-        cy[j, i] = 0.5 * (coeff[j, i] + coeff[j + 1, i]) * mask_cy[j, i]
-
-    These face coefficients appear directly in the variable-coefficient
-    Helmholtz stencil (see :func:`_apply_operator`).
-
-    Parameters
-    ----------
-    coeff : ndarray, shape (Ny, Nx)
-        Cell-centre coefficient field.
-    mask : ndarray, shape (Ny, Nx)
-        Cell-centre mask (used to derive face masks).
-
-    Returns
-    -------
-    cx : ndarray, shape (Ny, Nx)
-        X-direction face coefficient (zero at domain boundaries).
-    cy : ndarray, shape (Ny, Nx)
-        Y-direction face coefficient (zero at domain boundaries).
-    """
-    mask_cx, mask_cy = _compute_face_masks(mask)
-    cx = np.zeros_like(coeff)
-    cx[:, :-1] = 0.5 * (coeff[:, :-1] + coeff[:, 1:])
-    cx *= mask_cx
-    cy = np.zeros_like(coeff)
-    cy[:-1, :] = 0.5 * (coeff[:-1, :] + coeff[1:, :])
-    cy *= mask_cy
-    return cx, cy
-
-
-def _compute_wall_coefficient(
-    coeff: np.ndarray,
-    mask: np.ndarray,
-    bc: str,
-    dx: float,
-    dy: float,
+def _coarse_mask(
+    mask_f: np.ndarray, p0: sparse.csr_matrix, shape_c: tuple[int, int]
 ) -> np.ndarray:
-    """Diagonal sink from the wet–dry faces of the Dirichlet operator.
+    """Coarse wet mask such that the masked prolongation has full column rank.
 
-    With ``bc="dirichlet"`` the value at a dry neighbour (land, or outside
-    the array) is taken as 0, so the face between a wet cell ``(j, i)`` and
-    a dry neighbour keeps its coefficient and contributes
-    ``c_f (0 - u[j, i]) / h**2`` — the :func:`masked_laplacian` stencil with
-    dry neighbours zero.  Those terms only touch the diagonal::
+    Mask-coarsening rule:
 
-        wall[j, i] = sum over the faces of (j, i) with a dry neighbour of
-                     c[j, i] / h**2          (h = dx for x-faces, dy for y-faces)
+    1. Coarse point ``(J, I)`` is wet if its coincident fine point
+       ``(2J, 2I)`` is wet.  These columns of ``P0`` are independent: fine
+       point ``(2J, 2I)`` is interpolated from ``(J, I)`` alone.
+    2. A coarse point whose coincident fine point is dry but whose
+       interpolation support (fine points ``2J-1 .. 2J+1`` by
+       ``2I-1 .. 2I+1``) touches a wet fine point is a candidate; it is kept
+       only if its column (on the wet fine points) is linearly independent of
+       the other kept candidates.  Coarse points next to a coast thus extend
+       the coarse space, while a one-cell lake or channel at an odd index,
+       whose up to four candidates have identical columns, keeps one of them.
 
-    The face coefficient is the wet cell's own ``c`` (the dry side has none).
-    With ``bc="neumann"`` those faces carry no flux and ``wall = 0``.
+    No candidate column can depend on a rule-1 column (those own a fine
+    point no other column touches), so the independence test runs on the
+    candidates alone.  A candidate that is the only remaining candidate on
+    some wet fine point is independent of all the others (its coefficient
+    in any linear dependency is zero); those are kept and peeled off,
+    repeatedly — on a plain coast every candidate goes this way.  Only the
+    candidates left after peeling (one-cell lakes and channels at odd
+    indices) get a column-pivoted QR, per cluster of candidates that share
+    fine points.  With full column rank, ``A_c = R A P`` is non-singular for
+    Dirichlet and has only the constants as null space for Neumann at
+    ``lambda = 0``.
 
     Parameters
     ----------
-    coeff : ndarray, shape (Ny, Nx)
-        Cell-centre coefficient, zero on dry cells.
-    mask : ndarray, shape (Ny, Nx)
-        Cell-centre mask (1 = wet).
+    mask_f : ndarray, shape (Ny, Nx)
+        Fine mask (1 = wet).
+    p0 : scipy.sparse.csr_matrix, shape (Ny*Nx, Ny_c*Nx_c)
+        Unmasked bilinear prolongation.
+    shape_c : (int, int)
+        Coarse shape.
+
+    Returns
+    -------
+    ndarray, shape_c
+        Coarse mask (1 = wet).
+    """
+    wet_f = mask_f.ravel() > 0
+    support = p0.T @ wet_f.astype(np.float64)  # [Nc], wet weight in support
+    keep = (mask_f[::2, ::2] > 0).ravel()  # rule 1: coincident fine point wet
+    cand = np.flatnonzero((support > 0) & ~keep)
+    if cand.size:
+        sub = p0[wet_f][:, cand].tocsc()  # [n_wet_f, n_cand]
+        touch = (sub != 0).astype(np.int64).tocsr()  # [n_wet_f, n_cand]
+        # peel: a candidate alone on some wet fine point is independent
+        active = np.ones(cand.size, dtype=bool)
+        while active.any():
+            count = touch @ active.astype(np.int64)  # active candidates per row
+            rows = touch[count == 1].tocoo()  # rows with a single active one
+            owners = np.zeros(cand.size, dtype=bool)
+            owners[rows.col[active[rows.col]]] = True
+            if not owners.any():
+                break
+            keep[cand[owners]] = True
+            active &= ~owners
+        core = np.flatnonzero(active)
+        if core.size:
+            sub = sub[:, core]
+            # clusters of the remaining candidates that share a wet fine point
+            n_clusters, label = csgraph.connected_components(
+                (sub.T @ sub) != 0, directed=False
+            )
+            for k in range(n_clusters):
+                cols = np.flatnonzero(label == k)
+                block = sub[:, cols]
+                dense = block[np.unique(block.indices)].toarray()  # [rows, cols]
+                r, piv = linalg.qr(dense, mode="r", pivoting=True)
+                d = np.abs(np.diag(r))
+                # exact dependencies give |r_kk| ~ 1e-16; the weights are O(1)
+                rank = int(np.sum(d > 1e-10 * d[0]))
+                keep[cand[core[cols[piv[:rank]]]]] = True
+    return keep.reshape(shape_c).astype(np.float64)
+
+
+def _transfer_operators(
+    mask_f: np.ndarray, bc: str
+) -> tuple[np.ndarray, np.ndarray, sparse.csr_matrix]:
+    """Coarse mask, prolongation row scale and the sparse prolongation.
+
+    ``P0 = P0_y (x) P0_x`` is bilinear interpolation between nested points
+    (:func:`_prolongation_1d`).  The coarse mask follows
+    :func:`_coarse_mask` (every wet fine point is interpolated from at least
+    one wet coarse point, and ``P`` has full column rank); the Galerkin
+    coarse operator sees the true fine geometry through ``P``.  The
+    prolongation is::
+
+        P = diag(s) P0 diag(m_c),   s = m_f                 (bc="dirichlet")
+                                    s = m_f / (P0 m_c)      (bc="neumann")
+
+    Dirichlet interpolates with zero at dry coarse points (the wall value);
+    Neumann renormalises over the wet coarse points, so constants are
+    interpolated exactly (no-flux wall, and the null space of the
+    lambda = 0 operator is kept on every level).
+
+    Parameters
+    ----------
+    mask_f : ndarray, shape (Ny, Nx)
+        Fine mask (1 = wet).
     bc : {"dirichlet", "neumann"}
         Wall condition.
-    dx, dy : float
-        Grid spacings.
 
     Returns
     -------
-    ndarray, shape (Ny, Nx)
-        Wall sink ``wall[j, i] >= 0``, zero on dry cells.
+    mask_c : ndarray, shape ((Ny+1)//2, (Nx+1)//2)
+        Coarse mask.
+    scale : ndarray, shape (Ny, Nx)
+        Row scale ``s`` of ``P``.
+    P : scipy.sparse.csr_matrix, shape (Ny*Nx, Ny_c*Nx_c)
+        The prolongation, row-major flattening.
     """
+    ny, nx = mask_f.shape
+    p0 = sparse.kron(_prolongation_1d(ny), _prolongation_1d(nx), format="csr")
+    shape_c = (_coarse_size(ny), _coarse_size(nx))
+    mask_c = _coarse_mask(mask_f, p0, shape_c)
     if bc == "neumann":
-        return np.zeros_like(mask)
-    # number of dry 4-neighbours in each direction (outside the array = dry)
-    mp = np.pad(mask, 1)  # [Ny+2, Nx+2], zero ring = dry
-    dry_x = (1.0 - mp[1:-1, :-2]) + (1.0 - mp[1:-1, 2:])  # west + east
-    dry_y = (1.0 - mp[:-2, 1:-1]) + (1.0 - mp[2:, 1:-1])  # south + north
-    return coeff * mask * (dry_x / dx**2 + dry_y / dy**2)
+        weight = (p0 @ mask_c.ravel()).reshape(ny, nx)  # sum of wet weights
+        scale = np.where(weight > 0, mask_f / np.where(weight > 0, weight, 1.0), 0.0)
+    else:
+        scale = mask_f.copy()
+    p = sparse.diags(scale.ravel()) @ p0 @ sparse.diags(mask_c.ravel())
+    return mask_c, scale, p.tocsr()
 
 
-def _restrict_coeff(
+def _fine_stencil(
     coeff: np.ndarray,
-    mask_fine: np.ndarray,
-    mask_coarse: np.ndarray,
-) -> np.ndarray:
-    """Coarsen a cell-centre coefficient field by 2x (mask-weighted average).
-
-    Each coarse cell averages the coefficient over its four fine sub-cells,
-    weighted by the fine mask to avoid contamination from land cells::
-
-        c_coarse[J, I] = sum(c_fine * m_fine over 2x2 block)
-                         / max(sum(m_fine over 2x2 block), 1)
-
-    Parameters
-    ----------
-    coeff : ndarray, shape (Ny, Nx)
-        Fine-grid coefficient.
-    mask_fine : ndarray, shape (Ny, Nx)
-        Fine-grid mask.
-    mask_coarse : ndarray, shape (Ny//2, Nx//2)
-        Coarse-grid mask (from :func:`_restrict_mask`).
-
-    Returns
-    -------
-    ndarray, shape (Ny//2, Nx//2)
-        Coarsened coefficient, zeroed outside the coarse mask.
-    """
-    c_m = coeff * mask_fine
-    sum4 = c_m[::2, ::2] + c_m[1::2, ::2] + c_m[::2, 1::2] + c_m[1::2, 1::2]
-    count = (
-        mask_fine[::2, ::2]
-        + mask_fine[1::2, ::2]
-        + mask_fine[::2, 1::2]
-        + mask_fine[1::2, 1::2]
-    )
-    divisor = np.maximum(count, 1.0)
-    return (sum4 / divisor) * mask_coarse
-
-
-def _compute_inv_diagonal(
-    cx: np.ndarray,
-    cy: np.ndarray,
-    wall: np.ndarray,
     mask: np.ndarray,
     dx: float,
     dy: float,
     lambda_: float,
+    bc: str,
 ) -> np.ndarray:
-    """Precompute ``1 / diag(A)`` for the weighted Jacobi smoother.
+    """5-point stencil of ``div(c grad u) - lambda u`` on the finest grid.
 
-    The diagonal entry of the variable-coefficient Helmholtz operator at
-    cell ``(j, i)`` collects the coefficients of ``u[j, i]`` in the stencil::
+    Face coefficients are the mean of the two cell values on a wet–wet face.
+    A wet–dry face (land, or outside the array) keeps the wet cell's ``c``
+    and sees ``u = 0`` beyond it for ``bc="dirichlet"`` (only the diagonal
+    changes), and carries no flux for ``bc="neumann"``::
 
-        diag[j, i] = -(cx[j, i] + cx[j, i-1]) / dx**2
-                     -(cy[j, i] + cy[j-1, i]) / dy**2
-                     - wall[j, i] - lambda
+        (Au)[j,i] = sum_f c_f (u_nb - u[j,i]) / h_f**2 - lambda u[j,i]
 
-    where ``cx[j, i]`` is the x-face coefficient between ``(j,i)`` and
-    ``(j,i+1)`` and ``cx[j, i-1]`` is the face between ``(j,i-1)`` and
-    ``(j,i)``.  Outside the mask, ``diag = 0`` and the inverse is set to 0.
+    With ``c = 1`` and Dirichlet this is :func:`masked_laplacian` with dry
+    neighbours zero (no periodic wrap).
 
     Parameters
     ----------
-    cx, cy : ndarray, shape (Ny, Nx)
-        Face coefficients (from :func:`_interpolate_coeff_to_faces`).
-    wall : ndarray, shape (Ny, Nx)
-        Dirichlet wall sink (from :func:`_compute_wall_coefficient`).
+    coeff : ndarray, shape (Ny, Nx)
+        Cell coefficient ``c``, zero on dry cells.
     mask : ndarray, shape (Ny, Nx)
-        Cell-centre mask.
+        Cell mask (1 = wet).
     dx, dy : float
         Grid spacings.
     lambda_ : float
         Helmholtz parameter.
+    bc : {"dirichlet", "neumann"}
+        Wall condition.
 
     Returns
     -------
-    ndarray, shape (Ny, Nx)
-        Inverse diagonal, zeroed outside the mask.  Used by
-        :func:`_weighted_jacobi` as ``D^{-1}`` in the update formula.
+    ndarray, shape (5, Ny, Nx)
+        Coefficients for :data:`_OFFSETS_5` (centre, west, east, south,
+        north), zero on dry rows and towards dry neighbours.
     """
-    # Shift face coefficients to get the "west" and "south" faces at (j, i).
-    # cx_west[j, i] = cx[j, i-1] = face between cells (j, i-1) and (j, i)
-    cx_west = np.zeros_like(cx)
-    cx_west[:, 1:] = cx[:, :-1]
-    # cy_south[j, i] = cy[j-1, i] = face between cells (j-1, i) and (j, i)
-    cy_south = np.zeros_like(cy)
-    cy_south[1:, :] = cy[:-1, :]
+    mp = np.pad(mask, 1)  # [Ny+2, Nx+2], zero ring = dry
+    cp = np.pad(coeff * mask, 1)
+    c = cp[1:-1, 1:-1]
+    stencil = np.zeros((5, *mask.shape))
+    centre = -lambda_ * mask
+    for k, (dj, di) in enumerate(_OFFSETS_5[1:], start=1):
+        h2 = dx**2 if dj == 0 else dy**2
+        m_nb = mp[1 + dj : mp.shape[0] - 1 + dj, 1 + di : mp.shape[1] - 1 + di]
+        c_nb = cp[1 + dj : cp.shape[0] - 1 + dj, 1 + di : cp.shape[1] - 1 + di]
+        # wet-wet face: c_f = (c[j,i] + c_nb) / 2, couples to the neighbour
+        c_face = 0.5 * (c + c_nb) * mask * m_nb
+        stencil[k] = c_face / h2
+        centre = centre - c_face / h2
+        if bc == "dirichlet":
+            # wet-dry face: c_f = c[j,i], neighbour value 0 -> diagonal only
+            centre = centre - c * mask * (1.0 - m_nb) / h2
+    stencil[0] = centre
+    return stencil
 
-    # Diagonal = sum of (negative) face contributions, wall sink, minus lambda
-    diag = -(cx + cx_west) / dx**2 - (cy + cy_south) / dy**2 - wall - lambda_
-    diag *= mask
 
-    # Safe inversion: avoid division by zero outside domain / on land cells.
-    # Two-step where() avoids evaluating 1.0/0.0 on all elements.
-    safe_diag = np.where(np.abs(diag) > 1e-30, diag, 1.0)
-    inv_diag = np.where(np.abs(diag) > 1e-30, 1.0 / safe_diag, 0.0)
-    return inv_diag * mask
+def _stencil_to_sparse(
+    stencil: np.ndarray, offsets: tuple[tuple[int, int], ...]
+) -> sparse.csr_matrix:
+    """Sparse matrix of a stencil operator (zero-padded beyond the array)."""
+    _, ny, nx = stencil.shape
+    idx = np.arange(ny * nx).reshape(ny, nx)
+    rows, cols, vals = [], [], []
+    for k, (dj, di) in enumerate(offsets):
+        j0, j1 = max(0, -dj), min(ny, ny - dj)
+        i0, i1 = max(0, -di), min(nx, nx - di)
+        rows.append(idx[j0:j1, i0:i1].ravel())
+        cols.append(idx[j0 + dj : j1 + dj, i0 + di : i1 + di].ravel())
+        vals.append(stencil[k, j0:j1, i0:i1].ravel())
+    rows, cols, vals = (np.concatenate(a) for a in (rows, cols, vals))
+    nz = vals != 0
+    return sparse.csr_matrix((vals[nz], (rows[nz], cols[nz])), shape=(ny * nx, ny * nx))
+
+
+def _sparse_to_stencil(a: sparse.csr_matrix, shape: tuple[int, int]) -> np.ndarray:
+    """9-point stencil of a sparse operator on ``shape`` (:data:`_OFFSETS_9`)."""
+    ny, nx = shape
+    idx = np.arange(ny * nx).reshape(ny, nx)
+    a = a.tocsr()
+    stencil = np.zeros((9, ny, nx))
+    for k, (dj, di) in enumerate(_OFFSETS_9):
+        j0, j1 = max(0, -dj), min(ny, ny - dj)
+        i0, i1 = max(0, -di), min(nx, nx - di)
+        rows = idx[j0:j1, i0:i1].ravel()
+        cols = idx[j0 + dj : j1 + dj, i0 + di : i1 + di].ravel()
+        stencil[k, j0:j1, i0:i1] = np.asarray(a[rows, cols]).reshape(j1 - j0, i1 - i0)
+    # the Galerkin product of a 9-point (or 5-point) operator with nested
+    # bilinear transfers is 9-point: nothing may fall outside the stencil
+    total = float(abs(a).sum())
+    assert abs(float(np.abs(stencil).sum()) - total) <= 1e-12 * max(total, 1.0)
+    return stencil
+
+
+def _symmetric_inverse(a: np.ndarray) -> np.ndarray:
+    """Inverse of a symmetric matrix on its range (eigendecomposition).
+
+    Eigenvalues below ``1e-10 * max|eig|`` are dropped, so the result is the
+    exact inverse of a non-singular operator and the pseudo-inverse of the
+    singular Neumann ``lambda = 0`` operator (its round-off-sized null
+    eigenvalues would otherwise give entries ~1e13).  The cut-off is
+    relative, so it does not depend on the units of the operator.
+    """
+    if a.size == 0:
+        return a.copy()
+    w, v = np.linalg.eigh(a)
+    ok = np.abs(w) > 1e-10 * np.abs(w).max()
+    return (v[:, ok] / w[ok]) @ v[:, ok].T
+
+
+def _inverse_diagonal(diag: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """``1 / diag(A)`` on wet points for the Jacobi smoother, else 0.
+
+    A zero diagonal (a Neumann lake entirely inside one coarse point at
+    ``lambda = 0``) gets no Jacobi update; the threshold is relative, so it
+    does not depend on the units of the operator.
+    """
+    big = float(np.abs(diag).max()) if diag.size else 0.0
+    ok = (np.abs(diag) > 1e-12 * big) & (mask > 0)
+    return np.where(ok, 1.0 / np.where(ok, diag, 1.0), 0.0)
 
 
 # ---------------------------------------------------------------------------
@@ -342,36 +407,38 @@ class MultigridLevel(eqx.Module):
     Attributes
     ----------
     mask : Float[Array, "Ny Nx"]
-        Cell-centre domain mask (1 = fluid, 0 = land) at this level's
-        resolution.
-    cx : Float[Array, "Ny Nx"]
-        X-direction face coefficient, including face mask.
-        ``cx[j, i]`` is the coefficient on the face between cells
-        ``(j, i)`` and ``(j, i+1)``.  Zero if either cell is land.
-    cy : Float[Array, "Ny Nx"]
-        Y-direction face coefficient, including face mask.
-        ``cy[j, i]`` is the coefficient on the face between cells
-        ``(j, i)`` and ``(j+1, i)``.  Zero if either cell is land.
-    wall : Float[Array, "Ny Nx"]
-        Diagonal sink ``sum c_f / h**2`` over the wet–dry faces of each wet
-        cell (dry neighbour = 0, Dirichlet); zero for ``bc="neumann"``.
+        Domain mask (1 = fluid, 0 = land) at this level's resolution.
+    stencil : Float[Array, "K Ny Nx"]
+        Operator coefficients for each offset in ``offsets``::
+
+            (A u)[j, i] = sum_k stencil[k, j, i] * u[j + dj_k, i + di_k]
+
+        (``u`` zero beyond the array and on dry points).  The finest level
+        is the 5-point discretisation, coarser levels the 9-point Galerkin
+        products ``R A P``.
+    offsets : tuple of (int, int)
+        The ``(dj, di)`` of each stencil entry (static).
+    inv_diagonal : Float[Array, "Ny Nx"]
+        Precomputed ``1 / diag(A)`` for the weighted Jacobi smoother.
+        Zero outside the mask.
+    prolong_scale : Float[Array, "Ny Nx"] or None
+        Row scale ``s`` of the prolongation from the next coarser level,
+        ``P = diag(s) P0 diag(m_c)`` (see :func:`_prolongate`); ``None`` on
+        the coarsest level.
     dx, dy : float
         Grid spacing at this level (doubles at each coarser level).
     lambda_ : float
         Helmholtz parameter (same on all levels).
-    inv_diagonal : Float[Array, "Ny Nx"]
-        Precomputed ``1 / diag(A)`` for the weighted Jacobi smoother.
-        Zero outside the mask.
     """
 
     mask: Float[Array, "Ny Nx"]
-    cx: Float[Array, "Ny Nx"]
-    cy: Float[Array, "Ny Nx"]
-    wall: Float[Array, "Ny Nx"]
+    stencil: Float[Array, "K Ny Nx"]
+    inv_diagonal: Float[Array, "Ny Nx"]
+    prolong_scale: Float[Array, "Ny Nx"] | None
     dx: float
     dy: float
     lambda_: float = eqx.field(static=True)
-    inv_diagonal: Float[Array, "Ny Nx"]
+    offsets: tuple[tuple[int, int], ...] = eqx.field(static=True, default=_OFFSETS_5)
 
 
 # ---------------------------------------------------------------------------
@@ -383,41 +450,22 @@ def _apply_operator(
     u: Float[Array, "Ny Nx"],
     level: MultigridLevel,
 ) -> Float[Array, "Ny Nx"]:
-    r"""Apply the variable-coefficient Helmholtz operator: A u.
+    r"""Apply the level's Helmholtz operator: A u.
 
-    Discrete stencil (5-point, conservative finite-volume form)::
+    Stencil form, with ``u`` zeroed on dry points and zero-padded beyond
+    the array (nothing wraps across opposite edges)::
 
-        (Au)[j,i] =
-          (cx[j,i] * (u[j,i+1] - u[j,i]) - cx[j,i-1] * (u[j,i] - u[j,i-1])) / dx^2
-        + (cy[j,i] * (u[j+1,i] - u[j,i]) - cy[j-1,i] * (u[j,i] - u[j-1,i])) / dy^2
-        - wall[j,i] * u[j,i] - lambda * u[j,i]
+        (A u)[j, i] = sum_k stencil[k, j, i] * u[j + dj_k, i + di_k]
 
-    This is a discrete approximation of ``div(c grad u) - lambda u``.  The
-    ``cx`` / ``cy`` face coefficients already include the face mask, so
-    they carry the wet–wet fluxes only.
+    On the finest level this is the 5-point finite-volume stencil::
 
-    Boundary treatment
-    ~~~~~~~~~~~~~~~~~~
-    The wet–dry faces (land and the array edge) are set by ``wall``:
+        (Au)[j,i] = sum over the 4 faces f of c_f (u_nb - u[j,i]) / h_f^2
+                    - lambda u[j,i]
 
-    * ``bc="dirichlet"``: the dry neighbour's value is 0, so each wet–dry
-      face adds ``c_f (0 - u[j,i]) / h**2``, i.e. ``-wall[j,i] u[j,i]``.
-      With ``c = 1`` this is exactly :func:`masked_laplacian` (dry
-      neighbours zero, no periodic wrap).
-    * ``bc="neumann"``: ``wall = 0``, no flux crosses a wet–dry face.
-
-    Out-of-bounds neighbours are zero-padded, so nothing wraps across
-    opposite edges.
-
-    Implementation note
-    ~~~~~~~~~~~~~~~~~~~
-    Shifted arrays are constructed via ``jnp.zeros_like().at[].set()``
-    rather than ``jnp.roll``.  The zero padding is a convenience that
-    avoids periodic wrapping; the actual BC is enforced by the zeroed
-    face coefficients at boundary faces::
-
-        u_east[j, i] = u[j, i+1]   for i < Nx-1
-                      = 0           for i = Nx-1   (ghost = 0)
+    with ``u_nb = 0`` beyond a wet–dry face for ``bc="dirichlet"`` and no
+    flux through it for ``bc="neumann"`` (see :func:`_fine_stencil`).  With
+    ``c = 1`` and Dirichlet it equals :func:`masked_laplacian` with dry
+    neighbours zero.
 
     Parameters
     ----------
@@ -431,75 +479,16 @@ def _apply_operator(
     Float[Array, "Ny Nx"]
         Result of ``A u``, zeroed outside the mask.
     """
-    u_m = u * level.mask  # zero u outside domain before computing fluxes
-    cx, cy = level.cx, level.cy
-    dx2 = level.dx**2
-    dy2 = level.dy**2
-
-    # --- Shifted neighbours (zero-padded; actual BC via zeroed face coeffs) ---
-    # u_east[j, i] = u[j, i+1];  u_east[j, Nx-1] = 0
-    u_east = jnp.zeros_like(u_m).at[:, :-1].set(u_m[:, 1:])
-    # u_west[j, i] = u[j, i-1];  u_west[j, 0] = 0
-    u_west = jnp.zeros_like(u_m).at[:, 1:].set(u_m[:, :-1])
-    # u_north[j, i] = u[j+1, i]; u_north[Ny-1, i] = 0
-    u_north = jnp.zeros_like(u_m).at[:-1, :].set(u_m[1:, :])
-    # u_south[j, i] = u[j-1, i]; u_south[0, i] = 0
-    u_south = jnp.zeros_like(u_m).at[1:, :].set(u_m[:-1, :])
-
-    # --- Shifted face coefficients ---
-    # cx_west[j, i] = cx[j, i-1] (face between (j,i-1) and (j,i))
-    cx_west = jnp.zeros_like(cx).at[:, 1:].set(cx[:, :-1])
-    # cy_south[j, i] = cy[j-1, i] (face between (j-1,i) and (j,i))
-    cy_south = jnp.zeros_like(cy).at[1:, :].set(cy[:-1, :])
-
-    # --- Assemble the 5-point stencil ---
-    # x-flux divergence: [cx_{j,i} * (u_{j,i+1} - u_{j,i})
-    #                    - cx_{j,i-1} * (u_{j,i} - u_{j,i-1})] / dx^2
-    # y-flux divergence: analogous in the y-direction
-    lap = (cx * (u_east - u_m) - cx_west * (u_m - u_west)) / dx2 + (
-        cy * (u_north - u_m) - cy_south * (u_m - u_south)
-    ) / dy2
-
-    return (lap - (level.wall + level.lambda_) * u_m) * level.mask
-
-
-def _project_zero_mean(
-    u: Float[Array, "Ny Nx"],
-    mask: Float[Array, "Ny Nx"],
-    labels: Int[Array, "Ny Nx"],
-    counts: Float[Array, " n"],
-) -> Float[Array, "Ny Nx"]:
-    """Remove the wet mean of *u* on each connected wet component.
-
-    The Neumann operator at ``lambda = 0`` annihilates a constant on every
-    connected wet component, so ``A u = rhs`` is solvable only for a
-    zero-mean ``rhs`` and fixes ``u`` up to those constants.  This
-    orthogonal projection (symmetric, idempotent) imposes the zero-mean
-    gauge::
-
-        u[j, i] <- u[j, i] - mean(u over the component of (j, i))
-
-    Parameters
-    ----------
-    u : Float[Array, "Ny Nx"]
-        Field to project.
-    mask : Float[Array, "Ny Nx"]
-        Wet mask.
-    labels : Int[Array, "Ny Nx"]
-        Component label of each cell (0 = dry, 1..n wet components).
-    counts : Float[Array, " n"]
-        Wet-cell count per label (``counts[0]`` is unused, set to 1).
-
-    Returns
-    -------
-    Float[Array, "Ny Nx"]
-        Projected field, zero on dry cells.
-    """
-    u_m = u * mask
-    # per-component sum, [n_components + 1]
-    sums = jax.ops.segment_sum(u_m.ravel(), labels.ravel(), counts.shape[0])
-    mean = (sums / counts)[labels]  # [Ny, Nx]
-    return (u_m - mean) * mask
+    ny, nx = u.shape
+    # the hierarchy is float64; compute in the dtype of u (contract 7)
+    mask = level.mask.astype(u.dtype)
+    stencil = level.stencil.astype(u.dtype)  # [K, Ny, Nx]
+    up = jnp.pad(u * mask, 1)  # [Ny+2, Nx+2], zero beyond the array
+    out = jnp.zeros_like(up[1:-1, 1:-1])
+    for k, (dj, di) in enumerate(level.offsets):
+        # term k: stencil[k, j, i] * u[j + dj, i + di]
+        out = out + stencil[k] * up[1 + dj : 1 + dj + ny, 1 + di : 1 + di + nx]
+    return out * mask
 
 
 def _weighted_jacobi(
@@ -528,9 +517,10 @@ def _weighted_jacobi(
     the coarse grid, where those low-frequency modes become high-frequency
     and can be damped cheaply.
 
-    The weight ``omega < 1`` (typically 0.8-0.95) under-relaxes the update
-    to prevent amplification of certain error modes, improving smoothing
-    for the 5-point stencil.
+    The weight ``omega < 1`` under-relaxes the update so the
+    highest-frequency (checkerboard) modes are damped too; ``omega = 0.8``
+    (the default) damps the whole upper half of the 5-point spectrum by at
+    least 3/5 per sweep.
 
     Parameters
     ----------
@@ -541,7 +531,7 @@ def _weighted_jacobi(
     level : MultigridLevel
         Operator data (includes ``inv_diagonal`` = ``D^{-1}``).
     omega : float
-        Relaxation weight, typically 0.8-0.95.
+        Relaxation weight (default 0.8).
     n_iters : int
         Number of Jacobi sweeps.
 
@@ -551,148 +541,125 @@ def _weighted_jacobi(
         Smoothed solution, zeroed outside the mask.
     """
 
+    inv_diag = level.inv_diagonal.astype(u.dtype)  # hierarchy is float64
+    mask = level.mask.astype(u.dtype)
+
     def _step(_, u_cur: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         r = rhs - _apply_operator(u_cur, level)  # residual: r = f - A u
-        return (u_cur + omega * level.inv_diagonal * r) * level.mask
+        return (u_cur + omega * inv_diag * r) * mask
 
     return jax.lax.fori_loop(0, n_iters, _step, u)
 
 
-def _restrict(
-    v: Float[Array, "Ny Nx"],
-    mask_fine: Float[Array, "Ny Nx"],
-    mask_coarse: Float[Array, "Ny_c Nx_c"],
-) -> Float[Array, "Ny_c Nx_c"]:
-    """Cell-centred full-weighting restriction (fine -> coarse).
+def _interp_axis(v: Array, n_fine: int, axis: int) -> Array:
+    """Linear interpolation between nested points along *axis* (``P0_1d v``).
 
-    Transfers a fine-grid field to the coarse grid by averaging each 2x2
-    block of fine cells, weighted by the mask to handle irregular domains::
+    ::
 
-        v_coarse[J, I] = sum(v_fine[j,i] * mask_fine[j,i]  for (j,i) in block)
-                       / max(sum(mask_fine[j,i]             for (j,i) in block), 1)
+        out[2J]   = v[J]
+        out[2J+1] = (v[J] + v[J+1]) / 2      (v[n_coarse] = 0)
 
-    where the block is ``{(2J, 2I), (2J+1, 2I), (2J, 2I+1), (2J+1, 2I+1)}``.
-
-    The mask-weighted divisor ensures that coarse cells adjacent to land
-    boundaries are averaged over wet fine cells only, preventing land
-    contamination.  If all four fine cells are dry, the divisor clips to 1
-    to avoid division by zero (the result is 0 regardless).
-
-    Parameters
-    ----------
-    v : Float[Array, "Ny Nx"]
-        Fine-grid field to restrict.
-    mask_fine : Float[Array, "Ny Nx"]
-        Fine-grid mask.
-    mask_coarse : Float[Array, "Ny_c Nx_c"]
-        Coarse-grid mask (from :func:`_restrict_mask`).
-
-    Returns
-    -------
-    Float[Array, "Ny_c Nx_c"]
-        Coarsened field, zeroed outside the coarse mask.
+    then cropped to *n_fine* points along *axis*.
     """
-    v_m = v * mask_fine
-    sum4 = v_m[::2, ::2] + v_m[1::2, ::2] + v_m[::2, 1::2] + v_m[1::2, 1::2]
-    count = (
-        mask_fine[::2, ::2]
-        + mask_fine[1::2, ::2]
-        + mask_fine[::2, 1::2]
-        + mask_fine[1::2, 1::2]
-    )
-    divisor = jnp.maximum(count, 1.0)
-    return (sum4 / divisor) * mask_coarse
+    v = jnp.moveaxis(v, axis, 0)  # [n_c, ...]
+    vp = jnp.concatenate([v, jnp.zeros_like(v[:1])], axis=0)  # [n_c+1, ...]
+    odd = 0.5 * (vp[:-1] + vp[1:])  # out[2J+1], [n_c, ...]
+    out = jnp.stack([v, odd], axis=1).reshape(2 * v.shape[0], *v.shape[1:])
+    return jnp.moveaxis(out[:n_fine], 0, axis)
+
+
+def _interp_axis_t(w: Array, n_coarse: int, axis: int) -> Array:
+    """Transpose of :func:`_interp_axis` along *axis* (``P0_1dᵀ w``).
+
+    ::
+
+        out[J] = w[2J] + (w[2J+1] + w[2J-1]) / 2      (w beyond the array = 0)
+    """
+    w = jnp.moveaxis(w, axis, 0)  # [n_f, ...]
+    pad = 2 * n_coarse - w.shape[0]  # 0 or 1 trailing zero
+    w = jnp.concatenate([w, jnp.zeros((pad, *w.shape[1:]), w.dtype)], axis=0)
+    even, odd = w[0::2], w[1::2]  # w[2J], w[2J+1]; [n_c, ...] each
+    odd_prev = jnp.concatenate([jnp.zeros_like(odd[:1]), odd[:-1]], axis=0)
+    return jnp.moveaxis(even + 0.5 * (odd + odd_prev), 0, axis)
 
 
 def _prolongate(
     v_coarse: Float[Array, "Ny_c Nx_c"],
     mask_coarse: Float[Array, "Ny_c Nx_c"],
-    mask_fine: Float[Array, "Ny Nx"],
+    scale: Float[Array, "Ny Nx"],
 ) -> Float[Array, "Ny Nx"]:
-    r"""Cell-centred bilinear prolongation (coarse -> fine).
+    r"""Bilinear prolongation between nested points (coarse -> fine).
 
-    Each coarse cell ``(J, I)`` maps to four fine sub-cells at positions
-    ``(2J, 2I)``, ``(2J, 2I+1)``, ``(2J+1, 2I)``, ``(2J+1, 2I+1)``.
-    The value at each sub-cell is a bilinear interpolation using the
-    coarse cell and its three nearest neighbours, weighted 9/3/3/1::
+    Coarse point ``(J, I)`` sits on fine point ``(2J, 2I)``; the fine points
+    in between are interpolated linearly in each direction::
 
-        v_fine[2J, 2I] = (9*v[J,I] + 3*v[J,I-1] + 3*v[J-1,I] + v[J-1,I-1])
-                        / (9*m[J,I] + 3*m[J,I-1] + 3*m[J-1,I] + m[J-1,I-1])
+        v_f[2J,   2I  ] = v_c[J, I]
+        v_f[2J,   2I+1] = (v_c[J, I] + v_c[J, I+1]) / 2
+        v_f[2J+1, 2I  ] = (v_c[J, I] + v_c[J+1, I]) / 2
+        v_f[2J+1, 2I+1] = (v_c[J, I] + v_c[J, I+1] + v_c[J+1, I] + v_c[J+1, I+1]) / 4
 
-    The other three sub-cells use the same weights but with shifted
-    neighbour directions (e.g. ``(J, I+1)`` instead of ``(J, I-1)``).
-
-    The 9:3:3:1 ratio comes from bilinear interpolation distances:
-    the sub-cell at ``(2J, 2I)`` is closest to coarse cell ``(J, I)``
-    (distance 0.25*dx in each direction), and farthest from the
-    diagonal neighbour ``(J-1, I-1)`` (distance 0.75*dx in each direction).
-    The weight is ``(1-d_x)(1-d_y)`` where ``d`` is the normalised distance.
-
-    The mask-weighted divisor handles irregular boundaries: if a coarse
-    neighbour is land (mask=0), its contribution is excluded and the
-    remaining weights are renormalised.
+    with dry coarse values taken as zero, then scaled row-wise:
+    ``P = diag(scale) P0 diag(m_c)`` (``scale = m_f`` for Dirichlet,
+    ``m_f / (P0 m_c)`` for Neumann, see :func:`_transfer_operators`).
 
     Parameters
     ----------
     v_coarse : Float[Array, "Ny_c Nx_c"]
-        Coarse-grid field to prolongate.
+        Coarse-grid field, ``Ny_c = (Ny + 1) // 2``.
     mask_coarse : Float[Array, "Ny_c Nx_c"]
         Coarse-grid mask.
-    mask_fine : Float[Array, "Ny Nx"]
-        Fine-grid mask.
+    scale : Float[Array, "Ny Nx"]
+        Row scale of ``P`` (``MultigridLevel.prolong_scale`` of the fine
+        level); its shape sets the fine shape.
 
     Returns
     -------
     Float[Array, "Ny Nx"]
-        Interpolated fine-grid field, zeroed outside the fine mask.
+        Interpolated fine-grid field, zero outside the fine mask.
     """
-    ny_c, nx_c = v_coarse.shape
-    ny_f, nx_f = 2 * ny_c, 2 * nx_c
-    v_m = v_coarse * mask_coarse
-    m = mask_coarse
+    ny, nx = scale.shape
+    dtype = v_coarse.dtype
+    v = v_coarse * mask_coarse.astype(dtype)  # [Ny_c, Nx_c]
+    v = _interp_axis(v, ny, axis=0)  # [Ny, Nx_c]
+    v = _interp_axis(v, nx, axis=1)  # [Ny, Nx]
+    return v * scale.astype(dtype)
 
-    # Pad with zeros for neighbour access at boundaries (ghost ring).
-    # After padding: padded[1:-1, 1:-1] == original array.
-    vp = jnp.pad(v_m, ((1, 1), (1, 1)), mode="constant")
-    mp = jnp.pad(m, ((1, 1), (1, 1)), mode="constant")
 
-    # Centre slice of padded array (the original coarse grid)
-    vc = vp[1:-1, 1:-1]
-    mc = mp[1:-1, 1:-1]
+def _restrict(
+    v: Float[Array, "Ny Nx"],
+    scale: Float[Array, "Ny Nx"],
+    mask_coarse: Float[Array, "Ny_c Nx_c"],
+) -> Float[Array, "Ny_c Nx_c"]:
+    """Full-weighting restriction, the scaled transpose of :func:`_prolongate`.
 
-    def _interp(dj: int, di: int) -> Float[Array, "Ny_c Nx_c"]:
-        """Bilinear interpolation for sub-cell at offset ``(dj, di)`` in {0,1}^2.
+    ``R = Pᵀ / 4``, so ``<R v, w>_c = <v, P w>_f / 4`` exactly.  Away from
+    walls (``scale = 1``) it is the 9-point full-weighting average::
 
-        ``dj=0, di=0`` -> upper-left sub-cell (nearest to ``(J-1, I-1)``)
-        ``dj=0, di=1`` -> upper-right sub-cell (nearest to ``(J-1, I+1)``)
-        ``dj=1, di=0`` -> lower-left sub-cell (nearest to ``(J+1, I-1)``)
-        ``dj=1, di=1`` -> lower-right sub-cell (nearest to ``(J+1, I+1)``)
-        """
-        # Map {0,1} offset to {-1,+1} neighbour direction
-        sj = 2 * dj - 1  # -1 for dj=0 (look at J-1), +1 for dj=1 (look at J+1)
-        si = 2 * di - 1  # -1 for di=0 (look at I-1), +1 for di=1 (look at I+1)
+        v_c[J, I] = (4 v[2J, 2I] + 2 (v[2J, 2I±1] + v[2J±1, 2I])
+                     + v[2J±1, 2I±1]) / 16
 
-        # Extract neighbour values and masks from padded array via static slicing
-        v_si = vp[1:-1, 1 + si : nx_c + 1 + si]  # horizontal neighbour
-        m_si = mp[1:-1, 1 + si : nx_c + 1 + si]
-        v_sj = vp[1 + sj : ny_c + 1 + sj, 1:-1]  # vertical neighbour
-        m_sj = mp[1 + sj : ny_c + 1 + sj, 1:-1]
-        v_diag = vp[1 + sj : ny_c + 1 + sj, 1 + si : nx_c + 1 + si]  # diagonal
-        m_diag = mp[1 + sj : ny_c + 1 + sj, 1 + si : nx_c + 1 + si]
+    The transpose (rather than an independent average) makes the V-cycle
+    symmetric and the Galerkin coarse operator ``R A P`` consistent.
 
-        # 9/3/3/1 weighted sum (bilinear weights)
-        w_sum = 9 * vc + 3 * v_si + 3 * v_sj + 1 * v_diag
-        d_sum = 9 * mc + 3 * m_si + 3 * m_sj + 1 * m_diag
-        return w_sum / jnp.maximum(d_sum, 1.0)
+    Parameters
+    ----------
+    v : Float[Array, "Ny Nx"]
+        Fine-grid field to restrict (e.g. the residual).
+    scale : Float[Array, "Ny Nx"]
+        Row scale of ``P`` (``MultigridLevel.prolong_scale``).
+    mask_coarse : Float[Array, "Ny_c Nx_c"]
+        Coarse-grid mask.
 
-    # Scatter the four sub-cell values into the fine grid
-    v_fine = jnp.zeros((ny_f, nx_f))
-    v_fine = v_fine.at[::2, ::2].set(_interp(0, 0))  # sub-cell (2J,   2I)
-    v_fine = v_fine.at[::2, 1::2].set(_interp(0, 1))  # sub-cell (2J,   2I+1)
-    v_fine = v_fine.at[1::2, ::2].set(_interp(1, 0))  # sub-cell (2J+1, 2I)
-    v_fine = v_fine.at[1::2, 1::2].set(_interp(1, 1))  # sub-cell (2J+1, 2I+1)
-
-    return v_fine * mask_fine
+    Returns
+    -------
+    Float[Array, "Ny_c Nx_c"]
+        Coarse field, zero outside the coarse mask.
+    """
+    ny_c, nx_c = mask_coarse.shape
+    w = v * scale.astype(v.dtype)  # [Ny, Nx]
+    w = _interp_axis_t(w, nx_c, axis=1)  # [Ny, Nx_c]
+    w = _interp_axis_t(w, ny_c, axis=0)  # [Ny_c, Nx_c]
+    return 0.25 * w * mask_coarse.astype(v.dtype)
 
 
 # ---------------------------------------------------------------------------
@@ -718,19 +685,26 @@ class MultigridSolver(eqx.Module):
                                | restrict    prolong |
         Level 1           .....*---smooth---*---smooth---*.....
                                     | restrict  prolong |
-        Level 2 (coarse)  ..........*--bottom solve--*..........
+        Level 2 (coarse)  ..........*--exact solve--*..........
 
     At each level:
 
     1. **Pre-smooth** (nu_1 weighted Jacobi iterations): damp
        high-frequency error.
     2. **Compute residual**: ``r = rhs - A u``.
-    3. **Restrict** residual to the coarse grid (2x2 averaging).
-    4. **Recurse**: solve for the error on the coarse grid.
+    3. **Restrict** the residual to the coarse grid (full weighting,
+       ``R = Pᵀ / 4``).
+    4. **Recurse**: solve for the error on the coarse grid, whose operator
+       is the Galerkin product ``A_c = R A P``.
     5. **Prolongate** the coarse correction back to the fine grid
-       (bilinear interpolation).
+       (bilinear interpolation ``P``).
     6. **Post-smooth** (nu_2 weighted Jacobi iterations): damp any
        high-frequency error introduced by the prolongation.
+
+    The coarsest level is solved exactly (an inverse precomputed at build
+    time).  With ``n_pre == n_post`` one V-cycle from a zero guess,
+    ``r -> v_cycle(0, r)``, is a symmetric linear operator, so it is a valid
+    CG preconditioner.
 
     The recursion is **statically unrolled** at JAX trace time because
     each level has a different array shape.  All integer parameters
@@ -766,12 +740,17 @@ class MultigridSolver(eqx.Module):
         Precomputed level data, finest (index 0) to coarsest (index L-1).
     n_levels : int
         Number of multigrid levels.
+    bottom_inverse : Float[Array, "n_wet n_wet"]
+        Inverse of the coarsest operator on its wet points (the
+        pseudo-inverse, with a relative eigenvalue cut-off, for the singular
+        Neumann ``lambda = 0`` problem).
+    bottom_index : Int[Array, " n_wet"]
+        Flat (row-major) indices of the coarsest level's wet points.
     n_pre, n_post : int
-        Pre- and post-smoothing iterations (weighted Jacobi).
-    n_coarse : int
-        Jacobi iterations on the coarsest grid (bottom solver).
+        Pre- and post-smoothing iterations (weighted Jacobi).  Keep them
+        equal for a symmetric V-cycle.
     omega : float
-        Jacobi relaxation weight (typically 0.8-0.95).
+        Jacobi relaxation weight.
     n_cycles : int
         Number of V-cycles per solve.
     bc : {"dirichlet", "neumann"}
@@ -786,10 +765,11 @@ class MultigridSolver(eqx.Module):
 
     levels: tuple[MultigridLevel, ...]
     n_levels: int = eqx.field(static=True)
-    n_pre: int = eqx.field(static=True, default=6)
-    n_post: int = eqx.field(static=True, default=6)
-    n_coarse: int = eqx.field(static=True, default=50)
-    omega: float = eqx.field(static=True, default=0.95)
+    bottom_inverse: Float[Array, "n_wet n_wet"]
+    bottom_index: Int[Array, " n_wet"]
+    n_pre: int = eqx.field(static=True, default=3)
+    n_post: int = eqx.field(static=True, default=3)
+    omega: float = eqx.field(static=True, default=0.8)
     n_cycles: int = eqx.field(static=True, default=5)
     bc: str = eqx.field(static=True, default="dirichlet")
     null_labels: Array | None = None
@@ -849,7 +829,9 @@ class MultigridSolver(eqx.Module):
 
         The forward result is identical to :meth:`solve_unrolled`.  The
         gradient approximation error is O(rho) where rho is the per-cycle
-        convergence rate (typically 0.1-0.3 for multigrid).
+        convergence rate (about 0.07 per cycle on the default settings,
+        measured on 34² to 258² basins; the one-step gradient is then within
+        5 % of the implicit one).
 
         Gradient structure::
 
@@ -924,12 +906,12 @@ class MultigridSolver(eqx.Module):
         Algorithm::
 
             if coarsest level:
-                return jacobi(u, rhs, n_coarse)   # bottom solve
+                return A_c^{-1} rhs                # exact bottom solve
 
             u = jacobi(u, rhs, n_pre)             # 1. pre-smooth
             r = rhs - A(u)                        # 2. compute residual
-            r_c = restrict(r)                     # 3. restrict to coarse grid
-            e_c = v_cycle(0, r_c, level+1)        # 4. recurse (solve A_c e_c = r_c)
+            r_c = restrict(r)                     # 3. R = P^T / 4
+            e_c = v_cycle(0, r_c, level+1)        # 4. recurse on A_c = R A P
             u = u + prolongate(e_c)               # 5. correct with coarse error
             u = jacobi(u, rhs, n_post)            # 6. post-smooth
 
@@ -952,16 +934,13 @@ class MultigridSolver(eqx.Module):
         Float[Array, "Ny Nx"]
             Improved solution after one V-cycle.
         """
-        level = self.levels[level_idx]
-
         # Singular Neumann problem (lambda = 0): solve in the zero-mean gauge.
         # Projecting the input and output of the finest cycle keeps the
         # V-cycle linear and symmetric (P V P with P an orthogonal projection).
         if level_idx == 0 and self.null_labels is not None:
             rhs = self._project(rhs)
-            u = self._project(self._v_cycle_from(u, rhs, level_idx, level))
-            return u
-        return self._v_cycle_from(u, rhs, level_idx, level)
+            return self._project(self._v_cycle_from(u, rhs, level_idx))
+        return self._v_cycle_from(u, rhs, level_idx)
 
     def _project(self, u: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """Zero-mean projection on each wet component (Neumann, lambda = 0)."""
@@ -970,19 +949,27 @@ class MultigridSolver(eqx.Module):
             u, self.levels[0].mask, self.null_labels, self.null_counts
         )
 
+    def _bottom_solve(self, rhs: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+        """Exact solve on the coarsest level: ``u = A_c^{-1} rhs`` on wet points."""
+        flat = rhs.ravel()  # [Ny_c*Nx_c]
+        idx = self.bottom_index  # [n_wet], distinct flat indices
+        u_wet = self.bottom_inverse.astype(rhs.dtype) @ flat[idx]  # [n_wet]
+        # unique_indices: the scatter is then transposable (jax.linear_transpose)
+        u = jnp.zeros_like(flat).at[idx].set(u_wet, unique_indices=True)
+        return u.reshape(rhs.shape)
+
     def _v_cycle_from(
         self,
         u: Float[Array, "Ny Nx"],
         rhs: Float[Array, "Ny Nx"],
         level_idx: int,
-        level: MultigridLevel,
     ) -> Float[Array, "Ny Nx"]:
         """One V-cycle at *level_idx* without the zero-mean projection."""
-        # --- Coarsest level: iterated Jacobi as the bottom solver ---
-        # The grid is small (typically 8x8 to 16x16), so many Jacobi
-        # iterations are cheap and sufficient for convergence.
+        level = self.levels[level_idx]
+
+        # --- Coarsest level: exact solve (the guess u is not needed) ---
         if level_idx == self.n_levels - 1:
-            return _weighted_jacobi(u, rhs, level, self.omega, self.n_coarse)
+            return self._bottom_solve(rhs)
 
         # 1. Pre-smooth: damp high-frequency error on the current grid
         u = _weighted_jacobi(u, rhs, level, self.omega, self.n_pre)
@@ -990,27 +977,25 @@ class MultigridSolver(eqx.Module):
         # 2. Compute residual: r = f - A(u)
         #    After smoothing, r contains mostly low-frequency error that
         #    the smoother cannot resolve at this grid resolution.
-        r = (rhs - _apply_operator(u, level)) * level.mask
+        mask = level.mask.astype(rhs.dtype)  # the hierarchy is float64
+        r = (rhs - _apply_operator(u, level)) * mask
 
-        # 3. Restrict residual to the coarse grid (2x coarser in each dim)
+        # 3. Restrict the residual to the coarse grid: r_c = P^T r / 4
         coarse_level = self.levels[level_idx + 1]
-        r_coarse = _restrict(r, level.mask, coarse_level.mask)
+        assert level.prolong_scale is not None
+        r_coarse = _restrict(r, level.prolong_scale, coarse_level.mask)
 
-        # 4. Recurse: solve A_c * e_c = r_c on the coarse grid.
-        #    Start from zero because we're solving for the *error*, not
-        #    the solution itself.  On the coarse grid, the low-frequency
-        #    residual becomes high-frequency and can be efficiently damped.
+        # 4. Recurse: solve A_c e_c = r_c (A_c = R A P) for the error,
+        #    starting from zero.
         e_coarse = self.v_cycle(jnp.zeros_like(r_coarse), r_coarse, level_idx + 1)
 
-        # 5. Prolongate (interpolate) the coarse correction back to the
-        #    fine grid and add to the current solution: u <- u + e_fine
-        e_fine = _prolongate(e_coarse, coarse_level.mask, level.mask)
-        u = (u + e_fine) * level.mask
+        # 5. Prolongate the coarse correction and add it: u <- u + P e_c
+        e_fine = _prolongate(e_coarse, coarse_level.mask, level.prolong_scale)
+        u = (u + e_fine) * mask
 
         # 6. Post-smooth: clean up high-frequency error introduced by
         #    the coarse-to-fine interpolation
-        u = _weighted_jacobi(u, rhs, level, self.omega, self.n_post)
-        return u
+        return _weighted_jacobi(u, rhs, level, self.omega, self.n_post)
 
     # -- Internal ------------------------------------------------------------
 
@@ -1041,35 +1026,43 @@ def build_multigrid_solver(
     lambda_: float = 0.0,
     coeff: np.ndarray | Float[Array, "Ny Nx"] | None = None,
     n_levels: int | None = None,
-    n_pre: int = 6,
-    n_post: int = 6,
-    n_coarse: int = 50,
-    omega: float = 0.95,
+    n_pre: int = 3,
+    n_post: int = 3,
+    omega: float = 0.8,
     n_cycles: int = 5,
     bc: Literal["dirichlet", "neumann"] = "dirichlet",
 ) -> MultigridSolver:
     r"""Build a multigrid solver with precomputed level hierarchies.
 
-    This is an **offline** function (runs once on CPU with NumPy) that
-    constructs the entire multigrid hierarchy:
+    This is an **offline** function (runs once on CPU with NumPy / SciPy)
+    that constructs the entire multigrid hierarchy:
 
-    1. **Mask coarsening**: at each level, the cell mask is coarsened by
-       2x via 4-point averaging (threshold >= 0.5).
-    2. **Coefficient interpolation**: the cell-centre coefficient
-       ``c(x, y)`` is averaged to staggered face coefficients ``cx``,
-       ``cy`` at each level, then coarsened for the next level.
-    3. **Diagonal precomputation**: the inverse diagonal ``D^{-1}`` of
-       the Helmholtz operator is computed at each level for the Jacobi
-       smoother.
-    4. **Grid spacing doubling**: ``dx`` and ``dy`` double at each
-       coarser level.
+    1. **Finest operator**: the 5-point stencil of ``div(c grad u) -
+       lambda u``, face coefficients the mean of the two cell values, wet–dry
+       faces set by ``bc`` (below).
+    2. **Coarsening**: each dimension of ``n`` points becomes
+       ``(n + 1) // 2``, coarse point ``J`` on fine point ``2J`` — odd and
+       even sizes alike, so a standard ``N + 2`` grid is as deep as ``N``.
+       A coarse point is wet if its coincident fine point is wet; a point
+       whose interpolation support (fine points ``2J-1 .. 2J+1`` in each
+       direction) only touches wet fine points is added when its
+       prolongation column is linearly independent of the others, so
+       narrow channels keep a coarse unknown and ``P`` keeps full column
+       rank (:func:`_coarse_mask`).
+    3. **Transfers**: bilinear prolongation ``P`` between the nested points
+       (zero at dry coarse points for Dirichlet; renormalised over the wet
+       ones for Neumann) and full-weighting restriction ``R = Pᵀ / 4``.
+    4. **Galerkin coarse operators** ``A_c = R A P`` (9-point stencils),
+       which follow the fine geometry and coefficient exactly.
+    5. **Exact bottom solve**: the inverse of the coarsest operator on its
+       wet points (at most a few dozen unknowns for square grids).
 
-    Grid hierarchy example (64x64, auto levels)::
+    Grid hierarchy example (34x34, a 32-cell interior plus ghost ring)::
 
-        Level 0:  64 x 64   (dx,    dy)     <- finest (solve here)
-        Level 1:  32 x 32   (2*dx,  2*dy)
-        Level 2:  16 x 16   (4*dx,  4*dy)
-        Level 3:   8 x  8   (8*dx,  8*dy)   <- coarsest (bottom solve)
+        Level 0:  34 x 34   (dx,    dy)     <- finest (solve here)
+        Level 1:  17 x 17   (2*dx,  2*dy)
+        Level 2:   9 x  9   (4*dx,  4*dy)
+        Level 3:   5 x  5   (8*dx,  8*dy)   <- coarsest (exact solve)
 
     The returned ``MultigridSolver`` is an immutable ``equinox.Module``
     with frozen JAX arrays.  All subsequent calls (forward solves,
@@ -1078,7 +1071,7 @@ def build_multigrid_solver(
     Boundary condition
     ~~~~~~~~~~~~~~~~~~
     ``bc`` sets what happens on every face between a wet cell and a dry
-    one (land, or outside the array), on every level:
+    one (land, or outside the array):
 
     * ``"dirichlet"`` (default): ``u = 0`` on the dry neighbour, the face
       keeps its coefficient.  With ``coeff=None`` the finest-level operator
@@ -1111,24 +1104,26 @@ def build_multigrid_solver(
         ``None`` -> constant coefficient = 1 everywhere (reduces to the
         standard constant-coefficient Helmholtz operator).
     n_levels : int or None
-        Number of multigrid levels.  ``None`` -> auto-detect by halving
-        until either dimension drops below 8.  Both dimensions must be
-        divisible by ``2**(n_levels - 1)``; a ``ValueError`` is raised
-        otherwise.
+        Number of multigrid levels.  ``None`` -> auto-detect by coarsening
+        while both dimensions stay >= 4 (see :func:`_compute_n_levels`).
+        Any shape works with any ``n_levels >= 1``; ``1`` is a direct
+        solve.
     n_pre, n_post : int
         Number of pre- and post-smoothing Jacobi iterations per V-cycle.
-        More smoothing improves the convergence rate but increases cost
-        per cycle.  Default: 6 each.
-    n_coarse : int
-        Number of Jacobi iterations on the coarsest grid (bottom solver).
-        The coarsest grid is small (typically 8x8), so this is cheap.
-        Default: 50.
+        Keep them equal: the V-cycle is then a symmetric operator (needed
+        when it preconditions CG).  Default: 3 each.
     omega : float
-        Jacobi relaxation weight (0 < omega < 1).  Under-relaxation
-        improves smoothing stability.  Default: 0.95.
+        Jacobi relaxation weight (0 < omega < 1).  Default 0.8, the
+        weight that damps the high-frequency half of the 5-point spectrum
+        best (by at least 3/5 per sweep).
     n_cycles : int
-        Number of V-cycles applied per solve.  5 cycles typically reduce
-        the residual by 3-5 orders of magnitude.  Default: 5.
+        Number of V-cycles applied per solve.  Each cycle reduces the
+        residual by 0.06-0.07 on the default settings (measured on 34² to
+        258² circular basins, independent of the grid size), so 5 cycles
+        reduce it by about 3e-7.  One-cell channels and islands are slower
+        for ``bc="neumann"`` (0.1-0.5 per cycle, measured on 34² masks);
+        use the V-cycle as a CG preconditioner there.
+        Default: 5.
     bc : {"dirichlet", "neumann"}
         Condition on wet–dry faces (see above).  Default: ``"dirichlet"``.
 
@@ -1140,8 +1135,8 @@ def build_multigrid_solver(
     Raises
     ------
     ValueError
-        If grid dimensions are not divisible by ``2**(n_levels - 1)``, or
-        ``bc`` is not ``"dirichlet"`` or ``"neumann"``.
+        If ``n_levels < 1`` or ``bc`` is not ``"dirichlet"`` or
+        ``"neumann"``.
     """
     if bc not in ("dirichlet", "neumann"):
         raise ValueError(f"bc must be 'dirichlet' or 'neumann'; got {bc!r}")
@@ -1157,13 +1152,8 @@ def build_multigrid_solver(
     # --- Auto-detect or validate number of levels ---
     if n_levels is None:
         n_levels = _compute_n_levels(ny, nx)
-    factor = 2 ** (n_levels - 1)
-    if ny % factor != 0 or nx % factor != 0:
-        raise ValueError(
-            f"Grid shape ({ny}, {nx}) is not divisible by "
-            f"2^(n_levels-1) = {factor}.  Choose a different n_levels or "
-            f"pad the grid."
-        )
+    if n_levels < 1:
+        raise ValueError(f"n_levels must be >= 1; got {n_levels}")
 
     # --- Default coefficient: c(x,y) = 1 everywhere ---
     if coeff is None:
@@ -1172,63 +1162,65 @@ def build_multigrid_solver(
         coeff_np = np.asarray(coeff, dtype=np.float64)
     coeff_np = coeff_np * mask_np  # zero outside domain
 
-    # --- Build level hierarchy (finest to coarsest) ---
-    levels: list[MultigridLevel] = []
+    # --- Finest operator, then Galerkin products down the hierarchy ---
     cur_mask = mask_np
-    cur_coeff = coeff_np
     cur_dx, cur_dy = float(dx), float(dy)
+    stencil = _fine_stencil(coeff_np, mask_np, cur_dx, cur_dy, float(lambda_), bc)
+    offsets = _OFFSETS_5
+    a = _stencil_to_sparse(stencil, offsets)  # [Ny*Nx, Ny*Nx]
 
+    levels: list[MultigridLevel] = []
     for lev in range(n_levels):
-        # Interpolate cell-centre coefficient to staggered face coefficients.
-        # cx[j,i] = face coeff between (j,i) and (j,i+1), zero if either is land.
-        # cy[j,i] = face coeff between (j,i) and (j+1,i), zero if either is land.
-        cx, cy = _interpolate_coeff_to_faces(cur_coeff, cur_mask)
-        # Dirichlet: wet-dry faces keep c and see u = 0 beyond them (diagonal)
-        wall = _compute_wall_coefficient(cur_coeff, cur_mask, bc, cur_dx, cur_dy)
+        scale = None
+        next_a = next_mask = None
+        if lev < n_levels - 1:
+            # P = diag(s) P0 diag(m_c);  A_c = R A P with R = P^T / 4
+            next_mask, scale, p = _transfer_operators(cur_mask, bc)
+            next_a = (0.25 * (p.T @ a @ p)).tocsr()
 
-        # Precompute 1/diag(A) for the Jacobi smoother at this level
-        inv_diag = _compute_inv_diagonal(
-            cx, cy, wall, cur_mask, cur_dx, cur_dy, lambda_
-        )
-
-        # Store as frozen JAX arrays
         levels.append(
             MultigridLevel(
-                mask=jnp.array(cur_mask),
-                cx=jnp.array(cx),
-                cy=jnp.array(cy),
-                wall=jnp.array(wall),
+                mask=jnp.asarray(cur_mask),
+                stencil=jnp.asarray(stencil),
+                inv_diagonal=jnp.asarray(_inverse_diagonal(stencil[0], cur_mask)),
+                prolong_scale=None if scale is None else jnp.asarray(scale),
                 dx=cur_dx,
                 dy=cur_dy,
                 lambda_=float(lambda_),
-                inv_diagonal=jnp.array(inv_diag),
+                offsets=offsets,
             )
         )
 
-        # Coarsen mask and coefficient for the next (coarser) level
-        if lev < n_levels - 1:
-            next_mask = _restrict_mask(cur_mask)
-            next_coeff = _restrict_coeff(cur_coeff, cur_mask, next_mask)
-            cur_mask = next_mask
-            cur_coeff = next_coeff
+        if next_a is not None and next_mask is not None:
+            cur_mask, a = next_mask, next_a
+            offsets = _OFFSETS_9
+            stencil = _sparse_to_stencil(a, cur_mask.shape)
             cur_dx *= 2.0  # grid spacing doubles at each coarser level
             cur_dy *= 2.0
+
+    # --- Exact bottom solve: dense inverse on the coarsest wet points ---
+    wet = np.flatnonzero(cur_mask.ravel() > 0)
+    if wet.size > _MAX_BOTTOM:
+        raise ValueError(
+            f"the coarsest level ({cur_mask.shape[0]} x {cur_mask.shape[1]}) has "
+            f"{wet.size} wet points, more than the {_MAX_BOTTOM} the dense bottom "
+            "solve allows; use more levels (n_levels=None picks them)"
+        )
+    a_wet = a.toarray()[np.ix_(wet, wet)]
+    bottom_inverse = _symmetric_inverse(a_wet)
 
     # --- Neumann at lambda = 0: constants per wet component are the null space
     null_labels = null_counts = None
     if bc == "neumann" and lambda_ == 0.0:
-        labels, n_comp = ndimage.label(mask_np > 0)  # 4-connectivity, 0 = dry
-        counts = np.bincount(labels.ravel(), minlength=n_comp + 1).astype(np.float64)
-        counts[0] = 1.0  # dry label: never used as a divisor of wet values
-        null_labels = jnp.asarray(labels)
-        null_counts = jnp.asarray(counts)
+        null_labels, null_counts = _wet_components(mask_np)
 
     return MultigridSolver(
         levels=tuple(levels),
         n_levels=n_levels,
+        bottom_inverse=jnp.asarray(bottom_inverse),
+        bottom_index=jnp.asarray(wet),
         n_pre=n_pre,
         n_post=n_post,
-        n_coarse=n_coarse,
         omega=omega,
         n_cycles=n_cycles,
         bc=bc,
