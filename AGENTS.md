@@ -279,6 +279,13 @@ apply BCs to intermediate fields before chaining operators.
   `FieldBCSet` maps state-dict keys to sets. Ghost values are placed so the
   condition holds **at the face**, half a cell from the interior point (e.g.
   Dirichlet: `ghost = 2 * value - interior`).
+- Atoms also carry a static `point` (`"T"` default, `"U"`, `"V"`, `"X"`).
+  Where the field has a node **on** the wall (`U` / `X` on west / east, `V`
+  / `X` on south / north) the atom writes that node (index `0` or `-2`) and
+  mirrors it into the outside slot `-1`; the normal velocity of a closed
+  wall is `Dirichlet1D(face, 0.0, point="U")` (or
+  `BoundaryConditionSet.closed(point="U")`), never the T-point default,
+  which leaves `U[:, Nx-2]` open.
 - The elliptic wrappers accept a `BoundaryConditionSet` as `bc=` only when
   all four faces are `Dirichlet1D` (→ DST), zero-valued `Neumann1D` (→ DCT)
   or `Periodic1D` (→ FFT); non-zero Dirichlet values become known values via

@@ -65,9 +65,46 @@ $$
 $$
 
 **Physical use cases:**
-- No-slip walls: $u = 0$ on solid boundary.
+- No-slip walls for the tangential velocity: $v = 0$ on a west / east wall.
+- No normal flow through a wall: $u = 0$ on a west / east wall, with
+  `point="U"` (see below).
 - Fixed surface elevation: $\eta = 0$ on rigid lid.
 - Streamfunction: $\psi = 0$ on closed coastline (used by DST Poisson solver).
+
+### Staggered fields: `point=`
+
+The formula above places the wall half a cell outside the first interior
+node, which is right for every **cell-centred** direction: `T` on all four
+faces, `V` on the west / east faces, `U` on the south / north faces.  With
+same-index staggering the other pairs have a node **on** the wall:
+`U[:, 0]` and `U[:, Nx-2]` are the west and east wall faces, `V[0, :]` and
+`V[Ny-2, :]` the south and north ones, and an `X` field has a node on all
+four walls (`U[:, Nx-1]`, `V[Ny-1, :]` are outside the domain).
+
+Every atom except `Periodic1D` takes a static `point="T" | "U" | "V" | "X"`
+(default `"T"`).  For a node on the wall the condition is imposed on that
+node: `Dirichlet1D` writes `value` to it, `Neumann1D` / `Robin1D` use the
+one-sided gradient between it and the first interior node, `Slip1D` writes
+`a * interior`, and the outside slot on the east / north side gets the odd
+mirror $2\phi_{\text{wall}} - \phi_{\text{adjacent}}$.  `Periodic1D` needs no
+`point`: wrapping by one period is right for every stagger (`U[:, 0]` is the
+same face as `U[:, Nx-2]`).
+
+!!! warning "Normal velocity needs `point=`"
+    `Dirichlet1D("east", 0.0)` on a U-field sets the ghost column
+    `U[:, Nx-1] = -U[:, Nx-2]` and leaves the east wall face `U[:, Nx-2]`
+    untouched, so mass flows through a "closed" wall.  Use
+    `Dirichlet1D("east", 0.0, point="U")`, or
+    `BoundaryConditionSet.closed(point="U")` for the whole basin.
+
+```python
+import finitevolx as fvx
+
+bc_u = fvx.BoundaryConditionSet.closed(point="U")  # u = 0 on W/E faces, no-slip on S/N
+bc_v = fvx.BoundaryConditionSet.closed(point="V")  # v = 0 on S/N faces, no-slip on W/E
+u, v = bc_u(u, dx, dy), bc_v(v, dx, dy)
+# Difference2D(grid).divergence(u, v) now integrates to zero over the basin.
+```
 
 ### `Neumann1D`
 
@@ -237,16 +274,21 @@ Maps a BC set to a named field in a state dictionary or pytree.  Useful
 for model state vectors with multiple fields, each needing different BCs:
 
 ```python
-from finitevolx import FieldBCSet, BoundaryConditionSet, Neumann1D
+from finitevolx import BoundaryConditionSet, Dirichlet1D, FieldBCSet, Neumann1D
 
-# Free-slip velocity BCs
+# Free-slip velocity BCs: zero normal flow on the wall faces (point="U"),
+# zero tangential gradient on the south / north walls
 bc_u = BoundaryConditionSet(
     south=Neumann1D(face="south", value=0.0),
     north=Neumann1D(face="north", value=0.0),
-    west=Dirichlet1D(face="west",  value=0.0),
-    east=Dirichlet1D(face="east",  value=0.0),
+    west=Dirichlet1D(face="west", value=0.0, point="U"),
+    east=Dirichlet1D(face="east", value=0.0, point="U"),
 )
+bcs = FieldBCSet(bc_map={"u": bc_u, "h": BoundaryConditionSet.open()})
 ```
+
+Each atom carries its own `point`, so `FieldBCSet` needs no stagger
+information of its own.
 
 ---
 
@@ -284,8 +326,11 @@ q = enforce_periodic(q, x=True, y=True)   # both directions
 ```
 What physical condition applies?
 │
-├── Fixed value at wall (ψ=0, u=0, T=T_wall)
+├── Fixed value at wall (ψ=0, T=T_wall, tangential velocity)
 │   └── Dirichlet1D(face=..., value=...)
+│
+├── No normal flow through a wall (u on W/E, v on S/N)
+│   └── Dirichlet1D(face=..., value=0, point="U" / "V")
 │
 ├── Zero normal gradient (free-slip, insulating)
 │   └── Reflective1D  or  Neumann1D(face=..., value=0)

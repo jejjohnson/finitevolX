@@ -9,6 +9,8 @@ import pytest
 
 from finitevolx import (
     BoundaryConditionSet,
+    CartesianGrid2D,
+    Difference2D,
     Dirichlet1D,
     Extrapolation1D,
     FieldBCSet,
@@ -549,3 +551,122 @@ class TestExtrapolation1D:
         """Verify the precomputed coefficients for order 5."""
         bc = Extrapolation1D("south", order=5)
         assert bc._coeffs == (6.0, -15.0, 20.0, -15.0, 6.0, -1.0)
+
+
+class TestStaggeredPoints:
+    """``point=``: atoms on fields whose boundary node lies on the wall (#286).
+
+    Same-index staggering: ``U[:, 0]`` / ``U[:, Nx-2]`` are the west / east
+    wall faces, ``V[0, :]`` / ``V[Ny-2, :]`` the south / north ones, and an
+    X field has a node on every wall.
+    """
+
+    Ny, Nx = 6, 7
+    dx, dy = 0.25, 0.5
+
+    def _field(self):
+        j = jnp.arange(self.Ny)[:, None]
+        i = jnp.arange(self.Nx)[None, :]
+        return 1.0 + jnp.sin(1.3 * i + 0.7 * j)  # [Ny, Nx], no symmetry
+
+    def test_closed_basin_has_zero_net_mass_flux(self):
+        """u = v = 1, closed(point=U/V): no mass crosses the walls."""
+        g = CartesianGrid2D.from_interior(
+            self.Nx - 2,
+            self.Ny - 2,
+            Lx=(self.Nx - 2) * self.dx,
+            Ly=(self.Ny - 2) * self.dy,
+        )
+        u = jnp.ones((self.Ny, self.Nx))
+        v = jnp.ones((self.Ny, self.Nx))
+        u_bc = BoundaryConditionSet.closed(point="U")(u, self.dx, self.dy)
+        v_bc = BoundaryConditionSet.closed(point="V")(v, self.dx, self.dy)
+        np.testing.assert_array_equal(u_bc[1:-1, 0], 0.0)
+        np.testing.assert_array_equal(u_bc[1:-1, -2], 0.0)
+        np.testing.assert_array_equal(v_bc[0, 1:-1], 0.0)
+        np.testing.assert_array_equal(v_bc[-2, 1:-1], 0.0)
+        div = Difference2D(g).divergence(u_bc, v_bc)
+        net = float(div[1:-1, 1:-1].sum() * self.dx * self.dy)
+        assert abs(net) < 1e-14
+        # the T-point default leaves the east wall face open (the old leak)
+        u_t = BoundaryConditionSet.closed()(u, self.dx, self.dy)
+        v_t = BoundaryConditionSet.closed()(v, self.dx, self.dy)
+        leak = Difference2D(g).divergence(u_t, v_t)[1:-1, 1:-1].sum()
+        assert abs(float(leak)) > 1.0
+
+    @pytest.mark.parametrize(
+        ("face", "point", "wall", "adjacent"),
+        [
+            ("west", "U", (slice(None), 0), (slice(None), 1)),
+            ("east", "U", (slice(None), -2), (slice(None), -3)),
+            ("south", "V", (0, slice(None)), (1, slice(None))),
+            ("north", "V", (-2, slice(None)), (-3, slice(None))),
+            ("east", "X", (slice(None), -2), (slice(None), -3)),
+            ("north", "X", (-2, slice(None)), (-3, slice(None))),
+        ],
+    )
+    def test_wall_node_values(self, face, point, wall, adjacent):
+        """Each atom imposes its condition on the wall node itself."""
+        f = self._field()
+        spacing = self.dx if face in ("west", "east") else self.dy
+        adj = f[adjacent]
+        cases = [
+            (Dirichlet1D(face, 0.3, point=point), jnp.full_like(adj, 0.3)),
+            (Neumann1D(face, 0.4, point=point), adj + 0.4 * spacing),
+            (Outflow1D(face, point=point), adj),
+            (Slip1D(face, 0.25, point=point), 0.25 * adj),
+            # alpha u_w + beta (u_w - u_adj) / spacing = gamma
+            (
+                Robin1D(face, alpha=2.0, beta=0.5, gamma=1.0, point=point),
+                (1.0 + 0.5 / spacing * adj) / (2.0 + 0.5 / spacing),
+            ),
+        ]
+        for bc, expected in cases:
+            out = bc(f, dx=self.dx, dy=self.dy)
+            np.testing.assert_allclose(
+                out[wall], expected, rtol=1e-14, err_msg=repr(bc)
+            )
+
+    def test_extrapolation_on_wall_node(self):
+        """Linear extrapolation to the east wall node of a U-field."""
+        f = self._field()
+        out = Extrapolation1D("east", order=1, point="U")(f, dx=self.dx, dy=self.dy)
+        np.testing.assert_allclose(out[:, -2], 2 * f[:, -3] - f[:, -4], rtol=1e-14)
+
+    def test_outside_slot_is_odd_mirror(self):
+        """East / north wall nodes: phi[-1] = 2 phi_wall - phi[-3]."""
+        f = self._field()
+        out = Dirichlet1D("east", 0.0, point="U")(f, dx=self.dx, dy=self.dy)
+        np.testing.assert_allclose(out[:, -1], -f[:, -3], rtol=1e-14)
+        out = Dirichlet1D("north", 0.5, point="V")(f, dx=self.dx, dy=self.dy)
+        np.testing.assert_allclose(out[-1, :], 1.0 - f[-3, :], rtol=1e-14)
+        # the interior below the wall node is untouched
+        np.testing.assert_array_equal(out[:-2, :], f[:-2, :])
+
+    @pytest.mark.parametrize(
+        ("face", "point"),
+        [("west", "V"), ("east", "V"), ("south", "U"), ("north", "U"), ("east", "T")],
+    )
+    def test_cell_centred_pairs_match_default(self, face, point):
+        """Tangential components behave exactly like T-points (ghost = 2v - interior)."""
+        f = self._field()
+        out = Dirichlet1D(face, 0.3, point=point)(f, dx=self.dx, dy=self.dy)
+        ref = Dirichlet1D(face, 0.3)(f, dx=self.dx, dy=self.dy)
+        np.testing.assert_array_equal(out, ref)
+
+    def test_periodic_wraps_wall_faces(self):
+        """Periodic copies U[:, Nx-2] (the same face as U[:, 0]) into U[:, 0]."""
+        f = self._field()
+        out = BoundaryConditionSet.periodic()(f, self.dx, self.dy)
+        np.testing.assert_array_equal(out[1:-1, 0], f[1:-1, -2])
+        np.testing.assert_array_equal(out[1:-1, -1], f[1:-1, 1])
+
+    def test_bad_point_raises(self):
+        with pytest.raises(ValueError, match="point must be"):
+            Dirichlet1D("west", 0.0, point="Q")(self._field(), dx=1.0, dy=1.0)  # ty: ignore[invalid-argument-type]
+
+    def test_jit(self):
+        f = self._field()
+        bc = BoundaryConditionSet.closed(point="U")
+        out = jax.jit(lambda x: bc(x, self.dx, self.dy))(f)
+        np.testing.assert_array_equal(out, bc(f, self.dx, self.dy))
