@@ -22,6 +22,8 @@ References
 
 from __future__ import annotations
 
+import warnings
+
 import equinox as eqx
 from jaxtyping import Array, Float
 
@@ -30,6 +32,23 @@ from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators.difference import Difference2D
 from finitevolx._src.operators.interpolation import Interpolation2D
+
+
+def _resolve_scheme(scheme: str) -> str:
+    """Map the deprecated ``'al'`` alias to ``'blend'`` and validate *scheme*."""
+    if scheme == "al":
+        warnings.warn(
+            "scheme='al' is deprecated: it is a linear blend, not the "
+            "Arakawa-Lamb (1981) scheme; use scheme='blend' (#283).",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return "blend"
+    if scheme not in ("energy", "enstrophy", "blend"):
+        raise ValueError(
+            f"Unknown scheme: {scheme!r}.  Choose 'energy', 'enstrophy', or 'blend'."
+        )
+    return scheme
 
 
 class MomentumAdvection2D(eqx.Module):
@@ -52,9 +71,9 @@ class MomentumAdvection2D(eqx.Module):
     * ``'enstrophy'`` — Sadourny (1975) **Z-scheme**: interpolate ζ and the
       cross-face velocity to the faces, then multiply.  Conserves potential
       enstrophy for non-divergent flow.
-    * ``'al'`` — linear blend ⅓ energy + ⅔ enstrophy.  Despite the name this
-      is **not** the Arakawa-Lamb (1981) scheme (a distinct eight-point
-      stencil) and conserves neither invariant exactly (#283).
+    * ``'blend'`` — linear blend ⅓ energy + ⅔ enstrophy; conserves neither
+      invariant exactly.  ``'al'`` is a deprecated alias: the blend is not
+      the Arakawa-Lamb (1981) scheme, which is not implemented (#283).
 
     Parameters
     ----------
@@ -171,7 +190,7 @@ class MomentumAdvection2D(eqx.Module):
             y-velocity at V-points.
         scheme : str
             Vorticity-flux scheme: ``'energy'`` (default), ``'enstrophy'``,
-            or ``'al'`` (⅓–⅔ blend; not the Arakawa-Lamb 1981 scheme).
+            or ``'blend'`` (⅓–⅔ blend; ``'al'`` is a deprecated alias).
 
         Returns
         -------
@@ -183,18 +202,19 @@ class MomentumAdvection2D(eqx.Module):
         ------
         ValueError
             If ``scheme`` is not one of ``'energy'``, ``'enstrophy'``,
-            or ``'al'``.
+            or ``'blend'``.
         """
         # zeta[j+1/2, i+1/2] = dv/dx - du/dy  at X-points
         zeta = self.diff.curl(u, v)
         # dK/dx at U-points, dK/dy at V-points
         dK_dx, dK_dy = self._kinetic_energy_gradients(u, v)
 
+        scheme = _resolve_scheme(scheme)
         if scheme == "energy":
             zv_u, zu_v = self._vorticity_flux_energy(zeta, u, v)
         elif scheme == "enstrophy":
             zv_u, zu_v = self._vorticity_flux_enstrophy(zeta, u, v)
-        elif scheme == "al":
+        else:
             # linear blend: 1/3 energy + 2/3 enstrophy (not Arakawa-Lamb 1981)
             alpha = 1.0 / 3.0
             zv_u_e, zu_v_e = self._vorticity_flux_energy(zeta, u, v)
@@ -204,10 +224,6 @@ class MomentumAdvection2D(eqx.Module):
             )
             zu_v = interior(
                 alpha * zu_v_e[1:-1, 1:-1] + (1.0 - alpha) * zu_v_s[1:-1, 1:-1], v
-            )
-        else:
-            raise ValueError(
-                f"Unknown scheme: {scheme!r}.  Choose 'energy', 'enstrophy', or 'al'."
             )
 
         # du_adv[j, i+1/2] = +(zeta*v)_u - dK/dx
@@ -232,7 +248,8 @@ class MomentumAdvection3D(eqx.Module):
 
     * ``'energy'`` — Sadourny (1975) E-scheme (default).
     * ``'enstrophy'`` — Sadourny (1975) Z-scheme.
-    * ``'al'`` — linear ⅓ energy + ⅔ enstrophy blend (not Arakawa-Lamb 1981).
+    * ``'blend'`` — linear ⅓ energy + ⅔ enstrophy blend (``'al'`` is a
+      deprecated alias; it is not Arakawa-Lamb 1981).
 
     Parameters
     ----------
@@ -289,7 +306,7 @@ class MomentumAdvection3D(eqx.Module):
             y-velocity at V-points.
         scheme : str
             Vorticity-flux scheme: ``'energy'`` (default), ``'enstrophy'``,
-            or ``'al'`` (⅓–⅔ blend; not the Arakawa-Lamb 1981 scheme).
+            or ``'blend'`` (⅓–⅔ blend; ``'al'`` is a deprecated alias).
 
         Returns
         -------
@@ -303,8 +320,9 @@ class MomentumAdvection3D(eqx.Module):
         ------
         ValueError
             If ``scheme`` is not one of ``'energy'``, ``'enstrophy'``,
-            or ``'al'``.
+            or ``'blend'``.
         """
+        scheme = _resolve_scheme(scheme)
         du_adv, dv_adv = eqx.filter_vmap(
             lambda u_k, v_k: self._madv2d(u_k, v_k, scheme=scheme)
         )(u, v)

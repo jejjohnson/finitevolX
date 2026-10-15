@@ -539,15 +539,15 @@ def _vorticity_entries(
         ),
         (
             "Vorticity2D",
-            "pv_flux_arakawa_lamb",
+            "pv_flux_blend",
             "unmasked",
-            lambda: v2.pv_flux_arakawa_lamb(q2d, u2d, v2d),
+            lambda: v2.pv_flux_blend(q2d, u2d, v2d),
         ),
         (
             "Vorticity2D",
-            "pv_flux_arakawa_lamb",
+            "pv_flux_blend",
             "masked",
-            lambda: v2m.pv_flux_arakawa_lamb(q2d, u2d, v2d),
+            lambda: v2m.pv_flux_blend(q2d, u2d, v2d),
         ),
         (
             "Vorticity2D",
@@ -775,15 +775,15 @@ def _spherical_entries(
             ),
             (
                 "SphericalVorticity2D",
-                "pv_flux_arakawa_lamb",
+                "pv_flux_blend",
                 "unmasked",
-                lambda: sv2.pv_flux_arakawa_lamb(q2d, u2d, v2d),
+                lambda: sv2.pv_flux_blend(q2d, u2d, v2d),
             ),
             (
                 "SphericalVorticity2D",
-                "pv_flux_arakawa_lamb",
+                "pv_flux_blend",
                 "masked",
-                lambda: sv2m.pv_flux_arakawa_lamb(q2d, u2d, v2d),
+                lambda: sv2m.pv_flux_blend(q2d, u2d, v2d),
             ),
         ]
     )

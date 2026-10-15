@@ -111,7 +111,7 @@ face fields $(F_u, F_v)$ at U/V-points:
 |---|---|---|
 | `pv_flux_energy_conserving` | multiply at the corners, then average | $\overline{q\,\overline{F_u}^{y}}^{y}$ |
 | `pv_flux_enstrophy_conserving` | average $q$ to the face, then multiply | $\overline{q}^{y}\,F_u$ |
-| `pv_flux_arakawa_lamb` | linear blend $\alpha E + (1-\alpha) Z$ | — |
+| `pv_flux_blend` | linear blend $\alpha E + (1-\alpha) Z$ | — |
 
 The names refer to the **vortex-force** use (Sadourny 1975): when the
 cross-face transport is used — $+q\,V$ in the $u$-equation, $-q\,U$ in the
@@ -121,11 +121,12 @@ potential enstrophy for non-divergent flow.  Passed the same-component
 fields, e.g. `(q, u*h, v*h)`, the methods return the PV *transport* flux
 $(q\,Uh, q\,Vh)$ and neither label applies.
 
-!!! warning "`pv_flux_arakawa_lamb` is not the Arakawa–Lamb (1981) scheme"
-    It is a linear blend of the two Sadourny forms and, for
+!!! warning "The blend is not the Arakawa–Lamb (1981) scheme"
+    `pv_flux_blend` is a linear blend of the two Sadourny forms and, for
     $0 < \alpha < 1$, conserves neither invariant exactly.  The
     Arakawa–Lamb (1981) scheme is a distinct eight-point stencil and is not
-    implemented (#283).
+    implemented.  The old name `pv_flux_arakawa_lamb` (and
+    `scheme="al"` below) is a deprecated alias that warns (#283).
 
 The corner products are formed on the full arrays, so the first interior
 row and column read the south / west ghost corners of the caller's
@@ -317,15 +318,15 @@ the vorticity-flux product is evaluated.  Three schemes are available:
 |--------|------|-------------|-----------|
 | `'energy'` (default) | $\overline{\zeta\,\overline{v}^{xy}}^{y}$: product at the corners, then average | Conserves total KE for non-divergent flow | Sadourny (1975) E-scheme |
 | `'enstrophy'` | $\overline{\zeta}^{y}\,\overline{v}^{xy}$: average to the face, then multiply | Conserves potential enstrophy | Sadourny (1975) Z-scheme |
-| `'al'` | $\tfrac13 E + \tfrac23 Z$ | Conserves neither exactly | linear blend, **not** Arakawa & Lamb (1981) |
+| `'blend'` | $\tfrac13 E + \tfrac23 Z$ | Conserves neither exactly | linear blend, **not** Arakawa & Lamb (1981); `'al'` is a deprecated alias |
 
 !!! tip "When to use each scheme"
     - **`'energy'`**: energy-conserving vortex force, the usual choice for
       long integrations.
     - **`'enstrophy'`**: preferred when enstrophy conservation matters (e.g.
       turbulence spindown experiments).
-    - **`'al'`**: a ⅓–⅔ blend of the two; it is not the Arakawa–Lamb (1981)
-      scheme, which conserves both (not implemented, #283).
+    - **`'blend'`**: a ⅓–⅔ blend of the two; it is not the Arakawa–Lamb
+      (1981) scheme, which conserves both (not implemented, #283).
 
 ### Usage
 
@@ -343,7 +344,7 @@ madv_z = MomentumAdvection2D(grid=grid)
 du_adv, dv_adv = madv_z(u, v, scheme="enstrophy")
 
 # 1/3 energy + 2/3 enstrophy blend
-du_adv, dv_adv = madv(u, v, scheme="al")
+du_adv, dv_adv = madv(u, v, scheme="blend")
 ```
 
 ---

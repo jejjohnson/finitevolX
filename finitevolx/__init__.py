@@ -257,6 +257,7 @@ from finitevolx._src.operators.vorticity import (
     Vorticity2D,
     Vorticity3D,
     pv_flux_arakawa_lamb,
+    pv_flux_blend,
     vorticity_flux_upwind,
 )
 from finitevolx._src.solvers.elliptic import (
@@ -655,6 +656,7 @@ __all__ = [
     "Vorticity2D",
     "Vorticity3D",
     "pv_flux_arakawa_lamb",
+    "pv_flux_blend",
     "vorticity_flux_upwind",
     # Barotropic-mode filter
     "barotropic_filter",

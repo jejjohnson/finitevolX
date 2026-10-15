@@ -6,6 +6,8 @@ Composes Difference2D and Interpolation2D primitives.
 
 from __future__ import annotations
 
+import warnings
+
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
@@ -330,7 +332,7 @@ class Vorticity2D(eqx.Module):
         qv = interior(q_on_v[1:-1, 1:-1] * v[1:-1, 1:-1], v)
         return qu, qv
 
-    def pv_flux_arakawa_lamb(
+    def pv_flux_blend(
         self,
         q: Float[Array, "Ny Nx"],
         u: Float[Array, "Ny Nx"],
@@ -341,11 +343,10 @@ class Vorticity2D(eqx.Module):
 
         flux = alpha * energy_conserving + (1 - alpha) * enstrophy_conserving
 
-        !!! warning "Not the Arakawa-Lamb (1981) scheme"
-            Despite its name this is a linear blend of the two Sadourny
-            forms and, for 0 < alpha < 1, conserves *neither* energy nor
-            enstrophy exactly.  The Arakawa-Lamb (1981) scheme is a
-            distinct eight-point stencil and is not implemented (#283).
+        For 0 < alpha < 1 the blend conserves *neither* energy nor
+        enstrophy exactly.  It is not the Arakawa-Lamb (1981) scheme (a
+        distinct eight-point stencil, not implemented); the old name
+        :meth:`pv_flux_arakawa_lamb` is a deprecated alias (#283).
 
         Parameters
         ----------
@@ -369,6 +370,17 @@ class Vorticity2D(eqx.Module):
         qu = alpha * qu_e + (1.0 - alpha) * qu_s
         qv = alpha * qv_e + (1.0 - alpha) * qv_s
         return qu, qv
+
+    def pv_flux_arakawa_lamb(
+        self,
+        q: Float[Array, "Ny Nx"],
+        u: Float[Array, "Ny Nx"],
+        v: Float[Array, "Ny Nx"],
+        alpha: float = 1.0 / 3.0,
+    ) -> tuple:
+        """Deprecated alias of :meth:`pv_flux_blend` (not Arakawa-Lamb 1981)."""
+        _warn_arakawa_lamb("Vorticity2D.pv_flux_blend")
+        return self.pv_flux_blend(q, u, v, alpha=alpha)
 
 
 def _pv_flux_corner_product(
@@ -466,7 +478,7 @@ class Vorticity3D(eqx.Module):
         return out
 
 
-def pv_flux_arakawa_lamb(
+def pv_flux_blend(
     q: Float[Array, "Ny Nx"],
     u: Float[Array, "Ny Nx"],
     v: Float[Array, "Ny Nx"],
@@ -475,7 +487,7 @@ def pv_flux_arakawa_lamb(
 ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
     """Blend of the energy- and enstrophy-conserving PV fluxes (grid-free).
 
-    Public functional form of :meth:`Vorticity2D.pv_flux_arakawa_lamb`:
+    Public functional form of :meth:`Vorticity2D.pv_flux_blend`:
 
         flux = alpha * energy_conserving + (1 - alpha) * enstrophy_conserving
 
@@ -488,11 +500,10 @@ def pv_flux_arakawa_lamb(
     averaging stencils, so it is reachable without constructing a grid.
     For masked domains, use :class:`Vorticity2D` with a ``mask=``.
 
-    !!! warning "Not the Arakawa-Lamb (1981) scheme"
-        Despite its name this is a linear blend and, for 0 < alpha < 1,
-        conserves *neither* energy nor enstrophy exactly.  The
-        Arakawa-Lamb (1981) scheme is a distinct eight-point stencil and is
-        not implemented (#283).
+    For 0 < alpha < 1 the blend conserves *neither* energy nor enstrophy
+    exactly.  It is not the Arakawa-Lamb (1981) scheme (a distinct
+    eight-point stencil, not implemented); :func:`pv_flux_arakawa_lamb` is
+    a deprecated alias (#283).
 
     Parameters
     ----------
@@ -522,6 +533,28 @@ def pv_flux_arakawa_lamb(
     qu = alpha * qu_e + (1.0 - alpha) * qu_s
     qv = alpha * qv_e + (1.0 - alpha) * qv_s
     return qu, qv
+
+
+def pv_flux_arakawa_lamb(
+    q: Float[Array, "Ny Nx"],
+    u: Float[Array, "Ny Nx"],
+    v: Float[Array, "Ny Nx"],
+    *,
+    alpha: float = 1.0 / 3.0,
+) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
+    """Deprecated alias of :func:`pv_flux_blend` (not Arakawa-Lamb 1981)."""
+    _warn_arakawa_lamb("pv_flux_blend")
+    return pv_flux_blend(q, u, v, alpha=alpha)
+
+
+def _warn_arakawa_lamb(new: str) -> None:
+    warnings.warn(
+        f"pv_flux_arakawa_lamb is deprecated: it is a linear blend of the "
+        f"energy- and enstrophy-conserving forms, not the Arakawa-Lamb (1981) "
+        f"scheme; use {new} (#283).",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
 # Linear (optimal-polynomial) one-sided reconstruction weights, divided by their
@@ -613,7 +646,7 @@ def vorticity_flux_upwind(
     r"""Dissipative upwind vortex-force fluxes on a C-grid.
 
     The MASSH-parity alternative to the energy/enstrophy-conserving schemes
-    (:func:`pv_flux_arakawa_lamb`): instead of averaging, the (absolute)
+    (:func:`pv_flux_blend`): instead of averaging, the (absolute)
     vorticity at corners is reconstructed onto the velocity faces with an
     order-``{1, 3, 5}`` *upwind* stencil and multiplied by the cross mass
     flux.  Upwinding makes it monotone and dissipative — a robust, cheap

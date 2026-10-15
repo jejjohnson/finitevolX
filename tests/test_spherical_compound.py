@@ -148,9 +148,9 @@ class TestSphericalVorticity2D:
         np.testing.assert_allclose(qu_s, qu_c, atol=1e-10)
         np.testing.assert_allclose(qv_s, qv_c, atol=1e-10)
 
-        # Arakawa-Lamb
-        qu_s, qv_s = vort_op.pv_flux_arakawa_lamb(q, u, v)
-        qu_c, qv_c = cart_vort.pv_flux_arakawa_lamb(q, u, v)
+        # energy/enstrophy blend
+        qu_s, qv_s = vort_op.pv_flux_blend(q, u, v)
+        qu_c, qv_c = cart_vort.pv_flux_blend(q, u, v)
         np.testing.assert_allclose(qu_s, qu_c, atol=1e-10)
         np.testing.assert_allclose(qv_s, qv_c, atol=1e-10)
 

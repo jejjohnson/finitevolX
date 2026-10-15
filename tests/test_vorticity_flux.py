@@ -1,6 +1,6 @@
 """Tests for the §2 vorticity-flux additions.
 
-Covers the public ``pv_flux_arakawa_lamb`` free function (parity with the
+Covers the public ``pv_flux_blend`` free function (parity with the
 ``Vorticity2D`` method) and the dissipative ``vorticity_flux_upwind`` operator.
 """
 
@@ -13,8 +13,11 @@ import pytest
 
 from finitevolx import (
     CartesianGrid2D,
+    SphericalGrid2D,
+    SphericalVorticity2D,
     Vorticity2D,
     pv_flux_arakawa_lamb,
+    pv_flux_blend,
     vorticity_flux_upwind,
 )
 from finitevolx._src.operators._ghost import interior
@@ -30,14 +33,14 @@ def _rand(seed, shape):
     return jax.random.normal(jax.random.PRNGKey(seed), shape)
 
 
-class TestPVFluxArakawaLambFreeFn:
+class TestPVFluxBlendFreeFn:
     def test_parity_with_method(self, grid):
         q = _rand(0, (grid.Ny, grid.Nx))
         u = _rand(1, (grid.Ny, grid.Nx))
         v = _rand(2, (grid.Ny, grid.Nx))
         vort = Vorticity2D(grid=grid)
-        qu_m, qv_m = vort.pv_flux_arakawa_lamb(q, u, v)
-        qu_f, qv_f = pv_flux_arakawa_lamb(q, u, v)
+        qu_m, qv_m = vort.pv_flux_blend(q, u, v)
+        qu_f, qv_f = pv_flux_blend(q, u, v)
         np.testing.assert_allclose(qu_f, qu_m, atol=1e-12)
         np.testing.assert_allclose(qv_f, qv_m, atol=1e-12)
 
@@ -46,16 +49,16 @@ class TestPVFluxArakawaLambFreeFn:
         vort = Vorticity2D(grid=grid)
         qu_e, qv_e = vort.pv_flux_energy_conserving(q, u, v)
         qu_s, qv_s = vort.pv_flux_enstrophy_conserving(q, u, v)
-        qu1, qv1 = pv_flux_arakawa_lamb(q, u, v, alpha=1.0)
+        qu1, qv1 = pv_flux_blend(q, u, v, alpha=1.0)
         np.testing.assert_allclose(qu1, qu_e, atol=1e-12)
         np.testing.assert_allclose(qv1, qv_e, atol=1e-12)
-        qu0, qv0 = pv_flux_arakawa_lamb(q, u, v, alpha=0.0)
+        qu0, qv0 = pv_flux_blend(q, u, v, alpha=0.0)
         np.testing.assert_allclose(qu0, qu_s, atol=1e-12)
         np.testing.assert_allclose(qv0, qv_s, atol=1e-12)
 
     def test_ghost_ring_zero(self, grid):
         q, u, v = (_rand(s, (grid.Ny, grid.Nx)) for s in (6, 7, 8))
-        qu, _ = pv_flux_arakawa_lamb(q, u, v)
+        qu, _ = pv_flux_blend(q, u, v)
         assert bool((qu[0] == 0).all()) and bool((qu[-1] == 0).all())
         assert bool((qu[:, 0] == 0).all()) and bool((qu[:, -1] == 0).all())
 
@@ -191,7 +194,29 @@ class TestPVFluxForms:
 
     def test_free_function_matches_method(self, fields):
         g, q, u, v = fields
-        qu, qv = pv_flux_arakawa_lamb(q, u, v, alpha=0.25)
-        ref = Vorticity2D(g).pv_flux_arakawa_lamb(q, u, v, alpha=0.25)
+        qu, qv = pv_flux_blend(q, u, v, alpha=0.25)
+        ref = Vorticity2D(g).pv_flux_blend(q, u, v, alpha=0.25)
         np.testing.assert_allclose(qu, ref[0], rtol=0, atol=1e-14)
         np.testing.assert_allclose(qv, ref[1], rtol=0, atol=1e-14)
+
+
+class TestArakawaLambDeprecatedAliases:
+    """The old "Arakawa-Lamb" names warn and return the blend (#283)."""
+
+    def test_free_function(self, grid):
+        q, u, v = (_rand(s, (grid.Ny, grid.Nx)) for s in (9, 10, 11))
+        with pytest.warns(DeprecationWarning, match="pv_flux_blend"):
+            old = pv_flux_arakawa_lamb(q, u, v, alpha=0.25)
+        new = pv_flux_blend(q, u, v, alpha=0.25)
+        np.testing.assert_array_equal(old[0], new[0])
+        np.testing.assert_array_equal(old[1], new[1])
+
+    def test_methods(self, grid):
+        q, u, v = (_rand(s, (grid.Ny, grid.Nx)) for s in (12, 13, 14))
+        sgrid = SphericalGrid2D.from_interior(8, 8, (0.0, 40.0), (-20.0, 20.0))
+        for op in (Vorticity2D(grid=grid), SphericalVorticity2D(grid=sgrid)):
+            with pytest.warns(DeprecationWarning, match="not the Arakawa-Lamb"):
+                old = op.pv_flux_arakawa_lamb(q, u, v)
+            new = op.pv_flux_blend(q, u, v)
+            np.testing.assert_array_equal(old[0], new[0])
+            np.testing.assert_array_equal(old[1], new[1])
