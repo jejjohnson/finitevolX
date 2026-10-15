@@ -52,6 +52,10 @@ from finitevolx._src.solvers.inhomogeneous import (
 # Re-export from iterative module
 from finitevolx._src.solvers.iterative import (  # noqa: F401
     CGInfo,
+    _masked_face_dirichlet_laplacian,
+    _masked_neumann_laplacian,
+    _project_zero_mean,
+    _wet_components,
     masked_laplacian,
     solve_cg,
 )
@@ -349,30 +353,121 @@ def _solve_spectral(
     return jnp.zeros_like(rhs).at[..., sl, sl].set(psi.astype(rhs.dtype))
 
 
+def _check_cg_bc(bc: str, staggering: str) -> None:
+    """Raise unless ``method="cg"`` can honour *bc* for this staggering.
+
+    CG takes the coast condition from *bc*: ``"dst"`` is Dirichlet on the
+    coast nodes (:func:`masked_laplacian`), ``"dct"`` is zero flux through
+    the coast faces (T points only).  A periodic ``"fft"`` has no meaning on
+    a masked domain.
+    """
+    if bc == "dst" or (bc == "dct" and staggering == "T"):
+        return
+    if bc == "dct":
+        raise ValueError(
+            "method='cg' with bc='dct' (zero flux through the coast faces) is "
+            "only defined for the T-point pressure solve; the streamfunction "
+            "solves need bc='dst' (psi prescribed on the coast)."
+        )
+    raise ValueError(
+        f"method='cg' takes its coast condition from bc: 'dst' (Dirichlet) or, "
+        f"for pressure, 'dct' (Neumann); got bc={bc!r}.  A periodic 'fft' "
+        "cannot be imposed on a masked domain."
+    )
+
+
+def _cg_masked_solve(
+    rhs: Float[Array, "Ny Nx"],
+    solve_mask: Float[Array, "Ny Nx"],
+    dx: float,
+    dy: float,
+    lambda_: float | Array,
+    bc: str,
+    preconditioner: _PrecondLike | None,
+    staggering: str,
+) -> Float[Array, "Ny Nx"]:
+    """Preconditioned CG on *solve_mask* with the coast condition of *bc*.
+
+    The wall is where the spectral solve of the same staggering puts it:
+
+    * ψ (X), ``"dst"``: ψ = 0 on the dry nodes next to the wet ones
+      (:func:`masked_laplacian`), the C-grid wall nodes.
+    * p (T), ``"dst"``: p = 0 on the wet–dry *faces*, half a cell out
+      (the DST-II wall).
+    * p (T), ``"dct"``: zero flux through every wet–dry face (the DCT-II
+      wall).  At a concrete λ = 0 this is singular (a constant per connected
+      wet component), so the right-hand side is projected to zero mean on
+      each component and the zero-mean solution is returned; a traced mask
+      cannot be labelled, so it is treated as one component.
+
+    The default preconditioner is the spectral solve of the same *bc*.  Safe
+    under ``vmap`` with a traced *lambda_*.
+    """
+    if staggering == "X":
+        operator = masked_laplacian
+    elif bc == "dst":
+        operator = _masked_face_dirichlet_laplacian
+    else:
+        operator = _masked_neumann_laplacian
+
+    def _matvec(x: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+        return operator(x, solve_mask, dx, dy, lambda_=lambda_)
+
+    if preconditioner is None:
+        preconditioner = make_spectral_preconditioner(dx, dy, lambda_=lambda_, bc=bc)
+
+    b = rhs * solve_mask  # [Ny, Nx]
+    project = None
+    if bc == "dct" and _is_zero(lambda_):
+        try:
+            labels, counts = _wet_components(np.asarray(solve_mask))
+        except jax.errors.TracerArrayConversionError:
+            # Traced mask: one component, labels = 1 on the wet cells and
+            # counts = [1, n_wet].
+            labels = (solve_mask > 0.5).astype(jnp.int32)
+            counts = jnp.stack([jnp.ones((), b.dtype), jnp.sum(solve_mask)])
+
+        def project(u: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+            # u <- u - mean(u over its wet component): the consistent rhs and
+            # the zero-mean member of the solution family p + c.
+            return _project_zero_mean(u, solve_mask, labels, counts)
+
+        b = project(b)
+    x, _info = solve_cg(_matvec, b, preconditioner=preconditioner, throw=True)
+    x = x * solve_mask
+    if project is not None:
+        x = project(x)
+    return x
+
+
 def _solve_cg_method(
     rhs: Float[Array, "Ny Nx"],
     dx: float,
     dy: float,
-    lambda_: float,
+    lambda_: float | Array,
     mask: _MaskLike | None,
     preconditioner: _PrecondLike | None,
     staggering: str = "X",
+    bc: str = "dst",
 ) -> Float[Array, "Ny Nx"]:
     """Solve using preconditioned Conjugate Gradient on a masked domain."""
+    _check_cg_bc(bc, staggering)
     mask_arr = _resolve_mask_arr(mask, rhs.dtype, staggering)
     if mask_arr is None:
         raise ValueError("method='cg' requires a mask (array or Mask2D)")
-
-    def _matvec(x: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
-        return masked_laplacian(x, mask_arr, dx, dy, lambda_=lambda_)
-
-    if preconditioner is None:
-        preconditioner = make_spectral_preconditioner(dx, dy, lambda_=lambda_, bc="fft")
-
-    x, _info = solve_cg(
-        _matvec, rhs * mask_arr, preconditioner=preconditioner, throw=True
+    return _cg_masked_solve(
+        rhs, mask_arr, dx, dy, lambda_, bc, preconditioner, staggering
     )
-    return x * mask_arr
+
+
+def _check_capacitance_bc(bc: str) -> None:
+    """Raise unless *bc* is the Dirichlet coast the capacitance solver imposes."""
+    if bc != "dst":
+        raise ValueError(
+            "method='capacitance' imposes psi = 0 (Dirichlet) on the coast, so "
+            f"it needs bc='dst'; got bc={bc!r}.  For a Neumann (bc='dct') "
+            "pressure solve on a masked domain use method='cg'."
+        )
 
 
 def _solve_capacitance_method(
@@ -385,14 +480,15 @@ def _solve_capacitance_method(
             "method='capacitance' requires a pre-built CapacitanceSolver "
             "(see build_capacitance_solver)"
         )
-    return capacitance_solver(rhs)
+    # The solver's precomputed arrays are float64 under x64: keep the rhs dtype.
+    return capacitance_solver(rhs).astype(rhs.dtype)
 
 
 def _solve_dispatch(
     rhs: Float[Array, "Ny Nx"],
     dx: float,
     dy: float,
-    lambda_: float,
+    lambda_: float | Array,
     bc: str,
     method: str,
     mask: _MaskLike | None,
@@ -404,8 +500,11 @@ def _solve_dispatch(
     if method == "spectral":
         return _solve_spectral(rhs, dx, dy, lambda_, bc, staggering)
     if method == "cg":
-        return _solve_cg_method(rhs, dx, dy, lambda_, mask, preconditioner, staggering)
+        return _solve_cg_method(
+            rhs, dx, dy, lambda_, mask, preconditioner, staggering, bc
+        )
     if method == "capacitance":
+        _check_capacitance_bc(bc)
         return _solve_capacitance_method(rhs, capacitance_solver)
     raise ValueError(
         f"method must be 'spectral', 'cg', or 'capacitance'; got {method!r}"
@@ -617,14 +716,17 @@ def _known_value_domain(
     agree to solver tolerance.
     """
     _check_method(method)
+    if staggering == "T":
+        # Every T-point Dirichlet wall here (spectral DST-II, cg with
+        # bc="dst") is on the cell faces; the lifting pins values at cell
+        # centres (the ghost cells, half a cell outside the faces), which
+        # would be a different, first-order wall.
+        raise ValueError(
+            "known_values are not supported for the T-point pressure solve: "
+            "its Dirichlet wall sits on the cell faces, while known values are "
+            "pinned at cell centres (the ghost cells, half a cell outside)."
+        )
     if method == "spectral":
-        if staggering == "T":
-            raise ValueError(
-                "method='spectral' with known_values is not supported for the "
-                "T-point pressure solve: its Dirichlet wall (DST-II) sits on "
-                "the cell faces, while known values are pinned at cell centres "
-                "(the ghost cells).  Use method='cg' with a mask."
-            )
         if bc != "dst":
             raise ValueError(
                 "known_values prescribe Dirichlet data, so method='spectral' "
@@ -644,6 +746,11 @@ def _known_value_domain(
             )
         return SolveDomain(_x_basin(shape))
 
+    if bc != "dst":
+        raise ValueError(
+            "known_values prescribe Dirichlet data on the coast, so they need "
+            f"bc='dst'; got bc={bc!r}."
+        )
     mask_arr = _resolve_mask_arr(mask, dtype, staggering)
     if mask_arr is None:
         raise ValueError(f"known_values with method={method!r} requires a mask")
@@ -661,7 +768,7 @@ def _solve_with_known_values(
     known_values: Float[Array, "Ny Nx"],
     dx: float,
     dy: float,
-    lambda_: float,
+    lambda_: float | Array,
     bc: str,
     method: str,
     mask: _MaskLike | None,
@@ -745,11 +852,12 @@ def streamfunction_from_vorticity(
     dx, dy : float
         Grid spacings.
     bc : {"dst", "dct", "fft"} or BoundaryConditionSet
-        Boundary-condition type for the spectral solver (used by
-        ``method="spectral"``).
-        ``"dst"`` (Dirichlet, ψ = 0 on boundary) is the most common choice
-        for streamfunction inversion.  With ``"dct"`` (∂ψ/∂n = 0 on the
-        walls) the wall nodes themselves are unknowns, so *zeta* is read
+        Boundary condition on the wall / coast.  ``"dst"`` (Dirichlet,
+        ψ = 0 on the wall nodes) is the standard choice for streamfunction
+        inversion and the only one the mask-based methods accept for ψ;
+        ``"dct"`` and ``"fft"`` are for ``method="spectral"`` only (the
+        others raise rather than ignore them).  With ``"dct"`` (∂ψ/∂n = 0 on
+        the walls) the wall nodes themselves are unknowns, so *zeta* is read
         there too (X rows / columns 0 and N-2): an operator that writes only
         ``[1:-1, 1:-1]`` leaves row / column 0 at zero, which costs the
         second-order accuracy; fill the wall values of *zeta* first.
@@ -853,12 +961,13 @@ def pressure_from_divergence(
     Used in pressure-projection methods (Chorin splitting) where the
     divergence of the provisional velocity field must be removed.
 
-    Solver selection follows the same three-method dispatch as
-    :func:`streamfunction_from_vorticity`.  p lives at T points: the
-    spectral path solves on the T interior ``[1:-1, 1:-1]`` with the wall
-    on the cell faces (``"dct"``: DCT-II, ∂p/∂n = 0; ``"dst"``: DST-II,
-    p = 0; ``"fft"``: periodic) and returns a zero ghost ring, and a
-    ``Mask2D`` gives its ``h`` mask.
+    p lives at T points, and every method puts the wall on the cell faces:
+    the spectral path solves on the T interior ``[1:-1, 1:-1]``
+    (``"dct"``: DCT-II, ∂p/∂n = 0; ``"dst"``: DST-II, p = 0; ``"fft"``:
+    periodic) and returns a zero ghost ring; ``method="cg"`` solves on a
+    mask (a ``Mask2D`` gives its ``h`` mask) with the same face conditions
+    on every wet–dry face.  ``method="capacitance"`` and known values pin
+    values at cell centres, not on faces, so they raise here.
 
     Parameters
     ----------
@@ -867,43 +976,50 @@ def pressure_from_divergence(
     dx, dy : float
         Grid spacings.
     bc : {"dct", "dst", "fft"} or BoundaryConditionSet
-        Boundary-condition type for the spectral solver.
-        ``"dct"`` (Neumann, ∂p/∂n = 0) is the standard choice for
-        pressure with solid walls.  A :class:`BoundaryConditionSet` is
-        accepted as in :func:`streamfunction_from_vorticity`, except that
-        non-zero ``Dirichlet1D`` faces raise: a T-point Dirichlet value
-        belongs on the face, which known values (pinned at cell centres)
-        cannot reach.
-    method : {"spectral", "cg", "capacitance"}
-        Solver method.  Default: ``"spectral"``.
+        Boundary condition on the wall / coast, honoured by every method
+        or rejected.  ``"dct"`` (Neumann, ∂p/∂n = 0 on the cell faces) is
+        the standard choice for pressure with solid walls; with
+        ``method="cg"`` it is zero flux through every wet–dry face of the
+        mask, and the solution is the zero-mean one on each connected wet
+        region (the problem fixes p only up to a constant per region).
+        ``"dst"`` is p = 0 on the faces, for both methods.  ``"fft"``
+        (periodic) is ``method="spectral"`` only.  A
+        :class:`BoundaryConditionSet` is accepted as in
+        :func:`streamfunction_from_vorticity`, except that non-zero
+        ``Dirichlet1D`` faces raise (see *known_values*).
+    method : {"spectral", "cg"}
+        Solver method.  Default: ``"spectral"``.  ``"capacitance"`` raises:
+        the capacitance solver holds the unknown at zero on the dry cell
+        centres (the ψ wall), not on the faces.
     mask : Float[Array, "Ny Nx"] or Mask2D or None
         Domain mask.  Required for ``method="cg"``.  A :class:`Mask2D` gives
         its T-point mask ``h``.
-    capacitance_solver : CapacitanceSolver or None
-        Pre-built capacitance solver.  Required for
-        ``method="capacitance"``.
+    capacitance_solver : None
+        Not supported (kept for signature symmetry with the other wrappers).
     preconditioner : callable or None
         Custom preconditioner for ``method="cg"``.
-    known_values : Float[Array, "Ny Nx"] or None
-        Prescribed (inhomogeneous Dirichlet) values of the solution, used
-        on the coast ring -- the dry cells adjacent to a wet cell; for p at
-        T points that is the ghost ring, so the values sit at the ghost-cell
-        centres, half a cell outside the wall faces -- and at any
-        ``known_mask`` cells; values elsewhere are ignored.  The solution
-        equals ``known_values`` exactly at those cells.  ``None`` (default)
-        keeps the homogeneous solve unchanged.  Mask-based methods require
-        *mask*.  ``method="spectral"`` raises: its T-point Dirichlet wall
-        (DST-II) is on the faces, not at the ghost-cell centres.
-    known_mask : Bool[Array, "Ny Nx"] or None
-        Extra interior wet cells with known values (e.g. sparse
-        observations), pinned alongside the boundary ring.
-        ``method="cg"`` only.
+    known_values, known_mask : None
+        Not supported for pressure: a T-point Dirichlet value belongs on the
+        cell face, while known values are pinned at cell centres (the ghost
+        cells, half a cell outside the face), which would be a different,
+        first-order wall.  Passing either raises.
 
     Returns
     -------
     Float[Array, "Ny Nx"]
         Pressure field p.
     """
+    if method == "capacitance":
+        raise ValueError(
+            "method='capacitance' is not available for the T-point pressure "
+            "solve: the capacitance solver holds the unknown at zero on the dry "
+            "cell centres next to the wet ones (the psi wall), not on the cell "
+            "faces where the pressure wall is.  Use method='cg' with a mask."
+        )
+    if known_mask is not None and known_values is None:
+        raise ValueError(
+            "known_mask needs known_values (and pressure accepts neither)."
+        )
     bc, mask, known_values = _resolve_bc(
         bc, method, mask, known_values, div_u.shape, div_u.dtype, "T"
     )
@@ -969,9 +1085,9 @@ def pv_inversion(
         Helmholtz parameter(s).  Scalar for a single layer; array of
         shape ``(nl,)`` for multi-layer inversion.
     bc : {"dst", "dct", "fft"} or BoundaryConditionSet
-        Boundary-condition type (for ``method="spectral"``).  A
-        :class:`BoundaryConditionSet` is accepted as in
-        :func:`streamfunction_from_vorticity`.
+        Boundary condition on the wall / coast, as in
+        :func:`streamfunction_from_vorticity` (``"dst"`` for the mask-based
+        methods).  A :class:`BoundaryConditionSet` is accepted as there.
     method : {"spectral", "cg", "capacitance"}
         Solver method.  Default: ``"spectral"``.
     mask : Float[Array, "Ny Nx"] or Mask2D or None
@@ -999,6 +1115,10 @@ def pv_inversion(
         bc, method, mask, known_values, pv.shape, pv.dtype, "X"
     )
     lam = jnp.asarray(lambda_)
+    # A Python-number lambda stays concrete (the singular-Neumann projection
+    # keys on a concrete zero); a traced scalar is passed through as is, so
+    # jit / vmap over a scalar lambda_ work.
+    lam_scalar = lambda_ if isinstance(lambda_, numbers.Real) else lam
     kv = None if known_values is None else jnp.broadcast_to(known_values, pv.shape)
 
     if lam.ndim == 0 and kv is not None:
@@ -1011,7 +1131,7 @@ def pv_inversion(
                 kv_i,
                 dx,
                 dy,
-                float(lam),
+                lam_scalar,
                 bc,
                 method,
                 mask,
@@ -1035,7 +1155,7 @@ def pv_inversion(
                 pv,
                 dx,
                 dy,
-                float(lam),
+                lam_scalar,
                 bc,
                 method,
                 mask,
@@ -1052,7 +1172,7 @@ def pv_inversion(
                 rhs,
                 dx,
                 dy,
-                float(lam),
+                lam_scalar,
                 bc,
                 method,
                 mask,
@@ -1095,6 +1215,7 @@ def pv_inversion(
     )
 
     if method == "cg":
+        _check_cg_bc(bc, "X")
         mask_arr = _resolve_mask_arr(mask, pv.dtype, "X")
         if mask_arr is None:
             raise ValueError("method='cg' requires a mask")
@@ -1103,23 +1224,12 @@ def pv_inversion(
             mask_arr if domain is None else domain.effective_mask.astype(pv.dtype)
         )
 
-        _precond = preconditioner
-
         def _solve_layer(
             rhs: Float[Array, "Ny Nx"], lam_i: float
         ) -> Float[Array, "Ny Nx"]:
-            def _matvec(x: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
-                return masked_laplacian(x, solve_mask, dx, dy, lambda_=lam_i)
-
-            pc = (
-                _precond
-                if _precond is not None
-                else make_spectral_preconditioner(dx, dy, lambda_=lam_i, bc="fft")
+            return _cg_masked_solve(
+                rhs, solve_mask, dx, dy, lam_i, bc, preconditioner, "X"
             )
-            x, _info = solve_cg(
-                _matvec, rhs * solve_mask, preconditioner=pc, throw=True
-            )
-            return x * solve_mask
 
     elif method == "spectral":
         # With known values the ψ basin's solve domain is the DST-I rectangle.

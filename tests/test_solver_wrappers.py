@@ -319,17 +319,21 @@ class TestPressureFromDivergence:
         outside = np.array(p * (1 - mask_arr))
         np.testing.assert_allclose(outside, 0.0, atol=1e-12)
 
-    def test_capacitance_method(self, rect_mask):
-        """Pressure from divergence via capacitance solver."""
+    def test_capacitance_method_raises(self, rect_mask):
+        """The capacitance wall is the psi wall (cell centres), not the faces."""
         Ny, Nx = rect_mask.shape
         dx = 1.0 / (Nx - 1)
         dy = 1.0 / (Ny - 1)
-        solver = build_capacitance_solver(rect_mask, dx, dy, base_bc="fft")
-        div_u = jnp.zeros((Ny, Nx))
-        p = pressure_from_divergence(
-            div_u, dx, dy, method="capacitance", capacitance_solver=solver
-        )
-        assert p.shape == (Ny, Nx)
+        solver = build_capacitance_solver(rect_mask, dx, dy)
+        with pytest.raises(ValueError, match="not available for the T-point"):
+            pressure_from_divergence(
+                jnp.zeros((Ny, Nx)),
+                dx,
+                dy,
+                bc="dst",
+                method="capacitance",
+                capacitance_solver=solver,
+            )
 
 
 # ---------------------------------------------------------------------------
