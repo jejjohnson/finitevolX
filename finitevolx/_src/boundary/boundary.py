@@ -11,6 +11,7 @@ from __future__ import annotations
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
+from finitevolx._src.boundary.bc_1d import Dirichlet1D, Outflow1D
 from finitevolx._src.boundary.bc_set import BoundaryConditionSet
 
 
@@ -299,10 +300,13 @@ def wall_boundaries(
     on which C-grid variable the field represents:
 
     * ``'h'`` (tracer): zero-gradient (free-slip) + corner averaging.
-    * ``'u'`` (x-velocity): zero at east/west walls (no-flux normal),
-      free-slip at north/south walls, + corner averaging.
-    * ``'v'`` (y-velocity): zero at north/south walls (no-flux normal),
-      free-slip at east/west walls, + corner averaging.
+    * ``'u'`` (x-velocity): zero on the west / east wall faces ``U[:, 0]``
+      and ``U[:, Nx-2]`` (no normal flow; ``U[:, Nx-1]``, outside the
+      domain, gets the odd mirror ``-U[:, Nx-3]``), free-slip at
+      north/south walls, + corner averaging.
+    * ``'v'`` (y-velocity): zero on the south / north wall faces ``V[0, :]``
+      and ``V[Ny-2, :]`` (``V[Ny-1, :]`` gets ``-V[Ny-3, :]``), free-slip at
+      east/west walls, + corner averaging.
     * ``'q'`` (vorticity / psi): no-slip at all walls + corner averaging.
 
     Parameters
@@ -321,23 +325,24 @@ def wall_boundaries(
         # Tracer: zero-gradient (outflow/free-slip)
         out = free_slip_boundaries(field)
     elif staggering == "u":
-        # u-velocity: zero at E/W walls (normal), free-slip at N/S
-        out = field
-        # North/south: free-slip (copy interior)
-        out = out.at[0, :].set(field[1, :])
-        out = out.at[-1, :].set(field[-2, :])
-        # East/west: no-flux (zero normal velocity)
-        out = out.at[:, 0].set(0.0)
-        out = out.at[:, -1].set(0.0)
+        # u-velocity: free-slip (zero gradient) at N/S, no normal flow on the
+        # W/E wall faces U[:, 0] and U[:, Nx-2] (the atoms' point="U" fill,
+        # which mirrors U[:, Nx-1] = -U[:, Nx-3] outside the domain)
+        out = BoundaryConditionSet(
+            south=Outflow1D("south"),
+            north=Outflow1D("north"),
+            west=Dirichlet1D("west", 0.0, point="U"),
+            east=Dirichlet1D("east", 0.0, point="U"),
+        )(field, 1.0, 1.0)
     elif staggering == "v":
-        # v-velocity: zero at N/S walls (normal), free-slip at E/W
-        out = field
-        # East/west: free-slip (copy interior)
-        out = out.at[:, 0].set(field[:, 1])
-        out = out.at[:, -1].set(field[:, -2])
-        # North/south: no-flux (zero normal velocity)
-        out = out.at[0, :].set(0.0)
-        out = out.at[-1, :].set(0.0)
+        # v-velocity: no normal flow on the S/N wall faces V[0, :] and
+        # V[Ny-2, :] (V[Ny-1, :] = -V[Ny-3, :]), free-slip at W/E
+        out = BoundaryConditionSet(
+            south=Dirichlet1D("south", 0.0, point="V"),
+            north=Dirichlet1D("north", 0.0, point="V"),
+            west=Outflow1D("west"),
+            east=Outflow1D("east"),
+        )(field, 1.0, 1.0)
     elif staggering == "q":
         # Vorticity: no-slip at all walls
         out = no_slip_boundaries(field)

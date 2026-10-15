@@ -35,6 +35,12 @@ particular coefficients, or a set of existing atoms.
   outward of the interior, so `(ghost - interior) / spacing` is already the
   outward-normal gradient). Write that formula in the docstring and in a
   comment.
+- Give the atom `point: Point = eqx.field(static=True, default="T")` and
+  pass it to `_adjacent_interior` / `_set_face`: when `_on_wall(face,
+  point)` is true (`U` / `X` on west / east, `V` / `X` on south / north)
+  the field's node is on the wall itself, so impose the condition on that
+  node (Dirichlet writes `value`, a gradient is one-sided) and let
+  `_set_face` write the east / north mirror slot.
 - Add the class to the `BoundaryCondition1D` union at the bottom of
   `bc_1d.py` (it types `BoundaryConditionSet`'s fields).
 - **A set factory** is a `@classmethod` on `BoundaryConditionSet`

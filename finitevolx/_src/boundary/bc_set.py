@@ -10,6 +10,7 @@ from finitevolx._src.boundary.bc_1d import (
     Dirichlet1D,
     Outflow1D,
     Periodic1D,
+    Point,
 )
 from finitevolx._src.mask import Mask2D
 
@@ -19,6 +20,12 @@ class BoundaryConditionSet(eqx.Module):
 
     The application order is south, north, west, then east, so west/east
     updates overwrite the corner values written by south/north updates.
+
+    Each atom carries its own ``point`` (the C-grid point of the field); the
+    ``closed`` / ``open`` constructors pass one ``point`` to all four faces.
+    A closed basin for the velocity is ``BoundaryConditionSet.closed(point="U")``
+    for ``u`` and ``closed(point="V")`` for ``v``: zero normal velocity on the
+    wall faces and no-slip (``ghost = -interior``) on the tangential walls.
 
     Parameters
     ----------
@@ -53,25 +60,34 @@ class BoundaryConditionSet(eqx.Module):
 
     @classmethod
     def closed(
-        cls, mask: Mask2D | Float[Array, "Ny Nx"] | None = None
+        cls,
+        mask: Mask2D | Float[Array, "Ny Nx"] | None = None,
+        point: Point = "T",
     ) -> BoundaryConditionSet:
-        """Return a zero-Dirichlet boundary-condition set on all faces."""
+        """Return a zero-Dirichlet boundary-condition set on all faces.
+
+        ``point`` is the C-grid point of the field (``"T"``, ``"U"``, ``"V"``
+        or ``"X"``); see :class:`Dirichlet1D`.
+        """
         return cls(
-            south=Dirichlet1D("south", value=0.0),
-            north=Dirichlet1D("north", value=0.0),
-            west=Dirichlet1D("west", value=0.0),
-            east=Dirichlet1D("east", value=0.0),
+            south=Dirichlet1D("south", value=0.0, point=point),
+            north=Dirichlet1D("north", value=0.0, point=point),
+            west=Dirichlet1D("west", value=0.0, point=point),
+            east=Dirichlet1D("east", value=0.0, point=point),
             mask=mask,
         )
 
     @classmethod
-    def open(cls) -> BoundaryConditionSet:
-        """Return a zero-gradient boundary-condition set on all faces."""
+    def open(cls, point: Point = "T") -> BoundaryConditionSet:
+        """Return a zero-gradient boundary-condition set on all faces.
+
+        ``point`` is the C-grid point of the field; see :class:`Outflow1D`.
+        """
         return cls(
-            south=Outflow1D("south"),
-            north=Outflow1D("north"),
-            west=Outflow1D("west"),
-            east=Outflow1D("east"),
+            south=Outflow1D("south", point=point),
+            north=Outflow1D("north", point=point),
+            west=Outflow1D("west", point=point),
+            east=Outflow1D("east", point=point),
         )
 
     def __call__(

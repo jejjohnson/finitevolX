@@ -301,23 +301,29 @@ class TestWallBoundaries:
         """u-grid: zero at E/W walls (normal flux), free-slip at N/S."""
         f = _interior_field(8, 8)
         out = wall_boundaries(f, staggering="u")
-        # E/W ghost cols should be zero
+        # The E/W wall faces U[:, 0] and U[:, Nx-2] are zero; U[:, Nx-1] is
+        # outside the domain and holds the odd mirror -U[:, Nx-3] (#286).
         np.testing.assert_array_equal(out[1:-1, 0], 0.0)
-        np.testing.assert_array_equal(out[1:-1, -1], 0.0)
-        # N/S ghost rows should match interior (free-slip)
-        np.testing.assert_allclose(out[0, 1:-1], f[1, 1:-1], atol=1e-14)
-        np.testing.assert_allclose(out[-1, 1:-1], f[-2, 1:-1], atol=1e-14)
+        np.testing.assert_array_equal(out[1:-1, -2], 0.0)
+        np.testing.assert_allclose(out[1:-1, -1], -f[1:-1, -3], atol=1e-14)
+        # N/S ghost rows should match interior (free-slip), up to the
+        # east wall-face column
+        np.testing.assert_allclose(out[0, 1:-2], f[1, 1:-2], atol=1e-14)
+        np.testing.assert_allclose(out[-1, 1:-2], f[-2, 1:-2], atol=1e-14)
 
     def test_v_grid_no_flux_ns(self):
         """v-grid: zero at N/S walls (normal flux), free-slip at E/W."""
         f = _interior_field(8, 8)
         out = wall_boundaries(f, staggering="v")
-        # N/S ghost rows should be zero
+        # The N/S wall faces V[0, :] and V[Ny-2, :] are zero; V[Ny-1, :] is
+        # outside the domain and holds the odd mirror -V[Ny-3, :] (#286).
         np.testing.assert_array_equal(out[0, 1:-1], 0.0)
-        np.testing.assert_array_equal(out[-1, 1:-1], 0.0)
-        # E/W ghost cols should match interior (free-slip)
-        np.testing.assert_allclose(out[1:-1, 0], f[1:-1, 1], atol=1e-14)
-        np.testing.assert_allclose(out[1:-1, -1], f[1:-1, -2], atol=1e-14)
+        np.testing.assert_array_equal(out[-2, 1:-1], 0.0)
+        np.testing.assert_allclose(out[-1, 1:-1], -f[-3, 1:-1], atol=1e-14)
+        # E/W ghost cols should match interior (free-slip), up to the
+        # north wall-face row
+        np.testing.assert_allclose(out[1:-2, 0], f[1:-2, 1], atol=1e-14)
+        np.testing.assert_allclose(out[1:-2, -1], f[1:-2, -2], atol=1e-14)
 
     def test_q_grid_no_slip(self):
         """q-grid: no-slip (sign-flipped) at all walls."""
@@ -388,12 +394,17 @@ class TestBoundaryPhysics:
         u_bc = wall_boundaries(u, staggering="u")
         v_bc = wall_boundaries(v, staggering="v")
 
-        # u normal to E/W walls (interior edges, excluding corners)
+        # u on the E/W wall faces U[:, 0], U[:, Nx-2] (excluding corners)
         np.testing.assert_array_equal(u_bc[1:-1, 0], 0.0)
-        np.testing.assert_array_equal(u_bc[1:-1, -1], 0.0)
-        # v normal to N/S walls (interior edges, excluding corners)
+        np.testing.assert_array_equal(u_bc[1:-1, -2], 0.0)
+        # v on the N/S wall faces V[0, :], V[Ny-2, :] (excluding corners)
         np.testing.assert_array_equal(v_bc[0, 1:-1], 0.0)
-        np.testing.assert_array_equal(v_bc[-1, 1:-1], 0.0)
+        np.testing.assert_array_equal(v_bc[-2, 1:-1], 0.0)
+        # ... so the net mass flux through the basin walls is zero (#286)
+        net = (u_bc[1:-1, -2] - u_bc[1:-1, 0]).sum() + (
+            v_bc[-2, 1:-1] - v_bc[0, 1:-1]
+        ).sum()
+        assert float(net) == 0.0
 
     def test_no_slip_antisymmetry(self):
         """No-slip ghost cells should be antisymmetric about the wall."""
