@@ -10,6 +10,8 @@ import lineax as lx
 import numpy as np
 import pytest
 
+from finitevolx import Mask2D, masked_laplacian, solve_cg
+from finitevolx._src.solvers.iterative import _masked_neumann_laplacian
 from finitevolx._src.solvers.multigrid import (
     MultigridSolver,
     _apply_operator,
@@ -70,6 +72,26 @@ def _circular_mask(ny, nx, radius_frac=0.4):
     return (jj**2 + ii**2 < radius_frac**2).astype(np.float64)
 
 
+def _basin_mask2d(n_interior):
+    """Mask2D of a circular basin on an (n+2) grid; its ring is dry."""
+    n = n_interior + 2
+    jj, ii = np.mgrid[:n, :n]
+    c = (n - 1) / 2
+    h = ((jj - c) ** 2 + (ii - c) ** 2) < (0.45 * n_interior) ** 2
+    return Mask2D.from_mask(h.astype(float))
+
+
+def _dense_wet_operator(level):
+    """Dense matrix of the level operator restricted to its wet cells."""
+    ny, nx = level.mask.shape
+    wet = np.asarray(level.mask).ravel() > 0
+    eye = jnp.eye(ny * nx)
+    a = np.asarray(
+        jax.vmap(lambda e: _apply_operator(e.reshape(ny, nx), level).ravel())(eye)
+    ).T
+    return a[np.ix_(wet, wet)]
+
+
 # ---------------------------------------------------------------------------
 # TestBuildMultigridSolver
 # ---------------------------------------------------------------------------
@@ -110,6 +132,126 @@ class TestBuildMultigridSolver:
         for i, level in enumerate(solver.levels):
             factor = 2**i
             assert level.mask.shape == (ny // factor, nx // factor)
+
+    def test_bad_bc_raises(self):
+        with pytest.raises(ValueError, match="bc must be"):
+            build_multigrid_solver(np.ones((8, 8)), 1.0, 1.0, bc="robin")
+
+
+# ---------------------------------------------------------------------------
+# TestBoundaryCondition (#304)
+# ---------------------------------------------------------------------------
+
+
+class TestBoundaryCondition:
+    """bc="dirichlet" (default) is masked_laplacian's psi = 0 wall on the dry
+    X nodes; bc="neumann" is the zero-flux wall of a T-point problem."""
+
+    @pytest.mark.parametrize("kind", ["basin", "rectangle", "all_wet"])
+    def test_dirichlet_matches_masked_laplacian(self, kind):
+        n = 14
+        dx, dy = 1.0 / n, 1.3 / n
+        if kind == "basin":
+            mask = _basin_mask2d(n)
+        elif kind == "rectangle":
+            mask = Mask2D.from_mask(np.ones((n + 2, n + 2)))
+        else:
+            mask = np.ones((n + 2, n + 2))
+        solver = build_multigrid_solver(mask, dx, dy, lambda_=4.0)
+        assert solver.bc == "dirichlet"
+        level = solver.levels[0]
+        m = np.asarray(level.mask)
+        psi = jnp.asarray(np.random.default_rng(0).standard_normal(m.shape))
+        out = np.asarray(_apply_operator(psi, level))
+        # the documented contract: level 0 (c = 1) is masked_laplacian (dry
+        # neighbours zero, zero-padded at the array edge); the same 5-point
+        # arithmetic in a different order, so round-off only
+        ref = np.asarray(masked_laplacian(psi, jnp.asarray(m), dx, dy, 4.0))
+        np.testing.assert_allclose(out, ref, rtol=0, atol=1e-12 * np.abs(ref).max())
+
+    def test_neumann_matches_masked_neumann_laplacian(self):
+        """Level 0 with bc="neumann", c = 1, is the solvers' Neumann operator
+        on a basin with an island (the copies must not drift)."""
+        n = 14
+        dx, dy = 1.0 / n, 1.3 / n
+        h = np.asarray(_basin_mask2d(n).h, dtype=float)
+        h[6:9, 5:8] = 0.0  # island
+        solver = build_multigrid_solver(h, dx, dy, lambda_=4.0, bc="neumann")
+        psi = jnp.asarray(np.random.default_rng(0).standard_normal(h.shape))
+        out = np.asarray(_apply_operator(psi, solver.levels[0]))
+        ref = np.asarray(_masked_neumann_laplacian(psi, jnp.asarray(h), dx, dy, 4.0))
+        np.testing.assert_allclose(out, ref, rtol=0, atol=1e-12 * np.abs(ref).max())
+
+    def test_mask2d_uses_psi_mask(self):
+        mask = _basin_mask2d(14)
+        solver = build_multigrid_solver(mask, 1.0, 1.0)
+        np.testing.assert_array_equal(
+            np.asarray(solver.levels[0].mask), np.asarray(mask.xy_corner_strict)
+        )
+
+    def test_neumann_annihilates_constants(self):
+        mask = np.asarray(_basin_mask2d(14).h, dtype=float)
+        solver = build_multigrid_solver(mask, 0.1, 0.1, bc="neumann")
+        out = _apply_operator(jnp.ones(mask.shape), solver.levels[0])
+        np.testing.assert_allclose(np.asarray(out), 0.0, atol=1e-10)
+
+    def test_dirichlet_lambda0_nonsingular(self):
+        """The Dirichlet operator is negative definite at lambda = 0 (the
+        Neumann one has a zero eigenvalue per wet component)."""
+        mask = _basin_mask2d(10)
+        solver = build_multigrid_solver(mask, 1.0, 1.0, lambda_=0.0)
+        eig = np.linalg.eigvalsh(_dense_wet_operator(solver.levels[0]))
+        assert eig.max() < -1e-2  # smallest |eig| ~ 2 pi^2 / L^2 >> round-off
+        neu = build_multigrid_solver(
+            np.asarray(mask.xy_corner_strict), 1.0, 1.0, bc="neumann"
+        )
+        eig_n = np.linalg.eigvalsh(_dense_wet_operator(neu.levels[0]))
+        assert abs(eig_n.max()) < 1e-10
+
+    @pytest.mark.slow
+    @pytest.mark.parametrize("lambda_", [0.0, 4.0])
+    def test_dirichlet_solve_matches_cg(self, lambda_):
+        """MG on a masked basin solves masked_laplacian's problem: it agrees
+        with CG on the same operator to the solve tolerance."""
+        n = 30
+        dx = dy = 1.0 / n
+        mask = _basin_mask2d(n)
+        m = jnp.asarray(mask.xy_corner_strict, dtype=float)
+        rhs = jnp.asarray(np.random.default_rng(1).standard_normal(m.shape)) * m
+        x_cg, info = solve_cg(
+            lambda p: masked_laplacian(p, m, dx, dy, lambda_),
+            rhs,
+            rtol=1e-12,
+            atol=1e-12,
+            max_steps=2000,
+        )
+        assert info.converged
+        solver = build_multigrid_solver(mask, dx, dy, lambda_=lambda_, n_cycles=40)
+        u = solver(rhs)
+        # 40 V-cycles drive the MG error far below the 1e-8 asserted here; CG
+        # is converged to 1e-12
+        rel = float(jnp.abs(u - x_cg).max() / jnp.abs(x_cg).max())
+        assert rel < 1e-8
+
+    @pytest.mark.slow
+    def test_neumann_lambda0_zero_mean(self):
+        """bc="neumann" at lambda = 0 solves the projected (solvable) problem
+        and returns the zero-mean solution on each wet component."""
+        n = 30
+        h = np.asarray(_basin_mask2d(n).h, dtype=float)
+        h[n // 2, :] = 0.0  # split the basin into two components
+        solver = build_multigrid_solver(h, 1.0 / n, 1.0 / n, bc="neumann", n_cycles=30)
+        assert int(solver.null_counts.shape[0]) == 3  # dry + two basins
+        rhs = jnp.asarray(np.random.default_rng(2).standard_normal(h.shape)) * h
+        u = solver(rhs)
+        rhs_p = solver._project(rhs)
+        res = rhs_p - _apply_operator(u, solver.levels[0])
+        assert float(jnp.linalg.norm(res) / jnp.linalg.norm(rhs_p)) < 1e-6
+        top, bottom = h.copy(), h.copy()
+        top[: n // 2] = 0.0
+        bottom[n // 2 :] = 0.0
+        for part in (top, bottom):
+            assert abs(float(jnp.sum(u * part))) < 1e-10 * float(jnp.abs(u).sum())
 
 
 # ---------------------------------------------------------------------------
@@ -229,11 +371,8 @@ class TestJacobiSmoother:
 class TestVCycleSolver:
     @pytest.mark.slow
     def test_poisson_convergence(self, mg_grid_32):
-        """Constant-coeff Poisson on a full rectangle: residual decreases.
-
-        Note: λ=0 Neumann Laplacian is singular (constant null mode),
-        so convergence is slower than Helmholtz.
-        """
+        """Constant-coeff Poisson (Dirichlet walls) on a full rectangle:
+        residual decreases."""
         ny, nx, dx, dy = mg_grid_32
         solver = _all_ones_solver(ny, nx, dx, dy, n_cycles=20)
         rng = np.random.default_rng(10)

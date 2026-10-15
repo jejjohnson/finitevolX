@@ -13,7 +13,9 @@ implicitly — letting the caller take baroclinic-scale time steps.
 The hard part — the variable-coefficient Helmholtz solve ``div(h grad w)`` —
 is **not** re-implemented here: it is injected as ``helm_solve``, which the
 caller builds from the existing multigrid solver
-(``build_multigrid_solver(mask, dx, dy, coeff=h)``, which is itself callable).
+(``build_multigrid_solver(mask, dx, dy, coeff=h, bc="neumann")``, which is
+itself callable; the free surface of a closed basin has zero normal transport
+through the coast, hence the Neumann wall).
 This module is the thin operator that wires the transport, the solve, and the
 gradient correction together.
 
@@ -75,8 +77,8 @@ def barotropic_filter(
 
     .. note::
         :func:`~finitevolx.build_multigrid_solver` **freezes** the coefficient
-        (interpolated to the staggered ``cx``/``cy`` face fields) into the level
-        hierarchy at construction time.  A prebuilt ``helm_solve`` therefore
+        (interpolated to the cell faces) into the level hierarchy at
+        construction time.  A prebuilt ``helm_solve`` therefore
         solves with a *fixed* coefficient; it is correct only when the
         barotropic coefficient is time-invariant.  If ``h_u``/``h_v`` evolve,
         either accept the fixed-coefficient (frozen-``h``) barotropic
@@ -101,8 +103,10 @@ def barotropic_filter(
     helm_solve : Callable[[Array], Array]
         Solver for the variable-coefficient Helmholtz problem
         ``div(h grad w) = rhs`` at T-points, e.g. a
-        :class:`~finitevolx.MultigridSolver` built with ``coeff=h`` (the
-        solver object is itself callable).
+        :class:`~finitevolx.MultigridSolver` built with ``coeff=h`` and
+        ``bc="neumann"`` (zero transport through the coast; the multigrid
+        default is the Dirichlet wall of the streamfunction solves).  The
+        solver object is itself callable.
     layer_axis : int, optional
         Axis to sum the layers over.  Default ``-3``.
 

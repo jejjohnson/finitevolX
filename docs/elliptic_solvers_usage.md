@@ -311,9 +311,10 @@ psi = fvx.streamfunction_from_vorticity(
 )
 ```
 
-A standalone multigrid solve is not a drop-in here: its operator places the
-Dirichlet condition on cell faces rather than using `masked_laplacian`'s
-stencil, so it does not reproduce the lifted problem.
+The multigrid operator (default `bc="dirichlet"`) is `masked_laplacian`'s
+stencil with dry neighbours zero, so it is the same operator CG solves; the
+known-value lifting is done by the wrapper, so a standalone multigrid solve
+needs the lifted right-hand side.
 
 ---
 

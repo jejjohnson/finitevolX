@@ -60,7 +60,23 @@ u = solver(rhs * jnp.array(mask))  # zero RHS outside domain
 
 ```python
 cgrid_mask = fvx.Mask2D.from_mask(ocean_mask)
+# psi at X points (xy_corner_strict), psi = 0 on the coast: the default
 solver = fvx.build_multigrid_solver(cgrid_mask, dx, dy, lambda_=10.0)
+```
+
+### Boundary Condition
+
+`bc="dirichlet"` (the default) takes the value beyond every wet–dry face
+as zero: the streamfunction problem, the same operator as
+`fvx.masked_laplacian`. `bc="neumann"` puts no flux through wet–dry faces:
+the pressure / free-surface problem on the T-point mask.
+
+```python
+# Pressure at T points, zero normal flux at the coast.  At lambda_ = 0 the
+# solution is returned in the zero-mean gauge on each wet component.
+p_solver = fvx.build_multigrid_solver(
+    np.asarray(cgrid_mask.h, dtype=float), dx, dy, lambda_=0.0, bc="neumann"
+)
 ```
 
 ### Variable Coefficient
@@ -89,6 +105,7 @@ solver = fvx.build_multigrid_solver(
     n_coarse=50,    # bottom-solver iterations
     omega=0.95,     # Jacobi relaxation weight
     n_cycles=5,     # V-cycles per solve
+    bc="dirichlet", # or "neumann" (zero flux at the coast)
 )
 ```
 
