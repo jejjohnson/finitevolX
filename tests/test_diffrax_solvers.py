@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 
 import diffrax as dfx
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -388,6 +389,55 @@ class TestLeapfrogRAFSolver:
 
 
 class TestSplitExplicitRKSolver:
+    def test_oscillatory_fast_mode(self):
+        """Fast rotation w_f = 20 stays on the unit circle to 1e-6 over t = 10 (#312)."""
+        wf, dt = 20.0, 0.05
+        solver = SplitExplicitRKSolver(n_substeps=50)
+
+        def rhs_slow(_t, y_3d, y_2d_avg):
+            return jnp.array([y_3d[1], -y_3d[0]]) + 1e-3 * y_2d_avg
+
+        def rhs_fast(_t, y_2d, _y_3d):
+            return jnp.array([wf * y_2d[1], -wf * y_2d[0]])
+
+        step = jax.jit(lambda t, a, b: solver.step(rhs_slow, rhs_fast, t, a, b, dt))
+        y3 = y2 = jnp.array([1.0, 0.0])
+        for n in range(200):
+            y3, y2 = step(n * dt, y3, y2)
+        assert abs(float(jnp.linalg.norm(y2)) - 1.0) < 1e-6
+
+    def test_matches_split_explicit_step(self):
+        """The solver equals the functional step, slow forcing and coupling included."""
+        from finitevolx import split_explicit_step
+
+        solver = SplitExplicitRKSolver(n_substeps=7)
+        y3, y2 = jnp.array([1.0, -0.5]), jnp.array([0.3, 0.2])
+        args = dict(
+            slow_forcing=lambda a: 0.1 * a,
+            couple_2d_to_3d=lambda a, avg: a + 0.01 * avg,
+        )
+        out_s = solver.step(
+            lambda _t, a, avg: -a + avg,
+            lambda _t, b, a: -3.0 * b + a,
+            0.0,
+            y3,
+            y2,
+            0.2,
+            **args,
+        )
+        out_f = split_explicit_step(
+            y3,
+            y2,
+            lambda a, avg: -a + avg,
+            lambda _t, b, a: -3.0 * b + a,
+            args["couple_2d_to_3d"],
+            0.2,
+            7,
+            slow_forcing=args["slow_forcing"],
+        )
+        np.testing.assert_array_equal(out_s[0], out_f[0])
+        np.testing.assert_array_equal(out_s[1], out_f[1])
+
     def test_basic(self):
         solver = SplitExplicitRKSolver(n_substeps=10)
 

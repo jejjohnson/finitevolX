@@ -110,11 +110,25 @@ internal waves, but the barotropic equations are 2D (cheap).
 
 **Algorithm:**
 
-1. **Subcycle** the 2D barotropic equations with $N$ small Forward-Euler
-   steps ($\Delta t_{\text{fast}} = \Delta t_{\text{slow}} / N$).
-2. **Time-average** the barotropic solution to filter fast oscillations.
-3. **Advance** the 3D baroclinic equations with one slow step using the
-   averaged barotropic state.
+1. **Subcycle** the 2D barotropic equations with $N$ small classical RK4
+   steps ($\Delta t_{\text{fast}} = \Delta t_{\text{slow}} / N$), with an
+   optional slow (baroclinic) forcing held fixed over the cycle.  RK4 is
+   neutrally stable for the oscillatory gravity-wave mode to
+   $(\omega\Delta t_{\text{fast}})^6/144$ per substep; a Forward-Euler
+   subcycle would amplify it by $\sqrt{1 + (\omega\Delta t_{\text{fast}})^2}$
+   per substep, unconditionally.
+2. **Time-average** the barotropic solution over the cycle with the
+   trapezoidal rule (both end points, exact for a linear trend) to filter
+   fast oscillations.
+3. **Advance** the 3D baroclinic equations with one Forward-Euler slow step
+   (first order in $\Delta t_{\text{slow}}$) using the averaged barotropic
+   state, then call the user's `couple_2d_to_3d(state_3d, state_2d_avg)`.
+
+The returned barotropic state is the instantaneous end-of-cycle state (so it
+stays on time), not the average.  Making the 3D state consistent with the
+averaged barotropic one — e.g. replacing the depth mean of the 3D velocity
+by the averaged barotropic transport — is the caller's job, done in
+`couple_2d_to_3d`.
 
 This decouples the barotropic CFL from the slow timestep, allowing
 $\Delta t_{\text{slow}}$ to be set by the (much slower) baroclinic dynamics.

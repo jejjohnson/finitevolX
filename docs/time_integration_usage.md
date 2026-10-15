@@ -171,16 +171,25 @@ def rhs_2d(t_sub, state_2d, state_3d):
     return tendency_2d
 
 def couple(state_3d, state_2d_avg):
-    """Ensure 3D/2D consistency after the slow step."""
+    """Ensure 3D/2D consistency after the slow step (the caller's job)."""
     return corrected_3d
+
+def slow_forcing(state_3d):
+    """Baroclinic forcing of the barotropic mode, held fixed over the cycle."""
+    return forcing_2d   # same structure as state_2d
 
 state_3d, state_2d = split_explicit_step(
     state_3d, state_2d,
     rhs_3d, rhs_2d, couple,
     dt_slow=600.0,    # baroclinic timestep
-    n_substeps=30,    # 30 barotropic sub-steps
+    n_substeps=30,    # 30 barotropic RK4 sub-steps
+    slow_forcing=slow_forcing,   # optional
 )
 ```
+
+The fast mode is subcycled with RK4 (stable for oscillatory gravity waves),
+`rhs_3d` and `couple` receive the trapezoidal time mean of the fast state
+over the cycle, and the returned `state_2d` is the end-of-cycle state.
 
 ### Semi-Lagrangian Advection
 
@@ -340,6 +349,8 @@ y_3d_new, y_2d_new = solver.step(
     y_3d=state_3d,
     y_2d=state_2d,
     dt_slow=600.0,
+    slow_forcing=slow_forcing,        # optional, (y_3d) -> forcing_2d
+    couple_2d_to_3d=couple,           # optional, (new_y_3d, y_2d_avg) -> y_3d
 )
 ```
 

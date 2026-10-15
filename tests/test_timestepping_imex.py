@@ -209,9 +209,11 @@ class TestSplitExplicit:
         _, y_2d_new = split_explicit_step(
             y_3d, y_2d, rhs_3d, rhs_2d, couple, dt_slow, n_substeps
         )
-        # Forward Euler with dt=0.01 for 100 steps on dy/dt=-y
-        # Exact: exp(-1) ≈ 0.3679; Euler with dt=0.01: (0.99)^100 ≈ 0.366
-        np.testing.assert_allclose(float(y_2d_new), 0.99**100, rtol=1e-10)
+        # RK4 with h = dt_fast = 0.01 for 100 steps on dy/dt = -y: the
+        # amplification per step is the degree-4 Taylor polynomial of e^{-h}
+        h = 0.01
+        r = 1.0 - h + h**2 / 2 - h**3 / 6 + h**4 / 24
+        np.testing.assert_allclose(float(y_2d_new), r**100, rtol=1e-12)
 
     def test_coupling_modifies_slow_state(self):
         """Verify the coupling function actually modifies the slow state."""
@@ -284,3 +286,112 @@ class TestSplitExplicit:
         y3, y2 = step_jit(y_3d, y_2d)
         assert jnp.isfinite(y3)
         assert jnp.isfinite(y2)
+
+
+class TestSplitExplicitFastMode:
+    """The fast subcycle on oscillatory modes, the cycle mean and the slow forcing (#312)."""
+
+    @staticmethod
+    def _run(step, n_steps):
+        y3 = jnp.array([1.0, 0.0])
+        y2 = jnp.array([1.0, 0.0])
+        for n in range(n_steps):
+            y3, y2 = step(n, y3, y2)
+        return y3, y2
+
+    def test_oscillatory_fast_mode_stays_bounded(self):
+        """Fast rotation w_f = 20 with a slow rotation w_s = 1 coupled through the mean.
+
+        dt = 0.05, 50 substeps, t = 10 (10^4 fast steps, w_f dt_fast = 0.02).
+        Forward Euler grew the fast amplitude to 7.39; RK4 changes it by
+        (w dt)^6 / 144 per substep, ~4e-9 in total (bound 1e-6 from #312).
+        """
+        wf, ws, dt, nsub = 20.0, 1.0, 0.05, 50
+
+        def rhs_2d(_t, y2, _y3):
+            return jnp.array([wf * y2[1], -wf * y2[0]])
+
+        def rhs_3d(y3, y2_avg):
+            # slow rotation plus a coupling to the fast mean
+            return jnp.array([ws * y3[1], -ws * y3[0]]) + 1e-3 * y2_avg
+
+        def couple(y3, _y2_avg):
+            return y3
+
+        step = jax.jit(
+            lambda n, a, b: split_explicit_step(a, b, rhs_3d, rhs_2d, couple, dt, nsub)
+        )
+        y3, y2 = self._run(step, 200)
+        assert abs(float(jnp.linalg.norm(y2)) - 1.0) < 1e-6
+        assert bool(jnp.all(jnp.isfinite(y3)))
+
+    def test_cycle_mean_is_trapezoidal(self):
+        """y' = 1 from y = 0 over one step: the cycle mean is exactly 1/2."""
+        captured = {}
+
+        def rhs_3d(_y3, y2_avg):
+            captured["avg"] = y2_avg
+            return jnp.array(0.0)
+
+        split_explicit_step(
+            jnp.array(0.0),
+            jnp.array(0.0),
+            rhs_3d,
+            lambda _t, _y2, _y3: jnp.array(1.0),
+            lambda y3, _avg: y3,
+            1.0,
+            4,
+        )
+        np.testing.assert_allclose(float(captured["avg"]), 0.5, rtol=1e-14)
+
+    def test_slow_forcing_is_added_once_per_cycle(self):
+        """slow_forcing(state_3d) acts on the fast mode as a constant tendency."""
+        calls = []
+
+        def slow_forcing(y3):
+            calls.append(1)
+            return 2.0 * y3
+
+        _, y2 = split_explicit_step(
+            jnp.array(1.5),
+            jnp.array(0.0),
+            lambda _y3, _avg: jnp.array(0.0),
+            lambda _t, _y2, _y3: jnp.array(0.0),
+            lambda y3, _avg: y3,
+            0.5,
+            10,
+            slow_forcing=slow_forcing,
+        )
+        # dy2/dt = 2 * 1.5 = 3 over dt_slow = 0.5
+        np.testing.assert_allclose(float(y2), 1.5, rtol=1e-13)
+        assert len(calls) == 1
+
+    def test_stage_times(self):
+        """rhs_2d sees the RK4 stage times: y' = t integrates exactly to t^2 / 2."""
+        _, y2 = split_explicit_step(
+            jnp.array(0.0),
+            jnp.array(0.0),
+            lambda _y3, _avg: jnp.array(0.0),
+            lambda t, _y2, _y3: t,
+            lambda y3, _avg: y3,
+            2.0,
+            3,
+        )
+        np.testing.assert_allclose(float(y2), 2.0, rtol=1e-13)
+
+
+def test_split_explicit_float32_with_time_dependent_rhs():
+    """float32 states stay float32 (x64 on) even when rhs_2d uses the stage time."""
+    from finitevolx import SplitExplicitRKSolver
+
+    y3 = jnp.ones(3, jnp.float32)
+    y2 = jnp.ones(3, jnp.float32)
+    a3, a2 = split_explicit_step(
+        y3, y2, lambda a, b: -a, lambda t, b, a: -b * jnp.cos(t), lambda a, b: a, 0.1, 5
+    )
+    assert a3.dtype == jnp.float32 and a2.dtype == jnp.float32
+    b3, b2 = SplitExplicitRKSolver(n_substeps=5).step(
+        lambda t, a, b: -a, lambda t, b, a: -b * jnp.cos(t), 0.0, y3, y2, 0.1
+    )
+    assert b3.dtype == jnp.float32 and b2.dtype == jnp.float32
+    np.testing.assert_allclose(b2, a2, rtol=1e-6)
