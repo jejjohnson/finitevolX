@@ -106,7 +106,7 @@ from finitevolx._src.forcing.functional import (
     wind_stress_tendency,
 )
 from finitevolx._src.forcing.rayleigh import RayleighDamping2D, RayleighDamping3D
-from finitevolx._src.forcing.wind import WindStress2D, WindStress3D
+from finitevolx._src.forcing.wind import WindCurl2D, WindStress2D, WindStress3D
 from finitevolx._src.grid.base import (
     ArakawaCGrid1D,
     ArakawaCGrid2D,
@@ -673,6 +673,7 @@ __all__ = [
     "TimeVaryingForcing",
     # Forcing — 2D operators
     "WindStress2D",
+    "WindCurl2D",
     "LinearDrag2D",
     "QuadraticDrag2D",
     "RayleighDamping2D",

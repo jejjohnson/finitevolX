@@ -201,18 +201,38 @@ print(f"dt = {dt:.0f} s = {dt/3600:.1f} hours")
 # ($L_y/2 < y < L_y$, driving cyclonic circulation).  The two gyres
 # share a boundary at the mid-basin latitude, where the Gulf-Stream-like
 # western boundary current separates from the coast.
+#
+# `fvx.WindCurl2D` computes this forcing from the wind stress itself: the
+# C-grid curl of the stress, divided by $\rho_0 H$, at X-points.  A zonal
+# stress $\tau_x = -\tau_0 \cos(2\pi y / L_y)$ has
+# $\mathrm{curl}\,\tau / (\rho_0 H) = -\tau_0 (2\pi/L_y) \sin(2\pi y/L_y) / (\rho_0 H)$,
+# so $\tau_0 = F_0 \rho_0 H L_y / (2\pi)$ gives the peak forcing $F_0$.  The
+# stress is evaluated at every T-point, ghost ring included, and the X-point
+# forcing is averaged to the T-points where $q_a$ lives.
 
 # %%
-# Interior cell-centre coordinates
+# Interior cell-centre coordinates (for plotting)
 x_centers = (jnp.arange(nx) + 0.5) * dx
 y_centers = (jnp.arange(ny) + 0.5) * dy
-_, y2d = jnp.meshgrid(x_centers, y_centers)
 
-# Double-gyre wind-curl forcing at interior T-points
-wind_curl_interior = -wind_amp * jnp.sin(2.0 * jnp.pi * y2d / Ly)
+# Zonal wind stress at every T-point (ghost ring included): y_T[j] = (j - 1/2) dy
+rho0 = 1025.0  # reference density [kg m^-3]
+H = 500.0  # upper-layer thickness [m]
+tau0 = wind_amp * rho0 * H * Ly / (2.0 * jnp.pi)  # stress amplitude [N m^-2]
+y_t = (jnp.arange(Ny) - 0.5) * dy
+tau_x = -tau0 * jnp.cos(2.0 * jnp.pi * y_t / Ly)[:, None] * jnp.ones(Nx)
+tau_y = jnp.zeros((Ny, Nx))
 
-# Pad to full grid with zero ghost ring (wall BCs)
-wind_curl = jnp.pad(wind_curl_interior, pad_width=1, mode="constant")
+# curl(tau) / (rho0 H) at X-points, then averaged to the T-points of q_a
+wind_curl_x = fvx.WindCurl2D(grid=grid, rho0=rho0)(tau_x, tau_y, H)
+# X_to_T on the first interior row / column also reads the south / west wall
+# nodes (X row / column 0), which WindCurl2D leaves at zero like every
+# operator's ghost ring.  Fill them: the curl does not depend on x, so the
+# west wall column equals its neighbour; on the south wall (y = 0) the curl
+# -F0 sin(0) is zero already.
+wind_curl_x = wind_curl_x.at[:, 0].set(wind_curl_x[:, 1])
+wind_curl = fvx.Interpolation2D(grid=grid).X_to_T(wind_curl_x)  # zero ghost ring
+wind_curl_interior = wind_curl[1:-1, 1:-1]
 
 print(f"Wind curl shape (interior): {wind_curl_interior.shape}")
 print(f"Wind curl shape (full):     {wind_curl.shape}")
