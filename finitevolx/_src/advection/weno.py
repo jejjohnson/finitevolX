@@ -1,8 +1,33 @@
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 from jaxtyping import Array
 import numpy as np
+
+# Relative WENO floor (#243).  The weights are the textbook
+# ``g_k / (beta_k + eps)²`` with ``eps = eps_rel · Σβ``, a floor relative to
+# the stencil's own smoothness, so rescaling the field rescales the
+# reconstruction exactly.  They are evaluated on the normalised indicators
+# ``b_k = beta_k / Σβ`` (O(1), so nothing over- or underflows at any
+# amplitude, float32 included), with ``Σβ`` held out of the gradient: the
+# weights depend on the ratios ``beta_j / beta_k`` only (homogeneous of
+# degree 0), so by Euler's theorem that is exact.  A flat stencil
+# (``Σβ = 0``) gives the linear weights.
+_WENO_EPS_REL = 1e-6
+
+
+def _normalised(betas: tuple[Array, ...], *extra: Array) -> list[Array]:
+    """``(*betas, *extra) / Σβ`` with ``Σβ`` held out of the gradient.
+
+    Exact (see above); ``extra`` carries WENO-Z's ``tau``, a difference of
+    indicators that scales like them.
+    """
+    total = jax.lax.stop_gradient(sum(betas))
+    tiny = jnp.finfo(jnp.result_type(total)).tiny
+    inv = 1.0 / jnp.where(total > tiny, total, 1.0)
+    return [v * inv for v in (*betas, *extra)]
+
 
 _WENO7_COEFFS = (
     (-1.0 / 4.0, 13.0 / 12.0, -23.0 / 12.0, 25.0 / 12.0),
@@ -278,7 +303,6 @@ def _weno_reconstruct(
     coeffs: tuple[tuple[float, ...], ...],
     beta_matrices: tuple[np.ndarray, ...],
     linear_weights: tuple[float, ...],
-    eps: float = 1e-8,
 ) -> Array:
     candidates = [
         _linear_combo(stencil_coeffs, stencil)
@@ -288,9 +312,10 @@ def _weno_reconstruct(
         _smoothness_indicator(beta_matrix, stencil)
         for beta_matrix, stencil in zip(beta_matrices, stencils, strict=True)
     ]
+    # alpha_k = g_k / (b_k + eps_rel)², b_k = beta_k / Σβ
     alphas = [
-        weight / (beta + eps) ** 2
-        for weight, beta in zip(linear_weights, betas, strict=True)
+        weight / (b + _WENO_EPS_REL) ** 2
+        for weight, b in zip(linear_weights, _normalised(tuple(betas)), strict=True)
     ]
     alpha_sum = sum(alphas)
     return (
@@ -311,7 +336,6 @@ def weno_3pts(qm: Array, q0: Array, qp: Array) -> Array:
     Efficient Implementation of Weighted ENO Schemes, Jiang and Shu,
     Journal of Computation Physics 126, 202–228 (1996)
     """
-    eps = 1e-8
 
     qi1 = -1.0 / 2.0 * qm + 3.0 / 2.0 * q0
     qi2 = 1.0 / 2.0 * (q0 + qp)
@@ -320,8 +344,9 @@ def weno_3pts(qm: Array, q0: Array, qp: Array) -> Array:
     beta2 = (qp - q0) ** 2
 
     g1, g2 = 1.0 / 3.0, 2.0 / 3.0
-    w1 = g1 / (beta1 + eps) ** 2
-    w2 = g2 / (beta2 + eps) ** 2
+    b1, b2 = _normalised((beta1, beta2))
+    w1 = g1 / (b1 + _WENO_EPS_REL) ** 2
+    w2 = g2 / (b2 + _WENO_EPS_REL) ** 2
 
     qi_weno3 = (w1 * qi1 + w2 * qi2) / (w1 + w2)
 
@@ -337,7 +362,6 @@ def weno_3pts_improved(qm: Array, q0: Array, qp: Array) -> Array:
     An improved weighted essentially non-oscillatory scheme for hyperbolic
     conservation laws, Borges et al, Journal of Computational Physics 227 (2008).
     """
-    eps = 1e-14
 
     qi1 = -1.0 / 2.0 * qm + 3.0 / 2.0 * q0
     qi2 = 1.0 / 2.0 * (q0 + qp)
@@ -347,8 +371,9 @@ def weno_3pts_improved(qm: Array, q0: Array, qp: Array) -> Array:
     tau = jnp.abs(beta2 - beta1)
 
     g1, g2 = 1.0 / 3.0, 2.0 / 3.0
-    w1 = g1 * (1.0 + tau / (beta1 + eps))
-    w2 = g2 * (1.0 + tau / (beta2 + eps))
+    b1, b2, t = _normalised((beta1, beta2), tau)
+    w1 = g1 * (1.0 + t / (b1 + _WENO_EPS_REL))
+    w2 = g2 * (1.0 + t / (b2 + _WENO_EPS_REL))
 
     qi_weno3 = (w1 * qi1 + w2 * qi2) / (w1 + w2)
 
@@ -364,7 +389,6 @@ def weno_5pts(qmm: Array, qm: Array, q0: Array, qp: Array, qpp: Array) -> Array:
     Efficient Implementation of Weighted ENO Schemes, Jiang and Shu,
     Journal of Computation Physics 126, 202–228 (1996)
     """
-    eps = 1e-8
     qi1 = 1.0 / 3.0 * qmm - 7.0 / 6.0 * qm + 11.0 / 6.0 * q0
     qi2 = -1.0 / 6.0 * qm + 5.0 / 6.0 * q0 + 1.0 / 3.0 * qp
     qi3 = 1.0 / 3.0 * q0 + 5.0 / 6.0 * qp - 1.0 / 6.0 * qpp
@@ -375,9 +399,10 @@ def weno_5pts(qmm: Array, qm: Array, q0: Array, qp: Array, qpp: Array) -> Array:
     beta3 = k1 * (q0 - 2 * qp + qpp) ** 2 + k2 * (3 * q0 - 4 * qp + qpp) ** 2
 
     g1, g2, g3 = 0.1, 0.6, 0.3
-    w1 = g1 / (beta1 + eps) ** 2
-    w2 = g2 / (beta2 + eps) ** 2
-    w3 = g3 / (beta3 + eps) ** 2
+    b1, b2, b3 = _normalised((beta1, beta2, beta3))
+    w1 = g1 / (b1 + _WENO_EPS_REL) ** 2
+    w2 = g2 / (b2 + _WENO_EPS_REL) ** 2
+    w3 = g3 / (b3 + _WENO_EPS_REL) ** 2
 
     qi_weno5 = (w1 * qi1 + w2 * qi2 + w3 * qi3) / (w1 + w2 + w3)
 
@@ -395,7 +420,6 @@ def weno_5pts_improved(
     An improved weighted essentially non-oscillatory scheme for hyperbolic
     conservation laws, Borges et al, Journal of Computational Physics 227 (2008)
     """
-    eps = 1e-16
 
     qi1 = 1.0 / 3.0 * qmm - 7.0 / 6.0 * qm + 11.0 / 6.0 * q0
     qi2 = -1.0 / 6.0 * qm + 5.0 / 6.0 * q0 + 1.0 / 3.0 * qp
@@ -409,9 +433,10 @@ def weno_5pts_improved(
     tau5 = jnp.abs(beta1 - beta3)
 
     g1, g2, g3 = 0.1, 0.6, 0.3
-    w1 = g1 * (1 + tau5 / (beta1 + eps))
-    w2 = g2 * (1 + tau5 / (beta2 + eps))
-    w3 = g3 * (1 + tau5 / (beta3 + eps))
+    b1, b2, b3, t = _normalised((beta1, beta2, beta3), tau5)
+    w1 = g1 * (1.0 + t / (b1 + _WENO_EPS_REL))
+    w2 = g2 * (1.0 + t / (b2 + _WENO_EPS_REL))
+    w3 = g3 * (1.0 + t / (b3 + _WENO_EPS_REL))
 
     qi_weno5 = (w1 * qi1 + w2 * qi2 + w3 * qi3) / (w1 + w2 + w3)
 
@@ -428,7 +453,6 @@ def weno_3pts_right(q0: Array, qp: Array, qpp: Array) -> Array:
 
     Jiang and Shu, J. Comput. Phys. 126, 202–228 (1996), Section 2.3.
     """
-    eps = 1e-8
 
     qi1 = 0.5 * (q0 + qp)
     qi2 = 1.5 * qp - 0.5 * qpp
@@ -437,8 +461,9 @@ def weno_3pts_right(q0: Array, qp: Array, qpp: Array) -> Array:
     beta2 = (qpp - qp) ** 2
 
     g1, g2 = 2.0 / 3.0, 1.0 / 3.0
-    w1 = g1 / (beta1 + eps) ** 2
-    w2 = g2 / (beta2 + eps) ** 2
+    b1, b2 = _normalised((beta1, beta2))
+    w1 = g1 / (b1 + _WENO_EPS_REL) ** 2
+    w2 = g2 / (b2 + _WENO_EPS_REL) ** 2
 
     return (w1 * qi1 + w2 * qi2) / (w1 + w2)
 
@@ -451,7 +476,6 @@ def weno_3pts_improved_right(q0: Array, qp: Array, qpp: Array) -> Array:
 
     Borges et al, J. Comput. Phys. 227 (2008).
     """
-    eps = 1e-14
 
     qi1 = 0.5 * (q0 + qp)
     qi2 = 1.5 * qp - 0.5 * qpp
@@ -461,8 +485,9 @@ def weno_3pts_improved_right(q0: Array, qp: Array, qpp: Array) -> Array:
     tau = jnp.abs(beta2 - beta1)
 
     g1, g2 = 2.0 / 3.0, 1.0 / 3.0
-    w1 = g1 * (1.0 + tau / (beta1 + eps))
-    w2 = g2 * (1.0 + tau / (beta2 + eps))
+    b1, b2, t = _normalised((beta1, beta2), tau)
+    w1 = g1 * (1.0 + t / (b1 + _WENO_EPS_REL))
+    w2 = g2 * (1.0 + t / (b2 + _WENO_EPS_REL))
 
     return (w1 * qi1 + w2 * qi2) / (w1 + w2)
 
@@ -478,7 +503,6 @@ def weno_5pts_right(qm: Array, q0: Array, qp: Array, qpp: Array, qppp: Array) ->
 
     Jiang and Shu, J. Comput. Phys. 126, 202–228 (1996), Section 2.3.
     """
-    eps = 1e-8
 
     # Candidate reconstructions at face q0+1/2
     qi1 = 1.0 / 3.0 * qppp - 7.0 / 6.0 * qpp + 11.0 / 6.0 * qp
@@ -492,9 +516,10 @@ def weno_5pts_right(qm: Array, q0: Array, qp: Array, qpp: Array, qppp: Array) ->
     beta3 = k1 * (qm - 2 * q0 + qp) ** 2 + k2 * (qm - 4 * q0 + 3 * qp) ** 2
 
     g1, g2, g3 = 0.1, 0.6, 0.3
-    w1 = g1 / (beta1 + eps) ** 2
-    w2 = g2 / (beta2 + eps) ** 2
-    w3 = g3 / (beta3 + eps) ** 2
+    b1, b2, b3 = _normalised((beta1, beta2, beta3))
+    w1 = g1 / (b1 + _WENO_EPS_REL) ** 2
+    w2 = g2 / (b2 + _WENO_EPS_REL) ** 2
+    w3 = g3 / (b3 + _WENO_EPS_REL) ** 2
 
     return (w1 * qi1 + w2 * qi2 + w3 * qi3) / (w1 + w2 + w3)
 
@@ -509,7 +534,6 @@ def weno_5pts_improved_right(
 
     Borges et al, J. Comput. Phys. 227 (2008).
     """
-    eps = 1e-16
 
     qi1 = 1.0 / 3.0 * qppp - 7.0 / 6.0 * qpp + 11.0 / 6.0 * qp
     qi2 = -1.0 / 6.0 * qpp + 5.0 / 6.0 * qp + 1.0 / 3.0 * q0
@@ -523,9 +547,10 @@ def weno_5pts_improved_right(
     tau5 = jnp.abs(beta1 - beta3)
 
     g1, g2, g3 = 0.1, 0.6, 0.3
-    w1 = g1 * (1 + tau5 / (beta1 + eps))
-    w2 = g2 * (1 + tau5 / (beta2 + eps))
-    w3 = g3 * (1 + tau5 / (beta3 + eps))
+    b1, b2, b3, t = _normalised((beta1, beta2, beta3), tau5)
+    w1 = g1 * (1.0 + t / (b1 + _WENO_EPS_REL))
+    w2 = g2 * (1.0 + t / (b2 + _WENO_EPS_REL))
+    w3 = g3 * (1.0 + t / (b3 + _WENO_EPS_REL))
 
     return (w1 * qi1 + w2 * qi2 + w3 * qi3) / (w1 + w2 + w3)
 

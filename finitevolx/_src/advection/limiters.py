@@ -70,8 +70,10 @@ def van_leer(r: Float[Array, ...]) -> Float[Array, ...]:
     array
         Limiter values φ(r) ∈ [0, 2).
     """
-    r_abs = jnp.abs(r)
-    return (r + r_abs) / (1.0 + r_abs)
+    # (r + |r|) / (1 + |r|) = 2a / (1 + a) with a = max(r, 0); a is capped at
+    # 1e20 (phi = 2 to all digits) so phi(inf) = 2, not inf / inf.
+    a = jnp.clip(r, 0.0, 1e20)
+    return 2.0 * a / (1.0 + a)
 
 
 def superbee(r: Float[Array, ...]) -> Float[Array, ...]:

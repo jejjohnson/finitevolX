@@ -14,6 +14,7 @@ from collections.abc import Callable
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Float
+import numpy as np
 
 from finitevolx._src.advection.flux import upwind_flux
 from finitevolx._src.advection.limiters import mc, minmod, superbee, van_leer
@@ -39,8 +40,24 @@ from finitevolx._src.grid.base import (
 from finitevolx._src.mask import Mask2D
 from finitevolx._src.operators._ghost import interior
 
-# Small epsilon to avoid division by zero in TVD slope ratios.
-_TVD_EPS: float = 1e-8
+# Relative TVD floor (#294): ``r = num / (den + copysign(eps, den))`` with
+# ``eps = eps_rel · |num| + tiny``, a floor relative to the stencil's own
+# slopes with the sign of ``den`` kept.  ``r`` therefore scales exactly with
+# the field (an absolute floor made every limiter first-order upwind at small
+# amplitude), is within a relative ``eps_rel`` of the exact ratio whenever
+# ``|r| ≪ 1 / eps_rel``, and a tiny downwind slope cannot flip its sign.  A
+# flat stencil gives ``r = 0`` (the floor is the square root of the dtype's
+# smallest normal, so the gradient stays finite there).
+_TVD_EPS_REL: float = 1e-6
+
+
+def _slope_ratio(num: Array, den: Array) -> Array:
+    """TVD slope ratio ``num / (den + copysign(eps_rel |num| + tiny, den))``."""
+    # sqrt(tiny): its square (in the gradient's 1 / (den + eps)²) stays normal,
+    # so a flat stencil has a finite (zero) gradient, float32 included
+    floor = float(np.sqrt(jnp.finfo(jnp.result_type(den)).tiny))
+    return num / (den + jnp.copysign(_TVD_EPS_REL * jnp.abs(num) + floor, den))
+
 
 # Mapping from limiter name to callable for TVD reconstruction.
 _LIMITERS = {
@@ -556,13 +573,13 @@ class Reconstruction1D(eqx.Module):
         # r = (h[i]-h[i-1]) / (h[i+1]-h[i])  for i=1..Nx-2
         diff_fwd = h[2:] - h[1:-1]  # h[i+1] - h[i]
         diff_bwd = h[1:-1] - h[:-2]  # h[i] - h[i-1]
-        r_pos = diff_bwd / (diff_fwd + _TVD_EPS)
+        r_pos = _slope_ratio(diff_bwd, diff_fwd)
         h_pos = h[1:-1] + 0.5 * phi(r_pos) * diff_fwd
         # Negative flow: h_face = h[i+1] + 0.5*phi(r)*(h[i]-h[i+1])
         # r = (h[i+1]-h[i+2]) / (h[i]-h[i+1])  for i=1..Nx-3
         diff_neg = h[1:-2] - h[2:-1]  # h[i] - h[i+1]
         diff_neg2 = h[2:-1] - h[3:]  # h[i+1] - h[i+2]
-        r_neg_int = diff_neg2 / (diff_neg + _TVD_EPS)
+        r_neg_int = _slope_ratio(diff_neg2, diff_neg)
         h_neg_interior = h[2:-1] + 0.5 * phi(r_neg_int) * diff_neg
         # 1st-order upwind fallback at east boundary (i=Nx-2)
         h_neg_boundary = h[-1:]
@@ -1041,13 +1058,13 @@ class Reconstruction2D(eqx.Module):
         # r = (h[j,i]-h[j,i-1]) / (h[j,i+1]-h[j,i])
         diff_fwd = h[1:-1, 2:] - h[1:-1, 1:-1]  # h[j,i+1] - h[j,i]
         diff_bwd = h[1:-1, 1:-1] - h[1:-1, :-2]  # h[j,i] - h[j,i-1]
-        r_pos = diff_bwd / (diff_fwd + _TVD_EPS)
+        r_pos = _slope_ratio(diff_bwd, diff_fwd)
         h_pos = h[1:-1, 1:-1] + 0.5 * phi(r_pos) * diff_fwd
         # Negative flow: h_face = h[j,i+1] + 0.5*phi(r)*(h[j,i]-h[j,i+1])
         # r = (h[j,i+1]-h[j,i+2]) / (h[j,i]-h[j,i+1])  for i=1..Nx-3
         diff_neg = h[1:-1, 1:-2] - h[1:-1, 2:-1]  # h[j,i] - h[j,i+1]
         diff_neg2 = h[1:-1, 2:-1] - h[1:-1, 3:]  # h[j,i+1] - h[j,i+2]
-        r_neg_int = diff_neg2 / (diff_neg + _TVD_EPS)
+        r_neg_int = _slope_ratio(diff_neg2, diff_neg)
         h_neg_interior = h[1:-1, 2:-1] + 0.5 * phi(r_neg_int) * diff_neg
         # 1st-order upwind fallback at east boundary column (i=Nx-2)
         h_neg_boundary = h[1:-1, -1:]
@@ -1093,13 +1110,13 @@ class Reconstruction2D(eqx.Module):
         # r = (h[j,i]-h[j-1,i]) / (h[j+1,i]-h[j,i])
         diff_fwd = h[2:, 1:-1] - h[1:-1, 1:-1]  # h[j+1,i] - h[j,i]
         diff_bwd = h[1:-1, 1:-1] - h[:-2, 1:-1]  # h[j,i] - h[j-1,i]
-        r_pos = diff_bwd / (diff_fwd + _TVD_EPS)
+        r_pos = _slope_ratio(diff_bwd, diff_fwd)
         h_pos = h[1:-1, 1:-1] + 0.5 * phi(r_pos) * diff_fwd
         # Negative flow: h_face = h[j+1,i] + 0.5*phi(r)*(h[j,i]-h[j+1,i])
         # r = (h[j+1,i]-h[j+2,i]) / (h[j,i]-h[j+1,i])  for j=1..Ny-3
         diff_neg = h[1:-2, 1:-1] - h[2:-1, 1:-1]  # h[j,i] - h[j+1,i]
         diff_neg2 = h[2:-1, 1:-1] - h[3:, 1:-1]  # h[j+1,i] - h[j+2,i]
-        r_neg_int = diff_neg2 / (diff_neg + _TVD_EPS)
+        r_neg_int = _slope_ratio(diff_neg2, diff_neg)
         h_neg_interior = h[2:-1, 1:-1] + 0.5 * phi(r_neg_int) * diff_neg
         # 1st-order upwind fallback at north boundary row (j=Ny-2)
         h_neg_boundary = h[-1:, 1:-1]
@@ -1720,12 +1737,12 @@ class Reconstruction3D(eqx.Module):
         # Positive flow: h_face = h[k,j,i] + 0.5*phi(r)*(h[k,j,i+1]-h[k,j,i])
         diff_fwd = h[1:-1, 1:-1, 2:] - h[1:-1, 1:-1, 1:-1]
         diff_bwd = h[1:-1, 1:-1, 1:-1] - h[1:-1, 1:-1, :-2]
-        r_pos = diff_bwd / (diff_fwd + _TVD_EPS)
+        r_pos = _slope_ratio(diff_bwd, diff_fwd)
         h_pos = h[1:-1, 1:-1, 1:-1] + 0.5 * phi(r_pos) * diff_fwd
         # Negative flow: h_face = h[k,j,i+1] + 0.5*phi(r)*(h[k,j,i]-h[k,j,i+1])
         diff_neg = h[1:-1, 1:-1, 1:-2] - h[1:-1, 1:-1, 2:-1]
         diff_neg2 = h[1:-1, 1:-1, 2:-1] - h[1:-1, 1:-1, 3:]
-        r_neg_int = diff_neg2 / (diff_neg + _TVD_EPS)
+        r_neg_int = _slope_ratio(diff_neg2, diff_neg)
         h_neg_interior = h[1:-1, 1:-1, 2:-1] + 0.5 * phi(r_neg_int) * diff_neg
         # 1st-order upwind fallback at east boundary column (i=Nx-2)
         h_neg_boundary = h[1:-1, 1:-1, -1:]
@@ -1770,12 +1787,12 @@ class Reconstruction3D(eqx.Module):
         # Positive flow: h_face = h[k,j,i] + 0.5*phi(r)*(h[k,j+1,i]-h[k,j,i])
         diff_fwd = h[1:-1, 2:, 1:-1] - h[1:-1, 1:-1, 1:-1]
         diff_bwd = h[1:-1, 1:-1, 1:-1] - h[1:-1, :-2, 1:-1]
-        r_pos = diff_bwd / (diff_fwd + _TVD_EPS)
+        r_pos = _slope_ratio(diff_bwd, diff_fwd)
         h_pos = h[1:-1, 1:-1, 1:-1] + 0.5 * phi(r_pos) * diff_fwd
         # Negative flow: h_face = h[k,j+1,i] + 0.5*phi(r)*(h[k,j,i]-h[k,j+1,i])
         diff_neg = h[1:-1, 1:-2, 1:-1] - h[1:-1, 2:-1, 1:-1]
         diff_neg2 = h[1:-1, 2:-1, 1:-1] - h[1:-1, 3:, 1:-1]
-        r_neg_int = diff_neg2 / (diff_neg + _TVD_EPS)
+        r_neg_int = _slope_ratio(diff_neg2, diff_neg)
         h_neg_interior = h[1:-1, 2:-1, 1:-1] + 0.5 * phi(r_neg_int) * diff_neg
         # 1st-order upwind fallback at north boundary row (j=Ny-2)
         h_neg_boundary = h[1:-1, -1:, 1:-1]
