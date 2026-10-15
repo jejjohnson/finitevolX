@@ -421,7 +421,11 @@ class SphericalAdvection3D(eqx.Module):
         method: str = "upwind1",
         wall: str = "closed",
     ) -> Float[Array, "Nz Ny Nx"]:
-        """3-D advective tendency on a sphere (vmap over z-levels).
+        """3-D advective tendency on a sphere, level by level.
+
+        The z axis is a batch axis: the horizontal reconstruction and the
+        spherical divergence act on every level at once by array slicing
+        (no ``vmap``); the ghost slabs ``k = 0`` and ``Nz-1`` stay zero.
 
         Parameters
         ----------

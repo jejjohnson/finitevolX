@@ -210,8 +210,8 @@ apply BCs to intermediate fields before chaining operators.
   closed-wall horizontal write region to `[1:-1, ...]`.
 - **Closed walls by default.** Advection writes the tendency only on the
   strict interior and treats the four domain walls as no-flux; diffusion
-  leaves the wall-face fluxes at zero. `wall="open"` on `Advection1D/2D` and
-  `Diffusion2D/3D` instead computes the wall faces from the caller-filled
+  leaves the wall-face fluxes at zero. `wall="open"` on `Advection1D/2D/3D`,
+  `SphericalAdvection2D/3D` and `Diffusion2D/3D` instead computes the wall faces from the caller-filled
   ghost ring (first-order upwind for advection, `κ (h_edge − h_ghost) / dx`
   for diffusion; open advection then writes the full interior), so
   Dirichlet / outflow / periodic BCs drive transport while the flux stays
@@ -253,10 +253,13 @@ apply BCs to intermediate fields before chaining operators.
   output stagger** (`mask.h` for T, `mask.u` for U, `mask.v` for V,
   `mask.xy_corner_strict` for X). `mask=None` must reproduce the unmasked
   result bit for bit, and an all-ocean mask must equal `mask=None`.
-- Mask-dispatchable advection methods (`weno3`, `weno5`, `wenoz5`, the TVD
-  limiters) fall back to narrower stencils near the coast through
-  `upwind_flux` and the `(2, 4, 6)` adaptive hierarchy; other methods run
-  unmasked and multiply the tendency by `mask.h`.
+- Masked advection (`Advection1D/2D/3D`, `SphericalAdvection2D/3D`) is
+  land-safe for every method: dry inputs are zeroed with `jnp.where`, every
+  upwind-biased method falls back to narrower stencils near the coast
+  through `upwind_flux` and the `(2, 4, 6, 8, 10)` adaptive hierarchy
+  (`naive` reads only the two cells beside a face), and the fluxes on dry
+  faces (`mask.u` / `mask.v` false) are zeroed before the divergence, as in
+  `Diffusion2D`.
 - Where land may hold `NaN` (e.g. `Mask2D.from_center`), zero the dry
   inputs with `jnp.where` before any stencil reads them **and** mask the
   outputs with `jnp.where` (`forcing/_utils.mask_where`): multiplying by a
@@ -358,7 +361,7 @@ docstring before changing what it checks.
 
 | Test | Enforces |
 |---|---|
-| `tests/test_scale_covariance.py` | Operators are unit-agnostic (length and amplitude rescaling, masked and unmasked, Cartesian and spherical); `TestConstantsAudit` fails on a physical constant used outside a parameter default; the WENO / TVD absolute-epsilon departures are pinned (`xfail`, #243) |
+| `tests/test_scale_covariance.py` | Operators are unit-agnostic (length and amplitude rescaling, masked and unmasked, Cartesian and spherical); `TestConstantsAudit` fails on a physical constant used outside a parameter default; the WENO / TVD absolute-epsilon departures are pinned (`xfail`, #243, #294) |
 | `tests/test_*_masks.py` + `tests/fixtures/` | Golden-output regression for every mask-aware operator: unmasked and masked outputs match the committed `tests/fixtures/golden/*.npz`, all-ocean equals unmasked, dry points are exactly zero |
 | `tests/test_fixture_smoke.py` | The golden-fixture inputs, masks and helpers themselves |
 | `tests/test_convergence.py` | Second-order spatial convergence of the difference operators |
