@@ -343,30 +343,32 @@ The shared kernel is `_diffusion_2d_impl(h, kappa, dx, dy, mh, mu, mv)`
 in `finitevolx._src.diffusion.diffusion`; `Diffusion3D` vmaps it
 per-z-slice with sliced masks (**Pattern B** in #209's terminology).
 
-**Pattern 4 — Final-only multiply with mask-free inner harmonic.**
-Used by `BiharmonicDiffusion2D` and `BiharmonicDiffusion3D`.  The
-biharmonic operator is two successive harmonic Laplacians; the mask is
-applied **only** to the final ∇⁴ tendency via `* mask.h`.  Critically,
-the **inner harmonic Diffusion is deliberately built with `mask=None`**
-even when the outer biharmonic has a mask — masking the intermediate
-Laplacian would zero `lap1` at dry cells, which acts as a forced
-Dirichlet-0 BC for the second harmonic pass and corrupts the ∇⁴
-stencil at wet cells adjacent to land.  The same applies to the
-3-D class.
+**Pattern 4 — The masked harmonic operator applied twice.**
+Used by `BiharmonicDiffusion2D` / `3D` and `SphericalBiharmonicDiffusion2D`
+/ `3D`.  The tendency is `−κ · Dm(Dm(h))`, where `Dm` is the masked
+no-flux harmonic operator of Pattern 3 (the inner `Diffusion*` /
+`SphericalDiffusion*` is built with the outer mask).  Dry inputs are
+zeroed with `jnp.where` first, so land may hold `NaN` or a fill value.
+Because the second pass also zeroes the wet→dry fluxes, the dry zeros of
+the intermediate `Dm(h)` are never read: the coast is a no-flux wall for
+both `h` and `∇²h`, exactly like the closed domain walls.  The result is
+conservative (`Σ_wet ∂h/∂t = 0`) and symmetric on the wet cells, and no
+land value reaches a wet cell.  (Before #292 the inner Laplacian was
+unmasked and post-multiplied by `mask.h`, which read land values and was
+not conservative.)
 
 ### Pattern A vs Pattern B for 3-D operators
 
 The 3-D wrappers that vmap an inner 2-D operator over z-levels
-(`Vorticity3D`, `Coriolis3D`, `Spherical*3D`, `BiharmonicDiffusion3D`,
-`MomentumAdvection3D`) use **Pattern A (post-compute)**: the inner 2-D
-op is always constructed `mask=None` and the 3-D wrapper owns the
-mask, applying `* self.mask.<stagger>` after the vmap and
+(`Vorticity3D`, `Coriolis3D`, `Spherical*3D`, `MomentumAdvection3D`)
+use **Pattern A (post-compute)**: the inner 2-D op is always
+constructed `mask=None` and the 3-D wrapper owns the mask, applying `* self.mask.<stagger>` after the vmap and
 `zero_z_ghosts`.  This is cleaner than trying to thread per-z mask
 slices into the vmap'd 2-D op.
 
-`Diffusion3D` is the exception and uses **Pattern B** (vmap with
-per-z sliced masks) because its intermediate flux masking makes
-Pattern A incorrect.  See the Diffusion module docstring for the
+`Diffusion3D` (and `BiharmonicDiffusion3D`, built on it) is the
+exception and uses **Pattern B** (vmap with per-z sliced masks) because
+its intermediate flux masking makes Pattern A incorrect.  See the Diffusion module docstring for the
 implementation.
 
 ### Advection hierarchy pre-build

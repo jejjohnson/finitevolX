@@ -431,25 +431,21 @@ class SphericalBiharmonicDiffusion2D(eqx.Module):
     grid : SphericalGrid2D
         The underlying 2-D spherical grid.
     mask : Mask2D or None, optional
-        Optional land/ocean mask.  When provided, the inner harmonic
-        :class:`SphericalDiffusion2D` is deliberately built with
-        ``mask=None`` — masking the intermediate Laplacian would
-        corrupt the second harmonic pass because ``lap1 == 0`` at dry
-        T-cells becomes a forced zero-Dirichlet boundary for the
-        second pass, which distorts the ∇⁴ stencil at wet cells
-        adjacent to land.  Instead, the mask is applied via a
-        post-compute ``* mask.h`` on the **final** ``−κ · ∇⁴h``
-        tendency only.  This is the design exception called out in
-        issue #209 §4, identical to :class:`BiharmonicDiffusion2D`.
+        Optional land/ocean mask.  When provided, the tendency is
+        ``−κ · Dm(Dm(h))`` with ``Dm`` the masked no-flux
+        :class:`SphericalDiffusion2D` (fluxes zeroed on dry faces, output
+        zeroed on dry cells), and dry inputs are zeroed with
+        ``jnp.where`` first: the coast is a no-flux wall for ``h`` and
+        ``∇²h``, land values (``NaN``, ``1e10``) never enter, and the
+        operator is conservative on the wet cells — same semantics as
+        :class:`BiharmonicDiffusion2D`.
 
     Notes
     -----
-    The ghost ring of the intermediate Laplacian ``∇²_sphere h`` is
-    zero (Dirichlet-0), not zero-normal-gradient (Neumann).  The
-    second pass reads a zero halo for the intermediate field, which
-    contaminates the outermost interior row/column of the final
-    tendency — only results in the deep interior ``[2:-2, 2:-2]`` are
-    fully BC-consistent.  Same caveat as :class:`BiharmonicDiffusion2D`.
+    Both passes have zero wall-face fluxes: the four domain walls are
+    no-flux for ``h`` and for ``∇²_sphere h``, and no ghost cell (of
+    ``h`` or of the zero-ringed intermediate) is read.  Same as
+    :class:`BiharmonicDiffusion2D`.
 
     Examples
     --------
@@ -479,9 +475,8 @@ class SphericalBiharmonicDiffusion2D(eqx.Module):
     ) -> None:
         self.grid = grid
         self.mask = mask
-        # Critical: inner harmonic operator is ALWAYS mask=None, even when
-        # SphericalBiharmonicDiffusion2D has a mask.  See class docstring.
-        self._harm = SphericalDiffusion2D(grid=grid)
+        # Both passes are the masked no-flux Laplacian Dm (#292).
+        self._harm = SphericalDiffusion2D(grid=grid, mask=mask)
 
     def __call__(
         self,
@@ -501,15 +496,15 @@ class SphericalBiharmonicDiffusion2D(eqx.Module):
         -------
         Float[Array, "Ny Nx"]
             Tendency ``−κ · ∇⁴_sphere h`` at T-points, same shape as
-            ``h``.  Ghost cells are zero.  When ``self.mask`` is set,
-            the output is post-multiplied by ``mask.h``.
+            ``h``.  Ghost cells are zero.  When ``self.mask`` is set, it
+            is ``−κ · Dm(Dm(h))`` and zero on dry cells.
         """
+        if self.mask is not None:
+            # zero land (NaN / 1e10) before any stencil reads it
+            h = jnp.where(self.mask.h, h, 0.0)
         lap1 = self._harm(h, kappa=1.0)
         lap2 = self._harm(lap1, kappa=1.0)
-        out = -kappa * lap2
-        if self.mask is not None:
-            out = out * self.mask.h
-        return out
+        return -kappa * lap2
 
 
 class SphericalBiharmonicDiffusion3D(eqx.Module):
@@ -528,11 +523,10 @@ class SphericalBiharmonicDiffusion3D(eqx.Module):
     ----------
     grid : SphericalGrid3D
     mask : Mask3D or None, optional
-        Optional 3-D land/ocean mask.  The inner harmonic
-        :class:`SphericalDiffusion3D` is always built with
-        ``mask=None``; the outer mask is applied as a post-compute
-        ``* mask.h`` on the final tendency — same exception as
-        :class:`SphericalBiharmonicDiffusion2D`.
+        Optional 3-D land/ocean mask.  When provided, the tendency is
+        ``−κ · Dm(Dm(h))`` at every z-level with ``Dm`` the masked
+        no-flux :class:`SphericalDiffusion3D`, dry inputs zeroed first —
+        same semantics as :class:`SphericalBiharmonicDiffusion2D`.
     """
 
     grid: SphericalGrid3D
@@ -546,7 +540,8 @@ class SphericalBiharmonicDiffusion3D(eqx.Module):
     ) -> None:
         self.grid = grid
         self.mask = mask
-        self._harm = SphericalDiffusion3D(grid=grid)
+        # Both passes are the masked no-flux Laplacian Dm (#292).
+        self._harm = SphericalDiffusion3D(grid=grid, mask=mask)
 
     def __call__(
         self,
@@ -566,12 +561,12 @@ class SphericalBiharmonicDiffusion3D(eqx.Module):
         -------
         Float[Array, "Nz Ny Nx"]
             Tendency ``−κ · ∇⁴_{h,sphere} h`` at T-points.  Ghost cells
-            are zero.  When ``self.mask`` is set, the output is
-            post-multiplied by ``mask.h``.
+            are zero.  When ``self.mask`` is set, it is ``−κ · Dm(Dm(h))``
+            and zero on dry cells.
         """
+        if self.mask is not None:
+            # zero land (NaN / 1e10) before any stencil reads it
+            h = jnp.where(self.mask.h, h, 0.0)
         lap1 = self._harm(h, kappa=1.0)
         lap2 = self._harm(lap1, kappa=1.0)
-        out = -kappa * lap2
-        if self.mask is not None:
-            out = out * self.mask.h
-        return out
+        return -kappa * lap2
