@@ -22,9 +22,9 @@ own discrete Laplacian and land mask.
 
 ``masked_helmholtz_operator``
     The masked operator applied by :func:`masked_laplacian`, as a
-    ``gaussx.MaskedOperator`` over the periodic rectangular operator, with
-    the coupling ring precomputed so ``gaussx.solve`` uses the capacitance
-    method (two FFT solves per right-hand side).
+    ``gaussx.MaskedOperator`` over the Dirichlet (DST-I) rectangular
+    operator, with the coupling ring precomputed so ``gaussx.solve`` uses the
+    capacitance method (two DST solves per right-hand side).
 
 Both act on **flat** vectors (row-major), as every lineax operator does:
 ``op.mv(psi.ravel())``. The masked operator acts on the wet values only,
@@ -183,17 +183,19 @@ def masked_helmholtz_operator(
     dx: float,
     dy: float,
     lambda_: float = 0.0,
+    bc: str = "dst",
 ) -> gaussx.MaskedOperator:
     r"""The masked Helmholtz operator of :func:`masked_laplacian` as a gaussx operator.
 
-    ``masked_laplacian`` applies the periodic 5-point ``(∇² − λ)`` to ``ψ``
-    zeroed outside the mask (homogeneous Dirichlet on the coast) and keeps
-    the wet rows. As a matrix that is the wet sub-block ``A[m][:, m]`` of the
-    periodic rectangular operator ``A`` (:func:`helmholtz_operator` with
-    ``bc="fft"``). This returns that sub-block as a ``gaussx.MaskedOperator``
+    ``masked_laplacian`` applies the 5-point ``(∇² − λ)`` to ``ψ`` zeroed
+    outside the mask and outside the array (homogeneous Dirichlet on the
+    coast and one node beyond the array edge) and keeps the wet rows. As a
+    matrix that is the wet sub-block ``A[m][:, m]`` of the Dirichlet
+    rectangular operator ``A`` (:func:`helmholtz_operator` with
+    ``bc="dst"``). This returns that sub-block as a ``gaussx.MaskedOperator``
     acting on the wet values only, with the coupling ring (the dry cells the
     stencil reaches) precomputed, so ``gaussx.solve`` is the capacitance
-    method: exact, two FFT solves per right-hand side.
+    method: exact, two DST solves per right-hand side.
 
     The mask is concrete and the construction runs on the host (it builds
     the ``|C| × |C|`` capacitance factorisation); build it once per geometry
@@ -207,11 +209,17 @@ def masked_helmholtz_operator(
     dx, dy : float
         Grid spacings.
     lambda_ : float
-        Helmholtz parameter ``λ ≥ 0``. Default ``0`` (Poisson). With
-        ``λ = 0`` the periodic base operator is singular (the constant mode),
-        but the masked block is not as long as the mask has dry cells: gaussx
-        derives the base's null vector and borders the capacitance system
-        with it, so the masked solve is still exact.
+        Helmholtz parameter ``λ ≥ 0``. Default ``0`` (Poisson); the
+        Dirichlet base operator is non-singular at ``λ = 0``.
+    bc : {"dst", "fft", "dct"}
+        Rectangular base operator whose solves the capacitance method uses.
+        The base enters the masked block only through cells beyond the
+        array edge: with ``"dst"`` (default) the block is exactly
+        ``masked_laplacian``'s; ``"fft"`` (periodic wrap) and ``"dct"``
+        give the same block only when no wet cell touches the array edge.
+        A singular base (``"fft"`` / ``"dct"`` at ``λ = 0``) is handled
+        exactly by gaussx (it borders the capacitance system with the
+        base's null vector).
 
     Returns
     -------
@@ -229,9 +237,12 @@ def masked_helmholtz_operator(
     if isinstance(mask, Mask2D):
         mask = mask.xy_corner_strict
     wet = np.asarray(mask).astype(bool)  # [Ny, Nx], concrete
-    base = helmholtz_operator(wet.shape, dx, dy, lambda_=lambda_, bc="fft")
-    flat = jnp.asarray(wet.ravel())  # [Ny*Nx]
-    coupling = gaussx.grid_coupling_indices(jnp.asarray(wet), periodic=True)
+    # B = (∇² - λ) on the rectangle; "dst" matches masked_laplacian's zero pad
+    base = helmholtz_operator(wet.shape, dx, dy, lambda_=lambda_, bc=bc)
+    flat = jnp.asarray(wet.ravel())  # [Ny*Nx], the unknowns
+    # Coupling set: the dry cells the stencil of a wet cell reaches (the coast
+    # ring), wrapping around the array only for the periodic base.
+    coupling = gaussx.grid_coupling_indices(jnp.asarray(wet), periodic=bc == "fft")
     return gaussx.MaskedOperator(
         base,
         flat,

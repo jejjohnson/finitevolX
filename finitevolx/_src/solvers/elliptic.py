@@ -32,7 +32,6 @@ from collections.abc import Callable
 import numbers
 
 import equinox as eqx
-import gaussx
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
@@ -56,7 +55,7 @@ from finitevolx._src.solvers.iterative import (  # noqa: F401
     masked_laplacian,
     solve_cg,
 )
-from finitevolx._src.solvers.linear_operators import helmholtz_operator
+from finitevolx._src.solvers.linear_operators import masked_helmholtz_operator
 
 # Re-export from preconditioners module
 from finitevolx._src.solvers.preconditioners import (  # noqa: F401
@@ -173,7 +172,7 @@ def build_capacitance_solver(
 
     The masked operator is the wet sub-block ``B[W][:, W]`` of the
     rectangular five-point operator ``B = (∇² − λ)``
-    (:func:`~finitevolx.helmholtz_operator` with ``bc=base_bc``), as a
+    (:func:`~finitevolx.masked_helmholtz_operator` with ``bc=base_bc``), a
     ``gaussx.MaskedOperator`` whose coupling set is the coast ring.  This is
     an **offline** function: it factorises the ``N_c × N_c`` capacitance
     matrix (``N_c`` = number of coast cells) with ``N_c`` rectangular solves.
@@ -199,7 +198,7 @@ def build_capacitance_solver(
         The base only enters through cells beyond the array edge, so every
         base gives the ``masked_laplacian`` solution as long as no wet cell
         touches the array edge (true for any mask with a dry ghost ring);
-        with ``"fft"`` it is that solution for any mask.  A singular base
+        ``"fft"`` and ``"dct"`` raise when one does.  A singular base
         (``"fft"`` / ``"dct"`` at λ = 0) is handled exactly: gaussx borders
         the capacitance system with the base's null vector.
 
@@ -212,8 +211,9 @@ def build_capacitance_solver(
     Raises
     ------
     ValueError
-        For an unknown ``base_bc``, a mask with no wet cells, or a mask with
-        no dry cells (nothing to correct: use the rectangular solver).
+        For an unknown ``base_bc``, a mask with no wet cells, a mask with
+        no dry cells (nothing to correct: use the rectangular solver), or a
+        ``"fft"`` / ``"dct"`` base with a wet cell on the array edge.
 
     Examples
     --------
@@ -236,13 +236,18 @@ def build_capacitance_solver(
             "The mask has no dry (False) cells, so there is no coast to "
             f"correct for; use solve_helmholtz_{base_bc} directly."
         )
-    # B = (∇² - λ) on the rectangle, the same eigenvalues as the spectral solvers
-    base = helmholtz_operator(wet.shape, dx, dy, lambda_=lambda_, bc=base_bc)
-    flat = jnp.asarray(wet.ravel())  # [Ny*Nx], the unknowns W
-    # Coupling set: the cells outside W that the stencil of W reaches (the
-    # coast ring), wrapping around only for the periodic base.
-    coupling = gaussx.grid_coupling_indices(jnp.asarray(wet), periodic=base_bc == "fft")
-    operator = gaussx.MaskedOperator(base, flat, flat, coupling_indices=coupling)
+    edge = wet[0].any() | wet[-1].any() | wet[:, 0].any() | wet[:, -1].any()
+    if base_bc != "dst" and edge:
+        raise ValueError(
+            f"base_bc={base_bc!r} reaches beyond the array edge, where "
+            "masked_laplacian (method='cg') has psi = 0, but the mask has wet "
+            "cells on the edge: use base_bc='dst' or a mask with a dry ring."
+        )
+    # The wet block of B = (∇² - λ) on the rectangle (the same eigenvalues as
+    # the spectral solvers), coupled to the dry cells through the coast ring.
+    operator = masked_helmholtz_operator(
+        jnp.asarray(wet), dx, dy, lambda_=lambda_, bc=base_bc
+    )
     return CapacitanceSolver(
         operator=operator,
         interior_indices=jnp.asarray(np.flatnonzero(wet.ravel())),

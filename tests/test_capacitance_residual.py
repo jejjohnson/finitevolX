@@ -113,3 +113,25 @@ def test_known_values_on_mask2d_faces():
     full = fvx.masked_laplacian(psi, jnp.ones_like(psi), DX, DY, lambda_=lam)
     res = jnp.where(wet, full - f, 0.0)
     assert float(jnp.max(jnp.abs(res))) < 1e-10
+
+
+@pytest.mark.parametrize("base_bc", ["fft", "dct"])
+def test_non_dst_base_rejects_wet_array_edge(base_bc):
+    """A non-Dirichlet base reaches beyond the array edge, where CG has psi = 0."""
+    mask = np.ones((NY, NX), dtype=bool)
+    mask[NY // 2, :] = False  # dry somewhere, but wet on every array edge
+    with pytest.raises(ValueError, match="wet cells on the edge"):
+        fvx.build_capacitance_solver(mask, DX, DY, lambda_=4.0, base_bc=base_bc)
+
+
+@pytest.mark.slow
+def test_dst_base_matches_cg_with_wet_array_edge():
+    """The Dirichlet base is masked_laplacian's zero pad, edge included."""
+    mask = np.ones((NY, NX), dtype=bool)
+    mask[NY // 2, 5:-5] = False
+    f = _rhs()
+    psi = fvx.build_capacitance_solver(mask, DX, DY, lambda_=4.0, base_bc="dst")(f)
+    mask_f = jnp.asarray(mask, dtype=float)
+    res = fvx.masked_laplacian(psi, mask_f, DX, DY, lambda_=4.0) - f * mask_f
+    # direct solve: round-off of |f| ~ 1 times the O(1/dx^2) stencil
+    assert float(jnp.max(jnp.abs(res))) < 1e-10

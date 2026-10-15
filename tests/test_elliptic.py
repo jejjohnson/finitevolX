@@ -674,20 +674,55 @@ class TestNystromPreconditioner:
 
 
 class TestMaskedLaplacian:
-    def test_full_mask_matches_roll_laplacian(self, periodic_grid):
-        """With all-ones mask, result matches the standard periodic Laplacian."""
+    def test_full_mask_matches_dense_dirichlet_laplacian(self, periodic_grid):
+        """All-ones mask: the dense 5-point Laplacian with ψ = 0 one node
+        outside the array (Dirichlet), not the periodic one (#310)."""
         Ny, Nx, dx, dy = periodic_grid
+        lam = 2.0
         psi = jnp.sin(jnp.arange(Ny, dtype=float)[:, None]) * jnp.cos(
             jnp.arange(Nx, dtype=float)[None, :]
         )
-        mask = jnp.ones((Ny, Nx))
-        lap_masked = masked_laplacian(psi, mask, dx, dy, lambda_=0.0)
-        lap_std = (
-            jnp.roll(psi, 1, axis=1) + jnp.roll(psi, -1, axis=1) - 2 * psi
-        ) / dx**2 + (
-            jnp.roll(psi, 1, axis=0) + jnp.roll(psi, -1, axis=0) - 2 * psi
+
+        def d2(n, h):  # 1-D second difference, zero beyond both ends  [n, n]
+            return (np.eye(n, k=1) + np.eye(n, k=-1) - 2.0 * np.eye(n)) / h**2
+
+        # A = I_y ⊗ D2_x + D2_y ⊗ I_x - λ I on row-major [Ny*Nx]
+        A = np.kron(np.eye(Ny), d2(Nx, dx)) + np.kron(d2(Ny, dy), np.eye(Nx))
+        A -= lam * np.eye(Ny * Nx)
+        ref = (A @ np.asarray(psi).ravel()).reshape(Ny, Nx)
+        out = masked_laplacian(psi, jnp.ones((Ny, Nx)), dx, dy, lambda_=lam)
+        np.testing.assert_allclose(np.asarray(out), ref, rtol=1e-12, atol=1e-9)
+
+    def test_no_wrap_at_array_edge(self, periodic_grid):
+        Ny, Nx, dx, dy = periodic_grid
+        e = jnp.zeros((Ny, Nx)).at[Ny // 2, 0].set(1.0)
+        out = masked_laplacian(e, jnp.ones((Ny, Nx)), dx, dy)
+        assert float(out[Ny // 2, Nx - 1]) == 0.0
+        assert float(out[Ny // 2, 1]) == pytest.approx(1.0 / dx**2)
+
+    def test_full_mask_is_inverted_by_dst(self, periodic_grid):
+        """The DST-I solver is the exact inverse on the all-ones mask."""
+        Ny, Nx, dx, dy = periodic_grid
+        lam = 1.0
+        psi = jax.random.normal(jax.random.PRNGKey(0), (Ny, Nx))
+        f = masked_laplacian(psi, jnp.ones((Ny, Nx)), dx, dy, lambda_=lam)
+        np.testing.assert_allclose(
+            np.asarray(solve_helmholtz_dst(f, dx, dy, lam)), np.asarray(psi), atol=1e-10
+        )
+
+    def test_dry_edge_ring_unchanged_from_periodic_stencil(self, periodic_grid):
+        """With a dry array-edge ring the zero padding and the old periodic
+        roll read the same (zero) neighbours, so the result is unchanged."""
+        Ny, Nx, dx, dy = periodic_grid
+        psi = jax.random.normal(jax.random.PRNGKey(1), (Ny, Nx))
+        mask = jnp.zeros((Ny, Nx)).at[1:-1, 1:-1].set(1.0).at[3, 4].set(0.0)
+        pm = psi * mask
+        roll = (jnp.roll(pm, 1, axis=1) + jnp.roll(pm, -1, axis=1) - 2 * pm) / dx**2 + (
+            jnp.roll(pm, 1, axis=0) + jnp.roll(pm, -1, axis=0) - 2 * pm
         ) / dy**2
-        np.testing.assert_allclose(np.array(lap_masked), np.array(lap_std), atol=1e-12)
+        ref = (roll - 0.5 * pm) * mask
+        out = masked_laplacian(psi, mask, dx, dy, lambda_=0.5)
+        np.testing.assert_allclose(np.asarray(out), np.asarray(ref), rtol=1e-14, atol=0)
 
     def test_zero_outside_mask(self, periodic_grid):
         """Output is zero where mask is zero."""

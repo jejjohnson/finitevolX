@@ -10,7 +10,7 @@ Masked Laplacian
 ----------------
 :func:`masked_laplacian` applies the discrete Helmholtz operator
 ``(∇² − λ)`` on a masked (irregular) domain, enforcing homogeneous
-Dirichlet conditions at the mask boundary.
+Dirichlet conditions at the mask boundary and at the array edge.
 """
 
 from __future__ import annotations
@@ -264,8 +264,12 @@ def masked_laplacian(
     *psi* outside the mask before applying the 5-point stencil.  The output
     is also zeroed outside the mask.
 
-    Neighbors at the rectangle edges wrap around (periodic roll), which is
-    consistent with using the FFT as a preconditioner.
+    Neighbours beyond the array edge are zero (dry), so the array edge is a
+    homogeneous Dirichlet boundary one node outside the array, wherever the
+    mask is wet there; nothing wraps around.  On an all-ones mask this is
+    the dense Dirichlet 5-point operator that the DST-I solvers invert, so
+    ``make_spectral_preconditioner(..., bc="dst")`` matches it exactly on a
+    rectangle; the FFT preconditioner (periodic) is an approximation.
 
     Parameters
     ----------
@@ -291,11 +295,15 @@ def masked_laplacian(
         mask_arr = mask.xy_corner_strict.astype(psi.dtype)
     else:
         mask_arr = mask
-    psi_m = psi * mask_arr  # enforce zero outside domain
-    # 5-point finite-difference stencil with periodic roll at edges
-    lap = (
-        jnp.roll(psi_m, 1, axis=1) + jnp.roll(psi_m, -1, axis=1) - 2.0 * psi_m
-    ) / dx**2 + (
-        jnp.roll(psi_m, 1, axis=0) + jnp.roll(psi_m, -1, axis=0) - 2.0 * psi_m
-    ) / dy**2
-    return (lap - lambda_ * psi_m) * mask_arr
+    psi_m = psi * mask_arr  # enforce zero outside domain  [Ny, Nx]
+    # Zero ring outside the array (Dirichlet, not periodic); pad once and
+    # bind each neighbour view once, so the stencil lowers to one fused pass.
+    p = jnp.pad(psi_m, 1)  # [Ny+2, Nx+2]
+    east = p[1:-1, 2:]  # ψ[j, i+1]  [Ny, Nx]
+    west = p[1:-1, :-2]  # ψ[j, i-1]  [Ny, Nx]
+    north = p[2:, 1:-1]  # ψ[j+1, i]  [Ny, Nx]
+    south = p[:-2, 1:-1]  # ψ[j-1, i]  [Ny, Nx]
+    # ∇²ψ[j, i] = (ψ[j, i+1] + ψ[j, i-1] - 2ψ[j, i]) / dx²
+    #           + (ψ[j+1, i] + ψ[j-1, i] - 2ψ[j, i]) / dy²
+    lap = (east + west - 2.0 * psi_m) / dx**2 + (north + south - 2.0 * psi_m) / dy**2
+    return (lap - lambda_ * psi_m) * mask_arr  # [Ny, Nx]
