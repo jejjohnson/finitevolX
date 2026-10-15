@@ -241,15 +241,42 @@ sol = dfx.diffeqsolve(
 
 ### Available Diffrax Solvers
 
-| Class | Order | Type | Usage |
-|---|---|---|---|
-| `ForwardEulerDfx` | 1 | ERK | Debugging |
-| `RK2Heun` | 2 | ERK | General |
-| `SSP_RK2` | 2 | ERK | Same as Heun, SSP form |
-| `RK3SSP` | 3 | ERK | **Recommended** |
-| `RK4Classic` | 4 | ERK | High accuracy |
-| `SSP_RK104` | 4 | ERK (10 stages) | Large CFL + 4th order |
-| `IMEX_SSP2` | 2 | IMEX (MultiTerm) | Stiff/non-stiff split |
+| Class | Order | Type | Adaptive steps | Usage |
+|---|---|---|---|---|
+| `ForwardEulerDfx` | 1 | ERK | no (raises) | Debugging |
+| `RK2Heun` | 2 | ERK | yes (embedded Euler) | General |
+| `SSP_RK2` | 2 | ERK | yes (embedded Euler) | Same as Heun, SSP form |
+| `RK3SSP` | 3 | ERK | yes (embedded Heun) | **Recommended** |
+| `RK4Classic` | 4 | ERK | no (raises) | High accuracy |
+| `SSP_RK104` | 4 | ERK (10 stages) | no (raises) | Large CFL + 4th order |
+| `IMEX_SSP2` | 2 | IMEX (MultiTerm) | yes (embedded 1st order) | Stiff/non-stiff split |
+| `SemiLagrangianSolver` | 1 | semi-Lagrangian (`SemiLagrangianTerm`) | no (raises) | Advection at CFL > 1 |
+
+"Adaptive steps" means `stepsize_controller=dfx.PIDController(...)` works;
+the solvers marked "no" have no embedded error estimate and raise under an
+adaptive controller rather than step blindly.  For adaptive 4th / 5th order
+use diffrax's own `Tsit5` or `Dopri5`.
+
+```python
+# adaptive RK3-SSP
+sol = dfx.diffeqsolve(
+    dfx.ODETerm(rhs), RK3SSP(), t0=0.0, t1=10.0, dt0=0.1, y0=y0,
+    stepsize_controller=dfx.PIDController(rtol=1e-6, atol=1e-8),
+)
+
+# IMEX: explicit + implicit terms; with fixed steps the implicit root finder
+# needs its own tolerances
+terms = dfx.MultiTerm(dfx.ODETerm(rhs_explicit), dfx.ODETerm(rhs_implicit))
+solver = IMEX_SSP2(root_finder=dfx.VeryChord(rtol=1e-8, atol=1e-8))
+sol = dfx.diffeqsolve(terms, solver, t0=0.0, t1=1.0, dt0=0.01, y0=y0)
+
+# semi-Lagrangian: the term returns the velocity (u, v) in grid units / time
+term = SemiLagrangianTerm(lambda t, q, args: (u_grid, v_grid))
+sol = dfx.diffeqsolve(
+    term, SemiLagrangianSolver(), t0=0.0, t1=10.0, dt0=0.5, y0=q0,
+    saveat=dfx.SaveAt(ts=jnp.linspace(0.0, 10.0, 11)),
+)
+```
 
 ### The `solve_ocean_pde` Convenience Wrapper
 
@@ -277,6 +304,11 @@ sol = solve_ocean_pde(
     saveat=dfx.SaveAt(t1=True),
 )
 ```
+
+Any other keyword goes straight to `diffeqsolve` (`stepsize_controller=`,
+`adjoint=`, `max_steps=`, `throw=`, ...).  A fixed-step run gets
+`max_steps = ceil((t1 - t0) / dt0) + 16` by default, so long runs are not
+cut off by diffrax's default of 4096 steps.
 
 ### Saving Trajectories
 
