@@ -109,7 +109,7 @@ runs on the **effective** mask.  Accuracy is set by the stencil alone
 | CG | operator on the effective mask ($-A_{EE}$ is SPD for $\lambda \ge 0$) |
 | CG + multigrid | multigrid preconditioner built on the effective mask |
 | Spectral (DST) | ψ rectangle only: $E$ is the X basin `[1:-2, 1:-2]` and $K$ its wall nodes (rows / columns `0` and `N-2`) |
-| Capacitance | solver built on the **wet** mask |
+| Capacitance | solver built on the **wet** mask (its unknowns are every wet cell, $\psi = 0$ on the coast); no observed cells |
 
 In finitevolX, pass `known_values=` (and optionally `known_mask=`) to any
 convenience wrapper, or a `BoundaryConditionSet` as `bc=`; see the
@@ -160,8 +160,9 @@ defined by a binary mask.
 
 ### Algorithm
 
-Given a mask $M$ (True = ocean, False = land) and $N_b$ inner-boundary
-points $\{b_k\}$ (ocean cells adjacent to land):
+Given a mask $M$ (True = ocean, False = land) and the $N_b$ coast points
+$\{b_k\}$ (land cells adjacent to ocean, where $\psi = 0$; every ocean cell
+is an unknown, as in `masked_laplacian` / CG):
 
 1. **Precompute** (offline, $O(N_b)$ spectral solves):
    - For each boundary point $b_k$, solve the rectangular problem

@@ -59,23 +59,14 @@ def _rhs(psi: jnp.ndarray, mask: jnp.ndarray, lambda_: float) -> jnp.ndarray:
 
 
 def _capacitance(mask, lambda_):
-    """Capacitance solver on the wet mask (the DST base keeps lambda_ = 0 regular)."""
-    return fvx.build_capacitance_solver(
-        np.asarray(mask > 0.5), DX, DY, lambda_=lambda_, base_bc="dst"
-    )
+    """Capacitance solver on the wet mask: its unknowns are the solve domain."""
+    return fvx.build_capacitance_solver(np.asarray(mask > 0.5), DX, DY, lambda_=lambda_)
 
 
 def _wet_max_err(psi, exact, mask) -> float:
     """Max error over the wet cells and the coast (which carries the values)."""
     keep = (mask > 0.5) | fvx.coast_ring(mask)
     return float(jnp.max(jnp.abs(jnp.where(keep, psi - exact, 0.0))))
-
-
-# The capacitance solver still holds psi = 0 on the mask's inner wet ring,
-# one cell inside the coast where the known values now sit (#306).
-_CAP_XFAIL = pytest.mark.xfail(
-    reason="capacitance wall is one cell inside the coast (#306)", strict=True
-)
 
 
 class TestManufacturedSolution:
@@ -109,7 +100,6 @@ class TestManufacturedSolution:
         assert _wet_max_err(psi, exact, mask) < 1e-10
 
     @pytest.mark.slow
-    @_CAP_XFAIL
     @pytest.mark.parametrize("lambda_", [0.0, 4.0])
     def test_capacitance_basin(self, lambda_):
         mask, exact = _basin_mask(), _exact()
@@ -126,7 +116,6 @@ class TestManufacturedSolution:
         assert _wet_max_err(psi, exact, mask) < 1e-8
 
     @pytest.mark.slow
-    @_CAP_XFAIL
     def test_capacitance_island(self):
         mask, exact = _island_mask(), _exact()
         psi = fvx.streamfunction_from_vorticity(

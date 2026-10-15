@@ -228,10 +228,10 @@ class TestStreamfunctionCapacitance:
         psi = streamfunction_from_vorticity(
             rhs, dx, dy, method="capacitance", lambda_=-1.0, capacitance_solver=solver
         )
-        # BC enforcement: zero at boundary indices
+        # psi = 0 on the coast (every dry cell); the wet cells are unknowns
+        np.testing.assert_array_equal(np.array(psi)[~rect_mask], 0.0)
         j_b, i_b = _inner_boundary_indices(rect_mask)
-        bc_vals = psi[j_b, i_b]
-        np.testing.assert_allclose(np.array(bc_vals), 0.0, atol=1e-10)
+        assert float(jnp.max(jnp.abs(psi[j_b, i_b]))) > 0
 
     @pytest.mark.slow
     def test_with_cgrid_mask_solver(self, cgrid_mask):
@@ -248,9 +248,9 @@ class TestStreamfunctionCapacitance:
         psi = streamfunction_from_vorticity(
             rhs, dx, dy, method="capacitance", lambda_=-1.0, capacitance_solver=solver
         )
-        j_b, i_b = _inner_boundary_indices(np.asarray(cgrid_mask.xy_corner_strict))
-        bc_vals = psi[j_b, i_b]
-        np.testing.assert_allclose(np.array(bc_vals), 0.0, atol=1e-10)
+        # psi = 0 on the X wall nodes and every other dry node
+        wet = np.asarray(cgrid_mask.xy_corner_strict)
+        np.testing.assert_array_equal(np.array(psi)[~wet], 0.0)
 
     def test_capacitance_requires_solver(self, dirichlet_grid):
         """Capacitance method without solver raises ValueError."""
@@ -489,7 +489,7 @@ class TestCapacitanceSolverWithCGridMask:
         assert psi.shape == (Ny, Nx)
 
     def test_dirichlet_bc_enforced(self, cgrid_mask):
-        """Capacitance solver from CGridMask enforces zero at boundary."""
+        """psi = 0 on the X wall nodes; every wet X node solves the PDE (#306)."""
         Ny, Nx = cgrid_mask.h.shape
         dx = 1.0 / (Nx - 1)
         dy = 1.0 / (Ny - 1)
@@ -500,9 +500,12 @@ class TestCapacitanceSolverWithCGridMask:
         i = jnp.arange(Nx)[None, :]
         rhs = jnp.sin(jnp.pi * j / Ny) * jnp.cos(jnp.pi * i / Nx)
         psi = solver(rhs)
-        j_b, i_b = _inner_boundary_indices(np.asarray(cgrid_mask.xy_corner_strict))
-        bc_vals = psi[j_b, i_b]
-        np.testing.assert_allclose(np.array(bc_vals), 0.0, atol=1e-10)
+        wet = np.asarray(cgrid_mask.xy_corner_strict)
+        # The wall nodes X 0 and N-2 (and everything dry) are zero.
+        np.testing.assert_array_equal(np.array(psi)[~wet], 0.0)
+        res = masked_laplacian(psi, cgrid_mask, dx, dy, lambda_=-1.0) - rhs * wet
+        # Direct solve: round-off only.
+        assert float(jnp.max(jnp.abs(res))) < 1e-10
 
 
 # ---------------------------------------------------------------------------
@@ -652,6 +655,33 @@ class TestWallPlacement:
         assert min(rates) >= 1.9, (errs, rates)
 
     @pytest.mark.slow
+    @pytest.mark.slow
+    @pytest.mark.parametrize("base_bc", ["dst", "fft"])
+    def test_capacitance_second_order(self, base_bc):
+        """#306: capacitance on the rectangle's Mask2D has the C-grid wall.
+
+        Before, its wall was the mask's inner wet ring: rate ~0.97.
+        """
+        errs = []
+        for n in (16, 32, 64):
+            exact, k2, sl, d = _manufactured("X", "dst", n)
+            m = np.zeros((n + 2, n + 2), dtype=bool)
+            m[1:-1, 1:-1] = True
+            mask = Mask2D.from_mask(m)
+            solver = build_capacitance_solver(mask, d, d, lambda_=4.0, base_bc=base_bc)
+            psi = streamfunction_from_vorticity(
+                -(k2 + 4.0) * exact,
+                d,
+                d,
+                lambda_=4.0,
+                method="capacitance",
+                capacitance_solver=solver,
+            )
+            errs.append(float(jnp.max(jnp.abs(psi[sl, sl] - exact[sl, sl]))))
+        rates = [np.log2(errs[k] / errs[k + 1]) for k in range(2)]
+        # Same discrete problem as the spectral DST: rate 2.00.
+        assert min(rates) >= 1.9, (errs, rates)
+
     def test_x_dst_matches_masked_laplacian_cg(self):
         """Spectral DST equals CG on the rectangle's Mask2D (dry neighbours = 0)."""
         n = 16

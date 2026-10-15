@@ -604,7 +604,7 @@ class TestCapacitanceSolver:
 
     @pytest.mark.slow
     def test_dirichlet_bc_enforced(self):
-        """Solution is zero at all inner-boundary points (capacitance guarantee)."""
+        """psi = 0 on the coast (dry cells), every wet cell solves the PDE (#306)."""
         Ny, Nx = 10, 12
         mask = _build_rect_mask(Ny, Nx)
         dx = 1.0 / (Nx - 1)
@@ -616,14 +616,19 @@ class TestCapacitanceSolver:
         rhs = jnp.sin(jnp.pi * j / Ny) * jnp.cos(jnp.pi * i / Nx)
         psi = solver(rhs)
 
+        np.testing.assert_array_equal(np.array(psi)[~mask], 0.0)
+        # The inner wet ring is an unknown now, not a wall.
         j_b, i_b = _inner_boundary_indices(mask)
-        bc_vals = psi[j_b, i_b]
-        np.testing.assert_allclose(np.array(bc_vals), 0.0, atol=1e-10)
+        assert float(jnp.max(jnp.abs(psi[j_b, i_b]))) > 0
+        mask_f = jnp.asarray(mask, dtype=float)
+        res = masked_laplacian(psi, mask_f, dx, dy, lambda_=-1.0) - rhs * mask_f
+        # Direct solve: round-off only.
+        assert float(jnp.max(jnp.abs(res))) < 1e-10
 
     def test_no_boundary_raises(self):
-        """All-ones mask (no inner boundary) raises ValueError."""
+        """All-ones mask (no dry cells, no coast) raises ValueError."""
         mask = np.ones((8, 10), dtype=bool)
-        with pytest.raises(ValueError, match="no inner boundary"):
+        with pytest.raises(ValueError, match="no dry"):
             build_capacitance_solver(mask, dx=0.1, dy=0.1)
 
 
@@ -806,16 +811,14 @@ class TestVmapCapacitanceSolver:
 
     @pytest.mark.slow
     def test_batched_bc_enforced(self):
-        """Boundary condition is enforced for every batch element."""
+        """psi = 0 on the coast (every dry cell) for every batch element."""
         Ny, Nx = 10, 12
         mask = _build_rect_mask(Ny, Nx)
         dx = 1.0 / (Nx - 1)
         dy = 1.0 / (Ny - 1)
         solver = build_capacitance_solver(mask, dx, dy, lambda_=-1.0, base_bc="fft")
 
-        j_b, i_b = _inner_boundary_indices(mask)
         rhs = jnp.ones((4, Ny, Nx))
         psi = jax.vmap(solver)(rhs)
         for l in range(4):
-            bc_vals = psi[l][j_b, i_b]
-            np.testing.assert_allclose(np.array(bc_vals), 0.0, atol=1e-10)
+            np.testing.assert_array_equal(np.array(psi[l])[~mask], 0.0)

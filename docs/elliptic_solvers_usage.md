@@ -66,9 +66,7 @@ Solves $\nabla^2 \psi - \lambda\psi = \zeta$.
 
     ```python
     # One-time precomputation
-    solver = fvx.build_capacitance_solver(
-        ocean_mask, dx, dy, lambda_=-1.0, base_bc="fft"
-    )
+    solver = fvx.build_capacitance_solver(ocean_mask, dx, dy, lambda_=-1.0)
 
     # Reuse for many solves
     psi = fvx.streamfunction_from_vorticity(
@@ -184,11 +182,10 @@ $\psi = \psi_{\text{lift}} + \psi_{\text{hom}}$.
 === "Capacitance"
 
     ```python
-    # Build on the SAME wet mask.  The capacitance solver already holds its
-    # own inner ring at zero, so its unknowns are exactly the cells left to
-    # solve.  Use base_bc="dst" when lambda_ == 0.
+    # Build on the SAME wet mask: its unknowns are every wet cell with
+    # psi = 0 on the coast, exactly the cells left to solve.
     solver = fvx.build_capacitance_solver(
-        np.asarray(mask > 0.5), dx, dy, lambda_=4.0, base_bc="dst"
+        np.asarray(mask > 0.5), dx, dy, lambda_=4.0
     )
     psi = fvx.streamfunction_from_vorticity(
         zeta, dx, dy, lambda_=4.0, method="capacitance", mask=mask,
@@ -359,7 +356,10 @@ defined by a mask.
 ### Building the Solver
 
 The offline step precomputes Green's functions and the capacitance matrix.
-This is expensive ($N_b$ spectral solves) but only done once.
+This is expensive ($N_c$ spectral solves, $N_c$ = number of coast cells) but
+only done once.  The solver's unknowns are **every wet cell**, with
+$\psi = 0$ on the coast (the dry cells next to water): the same problem
+`method="cg"` solves on that mask, so the two agree to CG's tolerance.
 
 ```python
 import numpy as np
@@ -373,20 +373,24 @@ ocean_mask[:, :5] = ocean_mask[:, -5:] = False
 solver = fvx.build_capacitance_solver(
     ocean_mask, dx, dy,
     lambda_=-1.0,     # Helmholtz parameter
-    base_bc="fft",    # rectangular base solver
+    base_bc="dst",    # rectangular base solver (the default)
 )
 ```
 
+`base_bc` picks the rectangular base (`"dst"`, the default, `"fft"` or
+`"dct"`).  It only matters beyond the array edge, so every base gives the
+same solution when the mask's wet cells stay off the array edge (a dry
+ghost ring); a singular base (`"fft"` / `"dct"` at $\lambda = 0$) is
+handled exactly, but `"dst"` is non-singular for every $\lambda \ge 0$.
+
 ### Using with Mask2D
 
-When you have a `CGridMask`, pass it directly — the solver extracts the
-`psi` staggering mask and precomputed boundary indices automatically:
+When you have a `Mask2D`, pass it directly — the solver uses its ψ
+(X-point) mask `xy_corner_strict`, so ψ = 0 falls on the C-grid wall nodes:
 
 ```python
 cgrid_mask = fvx.Mask2D.from_mask(ocean_mask)
-solver = fvx.build_capacitance_solver(
-    cgrid_mask, dx, dy, lambda_=-1.0, base_bc="fft"
-)
+solver = fvx.build_capacitance_solver(cgrid_mask, dx, dy, lambda_=-1.0)
 ```
 
 ### Online Solve
@@ -395,8 +399,8 @@ solver = fvx.build_capacitance_solver(
 psi = solver(rhs)  # JIT-compilable, vmap-compatible
 ```
 
-The solver guarantees $\psi = 0$ at all inner-boundary points (ocean cells
-adjacent to land).
+The solver returns $\psi = 0$ on every dry cell (the coast included) and
+solves the 5-point equation on every wet cell.
 
 ---
 

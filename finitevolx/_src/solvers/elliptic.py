@@ -10,9 +10,10 @@ rectangle (e.g. ocean basins with land masks) using the classic
 Sherman-Morrison correction via boundary Green's functions.
 
 ``build_capacitance_solver`` performs a one-time offline precomputation
-(N_b rectangular solves, where N_b = number of irregular-boundary points).
-The returned ``CapacitanceSolver`` callable is then cheap to evaluate for
-any right-hand side.
+(N_c rectangular solves, where N_c = number of coast cells, the dry cells
+next to the wet mask).  The returned ``CapacitanceSolver`` callable is then
+cheap to evaluate for any right-hand side and solves the same problem as
+``method="cg"``: every wet cell an unknown, ψ = 0 on the coast.
 
 Convenience wrappers
 --------------------
@@ -31,15 +32,13 @@ from collections.abc import Callable
 import numbers
 
 import equinox as eqx
+import gaussx
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 import numpy as np
 from scipy import ndimage
-from spectraldiffx import (
-    CapacitanceSolver,
-    build_capacitance_solver as _build_capacitance_solver_base,
-)
+from spectraldiffx import CapacitanceSolver
 
 from finitevolx._src.boundary.bc_1d import Dirichlet1D, Neumann1D, Periodic1D
 from finitevolx._src.boundary.bc_set import BoundaryConditionSet
@@ -57,6 +56,7 @@ from finitevolx._src.solvers.iterative import (  # noqa: F401
     masked_laplacian,
     solve_cg,
 )
+from finitevolx._src.solvers.linear_operators import helmholtz_operator
 
 # Re-export from preconditioners module
 from finitevolx._src.solvers.preconditioners import (  # noqa: F401
@@ -162,39 +162,96 @@ def build_capacitance_solver(
     dx: float,
     dy: float,
     lambda_: float = 0.0,
-    base_bc: str = "fft",
+    base_bc: str = "dst",
 ) -> CapacitanceSolver:
     """Pre-compute the capacitance matrix and return a ready-to-use solver.
 
-    This is an **offline** function that performs *N_b* rectangular spectral
-    solves (``N_b`` = number of inner-boundary points).  The result is a
-    :class:`CapacitanceSolver` whose ``__call__`` method is JIT-compilable.
+    The solver's unknowns are **every wet cell** of *mask*, with ψ = 0 on the
+    coast ring (the dry cells 4-adjacent to a wet cell) and outside: the same
+    problem ``method="cg"`` solves through :func:`masked_laplacian` on that
+    mask (for ψ with a :class:`Mask2D`, the wall on the C-grid wall nodes).
+
+    The masked operator is the wet sub-block ``B[W][:, W]`` of the
+    rectangular five-point operator ``B = (∇² − λ)``
+    (:func:`~finitevolx.helmholtz_operator` with ``bc=base_bc``), as a
+    ``gaussx.MaskedOperator`` whose coupling set is the coast ring.  This is
+    an **offline** function: it factorises the ``N_c × N_c`` capacitance
+    matrix (``N_c`` = number of coast cells) with ``N_c`` rectangular solves.
+    The returned :class:`CapacitanceSolver` is then two rectangular solves
+    plus an ``O(N_c²)`` back-substitution per right-hand side and is
+    JIT-compilable.
 
     Parameters
     ----------
     mask : np.ndarray of bool shape (Ny, Nx), or Mask2D
-        Physical domain mask.  ``True`` = interior (ocean/fluid),
-        ``False`` = exterior (land/walls).
-
-        When an :class:`Mask2D` is passed, the ``psi``
-        staggering mask is extracted automatically.
+        Physical domain mask.  ``True`` = wet (ocean/fluid), ``False`` = dry
+        (land/walls).  A :class:`Mask2D` gives its ψ (X-point) mask
+        ``xy_corner_strict``.
     dx : float
         Grid spacing in x.
     dy : float
         Grid spacing in y.
     lambda_ : float
-        Helmholtz parameter λ.  Use ``0.0`` for pure Poisson.
-    base_bc : {"fft", "dst", "dct"}
-        Rectangular spectral solver used as the base.
+        Helmholtz parameter λ ≥ 0.  Use ``0.0`` for pure Poisson.
+    base_bc : {"dst", "fft", "dct"}
+        Rectangular base operator: Dirichlet (DST-I, the default:
+        non-singular for every λ ≥ 0), periodic (FFT) or Neumann (DCT-II).
+        The base only enters through cells beyond the array edge, so every
+        base gives the ``masked_laplacian`` solution as long as no wet cell
+        touches the array edge (true for any mask with a dry ghost ring);
+        with ``"fft"`` it is that solution for any mask.  A singular base
+        (``"fft"`` / ``"dct"`` at λ = 0) is handled exactly: gaussx borders
+        the capacitance system with the base's null vector.
 
     Returns
     -------
     CapacitanceSolver
-        A callable equinox Module with all precomputed arrays baked in.
+        A callable equinox Module with all precomputed arrays baked in; it
+        returns ψ on the full grid, zero on every dry cell.
+
+    Raises
+    ------
+    ValueError
+        For an unknown ``base_bc``, a mask with no wet cells, or a mask with
+        no dry cells (nothing to correct: use the rectangular solver).
+
+    Examples
+    --------
+    >>> mask = np.zeros((34, 34), dtype=bool)
+    >>> mask[1:-1, 1:-1] = True
+    >>> solver = build_capacitance_solver(Mask2D.from_mask(mask), dx, dy, lambda_=4.0)
+    >>> psi = streamfunction_from_vorticity(
+    ...     zeta, dx, dy, lambda_=4.0, method="capacitance", capacitance_solver=solver
+    ... )
     """
+    if base_bc not in ("fft", "dst", "dct"):
+        raise ValueError(f"base_bc must be 'fft', 'dst', or 'dct'; got {base_bc!r}")
     if isinstance(mask, Mask2D):
-        mask = np.asarray(mask.xy_corner_strict, dtype=bool)
-    return _build_capacitance_solver_base(mask, dx, dy, lambda_, base_bc)
+        mask = np.asarray(mask.xy_corner_strict)
+    wet = np.asarray(mask) > 0.5  # [Ny, Nx], concrete
+    if not wet.any():
+        raise ValueError("The mask has no wet (True) cells.")
+    if wet.all():
+        raise ValueError(
+            "The mask has no dry (False) cells, so there is no coast to "
+            f"correct for; use solve_helmholtz_{base_bc} directly."
+        )
+    # B = (∇² - λ) on the rectangle, the same eigenvalues as the spectral solvers
+    base = helmholtz_operator(wet.shape, dx, dy, lambda_=lambda_, bc=base_bc)
+    flat = jnp.asarray(wet.ravel())  # [Ny*Nx], the unknowns W
+    # Coupling set: the cells outside W that the stencil of W reaches (the
+    # coast ring), wrapping around only for the periodic base.
+    coupling = gaussx.grid_coupling_indices(jnp.asarray(wet), periodic=base_bc == "fft")
+    operator = gaussx.MaskedOperator(base, flat, flat, coupling_indices=coupling)
+    return CapacitanceSolver(
+        operator=operator,
+        interior_indices=jnp.asarray(np.flatnonzero(wet.ravel())),
+        shape=wet.shape,
+        dx=float(dx),
+        dy=float(dy),
+        lambda_=float(lambda_),
+        base_bc=base_bc,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -622,8 +679,10 @@ def _solve_with_known_values(
         # The ψ basin's solve domain is the rectangle [1:-2, 1:-2] (DST-I).
         psi_hom = _solve_spectral(rhs_corrected, dx, dy, lambda_, "dst", "X")
     else:
-        # CG solves on the effective domain directly; a capacitance solver
-        # must have been built on the same wet mask.
+        # CG solves on the effective domain directly.  A capacitance solver
+        # built on the same wet mask has every wet cell as an unknown and
+        # psi = 0 on the coast, which is exactly the effective domain when
+        # known_mask is None (the only case it accepts).
         eff_mask = domain.effective_mask.astype(rhs.dtype)
         psi_hom = _solve_dispatch(
             rhs_corrected,
@@ -725,7 +784,7 @@ def streamfunction_from_vorticity(
         cells and every other wet cell is solved for.  ``None`` (default)
         keeps the homogeneous solve unchanged.  Mask-based methods require
         *mask*.  For ``method="capacitance"`` build the solver on the same
-        wet *mask* (use ``base_bc="dst"`` when ``lambda_ == 0``).
+        wet *mask*: its unknowns are then exactly the solve domain.
         ``method="spectral"`` requires ``bc="dst"`` and no *mask*: it solves
         the ψ basin of the rectangle (wet X nodes ``[1:-2, 1:-2]``, values
         on the wall nodes ``0`` and ``N-2``), matching ``method="cg"`` with
