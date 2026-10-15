@@ -59,6 +59,26 @@ class TestVanLeer:
         r = jnp.ones((3, 5))
         assert van_leer(r).shape == (3, 5)
 
+    def test_infinite_r_is_finite(self):
+        """#294: ``(r + |r|) / (1 + |r|)`` was ``inf / inf = NaN`` at r = inf."""
+        np.testing.assert_array_equal(
+            van_leer(jnp.array([jnp.inf, -jnp.inf])), jnp.array([2.0, 0.0])
+        )
+
+    def test_matches_the_textbook_form(self):
+        r = jnp.array([-3.0, 0.0, 1e-300, 0.25, 1.0, 7.0, 1e300])
+        r_abs = jnp.abs(r)
+        np.testing.assert_allclose(
+            van_leer(r), (r + r_abs) / (1.0 + r_abs), rtol=1e-15, atol=0.0
+        )
+
+    def test_gradient_finite(self):
+        import jax
+
+        r = jnp.array([-2.0, 0.0, 0.5, 3.0, jnp.inf])
+        grad = jax.vmap(jax.grad(van_leer))(r)
+        assert bool(jnp.all(jnp.isfinite(grad)))
+
 
 class TestSuperbee:
     def test_negative_r_gives_zero(self):
@@ -125,3 +145,53 @@ class TestLimitersPublicAPI:
         assert float(_van_leer(r)) == pytest.approx(1.0)
         assert float(_superbee(r)) == pytest.approx(1.0)
         assert float(_mc(r)) == pytest.approx(1.0)
+
+
+class TestTvdSlopeRatio:
+    """#294: the TVD slope ratio is relative and sign-safe."""
+
+    @pytest.mark.parametrize("limiter", ["minmod", "van_leer", "superbee", "mc"])
+    def test_opposite_signs_give_exactly_the_upwind_value(self, limiter):
+        """Δ_bwd = 1, Δ_fwd = -0.5e-8: r < 0, φ = 0, face value = h[i].
+
+        The old ``Δ_bwd / (Δ_fwd + 1e-8)`` flipped the denominator's sign
+        (r = +2e8) and returned h[i] - 5e-9 (minmod 1 - 2.5e-9).
+        """
+        from finitevolx import CartesianGrid1D, Reconstruction1D
+
+        recon = Reconstruction1D(grid=CartesianGrid1D.from_interior(4, 1.0))
+        # face i+1/2 at i = 2: h[1] = 0, h[2] = 1, h[3] = 1 - 0.5e-8
+        h = jnp.array([0.0, 0.0, 1.0, 1.0 - 0.5e-8, 1.0 - 0.5e-8, 1.0 - 0.5e-8])
+        fe = recon.tvd_x(h, jnp.ones_like(h), limiter=limiter)
+        assert float(fe[2]) == 1.0
+        # mirrored, negative flow: face 2+1/2 reads h[3] upwind, h[4] beyond
+        hm = h[::-1]
+        fe = recon.tvd_x(hm, -jnp.ones_like(hm), limiter=limiter)
+        assert float(fe[2]) == -float(hm[3])
+
+    @pytest.mark.parametrize("limiter", ["minmod", "van_leer", "superbee", "mc"])
+    @pytest.mark.parametrize("amp", [1e-9, 1e-300])
+    def test_small_amplitude_is_not_first_order(self, limiter, amp):
+        """At amplitude 1e-9 the old absolute eps sent φ to 0 (upwind1); the
+        face value now scales exactly with the field (here a linear ramp,
+        r = 1, face value h[i] + Δ/2 for every limiter)."""
+        from finitevolx import CartesianGrid1D, Reconstruction1D
+
+        recon = Reconstruction1D(grid=CartesianGrid1D.from_interior(6, 1.0))
+        ramp = jnp.arange(8.0)
+        u = jnp.ones_like(ramp)
+        small = recon.tvd_x(amp * ramp, u, limiter=limiter)
+        unit = recon.tvd_x(ramp, u, limiter=limiter)
+        np.testing.assert_allclose(small[2:-2], amp * unit[2:-2], rtol=1e-15)
+        np.testing.assert_allclose(unit[2:-2], ramp[2:-2] + 0.5, rtol=1e-15)
+
+    @pytest.mark.parametrize("limiter", ["minmod", "van_leer", "superbee", "mc"])
+    def test_constant_and_zero_fields_are_finite(self, limiter):
+        """Δ_fwd = Δ_bwd = 0 gives r = 0 (never 0/0); a zero field gives 0."""
+        from finitevolx import CartesianGrid1D, Reconstruction1D
+
+        recon = Reconstruction1D(grid=CartesianGrid1D.from_interior(6, 1.0))
+        for value in (0.0, 3.0):
+            h = jnp.full(8, value)
+            fe = recon.tvd_x(h, jnp.ones_like(h), limiter=limiter)
+            np.testing.assert_array_equal(fe[1:-1], value)

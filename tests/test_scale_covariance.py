@@ -552,16 +552,30 @@ def _cases():
 #: Linear and upwind stencils: exactly covariant in both length and amplitude.
 LINEAR_METHODS = ("naive", "upwind1", "upwind2", "upwind3")
 
-#: WENO stencils: covariant in length, but *not* in amplitude, because the
-#: smoothness-indicator epsilon is absolute while beta carries units of
-#: amplitude squared. Tracked as #243.
+#: WENO stencils. Their smoothness-indicator epsilon is relative to the
+#: local indicator sum (#243), so they are exactly covariant in amplitude
+#: too — see :class:`TestReconstructionAmplitudeCovariance`.
 WENO_METHODS = ("weno3", "weno5", "wenoz5", "weno7", "weno9")
 
-#: TVD limiters. They guard a slope *ratio* with the absolute
-#: ``_TVD_EPS``, so they have the same shape of amplitude dependence
-#: #243 describes for WENO — a ratio is dimensionless, but the epsilon
-#: added to its denominator is not.
+#: TVD limiters. Their slope ratio is guarded by a floor relative to the
+#: differences it divides (#294), so they are exactly covariant as well.
 TVD_METHODS = ("minmod", "van_leer", "superbee", "mc")
+
+#: Field amplitudes for the reconstruction amplitude checks (#243, #294).
+#: ``run_case`` *divides* the fields by its ``amplitude`` argument, so a
+#: field amplitude ``a`` is probed with ``amplitude = 1 / a``.  1e-9 is
+#: where the old absolute TVD epsilon turned every limiter into upwind1,
+#: 1e3 where the old WENO epsilon moved the tendency by 3%.
+RECONSTRUCTION_FIELD_AMPLITUDES = (1e-9, 1e-4, 1.0, 1e3)
+
+#: Tolerance of the reconstruction amplitude checks.  A rescaled run differs
+#: from the rescaled base run only by rounding: every operation sees inputs
+#: scaled by a non-power-of-two, so each is off by <= 1 ulp (1.1e-16), and
+#: the flux divergence and the large WENO-9 indicator coefficients (~300)
+#: amplify that.  Measured worst case 1.0e-14 (weno9, 2-D), most cases
+#: 3e-16 - 1e-15; 1e-12 leaves a factor 100 while an epsilon in absolute
+#: units (>= 1e-8 departures before #243 / #294) still fails it.
+RECONSTRUCTION_RTOL = 1e-12
 
 #: Advection is implemented separately per dimension — different
 #: dispatch, different reconstruction paths — so a scale regression in
@@ -593,7 +607,7 @@ def _advection_case(method, dim, geometry="cartesian"):
 
 
 #: Not every dimension implements every scheme — ``Advection3D`` has no
-#: ``upwind2``/``upwind3``, and only the 2-D operator has ``wenoz5``.
+#: ``upwind2``/``upwind3``.
 #: Probed rather than hard-coded so the matrix cannot drift out of date,
 #: and asserted non-empty below so a probe that silently matches nothing
 #: cannot quietly empty the suite.
@@ -738,7 +752,7 @@ class TestAdvectionScaleCovariance:
     An amplitude failure here means a limiter guards a ratio with an
     epsilon in absolute units (a bare constant added to a squared
     gradient), which quietly changes the scheme when the field is
-    rescaled — see :class:`TestWenoAmplitudeCovariance`.
+    rescaled — see :class:`TestReconstructionAmplitudeCovariance`.
     """
 
     @pytest.mark.parametrize("case", ADVECTION_CASES, ids=repr)
@@ -757,49 +771,36 @@ class TestAdvectionScaleCovariance:
         assert_covariant(case, 1e-3, 1e3, use_mask=True)
 
 
-class TestWenoAmplitudeCovariance:
-    """WENO weights currently depend on the amplitude of the field.
+class TestReconstructionAmplitudeCovariance:
+    """WENO and TVD reconstructions are exactly amplitude-covariant.
 
-    ``beta`` (the smoothness indicator) has units of amplitude squared,
-    but the epsilon added to it in ``weno.py`` is a bare absolute
-    constant. Rescaling the field therefore shifts the nonlinear
-    weights: a 3% change in the tendency at amplitude 1e3. Tracked as
-    #243; these xfails flip to passes once the epsilon is made relative.
+    Before #243 / #294 the WENO smoothness indicators and the TVD slope
+    ratio were guarded by absolute epsilons (``1e-8``, ``1e-14``,
+    ``1e-16``), so rescaling the field changed the scheme: 3% in the WENO
+    tendency at amplitude 1e3, every limiter reduced to upwind1 at 1e-9.
+    Both epsilons are now relative, so these hold to rounding.
     """
 
-    @pytest.mark.xfail(
-        reason="#243: absolute epsilon in the WENO smoothness indicators",
-        strict=True,
-        # Only the numerical assertion is expected to fail. Without
-        # this, a WENO operator that started raising during
-        # construction or execution would still report XFAIL and keep
-        # the suite green.
-        raises=AssertionError,
+    @pytest.mark.parametrize(
+        "case", WENO_ADVECTION_CASES + TVD_ADVECTION_CASES, ids=repr
     )
-    @pytest.mark.parametrize("case", WENO_ADVECTION_CASES, ids=repr)
-    def test_amplitude_rescaling(self, case):
-        assert_covariant(case, 1.0, 1e3, use_mask=False)
+    @pytest.mark.parametrize("field_amplitude", RECONSTRUCTION_FIELD_AMPLITUDES)
+    def test_amplitude_rescaling(self, case, field_amplitude):
+        assert_covariant(
+            case, 1.0, 1.0 / field_amplitude, use_mask=False, rtol=RECONSTRUCTION_RTOL
+        )
 
-    @pytest.mark.xfail(
-        reason="#243: absolute epsilon in the WENO smoothness indicators",
-        strict=True,
-        # Only the numerical assertion is expected to fail. Without
-        # this, a WENO operator that started raising during
-        # construction or execution would still report XFAIL and keep
-        # the suite green.
-        raises=AssertionError,
+    @pytest.mark.parametrize(
+        "case", WENO_ADVECTION_CASES + TVD_ADVECTION_CASES, ids=repr
     )
-    @pytest.mark.parametrize("case", WENO_ADVECTION_CASES, ids=repr)
     def test_masked_advection_is_covariant(self, case):
-        assert_covariant(case, 1e-3, 1e3, use_mask=True)
+        assert_covariant(case, 1e-3, 1e3, use_mask=True, rtol=RECONSTRUCTION_RTOL)
 
-    @pytest.mark.parametrize("case", WENO_ADVECTION_CASES, ids=repr)
-    def test_departure_is_bounded_until_243_lands(self, case):
-        """Pin the size of the known breakage so it cannot silently grow."""
-        base, scaled, factor = run_case(case, 1.0, 1e3, use_mask=False)
-        expected = base * factor
-        err = np.abs(scaled - expected).max() / np.abs(expected).max()
-        assert err < 5e-2
+    @pytest.mark.parametrize(
+        "case", WENO_ADVECTION_CASES + TVD_ADVECTION_CASES, ids=repr
+    )
+    def test_combined_rescaling(self, case):
+        assert_covariant(case, 1e6, 1e9, use_mask=False, rtol=RECONSTRUCTION_RTOL)
 
 
 # ----------------------------------------------------------------------
@@ -1013,57 +1014,6 @@ class TestConstantsAudit:
         assert not _constants_outside_defaults(fine)
 
 
-class TestTvdAmplitudeCovariance:
-    """TVD limiters share WENO's defect, three orders of magnitude smaller.
-
-    Each guards a slope *ratio* with the absolute ``_TVD_EPS = 1e-8``.
-    A ratio is dimensionless but that epsilon is not, so rescaling the
-    field shifts the limiter slightly — the same mechanism as #243.
-
-    The size is what differs, and it is why these are not ``xfail``
-    like the WENO cases: at amplitude 1e3 a WENO tendency moves by 3%,
-    a TVD one by about 1e-5. Too large to call exact, far too small to
-    call broken. The bound below states that, so a regression toward
-    WENO-scale breakage fails here.
-    """
-
-    #: Measured departure is ~1.5e-5; an order of magnitude of headroom.
-    TOLERANCE = 1e-4
-
-    @pytest.mark.parametrize("case", TVD_ADVECTION_CASES, ids=repr)
-    @pytest.mark.parametrize("length_factor", LENGTH_FACTORS)
-    def test_length_rescaling_is_exact(self, case, length_factor):
-        """The grid carries no amplitude, so this half is unaffected."""
-        assert_covariant(case, length_factor, 1.0, use_mask=False)
-
-    @pytest.mark.parametrize("case", TVD_ADVECTION_CASES, ids=repr)
-    def test_amplitude_departure_is_bounded(self, case):
-        base, scaled, factor = run_case(case, 1.0, 1e3, use_mask=False)
-        expected = base * factor
-        err = np.abs(scaled - expected).max() / np.abs(expected).max()
-        assert err < self.TOLERANCE, f"{case.name}: amplitude error {err:.3e}"
-
-    @pytest.mark.parametrize("case", TVD_ADVECTION_CASES, ids=repr)
-    def test_the_departure_is_real_and_not_rounding(self, case):
-        """Otherwise the bound above could be met by an exact operator.
-
-        Pinning this means that if #243's fix also makes the limiters
-        exact, this test fails and the suite is updated deliberately
-        rather than keeping a stale allowance.
-        """
-        base, scaled, factor = run_case(case, 1.0, 1e3, use_mask=False)
-        expected = base * factor
-        err = np.abs(scaled - expected).max() / np.abs(expected).max()
-        assert err > 1e-8
-
-    @pytest.mark.parametrize("case", TVD_ADVECTION_CASES, ids=repr)
-    def test_masked_departure_is_bounded_too(self, case):
-        base, scaled, factor = run_case(case, 1e-3, 1e3, use_mask=True)
-        expected = base * factor
-        err = np.abs(scaled - expected).max() / np.abs(expected).max()
-        assert err < self.TOLERANCE
-
-
 class TestTheContractsHoldOnAnotherGrid:
     """Same contracts, a different array shape.
 
@@ -1073,8 +1023,8 @@ class TestTheContractsHoldOnAnotherGrid:
     vertical levels would pass the whole suite. This re-runs the
     matrix at :data:`ALTERNATE_SHAPE`, which is all three.
 
-    The WENO and TVD cases keep their own tolerances — the grid shape
-    does not change #243's amplitude dependence.
+    The WENO and TVD cases are exact since #243 / #294, so they run the
+    same masked check here.
     """
 
     @pytest.mark.slow
@@ -1084,7 +1034,12 @@ class TestTheContractsHoldOnAnotherGrid:
 
     @pytest.mark.parametrize(
         "case",
-        [c for c in CASES + LINEAR_ADVECTION_CASES if c.masked],
+        [c for c in CASES + LINEAR_ADVECTION_CASES if c.masked]
+        + [
+            pytest.param(c, marks=pytest.mark.slow)
+            for c in WENO_ADVECTION_CASES + TVD_ADVECTION_CASES
+            if c.masked
+        ],
         ids=repr,
     )
     def test_masked_is_covariant_too(self, case):
@@ -1095,7 +1050,7 @@ class TestTheContractsHoldOnAnotherGrid:
     )
     @pytest.mark.slow
     def test_length_rescaling_is_still_exact(self, case):
-        """The length half is exact for every scheme, #243 or not."""
+        """The length half is exact for every scheme."""
         assert_covariant(case, 1e6, 1.0, use_mask=False, shape=ALTERNATE_SHAPE)
 
 

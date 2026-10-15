@@ -55,10 +55,11 @@ def minmod(r: Float[Array, ...]) -> Float[Array, ...]:
 def van_leer(r: Float[Array, ...]) -> Float[Array, ...]:
     """Van Leer flux limiter.
 
-    φ(r) = (r + |r|) / (1 + |r|)
+    φ(r) = (r + |r|) / (1 + |r|)  =  2 / (1 + 1/r)  for r > 0,  0 otherwise
 
     A smooth limiter that is symmetric around r = 1.  Returns 0 for r ≤ 0
-    and approaches 2 for r → ∞.
+    and approaches 2 for r → ∞.  Evaluated in the ``2 / (1 + 1/r)`` form so
+    ``r = ±inf`` gives 2 / 0 instead of ``inf / inf = NaN``.
 
     Parameters
     ----------
@@ -70,8 +71,11 @@ def van_leer(r: Float[Array, ...]) -> Float[Array, ...]:
     array
         Limiter values φ(r) ∈ [0, 2).
     """
-    r_abs = jnp.abs(r)
-    return (r + r_abs) / (1.0 + r_abs)
+    positive = r > 0.0
+    # Guard the argument as well as the result, so the gradient at r <= 0
+    # stays finite (no 1/0 on the unused branch).
+    r_pos = jnp.where(positive, r, 1.0)
+    return jnp.where(positive, 2.0 / (1.0 + 1.0 / r_pos), 0.0)
 
 
 def superbee(r: Float[Array, ...]) -> Float[Array, ...]:
