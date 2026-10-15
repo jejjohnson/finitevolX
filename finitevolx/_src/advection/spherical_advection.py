@@ -21,8 +21,8 @@ dimensionality, matching the corresponding Cartesian operators:
   ``'mc'``.
 * :class:`SphericalAdvection3D` (matches :class:`Advection3D`) —
   the 3-D subset: ``'naive'``, ``'upwind1'``, ``'weno3'``,
-  ``'weno5'``, ``'weno7'``, ``'weno9'``, and the TVD limiters.
-  (``upwind2``, ``upwind3``, and ``wenoz5`` are 2-D-only because
+  ``'weno5'``, ``'wenoz5'``, ``'weno7'``, ``'weno9'``, and the TVD
+  limiters.  (``upwind2`` and ``upwind3`` are 2-D-only because
   :class:`~finitevolx.Reconstruction3D` does not expose native 3-D
   versions of those stencils.)
 
@@ -111,6 +111,8 @@ def _reconstruct_faces_3d(
         return recon.weno3_x(h, u), recon.weno3_y(h, v)
     if method == "weno5":
         return recon.weno5_x(h, u), recon.weno5_y(h, v)
+    if method == "wenoz5":
+        return recon.wenoz5_x(h, u), recon.wenoz5_y(h, v)
     if method == "weno7":
         return recon.weno7_x(h, u), recon.weno7_y(h, v)
     if method == "weno9":
@@ -136,16 +138,16 @@ class SphericalAdvection2D(eqx.Module):
     grid : SphericalGrid2D
         The underlying 2-D spherical grid.
     mask : Mask2D or None, optional
-        Optional land/ocean mask.  When provided and a
-        mask-dispatchable method (WENO3/5, WENOz5, any TVD limiter) is
-        used, the ``(2, 4, 6)`` adaptive stencil hierarchies for both
-        directions are pre-built once in ``__init__`` and reused on
-        every call via :func:`upwind_flux` — identical approach to
-        :class:`Advection2D`.  For non-dispatchable methods the
-        unmasked code path runs and the final tendency is post-
-        multiplied by ``mask.h``.  ``None`` (default) gives the
-        unmasked behaviour.  Per #209 Q2 a Cartesian ``Mask2D`` is
-        used pending a dedicated ``SphericalMask2D`` follow-up.
+        Optional land/ocean mask; every method is then land-safe,
+        exactly as in :class:`Advection2D`: dry inputs are zeroed with
+        ``jnp.where``, the upwind-biased methods go through
+        :func:`upwind_flux` with the ``(2, 4, 6, 8, 10)`` adaptive
+        stencil hierarchies pre-built once in ``__init__``, the face
+        fluxes on dry faces (``mask.u`` / ``mask.v`` false) are zeroed
+        before the divergence, and dry T-cells are exactly zero.
+        ``None`` (default) gives the unmasked behaviour.  Per #209 Q2 a
+        Cartesian ``Mask2D`` is used pending a dedicated
+        ``SphericalMask2D`` follow-up.
 
     Examples
     --------
@@ -223,6 +225,11 @@ class SphericalAdvection2D(eqx.Module):
             :class:`Advection2D` convention of only writing
             ``[2:-2, 2:-2]``).
         """
+        if self.mask is not None:
+            # Zero the dry inputs before any stencil reads them (NaN-safe).
+            h = jnp.where(self.mask.h, h, 0.0)  # [Ny, Nx]
+            u = jnp.where(self.mask.u, u, 0.0)  # [Ny, Nx]
+            v = jnp.where(self.mask.v, v, 0.0)  # [Ny, Nx]
         mh_x = self._mask_hierarchy_x
         mh_y = self._mask_hierarchy_y
         if mh_x is not None and mh_y is not None and method in _MASK_DISPATCHABLE:
@@ -233,6 +240,10 @@ class SphericalAdvection2D(eqx.Module):
             fn = upwind_flux(h, v, dim=0, rec_funcs=rfy, mask_hierarchy=mask_y)
         else:
             fe, fn = _reconstruct_faces_2d(self.recon, h, u, v, method)
+        if self.mask is not None:
+            # No flux through a dry face (mask.u / mask.v false).
+            fe = jnp.where(self.mask.u, fe, 0.0)  # [Ny, Nx]
+            fn = jnp.where(self.mask.v, fn, 0.0)  # [Ny, Nx]
 
         dlon = self.grid.dlon
         dlat = self.grid.dlat
@@ -250,7 +261,7 @@ class SphericalAdvection2D(eqx.Module):
         dv = dv_term / dlat
         out = interior(-_safe_div_cos(du + dv, cos_T_c, R), h, ghost=2)
         if self.mask is not None:
-            out = out * self.mask.h
+            out = jnp.where(self.mask.h, out, 0.0)
         return out
 
 
@@ -267,10 +278,10 @@ class SphericalAdvection3D(eqx.Module):
     ----------
     grid : SphericalGrid3D
     mask : Mask3D or None, optional
-        Optional 3-D land/ocean mask.  Pre-builds native 3-D adaptive
-        stencil hierarchies ``(2, 4, 6)`` in both horizontal directions
-        in ``__init__``.  Non-dispatchable methods use the unmasked path
-        and then post-multiply by ``mask.h``.  Per #209 Q2/Q3 a
+        Optional 3-D land/ocean mask; every method is then land-safe,
+        as in :class:`Advection3D` (dry inputs zeroed, native 3-D
+        adaptive stencil hierarchies ``(2, 4, 6, 8, 10)`` pre-built in
+        ``__init__``, dry-face fluxes zeroed).  Per #209 Q2/Q3 a
         Cartesian ``Mask3D`` is used pending a ``SphericalMask3D``
         follow-up.
     """
@@ -326,6 +337,11 @@ class SphericalAdvection3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             Advective tendency at T-points.
         """
+        if self.mask is not None:
+            # Zero the dry inputs before any stencil reads them (NaN-safe).
+            h = jnp.where(self.mask.h, h, 0.0)  # [Nz, Ny, Nx]
+            u = jnp.where(self.mask.u, u, 0.0)  # [Nz, Ny, Nx]
+            v = jnp.where(self.mask.v, v, 0.0)  # [Nz, Ny, Nx]
         mh_x = self._mask_hierarchy_x
         mh_y = self._mask_hierarchy_y
         if mh_x is not None and mh_y is not None and method in _MASK_DISPATCHABLE:
@@ -336,6 +352,10 @@ class SphericalAdvection3D(eqx.Module):
             fn = upwind_flux(h, v, dim=1, rec_funcs=rfy, mask_hierarchy=mask_y)
         else:
             fe, fn = _reconstruct_faces_3d(self.recon, h, u, v, method)
+        if self.mask is not None:
+            # No flux through a dry face (mask.u / mask.v false).
+            fe = jnp.where(self.mask.u, fe, 0.0)  # [Nz, Ny, Nx]
+            fn = jnp.where(self.mask.v, fn, 0.0)  # [Nz, Ny, Nx]
 
         dlon = self.grid.dlon
         dlat = self.grid.dlat
@@ -353,5 +373,5 @@ class SphericalAdvection3D(eqx.Module):
 
         out = jnp.zeros_like(h).at[1:-1, 2:-2, 2:-2].set(horiz)
         if self.mask is not None:
-            out = out * self.mask.h
+            out = jnp.where(self.mask.h, out, 0.0)
         return out
