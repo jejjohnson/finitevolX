@@ -26,7 +26,7 @@ scheme.
 | Point stencil (`qm, q0, qp, … → q at the face`) | `weno.py` (nonlinear, left and `_right` variants), `linear.py` (polynomial) | `__init__.py` exports |
 | Limiter `φ(r)` | `limiters.py` | `_LIMITERS` in `reconstruction.py` and `_TVD_LIMITERS` in `advection.py` (then every advection operator accepts it as `method=`) |
 | Face-value method on a grid | `reconstruction.py`: `<name>_x` on `Reconstruction1D`, `<name>_x` / `<name>_y` on `Reconstruction2D/3D` (there is no `_z`: z-levels are independent) | the `elif method == ...` chain in `Advection1D/2D/3D.__call__` (`advection.py`) and `_reconstruct_faces_2d` / `_reconstruct_faces_3d` (`spherical_advection.py`); the error for an unknown method must keep the words "Unknown method" (the scale-covariance probe relies on them) |
-| Coastal fallback (wide stencils) | `_rec_funcs_for_method_1d/2d/3d` in `advection.py`: `{stencil_size: fn}` down to `upwind1` at size 2 | `_MASK_DISPATCHABLE`; sizes must be a subset of `_HIERARCHY_SIZES = (2, 4, 6)` |
+| Coastal fallback (wide stencils) | `_rec_funcs_for_method_1d/2d/3d` in `advection.py`: `{stencil_size: fn}` down to `upwind1` at size 2 | `_MASK_DISPATCHABLE` and the ladder in `_tier_funcs`; sizes must be a subset of `_HIERARCHY_SIZES = (2, 4, 6, 8, 10)` |
 | Functional dispatcher | `reconstruct_fn.py` (`reconstruct(q, u, dim, method, num_pts)`) | only if the scheme fits its `method` × `num_pts` grid |
 
 Rules:
@@ -38,8 +38,8 @@ Rules:
   `[2:-2, 2:-2]`; a stencil wider than the ghost ring must fall back near
   the walls (as `weno5` does) rather than read outside the array.
 - No absolute epsilon on a dimensional quantity: the existing WENO / TVD
-  epsilons break amplitude covariance and are pinned as `xfail` (#243) in
-  `tests/test_scale_covariance.py`; don't add another.
+  epsilons break amplitude covariance and are pinned as `xfail` (#243, #294)
+  in `tests/test_scale_covariance.py`; don't add another.
 - Comment the stencil with its formula and cite the scheme in the
   docstring.
 
