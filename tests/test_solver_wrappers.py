@@ -505,3 +505,72 @@ class TestCapacitanceSolverWithCGridMask:
         j_b, i_b = _inner_boundary_indices(np.asarray(cgrid_mask.xy_corner_strict))
         bc_vals = psi[j_b, i_b]
         np.testing.assert_allclose(np.array(bc_vals), 0.0, atol=1e-10)
+
+
+# ---------------------------------------------------------------------------
+# Mask dtype follows the right-hand side (#302)
+# ---------------------------------------------------------------------------
+
+
+class TestMaskDtypeFollowsRhs:
+    """A ``Mask2D`` must not downcast a weakly typed float64 right-hand side."""
+
+    N = 34
+
+    def _problem(self):
+        n = self.N
+        dx = 1.0 / (n - 2)
+        m = np.zeros((n, n), dtype=bool)
+        m[1:-1, 1:-1] = True
+        mask = Mask2D.from_mask(m)
+        # arange * python scalar: weakly typed float64, |b| ~ 800
+        x = jnp.arange(n) * dx
+        rhs = (
+            800.0 * jnp.sin(3 * jnp.pi * x[None, :]) * jnp.sin(2 * jnp.pi * x[:, None])
+        )
+        return rhs, mask, dx
+
+    def test_weak_float64_rhs_with_mask2d_stays_float64(self):
+        from finitevolx._src.solvers.elliptic import _resolve_mask_arr, solve_cg
+
+        rhs, mask, dx = self._problem()
+        assert rhs.dtype == jnp.float64 and rhs.weak_type
+        psi = streamfunction_from_vorticity(
+            rhs, dx, dx, lambda_=4.0, method="cg", mask=mask
+        )
+        assert psi.dtype == jnp.float64
+
+        # The same solve the wrapper runs, with its diagnostics: float64 CG
+        # converges in ~11 steps (float32 stalled at |r| ~ 1e-2).
+        m_arr = _resolve_mask_arr(mask, rhs.dtype)
+        assert m_arr.dtype == jnp.float64
+        _, info = solve_cg(
+            lambda p: masked_laplacian(p, m_arr, dx, dx, lambda_=4.0),
+            rhs * m_arr,
+            preconditioner=make_spectral_preconditioner(dx, dx, lambda_=4.0, bc="fft"),
+        )
+        assert bool(info.converged)
+        assert int(info.iterations) <= 15
+
+    def test_float32_rhs_stays_float32(self):
+        rhs, mask, dx = self._problem()
+        psi = streamfunction_from_vorticity(
+            rhs.astype(jnp.float32), dx, dx, lambda_=4.0, method="cg", mask=mask
+        )
+        assert psi.dtype == jnp.float32
+
+    def test_known_values_with_mask2d_stays_float64(self):
+        rhs, mask, dx = self._problem()
+        kv = jnp.ones_like(rhs)
+        psi = streamfunction_from_vorticity(
+            rhs, dx, dx, lambda_=4.0, method="cg", mask=mask, known_values=kv
+        )
+        assert psi.dtype == jnp.float64
+
+    def test_solve_domain_masks_are_boolean(self):
+        from finitevolx._src.solvers.inhomogeneous import SolveDomain
+
+        _, mask, _ = self._problem()
+        domain = SolveDomain(mask)
+        for arr in (domain.wet_mask, domain.boundary_ring, domain.effective_mask):
+            assert arr.dtype == jnp.bool_
