@@ -399,6 +399,7 @@ from finitevolx._src.timestepping.diffrax_solvers import (
     RK2Heun,
     RK4Classic,
     SemiLagrangianSolver,
+    SemiLagrangianTerm,
     SplitExplicitRKSolver,
 )
 from finitevolx._src.timestepping.explicit_rk import (
@@ -832,5 +833,6 @@ __all__ = [
     "LeapfrogRAFSolver",
     "SplitExplicitRKSolver",
     "SemiLagrangianSolver",
+    "SemiLagrangianTerm",
     "solve_ocean_pde",
 ]

@@ -8,8 +8,11 @@ the BC function into the tendency.
 from __future__ import annotations
 
 from collections.abc import Callable
+import math
+from typing import Any
 
 import diffrax as dfx
+import jax
 from jaxtyping import PyTree
 
 
@@ -23,6 +26,7 @@ def solve_ocean_pde(
     saveat: dfx.SaveAt | None = None,
     bc_fn: Callable | None = None,
     args: PyTree = None,
+    **kwargs: Any,
 ) -> dfx.Solution:
     """Integrate an ocean PDE using diffrax.
 
@@ -45,6 +49,13 @@ def solve_ocean_pde(
         to the tendency after each RHS evaluation.
     args : PyTree, optional
         Static arguments forwarded to ``rhs_fn``.
+    **kwargs
+        Forwarded to :func:`diffrax.diffeqsolve` (``stepsize_controller``,
+        ``adjoint``, ``max_steps``, ``throw``, ``event``, ...).  For a
+        fixed-step run (no ``stepsize_controller``) with concrete times and
+        no ``max_steps``, ``max_steps`` defaults to
+        ``ceil((t1 - t0) / dt0) + 16``: diffrax's own default (4096) stops a
+        long fixed-step run early.  Otherwise diffrax's default applies.
 
     Returns
     -------
@@ -61,6 +72,15 @@ def solve_ocean_pde(
     else:
         term = dfx.ODETerm(rhs_fn)
 
+    if "max_steps" not in kwargs and "stepsize_controller" not in kwargs:
+        # fixed steps: exactly ceil((t1 - t0) / dt0) of them
+        try:
+            n_steps = math.ceil((float(t1) - float(t0)) / float(dt0))
+        except (TypeError, jax.errors.ConcretizationTypeError):
+            pass  # traced times: keep diffrax's default
+        else:
+            kwargs["max_steps"] = max(n_steps, 0) + 16
+
     return dfx.diffeqsolve(
         term,
         solver,
@@ -70,4 +90,5 @@ def solve_ocean_pde(
         y0=y0,
         args=args,
         saveat=saveat if saveat is not None else dfx.SaveAt(t1=True),
+        **kwargs,
     )

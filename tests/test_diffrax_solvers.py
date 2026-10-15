@@ -571,3 +571,214 @@ class TestButcherTableauConsistency:
                 atol=1e-14,
                 err_msg=f"c[{i}]={float(tab.c[i])} != row_sum={row_sum}",
             )
+
+
+# ---------------------------------------------------------------------------
+# diffrax protocol: every solver inside diffeqsolve (#313)
+# ---------------------------------------------------------------------------
+
+
+def _imex_terms():
+    # dy/dt = -y (explicit) - 10 y (implicit)
+    return dfx.MultiTerm(
+        dfx.ODETerm(lambda t, y, a: -y), dfx.ODETerm(lambda t, y, a: -10.0 * y)
+    )
+
+
+def _imex_fixed():
+    return IMEX_SSP2(root_finder=dfx.VeryChord(rtol=1e-12, atol=1e-12))
+
+
+class TestDiffeqsolveProtocol:
+    @pytest.mark.parametrize(
+        "solver_cls", [ForwardEulerDfx, RK2Heun, SSP_RK2, RK3SSP, RK4Classic, SSP_RK104]
+    )
+    def test_erk_stepto_with_dense_output(self, solver_cls):
+        ts = jnp.linspace(0.0, 1.0, 11)
+        sol = dfx.diffeqsolve(
+            dfx.ODETerm(_decay_rhs),
+            solver_cls(),
+            0.0,
+            1.0,
+            None,
+            jnp.array(1.0),
+            stepsize_controller=dfx.StepTo(ts=ts),
+            saveat=dfx.SaveAt(ts=jnp.linspace(0.0, 1.0, 4)),
+        )
+        # dt = 0.1, saved times between steps: ~3x the measured relative error
+        # (Euler 5.2e-2, Heun / SSP_RK2 1.8e-3, RK3SSP 7.2e-4 from the cubic
+        # Hermite dense output, RK4 1e-6, SSP_RK104 2e-7)
+        rtol = {
+            ForwardEulerDfx: 0.15,
+            RK2Heun: 5e-3,
+            SSP_RK2: 5e-3,
+            RK3SSP: 2e-3,
+            RK4Classic: 3e-6,
+            SSP_RK104: 1e-6,
+        }[solver_cls]
+        np.testing.assert_allclose(
+            sol.ys, jnp.exp(-jnp.linspace(0.0, 1.0, 4)), rtol=rtol
+        )
+
+    @pytest.mark.parametrize("solver_cls", [RK2Heun, SSP_RK2, RK3SSP])
+    def test_erk_order_matches_tableau(self, solver_cls):
+        assert (
+            solver_cls().order(None) == {RK2Heun: 2, SSP_RK2: 2, RK3SSP: 3}[solver_cls]
+        )
+
+    def test_rk3ssp_pid_stiff_decay(self):
+        """y' = -50 y on [0, 10] with PID(rtol=1e-6): finite and within 1e-5 of exact.
+
+        With the old zero b_error this took 5 steps and returned inf.
+        """
+        sol = dfx.diffeqsolve(
+            dfx.ODETerm(lambda t, y, a: -50.0 * y),
+            RK3SSP(),
+            0.0,
+            10.0,
+            0.01,
+            jnp.array(1.0),
+            stepsize_controller=dfx.PIDController(rtol=1e-6, atol=1e-12),
+            max_steps=100_000,
+        )
+        assert bool(jnp.isfinite(sol.ys[0]))
+        assert abs(float(sol.ys[0]) - math.exp(-500.0)) < 1e-5
+
+    @pytest.mark.parametrize("solver_cls", [RK2Heun, SSP_RK2, RK3SSP])
+    def test_adaptive_erk_accuracy(self, solver_cls):
+        sol = dfx.diffeqsolve(
+            dfx.ODETerm(_decay_rhs),
+            solver_cls(),
+            0.0,
+            1.0,
+            0.1,
+            jnp.array(1.0),
+            stepsize_controller=dfx.PIDController(rtol=1e-7, atol=1e-9),
+        )
+        # local-error control at rtol 1e-7: global error well under 1e-5
+        assert abs(float(sol.ys[0]) - math.exp(-1.0)) < 1e-5
+
+    @pytest.mark.parametrize("solver", [ForwardEulerDfx(), RK4Classic(), SSP_RK104()])
+    def test_fixed_step_solvers_refuse_adaptive(self, solver):
+        with pytest.raises(Exception, match="error estimates"):
+            dfx.diffeqsolve(
+                dfx.ODETerm(_decay_rhs),
+                solver,
+                0.0,
+                1.0,
+                0.1,
+                jnp.array(1.0),
+                stepsize_controller=dfx.PIDController(rtol=1e-6, atol=1e-8),
+            )
+
+    @pytest.mark.slow
+    def test_imex_stepto_matches_functional_step(self):
+        """IMEX_SSP2 in diffeqsolve equals imex_ssp2_step (exact implicit solve)."""
+        from finitevolx import imex_ssp2_step
+
+        dt, n = 0.01, 100
+        sol = dfx.diffeqsolve(
+            _imex_terms(),
+            _imex_fixed(),
+            0.0,
+            n * dt,
+            dt,
+            jnp.array(1.0),
+            saveat=dfx.SaveAt(ts=jnp.linspace(0.0, n * dt, 5)),
+        )
+        y = jnp.array(1.0)
+        for _ in range(n):
+            y = imex_ssp2_step(
+                y,
+                lambda y: -y,
+                lambda y: -10.0 * y,
+                lambda r, gdt: r / (1 + 10 * gdt),
+                dt,
+            )
+        # the linear implicit stage converges in one chord iteration: round-off only
+        np.testing.assert_allclose(sol.ys[-1], y, rtol=1e-12)
+
+    @pytest.mark.slow
+    def test_imex_pid(self):
+        assert IMEX_SSP2().order(None) == 2
+        sol = dfx.diffeqsolve(
+            _imex_terms(),
+            IMEX_SSP2(),
+            0.0,
+            1.0,
+            0.01,
+            jnp.array(1.0),
+            stepsize_controller=dfx.PIDController(rtol=1e-6, atol=1e-8),
+        )
+        # embedded first-order estimate at rtol 1e-6: ~6e-5 relative global error
+        np.testing.assert_allclose(sol.ys[0], math.exp(-11.0), rtol=1e-3)
+
+    def test_semi_lagrangian_in_diffeqsolve(self):
+        """SemiLagrangianTerm + SaveAt(ts): integer shifts per step are exact."""
+        from finitevolx import SemiLagrangianTerm
+
+        ny, nx = 8, 16
+        y0 = jnp.sin(2 * jnp.pi * jnp.arange(nx) / nx)[None, :] * jnp.ones((ny, 1))
+        # u = 2 grid cells per unit time, dt = 0.5 -> one cell per step
+        term = SemiLagrangianTerm(
+            lambda t, y, a: (jnp.full_like(y, 2.0), jnp.zeros_like(y))
+        )
+        solver = SemiLagrangianSolver()
+        assert solver.order(term) == 1
+        sol = dfx.diffeqsolve(
+            term, solver, 0.0, 2.0, 0.5, y0, saveat=dfx.SaveAt(ts=jnp.array([1.0, 2.0]))
+        )
+        np.testing.assert_allclose(sol.ys[0], jnp.roll(y0, 2, axis=1), atol=1e-12)
+        np.testing.assert_allclose(sol.ys[1], jnp.roll(y0, 4, axis=1), atol=1e-12)
+
+    def test_solvers_pass_through_jax_jit(self):
+        """Static int fields: the solver objects can be jax.jit arguments."""
+        from finitevolx import SemiLagrangianTerm
+
+        @jax.jit
+        def run_sl(solver, y0):
+            term = SemiLagrangianTerm(
+                lambda t, y, a: (jnp.ones_like(y), jnp.zeros_like(y))
+            )
+            return dfx.diffeqsolve(term, solver, 0.0, 1.0, 1.0, y0).ys
+
+        y0 = jnp.arange(16.0).reshape(4, 4)
+        np.testing.assert_allclose(
+            run_sl(SemiLagrangianSolver(), y0)[0], jnp.roll(y0, 1, axis=1)
+        )
+
+        @jax.jit
+        def run_split(solver, y3, y2):
+            return solver.step(lambda t, a, b: -a, lambda t, b, a: -b, 0.0, y3, y2, 0.1)
+
+        out = run_split(
+            SplitExplicitRKSolver(n_substeps=5), jnp.array(1.0), jnp.array(1.0)
+        )
+        assert bool(jnp.isfinite(out[1]))
+        # (IMEX_SSP2 holds an optimistix root finder with a function field, so it
+        # goes through eqx.filter_jit, as every diffrax implicit solver does.)
+
+
+class TestSolveOceanPDEKwargs:
+    def test_long_fixed_step_run(self):
+        """t1 = 10, dt0 = 1e-3 is 10^4 steps: more than diffrax's default 4096."""
+        sol = solve_ocean_pde(_decay_rhs, RK3SSP(), jnp.array(1.0), 0.0, 10.0, 1e-3)
+        np.testing.assert_allclose(sol.ys[0], math.exp(-10.0), rtol=1e-8)
+
+    def test_kwargs_reach_diffeqsolve(self):
+        sol = solve_ocean_pde(
+            _decay_rhs,
+            RK3SSP(),
+            jnp.array(1.0),
+            0.0,
+            1.0,
+            0.1,
+            stepsize_controller=dfx.PIDController(rtol=1e-8, atol=1e-10),
+            adjoint=dfx.DirectAdjoint(),
+        )
+        assert int(sol.stats["num_steps"]) != 10  # the controller chose the steps
+        np.testing.assert_allclose(sol.ys[0], math.exp(-1.0), rtol=1e-6)
+        with pytest.raises(Exception, match="maximum number of solver steps"):
+            solve_ocean_pde(
+                _decay_rhs, RK3SSP(), jnp.array(1.0), 0.0, 1.0, 0.01, max_steps=5
+            )

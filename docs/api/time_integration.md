@@ -59,6 +59,8 @@ for time-stepping PDEs on Arakawa C-grids.
 
 ::: finitevolx.SemiLagrangianSolver
 
+::: finitevolx.SemiLagrangianTerm
+
 ## Convenience Wrapper
 
 ::: finitevolx.solve_ocean_pde

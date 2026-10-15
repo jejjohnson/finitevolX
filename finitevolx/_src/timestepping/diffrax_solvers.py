@@ -77,10 +77,27 @@ class ForwardEulerDfx(dfx.AbstractSolver):
         return terms.vf(t0, y0, args)
 
 
+class _FixedStepERK(dfx.AbstractERK):
+    """An explicit RK wrapper with no embedded error estimate (fixed steps only).
+
+    ``step`` returns ``y_error = None``, so an adaptive step-size controller
+    raises (as for :class:`ForwardEulerDfx`) instead of silently reading a
+    zero error estimate and taking unbounded steps.
+    """
+
+    def step(self, terms, t0, t1, y0, args, solver_state, made_jump):
+        y1, _, dense_info, solver_state, result = super().step(
+            terms, t0, t1, y0, args, solver_state, made_jump
+        )
+        return y1, None, dense_info, solver_state, result
+
+
 class RK2Heun(dfx.AbstractERK):
     """Heun's method (RK2) via Butcher tableau.
 
-    Order 2, 2 stages, SSP with C = 1.
+    Order 2, 2 stages, SSP with C = 1.  Embedded Forward Euler error
+    estimate (``b_error = [1/2, -1/2]``, as :class:`diffrax.Heun`), so it
+    supports adaptive step-size controllers.
 
     Butcher tableau::
 
@@ -93,19 +110,26 @@ class RK2Heun(dfx.AbstractERK):
     tableau: ClassVar[dfx.ButcherTableau] = dfx.ButcherTableau(
         c=np.array([1.0]),
         b_sol=np.array([0.5, 0.5]),
-        b_error=np.zeros(2),
+        # b_error = b_euler - b_sol, b_euler = [1, 0]
+        b_error=np.array([0.5, -0.5]),
         a_lower=(np.array([1.0]),),
     )
     interpolation_cls: ClassVar[Any] = (
         dfx.ThirdOrderHermitePolynomialInterpolation.from_k
     )
 
+    def order(self, terms):
+        return 2
+
 
 class RK3SSP(dfx.AbstractERK):
     """3rd-order Strong-Stability-Preserving Runge-Kutta.
 
     Order 3, 3 stages, SSP coefficient C = 1 (optimal).  Preserves
-    monotonicity, positivity, and TVD properties.
+    monotonicity, positivity, and TVD properties.  The embedded 2nd-order
+    solution is Heun's method on the first two stages
+    (``b_hat = [1/2, 1/2, 0]``), so it supports adaptive step-size
+    controllers.
 
     Butcher tableau::
 
@@ -119,7 +143,8 @@ class RK3SSP(dfx.AbstractERK):
     tableau: ClassVar[dfx.ButcherTableau] = dfx.ButcherTableau(
         c=np.array([1.0, 0.5]),
         b_sol=np.array([1.0 / 6, 1.0 / 6, 2.0 / 3]),
-        b_error=np.zeros(3),
+        # b_error = b_hat - b_sol, b_hat = [1/2, 1/2, 0] (Heun, 2nd order)
+        b_error=np.array([1.0 / 3, 1.0 / 3, -2.0 / 3]),
         a_lower=(
             np.array([1.0]),
             np.array([0.25, 0.25]),
@@ -129,11 +154,18 @@ class RK3SSP(dfx.AbstractERK):
         dfx.ThirdOrderHermitePolynomialInterpolation.from_k
     )
 
+    def order(self, terms):
+        return 3
 
-class RK4Classic(dfx.AbstractERK):
+
+class RK4Classic(_FixedStepERK):
     """Classic 4th-order Runge-Kutta.
 
-    Order 4, 4 stages, not SSP.
+    Order 4, 4 stages, not SSP.  Fixed steps only: the classical tableau has
+    no embedded lower-order solution (any 3rd-order weights on these four
+    stages are the RK4 weights themselves), so an adaptive step-size
+    controller raises.  Use :class:`diffrax.Tsit5` or :class:`diffrax.Dopri5`
+    for adaptive 4th / 5th order.
 
     Butcher tableau::
 
@@ -159,29 +191,38 @@ class RK4Classic(dfx.AbstractERK):
         dfx.ThirdOrderHermitePolynomialInterpolation.from_k
     )
 
+    def order(self, terms):
+        return 4
+
 
 class SSP_RK2(dfx.AbstractERK):
     """2nd-order SSP Runge-Kutta (same as Heun).
 
-    Order 2, 2 stages, SSP coefficient C = 1.
+    Order 2, 2 stages, SSP coefficient C = 1.  Embedded Forward Euler error
+    estimate, so it supports adaptive step-size controllers.
     """
 
     tableau: ClassVar[dfx.ButcherTableau] = dfx.ButcherTableau(
         c=np.array([1.0]),
         b_sol=np.array([0.5, 0.5]),
-        b_error=np.zeros(2),
+        # b_error = b_euler - b_sol, b_euler = [1, 0]
+        b_error=np.array([0.5, -0.5]),
         a_lower=(np.array([1.0]),),
     )
     interpolation_cls: ClassVar[Any] = (
         dfx.ThirdOrderHermitePolynomialInterpolation.from_k
     )
 
+    def order(self, terms):
+        return 2
 
-class SSP_RK104(dfx.AbstractERK):
+
+class SSP_RK104(_FixedStepERK):
     """4th-order SSP Runge-Kutta with 10 stages (Ketcheson 2008).
 
     Order 4, 10 stages, SSP coefficient C = 6.  Highest SSP coefficient
-    achievable at 4th-order accuracy.
+    achievable at 4th-order accuracy.  Fixed steps only (no embedded error
+    estimate): an adaptive step-size controller raises.
 
     Reference: Ketcheson (2008). Highly efficient strong stability-preserving
     Runge-Kutta methods with low-storage implementations.
@@ -248,6 +289,9 @@ class SSP_RK104(dfx.AbstractERK):
         dfx.ThirdOrderHermitePolynomialInterpolation.from_k
     )
 
+    def order(self, terms):
+        return 4
+
 
 # ---------------------------------------------------------------------------
 # IMEX solver (explicit + implicit Butcher tableaux)
@@ -268,8 +312,25 @@ class IMEX_SSP2(dfx.AbstractRungeKutta, dfx.AbstractImplicitSolver):
         explicit_term = dfx.ODETerm(advection_rhs)
         implicit_term = dfx.ODETerm(diffusion_rhs)
         terms = dfx.MultiTerm(explicit_term, implicit_term)
-        solver = IMEX_SSP2()
-        sol = dfx.diffeqsolve(terms, solver, ...)
+        # fixed steps: give the implicit root finder its own tolerances
+        solver = IMEX_SSP2(root_finder=dfx.VeryChord(rtol=1e-8, atol=1e-8))
+        sol = dfx.diffeqsolve(terms, solver, t0, t1, dt0, y0)
+        # adaptive steps: the default root finder takes the controller's
+        sol = dfx.diffeqsolve(
+            terms,
+            IMEX_SSP2(),
+            t0,
+            t1,
+            dt0,
+            y0,
+            stepsize_controller=dfx.PIDController(rtol=1e-6, atol=1e-8),
+        )
+
+    Order 2.  The embedded first-order solution
+    ``y + dt (F_E(Y_1) + F_I(Y_1))`` (``b_hat = [1, 0]`` in both tableaux)
+    gives the error estimate for adaptive step-size control.  Dense output
+    is linear between steps (the Hermite interpolation of the explicit RK
+    wrappers needs one ``k`` per step; a ``MultiTerm`` gives one per term).
 
     Explicit tableau::
 
@@ -291,7 +352,8 @@ class IMEX_SSP2(dfx.AbstractRungeKutta, dfx.AbstractImplicitSolver):
         dfx.ButcherTableau(
             c=np.array([1.0]),
             b_sol=np.array([0.5, 0.5]),
-            b_error=np.zeros(2),
+            # b_error = b_hat - b_sol, b_hat = [1, 0]
+            b_error=np.array([0.5, -0.5]),
             a_lower=(np.array([1.0]),),
         ),
         # Implicit part (SDIRK)
@@ -300,16 +362,20 @@ class IMEX_SSP2(dfx.AbstractRungeKutta, dfx.AbstractImplicitSolver):
         dfx.ButcherTableau(
             c=np.array([1.0 - _GAMMA]),
             b_sol=np.array([0.5, 0.5]),
-            b_error=np.zeros(2),
+            # b_error = b_hat - b_sol, b_hat = [1, 0] (same embedded weights)
+            b_error=np.array([0.5, -0.5]),
             a_lower=(np.array([1.0 - 2.0 * _GAMMA]),),
             a_diagonal=np.array([_GAMMA, _GAMMA]),
             a_predictor=(np.array([1.0]),),
             c1=_GAMMA,
         ),
     )
-    interpolation_cls: ClassVar[Any] = (
-        dfx.ThirdOrderHermitePolynomialInterpolation.from_k
-    )
+
+    @staticmethod
+    def interpolation_cls(t0, t1, y0, y1, k):
+        # linear dense output; k (one stage tuple per term) is not needed
+        del k
+        return dfx.LocalLinearInterpolation(t0=t0, t1=t1, y0=y0, y1=y1)
 
     term_structure: ClassVar[Any] = dfx.MultiTerm[
         tuple[dfx.AbstractTerm, dfx.AbstractTerm]
@@ -317,7 +383,10 @@ class IMEX_SSP2(dfx.AbstractRungeKutta, dfx.AbstractImplicitSolver):
     calculate_jacobian: ClassVar[Any] = dfx.CalculateJacobian.first_stage
 
     root_finder: Any = dfx.with_stepsize_controller_tols(dfx.VeryChord)()
-    root_find_max_steps: int = 10
+    root_find_max_steps: int = eqx.field(static=True, default=10)
+
+    def order(self, terms):
+        return 2
 
 
 # ---------------------------------------------------------------------------
@@ -494,15 +563,55 @@ class SplitExplicitRKSolver(eqx.Module):
 # ---------------------------------------------------------------------------
 
 
+class SemiLagrangianTerm(dfx.AbstractTerm):
+    """Velocity term for :class:`SemiLagrangianSolver` in ``diffeqsolve``.
+
+    ``dfx.ODETerm`` requires its vector field to return a pytree shaped like
+    ``y0``, but semi-Lagrangian advection needs the velocity ``(u, v)`` of a
+    scalar field ``y``.  This term carries that velocity function.
+
+    Parameters
+    ----------
+    velocity : Callable[[float, Array, PyTree], tuple[Array, Array]]
+        ``velocity(t, y, args) -> (u, v)``, each shaped like ``y``, in
+        **grid index units per unit time** (physical velocity divided by
+        the grid spacing).
+
+    Examples
+    --------
+    >>> term = SemiLagrangianTerm(
+    ...     lambda t, y, args: (jnp.ones_like(y), jnp.zeros_like(y))
+    ... )
+    >>> sol = dfx.diffeqsolve(term, SemiLagrangianSolver(), 0.0, 4.0, 1.0, y0)
+    """
+
+    velocity: Callable
+
+    def vf(self, t, y, args):
+        return self.velocity(t, y, args)
+
+    def contr(self, t0, t1, **kwargs):
+        del kwargs
+        return t1 - t0
+
+    def prod(self, vf, control):
+        return jax.tree.map(lambda v: v * control, vf)
+
+
 class SemiLagrangianSolver(dfx.AbstractSolver):
     """Semi-Lagrangian advection solver for diffrax.
 
     Traces characteristic curves backward in time and interpolates the old
     field at departure points.  Unconditionally stable (CFL > 1 allowed).
 
-    The ``terms.vf(t, y, args)`` must return ``(u, v)`` velocity components
+    The term's ``vf(t, y, args)`` must return ``(u, v)`` velocity components
     in **grid index units per second** (i.e. physical velocity divided by
-    grid spacing).
+    grid spacing); wrap the velocity function in :class:`SemiLagrangianTerm`
+    to use the solver with ``diffeqsolve``.  The departure point is found
+    with one backward Euler step along a velocity frozen at ``t0``, so the
+    scheme is first order in time (:meth:`order` is 1); there is no error
+    estimate, so it runs with fixed steps only.  Dense output (``SaveAt(ts=...)``)
+    is linear between steps.
 
     Parameters
     ----------
@@ -512,13 +621,13 @@ class SemiLagrangianSolver(dfx.AbstractSolver):
     """
 
     term_structure: ClassVar[Any] = dfx.AbstractTerm
-    interpolation_cls: ClassVar[Any] = (
-        dfx.ThirdOrderHermitePolynomialInterpolation.from_k
-    )
-    interpolation_order: int = 1
+    interpolation_cls: ClassVar[Any] = dfx.LocalLinearInterpolation
+    interpolation_order: int = eqx.field(static=True, default=1)
 
     def order(self, terms):
-        return self.interpolation_order
+        # first-order backward trajectory; the spatial interpolation order
+        # (interpolation_order) is a separate, spatial accuracy
+        return 1
 
     def init(self, terms, t0, t1, y0, args):
         return None
