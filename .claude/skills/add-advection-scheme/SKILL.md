@@ -37,9 +37,12 @@ Rules:
 - Closed walls: the Cartesian operators write the tendency on `[2:-2]` /
   `[2:-2, 2:-2]`; a stencil wider than the ghost ring must fall back near
   the walls (as `weno5` does) rather than read outside the array.
-- No absolute epsilon on a dimensional quantity: the existing WENO / TVD
-  epsilons break amplitude covariance and are pinned as `xfail` (#243, #294)
-  in `tests/test_scale_covariance.py`; don't add another.
+- No absolute epsilon on a dimensional quantity: floor the WENO weights
+  through `weno._normalised` + `_WENO_EPS_REL` and TVD ratios through
+  `reconstruction._slope_ratio`; add a nonlinear scheme to `WENO_METHODS` /
+  `TVD_METHODS` in `tests/test_scale_covariance.py`
+  (`TestReconstructionAmplitudeCovariance` holds them to rounding) and to
+  `tests/test_relative_eps.py` (finite gradients on flat stencils, float32).
 - Comment the stencil with its formula and cite the scheme in the
   docstring.
 

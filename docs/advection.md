@@ -206,10 +206,10 @@ $\hat{q}_{i+1/2} = \bar{q}_{i+1} + \tfrac12\phi(r)(\bar{q}_i - \bar{q}_{i+1})$
 with $r = (\bar{q}_{i+1} - \bar{q}_{i+2}) / (\bar{q}_i - \bar{q}_{i+1})$.
 The four limiters are symmetric, $\phi(r)/r = \phi(1/r)$, so this equals the
 other common form $\bar{q}_i + \tfrac12\phi(1/r)(\bar{q}_i - \bar{q}_{i-1})$.
-The denominator of $r$ carries an absolute guard ($10^{-8}$), so at small
-field amplitude ($\lvert\Delta\bar q\rvert \lesssim 10^{-8}$) every limiter
-degrades towards first-order upwind, and the guard can flip the sign of a
-tiny downwind slope (#294).
+The denominator of $r$ is guarded relative to the slopes,
+$r = \Delta_{\text{up}} / (\Delta_{\text{down}} + \operatorname{sign}(\Delta_{\text{down}})\,(10^{-6}\lvert\Delta_{\text{up}}\rvert + \sqrt{\text{tiny}}))$:
+it scales exactly with the field, keeps the sign of a tiny downwind slope,
+and a flat stencil gives $r = 0$ with a finite gradient.
 
 The limiter keeps $\phi$ in the TVD region, so with an SSP time integrator
 under its CFL limit the total variation $\sum_i \lvert\bar{q}_{i+1} - \bar{q}_i\rvert$
@@ -265,21 +265,28 @@ global smoothness indicator $\tau_5 = |\beta_0 - \beta_2|$ to scale the
 weights, achieving less dissipation near smooth extrema while remaining
 ENO near discontinuities.
 
-#### Amplitude dependence (#243, #294)
+#### Relative epsilons: the scheme does not depend on the amplitude
 
-The WENO smoothness indicators $\beta_k$ carry the square of the field's
-units, but the weights add an *absolute* $\varepsilon$ to them ($10^{-8}$ in
-the JS form, $10^{-16}$ in WENO-Z), and the TVD ratio an absolute $10^{-8}$.
-Rescaling the field therefore changes the nonlinear weights: at amplitude
-$10^{3}$ the WENO tendencies depart from exact $1/A^2$ scaling by up to 3 %
-(`wenoz5` by $3\times10^{-7}$), at small amplitude the weights tend to the
-linear weights (weno5's L∞ rate on a sine rises to 4.5 at amplitude
-$1/512$ against 3.2 at $10^{3}$), and van Leer falls to first order at
-amplitude $10^{-9}$.  Linear and upwind schemes are exactly covariant.  The
-departures are pinned as `xfail` in `tests/test_scale_covariance.py`; making
-the epsilons relative without hurting the gradient cost is tracked in #243
-and #294.  Nondimensionalise, or keep advected fields O(1), when using WENO
-or TVD.
+Every WENO weight is $g_k / (b_k + \varepsilon)^2$ (JS) or
+$g_k (1 + \tau / (b_k + \varepsilon))$ (Z) on the *normalised* indicators
+$b_k = \beta_k / \sum_j \beta_j$, with a dimensionless $\varepsilon = 10^{-6}$:
+the textbook weights with a floor relative to the stencil's own smoothness,
+$\varepsilon \sum_j \beta_j$, instead of an absolute constant.  Rescaling the
+field therefore rescales the reconstruction exactly (checked to rounding,
+$\sim 10^{-15}$, from amplitude $10^{-9}$ to $10^{3}$ by
+`tests/test_scale_covariance.py`; before #243 an absolute $10^{-8}$ moved
+WENO tendencies by up to 3 % at amplitude $10^3$, and the TVD guard made
+van Leer first order at $10^{-9}$).
+
+Two details keep the gradient exact and finite.  The weights depend only
+on ratios of indicators (they are homogeneous of degree 0), so the
+normalising sum is held out of the gradient (`stop_gradient`): by Euler's
+theorem that changes nothing, and the normalised quantities are O(1) at any
+amplitude, float32 included.  A flat stencil ($\sum_j\beta_j = 0$, an
+ocean at rest or a plateau) gives the linear weights and a finite gradient.
+Cost against the absolute form (CPU, $256^2$, jitted): forward unchanged
+within noise; gradient about +25 % for weno5, unchanged for weno9, and
++50 % for the TVD limiters (still the cheapest gradients).
 
 ---
 
@@ -299,19 +306,19 @@ fastest of 50 jitted forward tendencies on a $256^2$ grid (one
 
 | Method | rel-L2 | min | max | ms ($256^2$) |
 |---|---|---|---|---|
-| `naive` | 0.49 | −0.16 | 0.822 | 0.11 |
-| `upwind1` | 0.80 | 0 | 0.145 | 0.09 |
-| `upwind2` | 0.57 | −0.11 | 0.617 | 0.20 |
+| `naive` | 0.49 | −0.16 | 0.822 | 0.09 |
+| `upwind1` | 0.80 | 0 | 0.145 | 0.10 |
+| `upwind2` | 0.57 | −0.11 | 0.617 | 0.17 |
 | `upwind3` | 0.13 | −7.7e-3 | 0.815 | 0.21 |
-| `weno3` | 0.38 | −2.0e-5 | 0.473 | 0.87 |
-| `weno5` | 3.3e-2 | −1.7e-5 | 0.929 | 0.64 |
-| `wenoz5` | 1.5e-2 | −3.4e-8 | 0.949 | 0.65 |
-| `weno7` | 5.4e-3 | −1.2e-6 | 0.959 | 1.16 |
-| `weno9` | 6.4e-4 | −1.4e-6 | 0.967 | 1.55 |
-| `minmod` | 0.44 | 0 | 0.429 | 0.24 |
-| `van_leer` | 0.27 | 0 | 0.600 | 0.48 |
-| `superbee` | 0.15 | 0 | 0.817 | 0.52 |
-| `mc` | 0.21 | 0 | 0.681 | 0.49 |
+| `weno3` | 0.38 | 0 | 0.473 | 0.65 |
+| `weno5` | 3.3e-2 | −1.5e-11 | 0.929 | 0.83 |
+| `wenoz5` | 1.5e-2 | −1.8e-8 | 0.949 | 0.82 |
+| `weno7` | 5.4e-3 | 0 | 0.959 | 1.35 |
+| `weno9` | 6.4e-4 | −7.1e-9 | 0.967 | 1.71 |
+| `minmod` | 0.44 | 0 | 0.429 | 0.27 |
+| `van_leer` | 0.27 | 0 | 0.600 | 0.38 |
+| `superbee` | 0.15 | 0 | 0.817 | 0.50 |
+| `mc` | 0.21 | 0 | 0.681 | 0.53 |
 
 What it says:
 
@@ -323,7 +330,7 @@ What it says:
   cut the `wenoz5` error by another ~3× / ~25× for ~1.6× / ~2× the cost.
 - The TVD limiters are the only schemes guaranteed free of undershoots;
   among them superbee and MC are the most accurate on this smooth bump.
-- The WENO undershoots are tiny ($\le 2\times10^{-5}$ of the peak here) but not
+- The WENO undershoots are tiny ($\le 2\times10^{-8}$ of the peak) but not
   guaranteed zero; `naive` and `upwind2` are dispersive (undershoots of
   16 % and 11 % of the peak).
 
@@ -554,7 +561,7 @@ Must the tracer never undershoot (positive-definite, bounded)?
 └── No ↓
 
 Is accuracy on smooth fields the priority?
-├── Yes → WENO (undershoots <= 2e-5 of the peak here, not guaranteed zero)
+├── Yes → WENO (undershoots <= 2e-8 of the peak here, not guaranteed zero)
 │         ├── default choice               → wenoz5 (1.5e-2; weno5 3.3e-2, same cost)
 │         ├── more accuracy, ~1.6-2x cost  → weno7 (5.4e-3) / weno9 (6.4e-4)
 │         └── not weno3 on its own         → (0.38: worse than upwind3 and

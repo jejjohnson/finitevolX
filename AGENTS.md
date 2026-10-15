@@ -361,7 +361,7 @@ docstring before changing what it checks.
 
 | Test | Enforces |
 |---|---|
-| `tests/test_scale_covariance.py` | Operators are unit-agnostic (length and amplitude rescaling, masked and unmasked, Cartesian and spherical); `TestConstantsAudit` fails on a physical constant used outside a parameter default; the WENO / TVD absolute-epsilon departures are pinned (`xfail`, #243, #294) |
+| `tests/test_scale_covariance.py` | Operators are unit-agnostic (length and amplitude rescaling, masked and unmasked, Cartesian and spherical); `TestConstantsAudit` fails on a physical constant used outside a parameter default; `TestReconstructionAmplitudeCovariance` holds every WENO / TVD case to rounding at field amplitudes 1e-9 to 1e3 (relative epsilons) |
 | `tests/test_*_masks.py` + `tests/fixtures/` | Golden-output regression for every mask-aware operator: unmasked and masked outputs match the committed `tests/fixtures/golden/*.npz`, all-ocean equals unmasked, dry points are exactly zero |
 | `tests/test_fixture_smoke.py` | The golden-fixture inputs, masks and helpers themselves |
 | `tests/test_convergence.py` | Second-order spatial convergence of the difference operators |
