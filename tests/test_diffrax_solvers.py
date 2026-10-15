@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import math
 
 import diffrax as dfx
@@ -16,6 +17,7 @@ from finitevolx import (
     SSP_RK2,
     SSP_RK104,
     AB2Solver,
+    AB3Solver,
     ForwardEulerDfx,
     LeapfrogRAFSolver,
     RK2Heun,
@@ -781,4 +783,60 @@ class TestSolveOceanPDEKwargs:
         with pytest.raises(Exception, match="maximum number of solver steps"):
             solve_ocean_pde(
                 _decay_rhs, RK3SSP(), jnp.array(1.0), 0.0, 1.0, 0.01, max_steps=5
+            )
+
+
+class TestAB3Solver:
+    """AB3 with an RK3 start inside diffeqsolve (#314)."""
+
+    @staticmethod
+    def _error(dt):
+        sol = dfx.diffeqsolve(
+            dfx.ODETerm(lambda t, y, a: -1.5 * y),
+            AB3Solver(),
+            0.0,
+            1.0,
+            None,
+            jnp.array(1.0),
+            stepsize_controller=dfx.StepTo(
+                ts=jnp.linspace(0.0, 1.0, int(round(1 / dt)) + 1)
+            ),
+        )
+        return abs(float(sol.ys[0]) - math.exp(-1.5))
+
+    @pytest.mark.slow
+    def test_convergence_rate_stepto(self):
+        errs = [self._error(dt) for dt in (0.05, 0.025, 0.0125)]
+        rates = [math.log2(a / b) for a, b in itertools.pairwise(errs)]
+        assert all(r >= 2.9 for r in rates), rates
+
+    def test_matches_rk3_bootstrap_then_ab3_step(self):
+        from finitevolx import ab3_step, rk3_ssp_step
+
+        f = lambda y: -1.5 * y
+        dt = 0.1
+        y1 = rk3_ssp_step(jnp.array(1.0), f, dt)
+        y2 = rk3_ssp_step(y1, f, dt)
+        y3, _, _ = ab3_step(y2, f, dt, f(y1), f(jnp.array(1.0)))
+        sol = dfx.diffeqsolve(
+            dfx.ODETerm(lambda t, y, a: f(y)),
+            AB3Solver(),
+            0.0,
+            0.3,
+            dt,
+            jnp.array(1.0),
+            saveat=dfx.SaveAt(steps=True),
+        )
+        np.testing.assert_allclose(sol.ys[:3], jnp.stack([y1, y2, y3]), rtol=1e-14)
+
+    def test_refuses_adaptive(self):
+        with pytest.raises(Exception, match="error estimates"):
+            dfx.diffeqsolve(
+                dfx.ODETerm(_decay_rhs),
+                AB3Solver(),
+                0.0,
+                1.0,
+                0.1,
+                jnp.array(1.0),
+                stepsize_controller=dfx.PIDController(rtol=1e-6, atol=1e-8),
             )
