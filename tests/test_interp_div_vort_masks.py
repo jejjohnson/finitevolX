@@ -350,19 +350,17 @@ class TestVorticity2DMasks:
             (qu, qv), "Vorticity2D", "pv_flux_enstrophy_conserving", "masked"
         )
 
-    def test_pv_flux_arakawa_lamb_unmasked(self, vort_unmasked):
-        qu, qv = vort_unmasked.pv_flux_arakawa_lamb(
+    def test_pv_flux_blend_unmasked(self, vort_unmasked):
+        qu, qv = vort_unmasked.pv_flux_blend(
             make_q_field_2d(), make_u_field_2d(), make_v_field_2d()
         )
-        assert_matches_golden(
-            (qu, qv), "Vorticity2D", "pv_flux_arakawa_lamb", "unmasked"
-        )
+        assert_matches_golden((qu, qv), "Vorticity2D", "pv_flux_blend", "unmasked")
 
-    def test_pv_flux_arakawa_lamb_masked(self, vort_masked):
-        qu, qv = vort_masked.pv_flux_arakawa_lamb(
+    def test_pv_flux_blend_masked(self, vort_masked):
+        qu, qv = vort_masked.pv_flux_blend(
             make_q_field_2d(), make_u_field_2d(), make_v_field_2d()
         )
-        assert_matches_golden((qu, qv), "Vorticity2D", "pv_flux_arakawa_lamb", "masked")
+        assert_matches_golden((qu, qv), "Vorticity2D", "pv_flux_blend", "masked")
 
 
 # ---------------------------------------------------------------------------

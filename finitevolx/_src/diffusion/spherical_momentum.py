@@ -32,6 +32,7 @@ from __future__ import annotations
 import equinox as eqx
 from jaxtyping import Array, Float
 
+from finitevolx._src.diffusion.momentum import _resolve_scheme
 from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
 from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
@@ -58,8 +59,9 @@ class SphericalMomentumAdvection2D(eqx.Module):
       average the product to the faces.
     * ``'enstrophy'`` — Sadourny (1975) **Z-scheme**: interpolate ζ and the
       cross-face velocity to the faces, then multiply.
-    * ``'al'`` — linear blend ⅓ energy + ⅔ enstrophy (not the Arakawa-Lamb
-      1981 scheme; #283).
+    * ``'blend'`` — linear blend ⅓ energy + ⅔ enstrophy; conserves neither
+      invariant exactly (``'al'`` is a deprecated alias; it is not the
+      Arakawa-Lamb 1981 scheme, #283).
 
     Parameters
     ----------
@@ -173,7 +175,7 @@ class SphericalMomentumAdvection2D(eqx.Module):
             Meridional velocity at V-points.
         scheme : str
             Vorticity-flux scheme: ``'energy'`` (default), ``'enstrophy'``,
-            or ``'al'`` (⅓–⅔ blend; not the Arakawa-Lamb 1981 scheme).
+            or ``'blend'`` (⅓–⅔ blend; ``'al'`` is a deprecated alias).
 
         Returns
         -------
@@ -185,16 +187,18 @@ class SphericalMomentumAdvection2D(eqx.Module):
         ------
         ValueError
             If ``scheme`` is not one of ``'energy'``, ``'enstrophy'``,
-            or ``'al'``.
+            or ``'blend'``.
         """
         zeta = self.vort.relative_vorticity(u, v)
         dK_dlon, dK_dlat = self._kinetic_energy_gradients(u, v)
 
+        scheme = _resolve_scheme(scheme)
         if scheme == "energy":
             zv_u, zu_v = self._vorticity_flux_energy(zeta, u, v)
         elif scheme == "enstrophy":
             zv_u, zu_v = self._vorticity_flux_enstrophy(zeta, u, v)
-        elif scheme == "al":
+        else:
+            # linear blend: 1/3 energy + 2/3 enstrophy (not Arakawa-Lamb 1981)
             alpha = 1.0 / 3.0
             zv_u_e, zu_v_e = self._vorticity_flux_energy(zeta, u, v)
             zv_u_s, zu_v_s = self._vorticity_flux_enstrophy(zeta, u, v)
@@ -203,10 +207,6 @@ class SphericalMomentumAdvection2D(eqx.Module):
             )
             zu_v = interior(
                 alpha * zu_v_e[1:-1, 1:-1] + (1.0 - alpha) * zu_v_s[1:-1, 1:-1], v
-            )
-        else:
-            raise ValueError(
-                f"Unknown scheme: {scheme!r}.  Choose 'energy', 'enstrophy', or 'al'."
             )
 
         # du_adv at U[j, i+1/2] = +(zeta * v)_u - dK/dlon
@@ -267,7 +267,7 @@ class SphericalMomentumAdvection3D(eqx.Module):
             Meridional velocity at V-points.
         scheme : str
             Vorticity-flux scheme: ``'energy'`` (default), ``'enstrophy'``,
-            or ``'al'``.
+            or ``'blend'``.
 
         Returns
         -------
@@ -275,6 +275,7 @@ class SphericalMomentumAdvection3D(eqx.Module):
             ``(du_adv, dv_adv)`` at U- and V-points; zero at z-ghost
             slices and at outermost horizontal ring.
         """
+        scheme = _resolve_scheme(scheme)
         du_adv, dv_adv = eqx.filter_vmap(
             lambda u_k, v_k: self._madv2d(u_k, v_k, scheme=scheme)
         )(u, v)

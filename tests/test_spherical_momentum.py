@@ -81,7 +81,7 @@ class TestSphericalMomentumAdvection2D:
             np.testing.assert_allclose(field[:, :2], 0.0)
             np.testing.assert_allclose(field[:, -2:], 0.0)
 
-    @pytest.mark.parametrize("scheme", ["energy", "enstrophy", "al"])
+    @pytest.mark.parametrize("scheme", ["energy", "enstrophy", "blend"])
     def test_schemes_produce_finite_output(self, madv, grid, scheme):
         key = jax.random.PRNGKey(1)
         k1, k2 = jax.random.split(key)
@@ -97,7 +97,7 @@ class TestSphericalMomentumAdvection2D:
         with pytest.raises(ValueError, match="Unknown scheme"):
             madv(u, v, scheme="bogus")
 
-    @pytest.mark.parametrize("scheme", ["energy", "enstrophy", "al"])
+    @pytest.mark.parametrize("scheme", ["energy", "enstrophy", "blend"])
     def test_matches_cartesian_at_narrow_equatorial_band(self, scheme):
         nx, ny = 20, 6
         sphere = SphericalGrid2D.from_interior(
@@ -143,7 +143,7 @@ class TestSphericalMomentumAdvection2D:
         k1, k2 = jax.random.split(key)
         u = jax.random.normal(k1, (grid.Ny, grid.Nx))
         v = jax.random.normal(k2, (grid.Ny, grid.Nx))
-        du, dv = jax.jit(lambda a, b: madv(a, b, scheme="al"))(u, v)
+        du, dv = jax.jit(lambda a, b: madv(a, b, scheme="blend"))(u, v)
         assert jnp.all(jnp.isfinite(du))
         assert jnp.all(jnp.isfinite(dv))
 
@@ -171,7 +171,7 @@ class TestSphericalMomentumAdvection2DMasked:
         k1, k2 = jax.random.split(key)
         u = jax.random.normal(k1, (grid.Ny, grid.Nx))
         v = jax.random.normal(k2, (grid.Ny, grid.Nx))
-        du, dv = madv(u, v, scheme="al")
+        du, dv = madv(u, v, scheme="blend")
         np.testing.assert_allclose(du, 0.0, atol=1e-12)
         np.testing.assert_allclose(dv, 0.0, atol=1e-12)
 
@@ -229,7 +229,7 @@ class TestSphericalMomentumAdvection3D:
         shape = (grid3d.Nz, grid3d.Ny, grid3d.Nx)
         u = jnp.zeros(shape)
         v = jnp.zeros(shape)
-        du, dv = madv(u, v, scheme="al")
+        du, dv = madv(u, v, scheme="blend")
         np.testing.assert_allclose(du, 0.0, atol=1e-12)
         np.testing.assert_allclose(dv, 0.0, atol=1e-12)
 
@@ -254,8 +254,8 @@ class TestSphericalMomentumAdvection3D:
         shape = (grid3d.Nz, grid3d.Ny, grid3d.Nx)
         u3 = jnp.broadcast_to(u2, shape)
         v3 = jnp.broadcast_to(v2, shape)
-        du2, dv2 = madv2(u2, v2, scheme="al")
-        du3, dv3 = madv(u3, v3, scheme="al")
+        du2, dv2 = madv2(u2, v2, scheme="blend")
+        du3, dv3 = madv(u3, v3, scheme="blend")
         for k in range(1, grid3d.Nz - 1):
             np.testing.assert_allclose(du3[k], du2, atol=1e-12)
             np.testing.assert_allclose(dv3[k], dv2, atol=1e-12)
@@ -285,7 +285,7 @@ class TestSphericalMomentumAdvection3D:
         assert jnp.all(jnp.isfinite(du)) and jnp.all(jnp.isfinite(dv))
 
         def loss(a, b):
-            du_, dv_ = madv(a, b, scheme="al")
+            du_, dv_ = madv(a, b, scheme="blend")
             return (du_**2 + dv_**2).sum()
 
         gu, gv = jax.grad(loss, argnums=(0, 1))(u, v)

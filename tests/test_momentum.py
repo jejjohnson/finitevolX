@@ -54,7 +54,7 @@ class TestMomentumAdvection2D:
         c = 2.5
         u = c * jnp.ones((grid2d.Ny, grid2d.Nx))
         v = jnp.zeros((grid2d.Ny, grid2d.Nx))
-        for scheme in ("energy", "enstrophy", "al"):
+        for scheme in ("energy", "enstrophy", "blend"):
             du, dv = madv(u, v, scheme=scheme)
             np.testing.assert_allclose(du[2:-2, 2:-2], 0.0, atol=1e-10)
             np.testing.assert_allclose(dv[2:-2, 2:-2], 0.0, atol=1e-10)
@@ -63,7 +63,7 @@ class TestMomentumAdvection2D:
         madv = MomentumAdvection2D(grid=grid2d)
         u = jnp.ones((grid2d.Ny, grid2d.Nx))
         v = jnp.ones((grid2d.Ny, grid2d.Nx))
-        for scheme in ("energy", "enstrophy", "al"):
+        for scheme in ("energy", "enstrophy", "blend"):
             du, dv = madv(u, v, scheme=scheme)
             assert du.shape == (grid2d.Ny, grid2d.Nx)
             assert dv.shape == (grid2d.Ny, grid2d.Nx)
@@ -82,7 +82,7 @@ class TestMomentumAdvection2D:
         y = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
         u = jnp.broadcast_to(-y[:, None], (grid2d.Ny, grid2d.Nx))
         v = jnp.broadcast_to(x, (grid2d.Ny, grid2d.Nx))
-        for scheme in ("energy", "enstrophy", "al"):
+        for scheme in ("energy", "enstrophy", "blend"):
             du, dv = madv(u, v, scheme=scheme)
             assert jnp.all(jnp.isfinite(du)), f"{scheme}: du contains NaN/Inf"
             assert jnp.all(jnp.isfinite(dv)), f"{scheme}: dv contains NaN/Inf"
@@ -96,7 +96,7 @@ class TestMomentumAdvection2D:
         v = jnp.broadcast_to(x, (grid2d.Ny, grid2d.Nx))
         du_e, dv_e = madv(u, v, scheme="energy")
         du_s, dv_s = madv(u, v, scheme="enstrophy")
-        du_al, dv_al = madv(u, v, scheme="al")
+        du_al, dv_al = madv(u, v, scheme="blend")
         expected_du = (1.0 / 3.0) * du_e + (2.0 / 3.0) * du_s
         expected_dv = (1.0 / 3.0) * dv_e + (2.0 / 3.0) * dv_s
         np.testing.assert_allclose(du_al, expected_du, rtol=1e-5, atol=1e-6)
@@ -141,7 +141,7 @@ class TestMomentumAdvection2D:
         madv = MomentumAdvection2D(grid=grid2d)
         u = jnp.zeros((grid2d.Ny, grid2d.Nx))
         v = jnp.zeros((grid2d.Ny, grid2d.Nx))
-        for scheme in ("energy", "enstrophy", "al"):
+        for scheme in ("energy", "enstrophy", "blend"):
             du, dv = madv(u, v, scheme=scheme)
             np.testing.assert_allclose(du, 0.0, atol=1e-15)
             np.testing.assert_allclose(dv, 0.0, atol=1e-15)
@@ -196,7 +196,7 @@ class TestMomentumAdvection3D:
         c = 1.5
         u = c * jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         v = jnp.zeros((grid3d.Nz, grid3d.Ny, grid3d.Nx))
-        for scheme in ("energy", "enstrophy", "al"):
+        for scheme in ("energy", "enstrophy", "blend"):
             du, dv = madv(u, v, scheme=scheme)
             np.testing.assert_allclose(du[1:-1, 2:-2, 2:-2], 0.0, atol=1e-10)
             np.testing.assert_allclose(dv[1:-1, 2:-2, 2:-2], 0.0, atol=1e-10)
@@ -205,7 +205,7 @@ class TestMomentumAdvection3D:
         madv = MomentumAdvection3D(grid=grid3d)
         u = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         v = jnp.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx))
-        for scheme in ("energy", "enstrophy", "al"):
+        for scheme in ("energy", "enstrophy", "blend"):
             du, dv = madv(u, v, scheme=scheme)
             assert du.shape == (grid3d.Nz, grid3d.Ny, grid3d.Nx)
             assert dv.shape == (grid3d.Nz, grid3d.Ny, grid3d.Nx)
@@ -225,7 +225,7 @@ class TestMomentumAdvection3D:
         v2d = jnp.broadcast_to(x, (grid3d.Ny, grid3d.Nx))
         u = jnp.broadcast_to(u2d[None], (grid3d.Nz, grid3d.Ny, grid3d.Nx))
         v = jnp.broadcast_to(v2d[None], (grid3d.Nz, grid3d.Ny, grid3d.Nx))
-        for scheme in ("energy", "enstrophy", "al"):
+        for scheme in ("energy", "enstrophy", "blend"):
             du, dv = madv(u, v, scheme=scheme)
             assert jnp.all(jnp.isfinite(du)), f"3D {scheme}: du has NaN/Inf"
             assert jnp.all(jnp.isfinite(dv)), f"3D {scheme}: dv has NaN/Inf"
@@ -234,7 +234,7 @@ class TestMomentumAdvection3D:
         madv = MomentumAdvection3D(grid=grid3d)
         u = jnp.zeros((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         v = jnp.zeros((grid3d.Nz, grid3d.Ny, grid3d.Nx))
-        for scheme in ("energy", "enstrophy", "al"):
+        for scheme in ("energy", "enstrophy", "blend"):
             du, dv = madv(u, v, scheme=scheme)
             np.testing.assert_allclose(du, 0.0, atol=1e-15)
             np.testing.assert_allclose(dv, 0.0, atol=1e-15)
@@ -250,7 +250,7 @@ class TestMomentumAdvection3D:
         v = jnp.broadcast_to(v2d[None], (grid3d.Nz, grid3d.Ny, grid3d.Nx))
         du_e, dv_e = madv(u, v, scheme="energy")
         du_s, dv_s = madv(u, v, scheme="enstrophy")
-        du_al, dv_al = madv(u, v, scheme="al")
+        du_al, dv_al = madv(u, v, scheme="blend")
         expected_du = (1.0 / 3.0) * du_e + (2.0 / 3.0) * du_s
         expected_dv = (1.0 / 3.0) * dv_e + (2.0 / 3.0) * dv_s
         np.testing.assert_allclose(du_al, expected_du, rtol=1e-5, atol=1e-6)
@@ -333,3 +333,28 @@ class TestVortexForceConservation:
         grid, u, v = _compact_nondivergent_flow()
         div = Difference2D(grid=grid).divergence(u, v)
         assert float(jnp.abs(div).max()) < 1e-10 * float(jnp.abs(u).max()) / grid.dx
+
+
+class TestBlendSchemeAlias:
+    """scheme="al" is a deprecated alias of scheme="blend" (#283)."""
+
+    def test_al_warns_and_matches_blend(self, grid2d, grid3d):
+        for grid, cls in ((grid2d, MomentumAdvection2D), (grid3d, MomentumAdvection3D)):
+            shape = (
+                (grid.Nz, grid.Ny, grid.Nx)
+                if hasattr(grid, "Nz")
+                else (grid.Ny, grid.Nx)
+            )
+            u = jnp.sin(jnp.arange(np.prod(shape), dtype=float).reshape(shape))
+            v = jnp.cos(0.7 * jnp.arange(np.prod(shape), dtype=float).reshape(shape))
+            madv = cls(grid=grid)
+            with pytest.warns(DeprecationWarning, match="scheme='blend'"):
+                old = madv(u, v, scheme="al")
+            new = madv(u, v, scheme="blend")
+            np.testing.assert_array_equal(old[0], new[0])
+            np.testing.assert_array_equal(old[1], new[1])
+
+    def test_unknown_scheme_raises(self, grid2d):
+        u = jnp.zeros((grid2d.Ny, grid2d.Nx))
+        with pytest.raises(ValueError, match="'blend'"):
+            MomentumAdvection2D(grid=grid2d)(u, u, scheme="arakawa")

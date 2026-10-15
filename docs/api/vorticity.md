@@ -6,6 +6,14 @@ Relative vorticity and Jacobian operators on Arakawa C-grids.
 
 ::: finitevolx.Vorticity3D
 
+## PV flux (functional)
+
+`pv_flux_blend` is the grid-free form of `Vorticity2D.pv_flux_blend`.
+`pv_flux_arakawa_lamb` is its deprecated alias: the blend is not the
+Arakawa–Lamb (1981) scheme.
+
+::: finitevolx.pv_flux_blend
+
 ## Jacobian
 
 `ArakawaJacobian2D` is the mask-aware class form: it returns the full

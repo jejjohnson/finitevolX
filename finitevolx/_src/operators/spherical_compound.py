@@ -28,7 +28,10 @@ from finitevolx._src.operators.stencils import (
     diff_x_bwd,
     diff_x_fwd,
 )
-from finitevolx._src.operators.vorticity import _pv_flux_corner_product
+from finitevolx._src.operators.vorticity import (
+    _pv_flux_corner_product,
+    _warn_arakawa_lamb,
+)
 
 
 class SphericalDivergence2D(eqx.Module):
@@ -87,7 +90,7 @@ class SphericalVorticity2D(eqx.Module):
     ζ = 1/(R·cosφ) · [dv/dλ − d(u·cosφ)/dφ]   at X-points
 
     The PV flux methods (energy-conserving, enstrophy-conserving,
-    Arakawa-Lamb) are coordinate-independent: they involve only
+    blend) are coordinate-independent: they involve only
     interpolation and multiplication.  They are delegated to an
     internal ``Interpolation2D``.
 
@@ -226,7 +229,7 @@ class SphericalVorticity2D(eqx.Module):
         qv = interior(q_on_v[1:-1, 1:-1] * v[1:-1, 1:-1], v)
         return qu, qv
 
-    def pv_flux_arakawa_lamb(
+    def pv_flux_blend(
         self,
         q: Float[Array, "Ny Nx"],
         u: Float[Array, "Ny Nx"],
@@ -235,14 +238,25 @@ class SphericalVorticity2D(eqx.Module):
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
         """Linear blend ``alpha * energy + (1 - alpha) * enstrophy`` PV flux.
 
-        Not the Arakawa-Lamb (1981) scheme despite its name: for
-        0 < alpha < 1 it conserves neither invariant exactly (#283).
+        For 0 < alpha < 1 it conserves neither invariant exactly; it is not
+        the Arakawa-Lamb (1981) scheme (#283).
         """
         qu_e, qv_e = self.pv_flux_energy_conserving(q, u, v)
         qu_s, qv_s = self.pv_flux_enstrophy_conserving(q, u, v)
         qu = alpha * qu_e + (1.0 - alpha) * qu_s
         qv = alpha * qv_e + (1.0 - alpha) * qv_s
         return qu, qv
+
+    def pv_flux_arakawa_lamb(
+        self,
+        q: Float[Array, "Ny Nx"],
+        u: Float[Array, "Ny Nx"],
+        v: Float[Array, "Ny Nx"],
+        alpha: float = 1.0 / 3.0,
+    ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
+        """Deprecated alias of :meth:`pv_flux_blend` (not Arakawa-Lamb 1981)."""
+        _warn_arakawa_lamb("SphericalVorticity2D.pv_flux_blend")
+        return self.pv_flux_blend(q, u, v, alpha=alpha)
 
 
 class SphericalLaplacian2D(eqx.Module):

@@ -118,7 +118,7 @@ def _cases(n: int, nz: int) -> list[Case]:
     for m in [
         "pv_flux_energy_conserving",
         "pv_flux_enstrophy_conserving",
-        "pv_flux_arakawa_lamb",
+        "pv_flux_blend",
     ]:
         C.append(Case(f"Vorticity2D.{m}", _op(vo, m), 3, s2, 2))
     C += [
