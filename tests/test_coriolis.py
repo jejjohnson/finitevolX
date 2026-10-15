@@ -7,9 +7,12 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
+from finitevolx import BoundaryConditionSet, Interpolation2D, enforce_periodic
 from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
 from finitevolx._src.mask import Mask2D, Mask3D
+from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.coriolis import Coriolis2D, Coriolis3D
+from finitevolx._src.operators.stencils import diff_x_bwd, diff_y_bwd
 
 
 @pytest.fixture
@@ -355,3 +358,97 @@ class TestCoriolis3D:
             np.asarray(du_unmasked[1:-1, 1:-1, 1]),
             rtol=1e-6,
         )
+
+
+class TestCoriolisEnergyConservation:
+    """sum(u du + v dv) = 0 for any f, beta-plane included (#289).
+
+    The corner-product form builds both tendencies from the same X-point
+    products, so the kinetic-energy tendency telescopes to zero.  Tolerance
+    1e-13 relative to sum(|u du| + |v dv|): float64 round-off of a ~1e3-term
+    sum (the pre-#289 face form gives ~3e-4 on the closed basin).
+    """
+
+    n = 24
+
+    def _grid(self):
+        return CartesianGrid2D.from_interior(self.n, self.n, 1.0, 1.0)
+
+    def _beta_f(self, g):
+        y = (jnp.arange(g.Ny, dtype=float) - 0.5) * g.dy
+        return jnp.broadcast_to(1.0 + 5.0 * y[:, None], (g.Ny, g.Nx))
+
+    @staticmethod
+    def _rel_dE(u, v, du, dv):
+        dE = float((u * du).sum() + (v * dv).sum())
+        scale = float(jnp.abs(u * du).sum() + jnp.abs(v * dv).sum())
+        return abs(dE) / scale
+
+    def test_closed_basin_beta_plane(self):
+        g = self._grid()
+        u = BoundaryConditionSet.closed(point="U")(
+            jax.random.normal(jax.random.PRNGKey(1), (g.Ny, g.Nx)), g.dx, g.dy
+        )
+        v = BoundaryConditionSet.closed(point="V")(
+            jax.random.normal(jax.random.PRNGKey(2), (g.Ny, g.Nx)), g.dx, g.dy
+        )
+        du, dv = Coriolis2D(grid=g)(u, v, self._beta_f(g))
+        assert self._rel_dE(u, v, du, dv) < 1e-13
+
+    def test_periodic_non_divergent_beta_plane(self):
+        """Periodic ghosts (f too), random non-divergent flow from a streamfunction."""
+        g = self._grid()
+        psi = enforce_periodic(jax.random.normal(jax.random.PRNGKey(0), (g.Ny, g.Nx)))
+        # u[j, i+1/2] = -(psi[j+1/2] - psi[j-1/2]) / dy, v[j+1/2, i] = (psi[i+1/2] - psi[i-1/2]) / dx
+        u = enforce_periodic(interior(-diff_y_bwd(psi) / g.dy, psi))
+        v = enforce_periodic(interior(diff_x_bwd(psi) / g.dx, psi))
+        du, dv = Coriolis2D(grid=g)(u, v, enforce_periodic(self._beta_f(g)))
+        assert self._rel_dE(u, v, du, dv) < 1e-13
+
+    def test_masked_closed_basin(self):
+        """An island: energy still conserved; uniform f equals the masked face form."""
+        g = self._grid()
+        h = np.ones((g.Ny, g.Nx), dtype=bool)
+        h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
+        h[8:13, 9:15] = False
+        mask = Mask2D.from_mask(h)
+        u = jax.random.normal(jax.random.PRNGKey(3), (g.Ny, g.Nx)) * mask.u
+        v = jax.random.normal(jax.random.PRNGKey(4), (g.Ny, g.Nx)) * mask.v
+        du, dv = Coriolis2D(grid=g, mask=mask)(u, v, self._beta_f(g))
+        assert self._rel_dE(u, v, du, dv) < 1e-13
+        # uniform f: same as f * V_to_U(v) on the masked velocities, also next
+        # to faces that touch land only at a corner
+        du, dv = Coriolis2D(grid=g, mask=mask)(u, v, jnp.full((g.Ny, g.Nx), 1.3))
+        interp = Interpolation2D(grid=g)
+        np.testing.assert_allclose(
+            du, 1.3 * interp.V_to_U(v) * mask.u, rtol=1e-13, atol=1e-15
+        )
+        np.testing.assert_allclose(
+            dv, -1.3 * interp.U_to_V(u) * mask.v, rtol=1e-13, atol=1e-15
+        )
+
+    def test_masked_nan_land_stays_finite(self):
+        """NaN on dry faces (e.g. Mask2D.from_center land) never reaches wet output."""
+        g = self._grid()
+        h = np.ones((g.Ny, g.Nx), dtype=bool)
+        h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
+        h[8:13, 9:15] = False
+        mask = Mask2D.from_mask(h)
+        u = jnp.where(mask.u, 1.0, jnp.nan)
+        v = jnp.where(mask.v, 1.0, jnp.nan)
+        op = Coriolis2D(grid=g, mask=mask)
+        du, dv = op(u, v, self._beta_f(g))
+        assert bool(jnp.all(jnp.isfinite(du))) and bool(jnp.all(jnp.isfinite(dv)))
+        grad = jax.grad(lambda a: op(a, v, self._beta_f(g))[0].sum())(u)
+        assert bool(jnp.all(jnp.isfinite(grad)))
+
+    def test_uniform_f_matches_face_form(self):
+        """For uniform f the corner form equals f * V_to_U(v), -f * U_to_V(u)."""
+        g = self._grid()
+        u = jax.random.normal(jax.random.PRNGKey(5), (g.Ny, g.Nx))
+        v = jax.random.normal(jax.random.PRNGKey(6), (g.Ny, g.Nx))
+        f = jnp.full((g.Ny, g.Nx), 1.3)
+        du, dv = Coriolis2D(grid=g)(u, v, f)
+        interp = Interpolation2D(grid=g)
+        np.testing.assert_allclose(du, 1.3 * interp.V_to_U(v), rtol=1e-13, atol=1e-15)
+        np.testing.assert_allclose(dv, -1.3 * interp.U_to_V(u), rtol=1e-13, atol=1e-15)

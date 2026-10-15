@@ -3,14 +3,20 @@
 Applies the Coriolis force to staggered velocity fields (u, v) on a C-grid,
 producing tendencies du_cor and dv_cor at velocity points.
 
-For the horizontal momentum equations on a C-grid:
+For the horizontal momentum equations on a C-grid the Coriolis force is
+the vortex force with the planetary vorticity f, in the energy-conserving
+form of Sadourny (1975): f is taken to the X-points (corners), multiplied
+there by the cross velocity averaged to the corner, and the product is
+averaged back to the faces:
 
-    du/dt|cor[j, i+1/2] = +f_on_u[j, i+1/2] * v_on_u[j, i+1/2]
-    dv/dt|cor[j+1/2, i] = -f_on_v[j+1/2, i] * u_on_v[j+1/2, i]
+    du/dt|cor[j, i+1/2] = +avg_y( f_X * avg_x(v) )[j, i+1/2]
+    dv/dt|cor[j+1/2, i] = -avg_x( f_X * avg_y(u) )[j+1/2, i]
 
-where f is the Coriolis parameter at T-points.  The Coriolis parameter is
-interpolated to velocity points using simple averaging, and the cross-face
-velocity averages are computed with 4-point bilinear interpolation.
+with ``f_X[j+1/2, i+1/2]`` the 4-point average of f (given at T-points).
+Because both tendencies are built from the same corner products,
+``sum(u * du) + sum(v * dv) = 0`` exactly for any f (beta-plane included),
+on a periodic domain or a closed basin.  For uniform f it reduces to the
+familiar ``f * V_to_U(v)`` / ``-f * U_to_V(u)``.
 
 References
 ----------
@@ -23,35 +29,53 @@ References
 from __future__ import annotations
 
 import equinox as eqx
+import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
 from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
-from finitevolx._src.operators.interpolation import Interpolation2D
 
 
 class Coriolis2D(eqx.Module):
     """Coriolis force operator for 2-D Arakawa C-grids.
 
-    Computes the Coriolis tendency for both velocity components:
+    Computes the Coriolis tendency for both velocity components in the
+    energy-conserving corner-product form (Sadourny 1975):
 
-        du_cor[j, i+1/2] = +f_on_u[j, i+1/2] * v_on_u[j, i+1/2]
-        dv_cor[j+1/2, i] = -f_on_v[j+1/2, i] * u_on_v[j+1/2, i]
+        du_cor[j, i+1/2] = +1/2 (P[j+1/2, i+1/2] + P[j-1/2, i+1/2])
+        dv_cor[j+1/2, i] = -1/2 (Q[j+1/2, i+1/2] + Q[j+1/2, i-1/2])
 
-    The Coriolis parameter f is interpolated from T-points to velocity points
-    using simple x/y averaging.  The cross-face velocity averages are computed
-    with 4-point bilinear interpolation (same as :class:`Interpolation2D`).
+        P = f_X * avg_x(v),   Q = f_X * avg_y(u)   at X-points,
+
+    with ``f_X`` the 4-point average of the T-point f.  The kinetic-energy
+    tendency ``sum(u * du_cor) + sum(v * dv_cor)`` vanishes to round-off for
+    any f, including a beta-plane (the f_on_u * V_to_U(v) form used before
+    #289 conserves energy only for uniform f).  For uniform f the two forms
+    coincide.
+
+    The corner products are formed on the full arrays (X rows / columns
+    ``0 .. N-2``), so the first interior row / column reads the south /
+    west ghost corners built from the caller's ghost cells.
 
     Parameters
     ----------
     grid : CartesianGrid2D
         The underlying 2-D grid.
     mask : Mask2D or None, optional
-        Optional land/ocean mask.  When provided, the ``__call__``
-        output is post-multiplied by ``mask.u`` / ``mask.v`` on the
-        two velocity components.  ``None`` (default) leaves the
-        output untouched.
+        Optional land/ocean mask.  When provided, ``u`` / ``v`` are zeroed
+        on dry faces with ``jnp.where`` before the stencil (so NaN-filled
+        land cannot leak) and the output on dry U / V faces.  Energy is
+        still conserved, and for uniform f the result equals the face form
+        on the masked velocities.  ``None`` (default) leaves the output
+        untouched.
+
+    Notes
+    -----
+    ``f`` must be filled on the whole array, ghost ring included (e.g. an
+    analytic ``f0 + beta * y`` evaluated at every T-point): the corner
+    average ``f_X`` on the first / last interior rows reads the ghost rows
+    of ``f``.
 
     Examples
     --------
@@ -66,17 +90,7 @@ class Coriolis2D(eqx.Module):
     """
 
     grid: CartesianGrid2D
-    mask: Mask2D | None
-    interp: Interpolation2D
-
-    def __init__(
-        self,
-        grid: CartesianGrid2D,
-        mask: Mask2D | None = None,
-    ) -> None:
-        self.grid = grid
-        self.mask = mask
-        self.interp = Interpolation2D(grid=grid, mask=mask)
+    mask: Mask2D | None = None
 
     def __call__(
         self,
@@ -86,8 +100,8 @@ class Coriolis2D(eqx.Module):
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
         """Coriolis tendencies (du_cor, dv_cor).
 
-        du_cor[j, i+1/2] = +f_on_u * v_on_u
-        dv_cor[j+1/2, i] = -f_on_v * u_on_v
+        du_cor[j, i+1/2] = +avg_y(f_X * avg_x(v))
+        dv_cor[j+1/2, i] = -avg_x(f_X * avg_y(u))
 
         Parameters
         ----------
@@ -96,37 +110,37 @@ class Coriolis2D(eqx.Module):
         v : Float[Array, "Ny Nx"]
             y-velocity at V-points (north faces).
         f : Float[Array, "Ny Nx"]
-            Coriolis parameter at T-points.
+            Coriolis parameter at T-points, ghost ring filled.
 
         Returns
         -------
         tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]
             ``(du_cor, dv_cor)`` — Coriolis tendencies at U-points and
             V-points respectively, both zero in the ghost ring.  When
-            ``self.mask`` is set, ``du_cor`` is zeroed at dry U-faces
-            via ``* mask.u`` and ``dv_cor`` at dry V-faces via
-            ``* mask.v``.
+            ``self.mask`` is set, dry U / V faces are zero.
         """
-        # Interpolate f from T-points to velocity points
-        # f_on_u[j, i+1/2] = 1/2 * (f[j, i] + f[j, i+1])
-        f_on_u = self.interp.T_to_U(f)
-        # f_on_v[j+1/2, i] = 1/2 * (f[j, i] + f[j+1, i])
-        f_on_v = self.interp.T_to_V(f)
-
-        # Cross-face velocity averages (4-point bilinear)
-        # v_on_u[j, i+1/2] = 1/4*(v[j+1/2,i] + v[j-1/2,i] + v[j+1/2,i+1] + v[j-1/2,i+1])
-        v_on_u = self.interp.V_to_U(v)
-        # u_on_v[j+1/2, i] = 1/4*(u[j,i+1/2] + u[j+1,i+1/2] + u[j,i-1/2] + u[j+1,i-1/2])
-        u_on_v = self.interp.U_to_V(u)
-
-        # du_cor[j, i+1/2] = +f_on_u * v_on_u
-        du_cor = interior(f_on_u[1:-1, 1:-1] * v_on_u[1:-1, 1:-1], u)
-        # dv_cor[j+1/2, i] = -f_on_v * u_on_v
-        dv_cor = interior(-f_on_v[1:-1, 1:-1] * u_on_v[1:-1, 1:-1], v)
+        if self.mask is not None:
+            # zero dry faces before any stencil reads them (NaN-filled land)
+            u = jnp.where(self.mask.u, u, 0.0)
+            v = jnp.where(self.mask.v, v, 0.0)
+        # f_X[j+1/2, i+1/2] = 1/4 (f[j, i] + f[j+1, i] + f[j, i+1] + f[j+1, i+1])
+        #   X rows / cols 0 .. N-2 (the south / west ghost corners included)
+        f_x = 0.25 * (f[:-1, :-1] + f[1:, :-1] + f[:-1, 1:] + f[1:, 1:])  # [Ny-1, Nx-1]
+        # v_X[j+1/2, i+1/2] = 1/2 (v[j+1/2, i] + v[j+1/2, i+1])
+        v_x = 0.5 * (v[:-1, :-1] + v[:-1, 1:])  # [Ny-1, Nx-1]
+        # u_X[j+1/2, i+1/2] = 1/2 (u[j, i+1/2] + u[j+1, i+1/2])
+        u_x = 0.5 * (u[:-1, :-1] + u[1:, :-1])  # [Ny-1, Nx-1]
+        # corner products P = f_X v_X, Q = f_X u_X              [Ny-1, Nx-1]
+        p = f_x * v_x
+        q = f_x * u_x
+        # du_cor[j, i+1/2] = +1/2 (P[j+1/2, i+1/2] + P[j-1/2, i+1/2])  [Ny-2, Nx-2]
+        du_cor = interior(0.5 * (p[1:, 1:] + p[:-1, 1:]), u)
+        # dv_cor[j+1/2, i] = -1/2 (Q[j+1/2, i+1/2] + Q[j+1/2, i-1/2])  [Ny-2, Nx-2]
+        dv_cor = interior(-0.5 * (q[1:, 1:] + q[1:, :-1]), v)
 
         if self.mask is not None:
-            du_cor = du_cor * self.mask.u
-            dv_cor = dv_cor * self.mask.v
+            du_cor = jnp.where(self.mask.u, du_cor, 0.0)
+            dv_cor = jnp.where(self.mask.v, dv_cor, 0.0)
 
         return du_cor, dv_cor
 
@@ -189,8 +203,10 @@ class Coriolis3D(eqx.Module):
     ) -> tuple[Float[Array, "Nz Ny Nx"], Float[Array, "Nz Ny Nx"]]:
         """Coriolis tendencies over all z-levels.
 
-        du_cor[k, j, i+1/2] = +f_on_u[j, i+1/2] * v_on_u[k, j, i+1/2]
-        dv_cor[k, j+1/2, i] = -f_on_v[j+1/2, i] * u_on_v[k, j+1/2, i]
+        du_cor[k, j, i+1/2] = +avg_y(f_X * avg_x(v[k]))
+        dv_cor[k, j+1/2, i] = -avg_x(f_X * avg_y(u[k]))
+
+        (the energy-conserving form of :class:`Coriolis2D` at each level)
 
         Parameters
         ----------
@@ -209,6 +225,10 @@ class Coriolis3D(eqx.Module):
             is set, ``du_cor`` is zeroed at dry U-faces via
             ``* mask.u`` and ``dv_cor`` at dry V-faces via ``* mask.v``.
         """
+        if self.mask is not None:
+            # zero dry faces before the stencil, as Coriolis2D does
+            u = jnp.where(self.mask.u, u, 0.0)
+            v = jnp.where(self.mask.v, v, 0.0)
         # Vmap the 2D Coriolis operator over z-levels.
         # f is 2D (depth-independent) and broadcast to each z-slice.
         du_cor, dv_cor = eqx.filter_vmap(lambda u_k, v_k: self._cor2d(u_k, v_k, f))(

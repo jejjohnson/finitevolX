@@ -22,7 +22,7 @@ and what they compute:
 | `Vorticity2D.pv_flux_energy_conserving` | vorticity | U/V-points | $(q\,Uh, q\,Vh)$ |
 | `Diffusion2D` / `diffusion_2d` | diffusion | T-points | $\nabla \cdot (\kappa\,\nabla h)$ |
 | `BiharmonicDiffusion2D` | diffusion | T-points | $-\kappa\,\nabla^4 h$ |
-| `Coriolis2D` | coriolis | U/V-points | $(+f\bar{v}, -f\bar{u})$ |
+| `Coriolis2D` | coriolis | U/V-points | $(+\overline{f_X\bar{v}}, -\overline{f_X\bar{u}})$, energy-conserving |
 | `MomentumAdvection2D` | momentum | U/V-points | Vortex-force form |
 | `Vorticity2D.enstrophy` / `.potential_enstrophy` | vorticity | X-points | $\tfrac12\zeta^2$, $\tfrac12 q^2 h$ |
 | `Energetics2D` | diagnostics | T-points | KE, Bernoulli potential, APE |
@@ -254,23 +254,31 @@ dh_dt = diffusion_2d(h, kappa=100.0, dx=grid.dx, dy=grid.dy)
 
 ### Theory
 
-The Coriolis term in the horizontal momentum equations on a C-grid:
+The Coriolis term is the vortex force with the planetary vorticity $f$.
+`Coriolis2D` uses the energy-conserving corner-product form of Sadourny
+(1975), the same construction as the `'energy'` vortex force of
+`MomentumAdvection2D`: $f$ (given at T-points) is averaged to the X-points,
+multiplied there by the cross velocity averaged to the corner, and the
+product is averaged back to the faces:
 
 $$
 \frac{\partial u}{\partial t}\bigg|_{\text{Cor}}
-  = +f_{\text{on-U}}\,\bar{v}_{\text{on-U}}
-$$
-
-$$
+  = +\overline{f_X\,\overline{v}^{x}}^{y},
+\qquad
 \frac{\partial v}{\partial t}\bigg|_{\text{Cor}}
-  = -f_{\text{on-V}}\,\bar{u}_{\text{on-V}}
+  = -\overline{f_X\,\overline{u}^{y}}^{x},
+\qquad
+f_X = \overline{f}^{xy}.
 $$
 
-The Coriolis parameter $f$ (defined at T-points) is interpolated to U/V-points
-by simple x/y averaging.  The cross-velocity $v$ (at V-points) is interpolated
-to U-points via the **4-point bilinear average** `Interpolation2D.V_to_U`, and
-vice versa.  This is the standard C-grid Coriolis discretisation from Sadourny
-(1975), which conserves energy.
+Both tendencies come from the same corner products, so the kinetic-energy
+tendency $\sum u\,\dot u + \sum v\,\dot v$ vanishes to round-off for **any**
+$f$, including a $\beta$-plane, on a periodic domain or a closed basin (with
+the wall BCs of `BoundaryConditionSet.closed(point="U")` / `"V"`).  For
+uniform $f$ it reduces to the familiar $+f\,\overline{v}^{xy}$,
+$-f\,\overline{u}^{xy}$ (`Interpolation2D.V_to_U` / `U_to_V`).  The form
+used before #289, $f_{\text{on-U}}\,\overline{v}_{\text{on-U}}$, conserves
+energy only for uniform $f$.
 
 ### Usage
 
