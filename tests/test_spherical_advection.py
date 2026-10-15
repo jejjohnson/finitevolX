@@ -15,6 +15,7 @@ from finitevolx._src.advection.spherical_advection import (
 from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
 from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
 from finitevolx._src.mask import Mask2D, Mask3D
+from finitevolx._src.operators.reductions import spherical_area_weights
 
 R = 6.371e6
 NX_INT, NY_INT = 16, 10
@@ -389,3 +390,197 @@ class TestSphericalAdvection3D:
         g = jax.grad(lambda a: op(a, u, v, method="upwind1").sum())(h)
         assert g.shape == shape
         assert jnp.all(jnp.isfinite(g))
+
+
+# ======================================================================
+# Telescoping against spherical_area_weights (#247, #297)
+# ======================================================================
+
+#: Rounding of a sum of ~1000 O(1)-relative terms (measured 1e-18 - 3e-17);
+#: the closed-wall defect of #247 is 5e-3.
+TELESCOPE_RTOL = 1e-12
+
+NP_LON, NY_LAT = 24, 12  # physical longitudes (360 degrees) and latitudes
+
+#: Minimum periodic halo per method (module docstring of
+#: ``spherical_advection.py``).
+HALO = {"upwind1": 1, "van_leer": 2, "weno5": 3}
+
+
+def _periodic_setup(halo, seed=0):
+    """A zonally periodic grid with ``halo`` wrapped columns on each side.
+
+    The grid carries ``halo - 1`` extra columns beyond the ghost ring, the
+    physical longitudes are columns ``[halo:-halo]``, and every field is
+    filled by wrapping the ``NP_LON`` physical columns.  ``v = 0`` on the
+    south / north boundary faces, so nothing crosses those walls.
+    """
+    dl = 360.0 / NP_LON
+    pad = (halo - 1) * dl
+    grid = SphericalGrid2D.from_interior(
+        nx_interior=NP_LON + 2 * (halo - 1),
+        ny_interior=NY_LAT,
+        lon_range=(-pad, 360.0 + pad),
+        lat_range=(-60.0, 60.0),
+        R=R,
+    )
+    rng = np.random.default_rng(seed)
+    shape = (grid.Ny, NP_LON)
+    lon = np.deg2rad(np.arange(NP_LON) * dl)
+    h = 1000.0 + 10.0 * np.sin(lon)[None, :] + rng.standard_normal(shape)
+    u = rng.standard_normal(shape)
+    v = rng.standard_normal(shape)
+    v[0] = 0.0
+    v[-2] = 0.0
+    cols = (np.arange(grid.Nx) - halo) % NP_LON
+    fields = tuple(jnp.asarray(f[:, cols]) for f in (h, u, v))
+    physical = (slice(1, -1), slice(halo, halo + NP_LON))
+    return grid, fields, physical
+
+
+def _advect(op, h, u, v, method, wall="closed"):
+    """``op(h, u, v, method, wall)`` under ``jax.jit`` (one compiled program:
+    ~5x faster than eager on these grids, keeping the tests in the fast tier)."""
+    return jax.jit(lambda a, b, c: op(a, b, c, method=method, wall=wall))(h, u, v)
+
+
+def _relative_net(area, tendency, region=(slice(1, -1), slice(1, -1))):
+    """``sum(A t) / sum(A |t|)`` over ``region``: 0 when the fluxes telescope."""
+    weighted = area[region] * tendency[region]
+    return float(jnp.sum(weighted) / jnp.sum(jnp.abs(weighted)))
+
+
+class TestSphericalTelescoping:
+    def test_divergence_zonally_periodic(self):
+        """``Σ A · SphericalDivergence2D(u, v)`` over the interior: the metric
+        is self-consistent (#297 audit), so this is rounding."""
+        from finitevolx import SphericalDivergence2D
+
+        grid, (_, u, v), _ = _periodic_setup(halo=1)
+        div = SphericalDivergence2D(grid=grid)(u, v)
+        area = spherical_area_weights(grid)
+        assert abs(_relative_net(area, div)) < TELESCOPE_RTOL
+
+    def test_divergence_zero_boundary_velocity(self):
+        from finitevolx import SphericalDivergence2D
+
+        grid, (_, u, v), _ = _periodic_setup(halo=1)
+        u = u.at[:, 0].set(0.0).at[:, -2].set(0.0)  # west / east wall faces
+        div = SphericalDivergence2D(grid=grid)(u, v)
+        area = spherical_area_weights(grid)
+        assert abs(_relative_net(area, div)) < TELESCOPE_RTOL
+
+    @pytest.mark.parametrize("method", ["upwind1", "weno5", "van_leer"])
+    def test_issue_247_script(self, method):
+        """The #247 reproduction (48x24, ±80°, one wrapped ghost column):
+        -5.0e-3 with the default wall="closed", rounding with "open"."""
+        grid = SphericalGrid2D.from_interior(48, 24, (0.0, 360.0), (-80.0, 80.0), R=R)
+        rng = np.random.RandomState(0)
+
+        def wrap(a):
+            return a.at[:, 0].set(a[:, -2]).at[:, -1].set(a[:, 1])
+
+        h = wrap(jnp.asarray(1000.0 + 10 * rng.randn(grid.Ny, grid.Nx)))
+        u = wrap(jnp.asarray(rng.randn(grid.Ny, grid.Nx)))
+        op = SphericalAdvection2D(grid=grid)
+        area = spherical_area_weights(grid)
+        closed = _advect(op, h, u, jnp.zeros_like(u), method)
+        opened = _advect(op, h, u, jnp.zeros_like(u), method, wall="open")
+        assert abs(_relative_net(area, closed)) > 1e-3  # the #247 defect
+        assert abs(_relative_net(area, opened)) < TELESCOPE_RTOL
+
+    @pytest.mark.slow
+    @pytest.mark.parametrize("method", ["upwind1", "weno5", "van_leer"])
+    def test_periodic_with_the_documented_halo(self, method):
+        """With the documented halo the physical tendency is the periodic
+        scheme's (equal to a much wider halo) and telescopes."""
+        grid, (h, u, v), physical = _periodic_setup(halo=HALO[method])
+        out = _advect(SphericalAdvection2D(grid=grid), h, u, v, method, "open")
+        area = spherical_area_weights(grid)
+        assert abs(_relative_net(area, out, physical)) < TELESCOPE_RTOL
+
+        wide, (hw, uw, vw), physical_w = _periodic_setup(halo=6)
+        ref = _advect(SphericalAdvection2D(grid=wide), hw, uw, vw, method, "open")
+        np.testing.assert_allclose(
+            out[physical],
+            ref[physical_w],
+            rtol=0.0,
+            atol=1e-13 * float(jnp.max(jnp.abs(ref[physical_w]))),
+        )
+
+    @pytest.mark.parametrize("method", ["upwind1", "weno5", "van_leer"])
+    def test_zero_velocity_on_the_boundary_faces(self, method):
+        """No flux through any wall face: Σ A · tendency over the full
+        interior is rounding (the closed write range drops the ring)."""
+        grid, (h, u, v), _ = _periodic_setup(halo=1, seed=3)
+        u = u.at[:, 0].set(0.0).at[:, -2].set(0.0)
+        out = _advect(SphericalAdvection2D(grid=grid), h, u, v, method, "open")
+        area = spherical_area_weights(grid)
+        assert abs(_relative_net(area, out)) < TELESCOPE_RTOL
+
+
+class TestSphericalOpenWall:
+    @pytest.mark.parametrize("method", ["upwind1", "weno5", "van_leer"])
+    def test_closed_is_the_strict_interior_of_open(self, grid, method):
+        """The default is unchanged, and "open" only adds the outer ring."""
+        k1, k2, k3 = jax.random.split(jax.random.PRNGKey(21), 3)
+        shape = (grid.Ny, grid.Nx)
+        h, u, v = (jax.random.normal(k, shape) for k in (k1, k2, k3))
+        op = SphericalAdvection2D(grid=grid)
+        closed = _advect(op, h, u, v, method)
+        opened = _advect(op, h, u, v, method, wall="open")
+        np.testing.assert_array_equal(closed, _advect(op, h, u, v, method, "closed"))
+        # same expressions on [2:-2, 2:-2]; only XLA's fusion can differ (ulp)
+        np.testing.assert_allclose(
+            opened[2:-2, 2:-2], closed[2:-2, 2:-2], rtol=1e-14, atol=1e-14
+        )
+        assert float(jnp.max(jnp.abs(opened[1, 1:-1]))) > 0.0
+        np.testing.assert_array_equal(opened[0], 0.0)
+        np.testing.assert_array_equal(opened[:, -1], 0.0)
+
+    @pytest.mark.slow
+    def test_matches_cartesian_open_wall_at_the_equator(self):
+        """Mirrors Advection2D(wall="open"), ring included, where cos ~ 1."""
+        sphere = SphericalGrid2D.from_interior(
+            nx_interior=24,
+            ny_interior=6,
+            lon_range=(0.0, 30.0),
+            lat_range=(-0.5, 0.5),
+            R=R,
+        )
+        cart = CartesianGrid2D.from_interior(
+            nx_interior=24, ny_interior=6, Lx=sphere.Lx, Ly=sphere.Ly
+        )
+        k1, k2, k3 = jax.random.split(jax.random.PRNGKey(22), 3)
+        shape = (sphere.Ny, sphere.Nx)
+        h, u, v = (jax.random.normal(k, shape) for k in (k1, k2, k3))
+        for method in ("upwind1", "weno5", "van_leer"):
+            t_s = SphericalAdvection2D(grid=sphere)(h, u, v, method, wall="open")
+            t_c = Advection2D(grid=cart)(h, u, v, method, wall="open")
+            # Across 1 degree of latitude, cos varies by O(1e-4).
+            np.testing.assert_allclose(t_s, t_c, rtol=5e-3, atol=1e-3)
+
+    @pytest.mark.slow
+    def test_3d_matches_2d_per_level(self, grid, grid3d):
+        k1, k2, k3 = jax.random.split(jax.random.PRNGKey(23), 3)
+        shape = (grid3d.Nz, grid3d.Ny, grid3d.Nx)
+        h, u, v = (jax.random.normal(k, shape) for k in (k1, k2, k3))
+        out3 = SphericalAdvection3D(grid=grid3d)(h, u, v, "weno5", wall="open")
+        op2 = SphericalAdvection2D(grid=grid)
+        for k in range(1, grid3d.Nz - 1):
+            np.testing.assert_allclose(
+                out3[k], op2(h[k], u[k], v[k], "weno5", wall="open"), rtol=1e-12
+            )
+        np.testing.assert_array_equal(out3[0], 0.0)
+        np.testing.assert_array_equal(out3[-1], 0.0)
+
+    def test_open_with_mask_raises(self, grid):
+        mask = Mask2D.from_mask(np.ones((grid.Ny, grid.Nx), dtype=bool))
+        z = jnp.zeros((grid.Ny, grid.Nx))
+        with pytest.raises(NotImplementedError, match="wall='open'"):
+            SphericalAdvection2D(grid=grid, mask=mask)(z, z, z, wall="open")
+
+    def test_unknown_wall_raises(self, grid):
+        z = jnp.zeros((grid.Ny, grid.Nx))
+        with pytest.raises(ValueError, match="wall must be one of"):
+            SphericalAdvection2D(grid=grid)(z, z, z, wall="periodic")

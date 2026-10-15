@@ -35,6 +35,45 @@ differs only by:
 
 At the equator (``cos(lat) = 1``) the spherical operator reduces to
 the Cartesian advection with ``dx = R·dlon`` and ``dy = R·dlat``.
+
+Both classes take the Cartesian ``wall="closed" | "open"`` argument with the
+same semantics.  The flux divergence telescopes against
+:func:`~finitevolx.spherical_area_weights` (``R² cos(lat_T) dlon dlat``, the
+cell area the divergence divides by), so ``Σ A · tendency`` is the net flux
+through the faces bounding the written cells, and is zero to rounding when
+those cancel:
+
+* ``wall="closed"`` writes ``[2:-2, 2:-2]``, so the sum over the domain
+  closes only if the velocity vanishes on the faces bounding that region
+  (``i = 1, Nx-3``; ``j = 1, Ny-3``) — not on a zonally periodic grid, where
+  the seam-adjacent physical columns ``i = 1, Nx-2`` get no tendency at all
+  (#247).
+* ``wall="open"`` writes ``[1:-1, 1:-1]``: with zero velocity on the
+  boundary faces, or a zonally periodic ghost ring (``h``, ``u`` and ``v``
+  wrapped by the caller), mass is conserved exactly — on a one-cell ghost
+  ring the seam face is then first-order upwind, and equal on both sides.
+
+Periodic halo.  For the tendency of the physical cells to be the
+*periodic* scheme's (full-order stencils across the seam, not the boundary
+fallbacks), build the grid with ``H - 1`` extra columns on each side, fill
+the outer ``H`` columns of every field by wrapping, and keep the physical
+columns ``[H:-H]``.  Measured minimum ``H``:
+
+=================================================================  ===
+method                                                             H
+=================================================================  ===
+``upwind1``                                                        1
+``naive``, ``upwind2``, ``upwind3``, ``weno3``, the TVD limiters   2
+``weno5``, ``wenoz5``                                              3
+``weno7``                                                          4
+``weno9``                                                          5
+=================================================================  ===
+
+with ``wall="open"``; ``wall="closed"`` needs ``max(H, 2)``.  ``Σ A ·
+tendency`` over ``[H:-H]`` is then zero to rounding, the two seam faces
+carrying the same flux.  A halo *between* 1 and that ``H`` is not exactly
+conservative: the two seam faces then use different boundary fallbacks
+(measured ``sum(A t) / sum(A |t|) ~ 5e-7`` for weno5 with ``H = 2``).
 """
 
 from __future__ import annotations
@@ -49,6 +88,8 @@ from finitevolx._src.advection.advection import (
     _TVD_LIMITERS,
     _rec_funcs_for_method_2d,
     _rec_funcs_for_method_3d,
+    _validate_wall,
+    _wall_upwind_flux,
 )
 from finitevolx._src.advection.flux import narrow_mask_hierarchy, upwind_flux
 from finitevolx._src.advection.reconstruction import (
@@ -59,6 +100,60 @@ from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
 from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators._utils import _safe_div_cos
+
+
+def _open_wall_fluxes(
+    h: Float[Array, "*Nz Ny Nx"],
+    u: Float[Array, "*Nz Ny Nx"],
+    v: Float[Array, "*Nz Ny Nx"],
+    fe: Float[Array, "*Nz Ny Nx"],
+    fn: Float[Array, "*Nz Ny Nx"],
+) -> tuple[Float[Array, "*Nz Ny Nx"], Float[Array, "*Nz Ny Nx"]]:
+    """Overwrite the four domain-wall faces with the ``wall="open"`` flux.
+
+    West / east faces ``fe[..., 0]`` (``i = 1/2``) and ``fe[..., -2]``
+    (``i = Nx-3/2``), south / north faces ``fn[..., 0, :]`` and
+    ``fn[..., -2, :]``: first-order upwind on the caller-filled ghost ring,
+    exactly as :class:`~finitevolx.Advection2D` (``_wall_upwind_flux``).
+    """
+    # fe[j, 1/2] = upwind(h[j, 0], h[j, 1]) · u[j, 1/2]   (west wall)
+    fe = fe.at[..., 0].set(_wall_upwind_flux(u[..., 0], h[..., 0], h[..., 1]))
+    # fe[j, Nx-3/2] = upwind(h[j, Nx-2], h[j, Nx-1]) · u   (east wall)
+    fe = fe.at[..., -2].set(_wall_upwind_flux(u[..., -2], h[..., -2], h[..., -1]))
+    # fn[1/2, i] = upwind(h[0, i], h[1, i]) · v[1/2, i]   (south wall)
+    fn = fn.at[..., 0, :].set(
+        _wall_upwind_flux(v[..., 0, :], h[..., 0, :], h[..., 1, :])
+    )
+    # fn[Ny-3/2, i] = upwind(h[Ny-2, i], h[Ny-1, i]) · v   (north wall)
+    fn = fn.at[..., -2, :].set(
+        _wall_upwind_flux(v[..., -2, :], h[..., -2, :], h[..., -1, :])
+    )
+    return fe, fn
+
+
+def _spherical_flux_divergence(
+    fe: Float[Array, "*Nz Ny Nx"],
+    fn: Float[Array, "*Nz Ny Nx"],
+    grid: SphericalGrid2D | SphericalGrid3D,
+    ghost: int,
+) -> Float[Array, "*Nz Ny-2g Nx-2g"]:
+    """``-1/(R cosφ_T) [Δλ fe / dλ + Δφ (cosφ_V fn) / dφ]`` on ``[g:-g, g:-g]``.
+
+    dh[j, i] = -( (fe[j, i+1/2] - fe[j, i-1/2]) / dlon
+                + (cos_V[j+1/2] fn[j+1/2, i] - cos_V[j-1/2] fn[j-1/2, i]) / dlat )
+               / (R cos_T[j])
+
+    ``ghost=2`` (``wall="closed"``) never reads the wall faces; ``ghost=1``
+    (``wall="open"``) reads them.  Leading (z) axes are batch axes.
+    """
+    c = slice(ghost, -ghost)  # the written cells
+    s = slice(ghost - 1, -ghost - 1)  # one step west / south
+    cos_T_c = grid.cos_lat_T[c, c]  # [Ny-2g, Nx-2g]
+    cos_V_N = grid.cos_lat_V[c, c]  # north face j+1/2
+    cos_V_S = grid.cos_lat_V[s, c]  # south face j-1/2
+    du = (fe[..., c, c] - fe[..., c, s]) / grid.dlon
+    dv = (cos_V_N * fn[..., c, c] - cos_V_S * fn[..., s, c]) / grid.dlat
+    return -_safe_div_cos(du + dv, cos_T_c, grid.R)
 
 
 def _reconstruct_faces_2d(
@@ -199,6 +294,7 @@ class SphericalAdvection2D(eqx.Module):
         u: Float[Array, "Ny Nx"],
         v: Float[Array, "Ny Nx"],
         method: str = "upwind1",
+        wall: str = "closed",
     ) -> Float[Array, "Ny Nx"]:
         """Advective tendency ``−∇·(h·u_vec)`` at T-points on a sphere.
 
@@ -216,15 +312,25 @@ class SphericalAdvection2D(eqx.Module):
             ``'upwind2'``, ``'upwind3'``, ``'weno3'``, ``'weno5'``,
             ``'wenoz5'``, ``'weno7'``, ``'weno9'``, or a TVD limiter
             (``'minmod'``, ``'van_leer'``, ``'superbee'``, ``'mc'``).
+        wall : {"closed", "open"}, default "closed"
+            Lateral-boundary treatment, as in :meth:`Advection2D.__call__`.
+            ``"closed"`` (default, unchanged) writes ``[2:-2, 2:-2]`` and
+            treats the four domain walls as no-flux.  ``"open"`` writes
+            ``[1:-1, 1:-1]`` and computes the four wall-face fluxes with a
+            first-order upwind reconstruction that reads the caller-filled
+            ghost ring (periodic, Dirichlet, outflow); the interior faces
+            keep ``method`` and the flux stays single-valued, so the
+            area-weighted tendency telescopes (see the module docstring for
+            the halo a periodic seam needs).  ``"open"`` is not supported
+            together with a ``mask``.
 
         Returns
         -------
         Float[Array, "Ny Nx"]
-            Advective tendency at T-points.  Ghost ring and the
-            outermost interior ring are zero (matching the Cartesian
-            :class:`Advection2D` convention of only writing
-            ``[2:-2, 2:-2]``).
+            Advective tendency at T-points.  The ghost ring is zero, and
+            with ``wall="closed"`` the outermost interior ring too.
         """
+        _validate_wall(wall, self.mask)
         if self.mask is not None:
             # Zero the dry inputs before any stencil reads them (NaN-safe).
             h = jnp.where(self.mask.h, h, 0.0)  # [Ny, Nx]
@@ -245,21 +351,14 @@ class SphericalAdvection2D(eqx.Module):
             fe = jnp.where(self.mask.u, fe, 0.0)  # [Ny, Nx]
             fn = jnp.where(self.mask.v, fn, 0.0)  # [Ny, Nx]
 
-        dlon = self.grid.dlon
-        dlat = self.grid.dlat
-        R = self.grid.R
-
-        # Flux divergence on the sphere at interior cells [2:-2, 2:-2].
-        # Matches the Cartesian Advection2D writing convention
-        # (avoids reading ghost-adjacent flux entries).
-        cos_T_c = self.grid.cos_lat_T[2:-2, 2:-2]
-        cos_V_N = self.grid.cos_lat_V[2:-2, 2:-2]
-        cos_V_S = self.grid.cos_lat_V[1:-3, 2:-2]
-
-        du = (fe[2:-2, 2:-2] - fe[2:-2, 1:-3]) / dlon
-        dv_term = cos_V_N * fn[2:-2, 2:-2] - cos_V_S * fn[1:-3, 2:-2]
-        dv = dv_term / dlat
-        out = interior(-_safe_div_cos(du + dv, cos_T_c, R), h, ghost=2)
+        if wall == "open":
+            fe, fn = _open_wall_fluxes(h, u, v, fe, fn)
+            ghost = 1  # write [1:-1, 1:-1], reading the wall faces
+        else:
+            ghost = 2  # write [2:-2, 2:-2], never reading a wall face
+        out = interior(
+            _spherical_flux_divergence(fe, fn, self.grid, ghost), h, ghost=ghost
+        )
         if self.mask is not None:
             out = jnp.where(self.mask.h, out, 0.0)
         return out
@@ -317,6 +416,7 @@ class SphericalAdvection3D(eqx.Module):
         u: Float[Array, "Nz Ny Nx"],
         v: Float[Array, "Nz Ny Nx"],
         method: str = "upwind1",
+        wall: str = "closed",
     ) -> Float[Array, "Nz Ny Nx"]:
         """3-D advective tendency on a sphere (vmap over z-levels).
 
@@ -331,12 +431,19 @@ class SphericalAdvection3D(eqx.Module):
         method : str
             Reconstruction scheme, same alphabet as
             :meth:`Advection3D.__call__`.
+        wall : {"closed", "open"}, default "closed"
+            Lateral-boundary treatment, as in :meth:`Advection3D.__call__`
+            and :meth:`SphericalAdvection2D.__call__`: ``"closed"`` writes
+            ``[1:-1, 2:-2, 2:-2]``, ``"open"`` writes ``[1:-1, 1:-1, 1:-1]``
+            with first-order upwind wall-face fluxes read from the ghost
+            ring.  ``"open"`` is not supported together with a ``mask``.
 
         Returns
         -------
         Float[Array, "Nz Ny Nx"]
             Advective tendency at T-points.
         """
+        _validate_wall(wall, self.mask)
         if self.mask is not None:
             # Zero the dry inputs before any stencil reads them (NaN-safe).
             h = jnp.where(self.mask.h, h, 0.0)  # [Nz, Ny, Nx]
@@ -357,21 +464,15 @@ class SphericalAdvection3D(eqx.Module):
             fe = jnp.where(self.mask.u, fe, 0.0)  # [Nz, Ny, Nx]
             fn = jnp.where(self.mask.v, fn, 0.0)  # [Nz, Ny, Nx]
 
-        dlon = self.grid.dlon
-        dlat = self.grid.dlat
-        R = self.grid.R
-
-        # cos_* arrays are 2-D; broadcast over the leading Nz axis.
-        cos_T_c = self.grid.cos_lat_T[2:-2, 2:-2]
-        cos_V_N = self.grid.cos_lat_V[2:-2, 2:-2]
-        cos_V_S = self.grid.cos_lat_V[1:-3, 2:-2]
-
-        du = (fe[1:-1, 2:-2, 2:-2] - fe[1:-1, 2:-2, 1:-3]) / dlon
-        dv_term = cos_V_N * fn[1:-1, 2:-2, 2:-2] - cos_V_S * fn[1:-1, 1:-3, 2:-2]
-        dv = dv_term / dlat
-        horiz = -_safe_div_cos(du + dv, cos_T_c, R)
-
-        out = jnp.zeros_like(h).at[1:-1, 2:-2, 2:-2].set(horiz)
+        if wall == "open":
+            fe, fn = _open_wall_fluxes(h, u, v, fe, fn)
+            g = 1  # write [1:-1, 1:-1, 1:-1], reading the wall faces
+        else:
+            g = 2  # write [1:-1, 2:-2, 2:-2]
+        # cos_* arrays are 2-D; they broadcast over the leading Nz axis,
+        # whose ghost slabs k = 0, Nz-1 are skipped (z is a batch axis).
+        horiz = _spherical_flux_divergence(fe[1:-1], fn[1:-1], self.grid, g)
+        out = jnp.zeros_like(h).at[1:-1, g:-g, g:-g].set(horiz)
         if self.mask is not None:
             out = jnp.where(self.mask.h, out, 0.0)
         return out
