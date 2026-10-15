@@ -206,9 +206,13 @@ grid-scale noise without excessively damping the resolved mesoscale.
 
 ### Mask Support
 
-All diffusion operators accept optional `mask_h`, `mask_u`, `mask_v` arrays.
-Land-cell fluxes are zeroed and land-cell tendencies are zeroed, giving
-natural no-flux BCs at irregular coastlines without any additional code.
+All diffusion classes take an optional `mask=` (`Mask2D` / `Mask3D`) field.
+Fluxes through faces with a dry side are zeroed and land-cell tendencies are
+zeroed, giving natural no-flux BCs at irregular coastlines without any
+additional code.  The masked biharmonic operators apply this masked no-flux
+Laplacian $D_m$ twice, $-\kappa\,D_m(D_m h)$, after zeroing the dry inputs:
+the coast is no-flux for both $h$ and $\nabla^2 h$, land values (even `NaN`)
+never enter the wet tendency, and the operator conserves $\sum_\text{wet} h$.
 
 ### Usage
 

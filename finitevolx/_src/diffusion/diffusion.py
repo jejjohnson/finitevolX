@@ -620,30 +620,28 @@ class BiharmonicDiffusion2D(eqx.Module):
 
     Notes
     -----
-    The ghost ring of the intermediate Laplacian ∇²h is zero (Dirichlet-0),
-    not a zero-normal-gradient (Neumann) BC.  This means the second Laplacian
-    pass reads a zero halo for the intermediate field, which contaminates the
-    outermost interior row/column of the final tendency even if the input ``h``
-    had correctly set ghost cells.  Only results in the deep interior
-    ``[2:-2, 2:-2]`` are fully BC-consistent.  For periodic domains, call
-    ``enforce_periodic`` on ``h`` before invoking this operator; this sets the
-    input ghost ring correctly and reduces (but does not eliminate) the
-    Dirichlet-0 contamination of the intermediate field.
+    Both Laplacian passes use the closed-wall (``wall="closed"``)
+    :class:`Diffusion2D`, whose wall-face fluxes are zero: the four domain
+    walls are no-flux for ``h`` **and** for ``∇²h``, and neither the ghost
+    ring of ``h`` nor that of the intermediate ``∇²h`` (zero) is ever read.
+    The operator is therefore conservative (``Σ_interior ∂h/∂t = 0``) and
+    symmetric negative semi-definite on the interior.
 
     Parameters
     ----------
     grid : CartesianGrid2D
         The underlying 2-D grid.
     mask : Mask2D or None, optional
-        Optional land/ocean mask.  When provided, the **inner harmonic
-        Diffusion2D is deliberately built with** ``mask=None`` — masking
-        the intermediate Laplacian would corrupt the second harmonic
-        pass because ``lap1 == 0`` at dry T-cells becomes a forced
-        zero-Dirichlet boundary for the second pass, which changes the
-        ∇⁴ stencil at wet cells adjacent to land.  Instead, the mask is
-        applied via a post-compute ``* mask.h`` on the **final**
-        ``-κ ∇⁴h`` tendency only.  This is the design exception called
-        out in issue #209 §4.
+        Optional land/ocean mask.  When provided, the tendency is
+        ``−κ · Dm(Dm(h))`` with ``Dm`` the masked no-flux Laplacian of
+        :class:`Diffusion2D` (fluxes zeroed on faces with ``mask.u`` /
+        ``mask.v`` dry, output zeroed where ``mask.h`` is dry): the coast
+        is a no-flux wall for ``h`` and for ``∇²h``, exactly like the
+        domain walls.  Dry inputs are zeroed with ``jnp.where`` first, so
+        land may hold any value (``NaN``, ``1e10``) without entering the
+        wet tendency or its gradient.  The masked operator is
+        conservative and symmetric on the wet cells, and has no land→wet
+        coupling.  ``None`` (default) gives the unmasked operator.
 
     References
     ----------
@@ -675,9 +673,8 @@ class BiharmonicDiffusion2D(eqx.Module):
     ) -> None:
         self.grid = grid
         self.mask = mask
-        # Critical: inner harmonic operator is ALWAYS mask=None, even
-        # when BiharmonicDiffusion2D has a mask.  See class docstring.
-        self._harm = Diffusion2D(grid=grid)
+        # Both passes are the masked no-flux Laplacian Dm (#292).
+        self._harm = Diffusion2D(grid=grid, mask=mask)
 
     def __call__(
         self,
@@ -697,22 +694,23 @@ class BiharmonicDiffusion2D(eqx.Module):
         -------
         Float[Array, "Ny Nx"]
             Tendency -kappa * nabla^4 h at T-points, same shape as ``h``.
-            Ghost cells are zero.  When ``self.mask`` is set, the final
-            output is post-multiplied by ``mask.h``.
+            Ghost cells are zero.  When ``self.mask`` is set, it is
+            ``-kappa * Dm(Dm(h))`` (see the class docstring) and zero on
+            dry cells.
         """
-        # First Laplacian pass: kappa=1.0 gives pure nabla^2 h.
-        # Ghost ring of lap1 is zero (Dirichlet-0 BC on intermediate field).
-        # Inner _harm is mask=None so the intermediate Laplacian is *not*
-        # zeroed at dry cells — see class docstring for why.
+        if self.mask is not None:
+            # land may hold NaN / 1e10: zero it before any stencil reads it
+            # (NaN * 0 = NaN in the flux masking, and in its gradient)
+            h = jnp.where(self.mask.h, h, 0.0)
+        # First Laplacian pass: kappa=1.0 gives pure nabla^2 h (Dm h when
+        # masked: zero on dry cells, no flux through the coast).
         # _materialize: the second pass reads lap1 at four offsets; keep it as
         # one buffer rather than letting XLA recompute it per offset.
         lap1 = _materialize(self._harm(h, kappa=1.0))
-        # Second Laplacian pass: nabla^2(nabla^2 h) = nabla^4 h
+        # Second Laplacian pass: nabla^2(nabla^2 h) = nabla^4 h; the output
+        # is already zero on dry cells when masked.
         lap2 = self._harm(lap1, kappa=1.0)
-        out = -kappa * lap2
-        if self.mask is not None:
-            out = out * self.mask.h
-        return out
+        return -kappa * lap2
 
 
 class BiharmonicDiffusion3D(eqx.Module):
@@ -731,21 +729,19 @@ class BiharmonicDiffusion3D(eqx.Module):
 
     Notes
     -----
-    The ghost ring of the intermediate Laplacian is zero (Dirichlet-0).
-    See :class:`BiharmonicDiffusion2D` notes for details.
-
-    The inner harmonic :class:`Diffusion3D` is deliberately built with
-    ``mask=None``; the outer mask is applied as a post-compute ``* mask.h``
-    on the final tendency only — same exception as
-    :class:`BiharmonicDiffusion2D`.
+    Both passes are closed-wall: the lateral walls are no-flux for ``h``
+    and ``∇²h`` and no ghost cell is read.  See
+    :class:`BiharmonicDiffusion2D` notes for details.
 
     Parameters
     ----------
     grid : CartesianGrid3D
         The underlying 3-D grid.
     mask : Mask3D or None, optional
-        Optional 3-D land/ocean mask.  Applied final-only (see class
-        docstring).
+        Optional 3-D land/ocean mask.  When provided, the tendency is
+        ``−κ · Dm(Dm(h))`` at every z-level with ``Dm`` the masked no-flux
+        :class:`Diffusion3D`, and dry inputs are zeroed first — same
+        semantics as :class:`BiharmonicDiffusion2D`.
 
     Examples
     --------
@@ -770,8 +766,8 @@ class BiharmonicDiffusion3D(eqx.Module):
     ) -> None:
         self.grid = grid
         self.mask = mask
-        # Critical: inner harmonic operator is ALWAYS mask=None.
-        self._harm = Diffusion3D(grid=grid)
+        # Both passes are the masked no-flux Laplacian Dm (#292).
+        self._harm = Diffusion3D(grid=grid, mask=mask)
 
     def __call__(
         self,
@@ -791,14 +787,14 @@ class BiharmonicDiffusion3D(eqx.Module):
         -------
         Float[Array, "Nz Ny Nx"]
             Tendency -kappa * nabla^4_h h at T-points, same shape as ``h``.
-            When ``self.mask`` is set, the final output is post-multiplied
-            by ``mask.h``.
+            When ``self.mask`` is set, it is ``-kappa * Dm(Dm(h))`` and zero
+            on dry cells.
         """
+        if self.mask is not None:
+            # zero land (NaN / 1e10) before any stencil reads it
+            h = jnp.where(self.mask.h, h, 0.0)
         # _materialize: the second pass reads lap1 at four offsets; keep it as
         # one buffer rather than letting XLA recompute it per offset.
         lap1 = _materialize(self._harm(h, kappa=1.0))
         lap2 = self._harm(lap1, kappa=1.0)
-        out = -kappa * lap2
-        if self.mask is not None:
-            out = out * self.mask.h
-        return out
+        return -kappa * lap2
