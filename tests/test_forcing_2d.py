@@ -11,10 +11,13 @@ import pytest
 from finitevolx import (
     AbstractForcing,
     CartesianGrid2D,
+    Difference2D,
     ForcingSum,
     LinearDrag2D,
+    Mask2D,
     QuadraticDrag2D,
     RayleighDamping2D,
+    WindCurl2D,
     WindStress2D,
     multilayer,
 )
@@ -342,3 +345,81 @@ class TestNaNLandGradients:
         mu = np.asarray(mask.u)
         wet_moving = mu & (np.abs(np.nan_to_num(np.asarray(u))) > 0)
         assert bool((np.asarray(du)[wet_moving] != 0).all())
+
+
+class TestWindCurl2D:
+    """curl(tau) / (rho0 H) at X-points against the analytic curl (#314)."""
+
+    @staticmethod
+    def _gaussian(n):
+        g = CartesianGrid2D.from_interior(n, n, 2.0, 2.0)
+        # T-point coordinates, ghost ring included: x_T[i] = (i - 1/2) dx
+        x = (jnp.arange(g.Nx) - 0.5) * g.dx - 1.0
+        y = (jnp.arange(g.Ny) - 0.5) * g.dy - 1.0
+        X, Y = jnp.meshgrid(x, y)  # [Ny, Nx]
+        e = jnp.exp(-(X**2 + 2.0 * Y**2) / 0.3)
+        tau_x, tau_y = 0.2 * e * (1.0 + Y), -0.1 * e
+        # X-point coordinates: x_X[i] = i dx, y_X[j] = j dy
+        Xc, Yc = jnp.meshgrid(
+            jnp.arange(g.Nx) * g.dx - 1.0, jnp.arange(g.Ny) * g.dy - 1.0
+        )
+        ec = jnp.exp(-(Xc**2 + 2.0 * Yc**2) / 0.3)
+        # curl = d(tau_y)/dx - d(tau_x)/dy
+        dtauy_dx = -0.1 * ec * (-2.0 * Xc / 0.3)
+        dtaux_dy = 0.2 * ec * (1.0 + (1.0 + Yc) * (-4.0 * Yc / 0.3))
+        return g, tau_x, tau_y, dtauy_dx - dtaux_dy
+
+    @pytest.mark.slow
+    def test_analytic_curl_second_order(self):
+        """Sign, location and 2nd-order convergence on a Gaussian stress."""
+        rho0, H = 1000.0, 2.0
+        errs = []
+        for n in (16, 32, 64):
+            g, tx, ty, curl = self._gaussian(n)
+            out = eqx.filter_jit(WindCurl2D(grid=g, rho0=rho0))(tx, ty, H)
+            err = out[1:-1, 1:-1] - curl[1:-1, 1:-1] / (rho0 * H)
+            errs.append(float(jnp.abs(err).max()))
+        _assert_ghost_ring_zero(out)
+        rates = np.log2(np.array(errs[:-1]) / np.array(errs[1:]))
+        assert np.all(rates > 1.9), rates
+
+    def test_double_gyre_sign(self):
+        """tau_x = -tau0 cos(2 pi y / L): F = -tau0 (2 pi / L) sin(2 pi y / L) / (rho0 H)."""
+        g = CartesianGrid2D.from_interior(32, 32, 5.12e6, 5.12e6)
+        y_t = (jnp.arange(g.Ny) - 0.5) * g.dy
+        tau_x = -0.1 * jnp.cos(2 * jnp.pi * y_t / g.Ly)[:, None] * jnp.ones(g.Nx)
+        out = WindCurl2D(grid=g)(tau_x, jnp.zeros_like(tau_x), 500.0)
+        y_x = jnp.arange(g.Ny) * g.dy
+        k = 2 * jnp.pi / g.Ly
+        exact = -0.1 * k * jnp.sin(k * y_x)[:, None] * jnp.ones(g.Nx) / (1025.0 * 500.0)
+        # centred difference of cos: exact up to sin(k dy/2) / (k dy/2) = 1 - 1e-3
+        np.testing.assert_allclose(
+            out[1:-1, 1:-1], exact[1:-1, 1:-1], rtol=2e-3, atol=1e-20
+        )
+        assert float(out[8, 5]) < 0.0 < float(out[24, 5])
+
+    def test_matches_curl_of_wind_stress_tendency(self):
+        """Interior X-points equal Difference2D.curl of WindStress2D's (du, dv)."""
+        g, tx, ty, _ = self._gaussian(16)
+        du, dv = WindStress2D(grid=g, rho0=1000.0)(tx, ty, dz_top=2.0)
+        ref = Difference2D(grid=g).curl(du, dv)
+        out = WindCurl2D(grid=g, rho0=1000.0)(tx, ty, 2.0)
+        # away from the north / east walls, where WindStress2D's zero ghost ring differs
+        np.testing.assert_allclose(
+            out[1:-2, 1:-2], ref[1:-2, 1:-2], rtol=1e-12, atol=1e-15
+        )
+
+    def test_mask_zeroes_dry_corners_and_ignores_nan_land(self):
+        g, tx, ty, _ = self._gaussian(16)
+        h = np.ones((g.Ny, g.Nx), dtype=bool)
+        h[6:10, 6:10] = False
+        mask = Mask2D.from_mask(h)
+        tx_nan = jnp.where(h, tx, jnp.nan)
+        op = WindCurl2D(grid=g, mask=mask)
+        out = eqx.filter_jit(op)(tx_nan, ty, 2.0)
+        assert bool(jnp.all(jnp.isfinite(out)))
+        np.testing.assert_array_equal(
+            np.asarray(out)[~np.asarray(mask.xy_corner_strict)], 0.0
+        )
+        grad = jax.jit(jax.grad(lambda a: op(a, ty, 2.0).sum()))(tx_nan)
+        assert bool(jnp.all(jnp.isfinite(grad)))

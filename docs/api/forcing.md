@@ -47,6 +47,11 @@ calling them on a single layer, e.g. bottom drag on `u[-1], v[-1]`.
 
 ::: finitevolx.WindStress2D
 
+`WindCurl2D` is the vorticity / QG-PV form of the same forcing: the C-grid
+curl of the face-interpolated stress divided by `rho0 * H`, at X-points.
+
+::: finitevolx.WindCurl2D
+
 ::: finitevolx.LinearDrag2D
 
 ::: finitevolx.QuadraticDrag2D
