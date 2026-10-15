@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 from jaxtyping import Array
 import numpy as np
@@ -7,39 +8,84 @@ import numpy as np
 #: Dimensionless epsilon of the WENO nonlinear weights (#243).  The
 #: smoothness indicators ``beta_k`` carry units of (field amplitude)², so an
 #: absolute epsilon made the weights, and hence the scheme, depend on the
-#: field's amplitude.  Every WENO here first normalises the indicators by
-#: their stencil sum, ``b_k = beta_k / (Σ_j beta_j + tiny)`` (in [0, 1],
-#: dimensionless), and adds ``_WENO_EPS_REL`` to those: the same weights as
-#: ``g_k / (beta_k + eps_eff)²`` with ``eps_eff = _WENO_EPS_REL · (Σβ + tiny)``
-#: (the common factor ``(Σβ + tiny)²`` cancels in the normalisation), so the
-#: reconstruction is exactly amplitude-covariant down to ``Σβ ~ tiny`` (the
-#: dtype's smallest normal number).  A constant stencil (all ``beta_k = 0``)
-#: gives exactly the linear weights.  ``1e-12`` keeps the epsilon out of the
-#: weights wherever a sub-stencil is resolved at all: at amplitude 1 the
-#: tendencies of WENO-Z and of every scheme at a step are unchanged to
-#: < 2e-11 relative (WENO-JS on smooth fields moves by <= 4e-5, the
-#: influence the old absolute ``1e-8`` had there).
+#: field's amplitude.  The weights here use ``eps_eff = _WENO_EPS_REL · Σβ``
+#: instead, so they depend on the stencil only through ratios and the
+#: reconstruction is exactly amplitude-covariant.  A constant stencil (all
+#: ``beta_k = 0``) gives exactly the linear weights.  ``1e-12`` keeps the
+#: epsilon out of the weights wherever a sub-stencil is resolved at all: at
+#: amplitude 1 the tendencies of WENO-Z and of every scheme at a step are
+#: unchanged to < 2e-11 relative (WENO-JS on smooth fields moves by <= 4e-5,
+#: the influence the old absolute ``1e-8`` had there).
 _WENO_EPS_REL: float = 1e-12
 
-#: ``1 / _WENO_EPS_REL``: the JS weights are evaluated as
-#: ``g_k / (1 + b_k / eps_rel)²`` (``= eps_rel² · g_k / (b_k + eps_rel)²``, the
-#: same normalised weights), which lie in ``[~g_k · 1e-24, g_k]`` and so can
-#: neither overflow nor underflow in float32.
-_WENO_INV_EPS_REL: float = 1.0 / _WENO_EPS_REL
+
+def _scaled_stencil(*q: Array) -> tuple[Array | float, ...]:
+    """Stencil differences rescaled to O(1), for the smoothness indicators.
+
+    ``d_j = (q_j - q_0) / s`` with ``s = max_j |q_j - q_0|`` (``1`` on a
+    constant stencil), so ``max_j |d_j| = 1``.  The indicators are quadratic
+    forms that vanish on constants, so ``beta_k(d) = beta_k(q) / s²``, and
+    the weights are invariant to that common factor; computing them on ``d``
+    keeps every intermediate O(1), so neither the indicators nor their
+    gradients under- or overflow at small or large amplitude (float32
+    included).  ``s`` is held out of the gradient (``stop_gradient``): exact,
+    because the weights do not depend on it.
+    """
+    diffs = [q_j - q[0] for q_j in q[1:]]
+    scale = jnp.abs(diffs[0])
+    for d in diffs[1:]:
+        scale = jnp.maximum(scale, jnp.abs(d))
+    scale = jax.lax.stop_gradient(scale)
+    inv_scale = 1.0 / jnp.where(scale > 0.0, scale, 1.0)
+    return (0.0, *(d * inv_scale for d in diffs))
 
 
-def _relative_betas(*betas: Array) -> tuple[Array, ...]:
-    """Normalise smoothness indicators by their sum: ``b_k = β_k / (Σβ + tiny)``.
+def _js_alphas(
+    linear_weights: tuple[float, ...], betas: tuple[Array | float, ...]
+) -> list[Array]:
+    """Unnormalised WENO-JS weights, in ``(0, g_k]``.
 
-    The result is dimensionless and in ``[0, 1]``; ``tiny`` (the smallest
-    normal number of the dtype) keeps a constant stencil (``Σβ = 0``) at
-    ``b_k = 0`` instead of ``0 / 0``.  Multiplying by one reciprocal keeps
-    the stencil a single fused elementwise pass.
+    ``alpha_k = g_k · ((beta_min + eps_eff) / (beta_k + eps_eff))²`` with
+    ``eps_eff = _WENO_EPS_REL · Σβ``: the normalised weights of
+    ``g_k / (beta_k + eps_eff)²``, scaled so the smoothest sub-stencil has
+    ``alpha = g_k``; ``Σα`` is then bounded below by ``min g_k``, so neither
+    the weights nor the gradient of their normalisation overflow.  A
+    constant stencil (``Σβ = 0``) gives ``alpha_k = g_k``, through a double
+    ``where`` so its gradient stays finite.
     """
     total = sum(betas)
-    tiny = jnp.finfo(jnp.result_type(total, 1.0)).tiny
-    inv_total = 1.0 / (total + tiny)
-    return tuple(beta * inv_total for beta in betas)
+    pos = total > 0.0
+    eps_eff = _WENO_EPS_REL * total
+    beta_min = betas[0]
+    for b in betas[1:]:
+        beta_min = jnp.minimum(beta_min, b)
+    num = beta_min + eps_eff
+    return [
+        g * jnp.where(pos, num / jnp.where(pos, b + eps_eff, 1.0), 1.0) ** 2
+        for g, b in zip(linear_weights, betas, strict=True)
+    ]
+
+
+def _z_alphas(
+    linear_weights: tuple[float, ...], betas: tuple[Array | float, ...], tau: Array
+) -> list[Array]:
+    """Unnormalised WENO-Z weights ``g_k (1 + tau / (beta_k + eps_eff))``.
+
+    ``eps_eff = _WENO_EPS_REL · Σβ``; in ``[g_k, g_k (1 + 1/eps_rel)]``.  A
+    constant stencil gives ``g_k`` (double ``where``, finite gradient).
+    """
+    total = sum(betas)
+    pos = total > 0.0
+    eps_eff = _WENO_EPS_REL * total
+    return [
+        g * (1.0 + jnp.where(pos, tau / jnp.where(pos, b + eps_eff, 1.0), 0.0))
+        for g, b in zip(linear_weights, betas, strict=True)
+    ]
+
+
+def _weighted(alphas: list[Array], candidates: list[Array]) -> Array:
+    """``Σ alpha_k q_k / Σ alpha_k``."""
+    return sum(a * c for a, c in zip(alphas, candidates, strict=True)) / sum(alphas)
 
 
 _WENO7_COEFFS = (
@@ -295,7 +341,9 @@ def _linear_combo(coeffs: tuple[float, ...], stencil: tuple[Array, ...]) -> Arra
     return sum(coeff * value for coeff, value in zip(coeffs, stencil, strict=True))
 
 
-def _smoothness_indicator(beta_matrix: np.ndarray, stencil: tuple[Array, ...]) -> Array:
+def _smoothness_indicator(
+    beta_matrix: np.ndarray, stencil: tuple[Array | float, ...]
+) -> Array:
     # beta = q^T B q = sum_i q_i * (sum_j B[i, j] * q_j)
     #
     # Same quadratic form as
@@ -312,34 +360,24 @@ def _smoothness_indicator(beta_matrix: np.ndarray, stencil: tuple[Array, ...]) -
 
 
 def _weno_reconstruct(
-    stencils: tuple[tuple[Array, ...], ...],
+    cells: tuple[Array, ...],
     coeffs: tuple[tuple[float, ...], ...],
     beta_matrices: tuple[np.ndarray, ...],
     linear_weights: tuple[float, ...],
 ) -> Array:
-    candidates = [
-        _linear_combo(stencil_coeffs, stencil)
-        for stencil_coeffs, stencil in zip(coeffs, stencils, strict=True)
-    ]
-    betas = _relative_betas(
-        *(
-            _smoothness_indicator(beta_matrix, stencil)
-            for beta_matrix, stencil in zip(beta_matrices, stencils, strict=True)
-        )
+    """WENO-JS from ``K`` overlapping sub-stencils of ``r`` cells each.
+
+    Sub-stencil ``k`` is ``cells[k : k + r]``; candidates use the raw cells,
+    the indicators the rescaled stencil (:func:`_scaled_stencil`).
+    """
+    width = len(coeffs[0])
+    windows = range(len(coeffs))
+    scaled = _scaled_stencil(*cells)
+    candidates = [_linear_combo(coeffs[k], cells[k : k + width]) for k in windows]
+    betas = tuple(
+        _smoothness_indicator(beta_matrices[k], scaled[k : k + width]) for k in windows
     )
-    # alpha_k = g_k / (1 + b_k / eps_rel)²,  b_k = beta_k / (Σβ + tiny)
-    alphas = [
-        weight / (1.0 + beta * _WENO_INV_EPS_REL) ** 2
-        for weight, beta in zip(linear_weights, betas, strict=True)
-    ]
-    alpha_sum = sum(alphas)
-    return (
-        sum(
-            alpha * candidate
-            for alpha, candidate in zip(alphas, candidates, strict=True)
-        )
-        / alpha_sum
-    )
+    return _weighted(_js_alphas(linear_weights, betas), candidates)
 
 
 def weno_3pts(qm: Array, q0: Array, qp: Array) -> Array:
@@ -355,18 +393,14 @@ def weno_3pts(qm: Array, q0: Array, qp: Array) -> Array:
     qi1 = -1.0 / 2.0 * qm + 3.0 / 2.0 * q0
     qi2 = 1.0 / 2.0 * (q0 + qp)
 
-    beta1 = (q0 - qm) ** 2
-    beta2 = (qp - q0) ** 2
+    # indicators on the rescaled stencil (dm, d0, dp) = (q - qm) / s
+    dm, d0, dp = _scaled_stencil(qm, q0, qp)
+    beta1 = (d0 - dm) ** 2
+    beta2 = (dp - d0) ** 2
 
-    b1, b2 = _relative_betas(beta1, beta2)
-
-    g1, g2 = 1.0 / 3.0, 2.0 / 3.0
-    w1 = g1 / (1.0 + b1 * _WENO_INV_EPS_REL) ** 2
-    w2 = g2 / (1.0 + b2 * _WENO_INV_EPS_REL) ** 2
-
-    qi_weno3 = (w1 * qi1 + w2 * qi2) / (w1 + w2)
-
-    return qi_weno3
+    # w_k ∝ g_k / (beta_k + eps_rel Σβ)²,  (g1, g2) = (1/3, 2/3)
+    alphas = _js_alphas((1.0 / 3.0, 2.0 / 3.0), (beta1, beta2))
+    return _weighted(alphas, [qi1, qi2])
 
 
 def weno_3pts_improved(qm: Array, q0: Array, qp: Array) -> Array:
@@ -382,18 +416,14 @@ def weno_3pts_improved(qm: Array, q0: Array, qp: Array) -> Array:
     qi1 = -1.0 / 2.0 * qm + 3.0 / 2.0 * q0
     qi2 = 1.0 / 2.0 * (q0 + qp)
 
-    beta1 = (q0 - qm) ** 2
-    beta2 = (qp - q0) ** 2
-    b1, b2 = _relative_betas(beta1, beta2)
-    tau = jnp.abs(b2 - b1)
+    dm, d0, dp = _scaled_stencil(qm, q0, qp)
+    beta1 = (d0 - dm) ** 2
+    beta2 = (dp - d0) ** 2
+    tau = jnp.abs(beta2 - beta1)
 
-    g1, g2 = 1.0 / 3.0, 2.0 / 3.0
-    w1 = g1 * (1.0 + tau / (b1 + _WENO_EPS_REL))
-    w2 = g2 * (1.0 + tau / (b2 + _WENO_EPS_REL))
-
-    qi_weno3 = (w1 * qi1 + w2 * qi2) / (w1 + w2)
-
-    return qi_weno3
+    # w_k ∝ g_k (1 + tau / (beta_k + eps_rel Σβ))
+    alphas = _z_alphas((1.0 / 3.0, 2.0 / 3.0), (beta1, beta2), tau)
+    return _weighted(alphas, [qi1, qi2])
 
 
 def weno_5pts(qmm: Array, qm: Array, q0: Array, qp: Array, qpp: Array) -> Array:
@@ -410,20 +440,16 @@ def weno_5pts(qmm: Array, qm: Array, q0: Array, qp: Array, qpp: Array) -> Array:
     qi3 = 1.0 / 3.0 * q0 + 5.0 / 6.0 * qp - 1.0 / 6.0 * qpp
 
     k1, k2 = 13.0 / 12.0, 0.25
-    beta1 = k1 * (qmm - 2 * qm + q0) ** 2 + k2 * (qmm - 4 * qm + 3 * q0) ** 2
-    beta2 = k1 * (qm - 2 * q0 + qp) ** 2 + k2 * (qm - qp) ** 2
-    beta3 = k1 * (q0 - 2 * qp + qpp) ** 2 + k2 * (3 * q0 - 4 * qp + qpp) ** 2
+    # indicators on the rescaled stencil d = (q - qmm) / s
+    dmm, dm, d0, dp, dpp = _scaled_stencil(qmm, qm, q0, qp, qpp)
+    beta1 = k1 * (dmm - 2 * dm + d0) ** 2 + k2 * (dmm - 4 * dm + 3 * d0) ** 2
+    beta2 = k1 * (dm - 2 * d0 + dp) ** 2 + k2 * (dm - dp) ** 2
+    beta3 = k1 * (d0 - 2 * dp + dpp) ** 2 + k2 * (3 * d0 - 4 * dp + dpp) ** 2
 
-    b1, b2, b3 = _relative_betas(beta1, beta2, beta3)
+    # w_k ∝ g_k / (beta_k + eps_rel Σβ)²,  (g1, g2, g3) = (0.1, 0.6, 0.3)
+    alphas = _js_alphas((0.1, 0.6, 0.3), (beta1, beta2, beta3))
 
-    g1, g2, g3 = 0.1, 0.6, 0.3
-    w1 = g1 / (1.0 + b1 * _WENO_INV_EPS_REL) ** 2
-    w2 = g2 / (1.0 + b2 * _WENO_INV_EPS_REL) ** 2
-    w3 = g3 / (1.0 + b3 * _WENO_INV_EPS_REL) ** 2
-
-    qi_weno5 = (w1 * qi1 + w2 * qi2 + w3 * qi3) / (w1 + w2 + w3)
-
-    return qi_weno5
+    return _weighted(alphas, [qi1, qi2, qi3])
 
 
 def weno_5pts_improved(
@@ -443,21 +469,18 @@ def weno_5pts_improved(
     qi3 = 1.0 / 3.0 * q0 + 5.0 / 6.0 * qp - 1.0 / 6.0 * qpp
 
     k1, k2 = 13.0 / 12.0, 0.25
-    beta1 = k1 * (qmm - 2 * qm + q0) ** 2 + k2 * (qmm - 4 * qm + 3 * q0) ** 2
-    beta2 = k1 * (qm - 2 * q0 + qp) ** 2 + k2 * (qm - qp) ** 2
-    beta3 = k1 * (q0 - 2 * qp + qpp) ** 2 + k2 * (3 * q0 - 4 * qp + qpp) ** 2
+    # indicators on the rescaled stencil d = (q - qmm) / s
+    dmm, dm, d0, dp, dpp = _scaled_stencil(qmm, qm, q0, qp, qpp)
+    beta1 = k1 * (dmm - 2 * dm + d0) ** 2 + k2 * (dmm - 4 * dm + 3 * d0) ** 2
+    beta2 = k1 * (dm - 2 * d0 + dp) ** 2 + k2 * (dm - dp) ** 2
+    beta3 = k1 * (d0 - 2 * dp + dpp) ** 2 + k2 * (3 * d0 - 4 * dp + dpp) ** 2
 
-    b1, b2, b3 = _relative_betas(beta1, beta2, beta3)
-    tau5 = jnp.abs(b1 - b3)
+    tau5 = jnp.abs(beta1 - beta3)
 
-    g1, g2, g3 = 0.1, 0.6, 0.3
-    w1 = g1 * (1 + tau5 / (b1 + _WENO_EPS_REL))
-    w2 = g2 * (1 + tau5 / (b2 + _WENO_EPS_REL))
-    w3 = g3 * (1 + tau5 / (b3 + _WENO_EPS_REL))
+    # w_k ∝ g_k (1 + tau5 / (beta_k + eps_rel Σβ))
+    alphas = _z_alphas((0.1, 0.6, 0.3), (beta1, beta2, beta3), tau5)
 
-    qi_weno5 = (w1 * qi1 + w2 * qi2 + w3 * qi3) / (w1 + w2 + w3)
-
-    return qi_weno5
+    return _weighted(alphas, [qi1, qi2, qi3])
 
 
 def weno_3pts_right(q0: Array, qp: Array, qpp: Array) -> Array:
@@ -474,16 +497,12 @@ def weno_3pts_right(q0: Array, qp: Array, qpp: Array) -> Array:
     qi1 = 0.5 * (q0 + qp)
     qi2 = 1.5 * qp - 0.5 * qpp
 
-    beta1 = (qp - q0) ** 2
-    beta2 = (qpp - qp) ** 2
+    d0, dp, dpp = _scaled_stencil(q0, qp, qpp)
+    beta1 = (dp - d0) ** 2
+    beta2 = (dpp - dp) ** 2
 
-    b1, b2 = _relative_betas(beta1, beta2)
-
-    g1, g2 = 2.0 / 3.0, 1.0 / 3.0
-    w1 = g1 / (1.0 + b1 * _WENO_INV_EPS_REL) ** 2
-    w2 = g2 / (1.0 + b2 * _WENO_INV_EPS_REL) ** 2
-
-    return (w1 * qi1 + w2 * qi2) / (w1 + w2)
+    alphas = _js_alphas((2.0 / 3.0, 1.0 / 3.0), (beta1, beta2))
+    return _weighted(alphas, [qi1, qi2])
 
 
 def weno_3pts_improved_right(q0: Array, qp: Array, qpp: Array) -> Array:
@@ -498,16 +517,13 @@ def weno_3pts_improved_right(q0: Array, qp: Array, qpp: Array) -> Array:
     qi1 = 0.5 * (q0 + qp)
     qi2 = 1.5 * qp - 0.5 * qpp
 
-    beta1 = (qp - q0) ** 2
-    beta2 = (qpp - qp) ** 2
-    b1, b2 = _relative_betas(beta1, beta2)
-    tau = jnp.abs(b2 - b1)
+    d0, dp, dpp = _scaled_stencil(q0, qp, qpp)
+    beta1 = (dp - d0) ** 2
+    beta2 = (dpp - dp) ** 2
+    tau = jnp.abs(beta2 - beta1)
 
-    g1, g2 = 2.0 / 3.0, 1.0 / 3.0
-    w1 = g1 * (1.0 + tau / (b1 + _WENO_EPS_REL))
-    w2 = g2 * (1.0 + tau / (b2 + _WENO_EPS_REL))
-
-    return (w1 * qi1 + w2 * qi2) / (w1 + w2)
+    alphas = _z_alphas((2.0 / 3.0, 1.0 / 3.0), (beta1, beta2), tau)
+    return _weighted(alphas, [qi1, qi2])
 
 
 def weno_5pts_right(qm: Array, q0: Array, qp: Array, qpp: Array, qppp: Array) -> Array:
@@ -529,18 +545,16 @@ def weno_5pts_right(qm: Array, q0: Array, qp: Array, qpp: Array, qppp: Array) ->
 
     # Smoothness indicators
     k1, k2 = 13.0 / 12.0, 0.25
-    beta1 = k1 * (qp - 2 * qpp + qppp) ** 2 + k2 * (3 * qp - 4 * qpp + qppp) ** 2
-    beta2 = k1 * (q0 - 2 * qp + qpp) ** 2 + k2 * (q0 - qpp) ** 2
-    beta3 = k1 * (qm - 2 * q0 + qp) ** 2 + k2 * (qm - 4 * q0 + 3 * qp) ** 2
+    # indicators on the rescaled stencil d = (q - qm) / s
+    dm, d0, dp, dpp, dppp = _scaled_stencil(qm, q0, qp, qpp, qppp)
+    beta1 = k1 * (dp - 2 * dpp + dppp) ** 2 + k2 * (3 * dp - 4 * dpp + dppp) ** 2
+    beta2 = k1 * (d0 - 2 * dp + dpp) ** 2 + k2 * (d0 - dpp) ** 2
+    beta3 = k1 * (dm - 2 * d0 + dp) ** 2 + k2 * (dm - 4 * d0 + 3 * dp) ** 2
 
-    b1, b2, b3 = _relative_betas(beta1, beta2, beta3)
+    # w_k ∝ g_k / (beta_k + eps_rel Σβ)²,  (g1, g2, g3) = (0.1, 0.6, 0.3)
+    alphas = _js_alphas((0.1, 0.6, 0.3), (beta1, beta2, beta3))
 
-    g1, g2, g3 = 0.1, 0.6, 0.3
-    w1 = g1 / (1.0 + b1 * _WENO_INV_EPS_REL) ** 2
-    w2 = g2 / (1.0 + b2 * _WENO_INV_EPS_REL) ** 2
-    w3 = g3 / (1.0 + b3 * _WENO_INV_EPS_REL) ** 2
-
-    return (w1 * qi1 + w2 * qi2 + w3 * qi3) / (w1 + w2 + w3)
+    return _weighted(alphas, [qi1, qi2, qi3])
 
 
 def weno_5pts_improved_right(
@@ -559,19 +573,18 @@ def weno_5pts_improved_right(
     qi3 = 1.0 / 3.0 * qp + 5.0 / 6.0 * q0 - 1.0 / 6.0 * qm
 
     k1, k2 = 13.0 / 12.0, 0.25
-    beta1 = k1 * (qp - 2 * qpp + qppp) ** 2 + k2 * (3 * qp - 4 * qpp + qppp) ** 2
-    beta2 = k1 * (q0 - 2 * qp + qpp) ** 2 + k2 * (q0 - qpp) ** 2
-    beta3 = k1 * (qm - 2 * q0 + qp) ** 2 + k2 * (qm - 4 * q0 + 3 * qp) ** 2
+    # indicators on the rescaled stencil d = (q - qm) / s
+    dm, d0, dp, dpp, dppp = _scaled_stencil(qm, q0, qp, qpp, qppp)
+    beta1 = k1 * (dp - 2 * dpp + dppp) ** 2 + k2 * (3 * dp - 4 * dpp + dppp) ** 2
+    beta2 = k1 * (d0 - 2 * dp + dpp) ** 2 + k2 * (d0 - dpp) ** 2
+    beta3 = k1 * (dm - 2 * d0 + dp) ** 2 + k2 * (dm - 4 * d0 + 3 * dp) ** 2
 
-    b1, b2, b3 = _relative_betas(beta1, beta2, beta3)
-    tau5 = jnp.abs(b1 - b3)
+    tau5 = jnp.abs(beta1 - beta3)
 
-    g1, g2, g3 = 0.1, 0.6, 0.3
-    w1 = g1 * (1 + tau5 / (b1 + _WENO_EPS_REL))
-    w2 = g2 * (1 + tau5 / (b2 + _WENO_EPS_REL))
-    w3 = g3 * (1 + tau5 / (b3 + _WENO_EPS_REL))
+    # w_k ∝ g_k (1 + tau5 / (beta_k + eps_rel Σβ))
+    alphas = _z_alphas((0.1, 0.6, 0.3), (beta1, beta2, beta3), tau5)
 
-    return (w1 * qi1 + w2 * qi2 + w3 * qi3) / (w1 + w2 + w3)
+    return _weighted(alphas, [qi1, qi2, qi3])
 
 
 _WENO7_COEFFS_RIGHT = tuple(tuple(reversed(c)) for c in reversed(_WENO7_COEFFS))
@@ -604,14 +617,11 @@ def weno_7pts(
     Efficient finite-volume WENO-7 reconstruction using Jiang-Shu
     smoothness indicators.
     """
-    stencils = (
-        (qmmm, qmm, qm, q0),
-        (qmm, qm, q0, qp),
-        (qm, q0, qp, qpp),
-        (q0, qp, qpp, qppp),
-    )
     return _weno_reconstruct(
-        stencils, _WENO7_COEFFS, _WENO7_BETA_MATRICES, _WENO7_WEIGHTS
+        (qmmm, qmm, qm, q0, qp, qpp, qppp),
+        _WENO7_COEFFS,
+        _WENO7_BETA_MATRICES,
+        _WENO7_WEIGHTS,
     )
 
 
@@ -634,15 +644,11 @@ def weno_9pts(
     Efficient finite-volume WENO-9 reconstruction using Jiang-Shu
     smoothness indicators.
     """
-    stencils = (
-        (qmmmm, qmmm, qmm, qm, q0),
-        (qmmm, qmm, qm, q0, qp),
-        (qmm, qm, q0, qp, qpp),
-        (qm, q0, qp, qpp, qppp),
-        (q0, qp, qpp, qppp, qpppp),
-    )
     return _weno_reconstruct(
-        stencils, _WENO9_COEFFS, _WENO9_BETA_MATRICES, _WENO9_WEIGHTS
+        (qmmmm, qmmm, qmm, qm, q0, qp, qpp, qppp, qpppp),
+        _WENO9_COEFFS,
+        _WENO9_BETA_MATRICES,
+        _WENO9_WEIGHTS,
     )
 
 
@@ -666,14 +672,8 @@ def weno_7pts_right(
 
     Jiang and Shu, J. Comput. Phys. 126, 202–228 (1996), Section 2.3.
     """
-    stencils = (
-        (qmm, qm, q0, qp),
-        (qm, q0, qp, qpp),
-        (q0, qp, qpp, qppp),
-        (qp, qpp, qppp, qpppp),
-    )
     return _weno_reconstruct(
-        stencils,
+        (qmm, qm, q0, qp, qpp, qppp, qpppp),
         _WENO7_COEFFS_RIGHT,
         _WENO7_BETA_MATRICES_RIGHT,
         _WENO7_WEIGHTS_RIGHT,
@@ -702,15 +702,8 @@ def weno_9pts_right(
 
     Jiang and Shu, J. Comput. Phys. 126, 202–228 (1996), Section 2.3.
     """
-    stencils = (
-        (qmmm, qmm, qm, q0, qp),
-        (qmm, qm, q0, qp, qpp),
-        (qm, q0, qp, qpp, qppp),
-        (q0, qp, qpp, qppp, qpppp),
-        (qp, qpp, qppp, qpppp, qppppp),
-    )
     return _weno_reconstruct(
-        stencils,
+        (qmmm, qmm, qm, q0, qp, qpp, qppp, qpppp, qppppp),
         _WENO9_COEFFS_RIGHT,
         _WENO9_BETA_MATRICES_RIGHT,
         _WENO9_WEIGHTS_RIGHT,

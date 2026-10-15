@@ -312,7 +312,8 @@ class TestOnePadPerOffset:
 
 def _einsum_smoothness_indicator(beta_matrix, stencil):
     """The original stacked-einsum form of ``q^T B q``."""
-    values = jnp.stack(stencil, axis=0)
+    # broadcast: the rescaled stencil's first entry is the Python scalar 0.0
+    values = jnp.stack(jnp.broadcast_arrays(*stencil), axis=0)
     beta = jnp.asarray(beta_matrix, dtype=values.dtype)
     return jnp.einsum("i...,ij,j...->...", values, beta, values)
 

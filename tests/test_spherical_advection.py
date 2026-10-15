@@ -529,7 +529,11 @@ class TestSphericalOpenWall:
         op = SphericalAdvection2D(grid=grid)
         closed = _advect(op, h, u, v, method)
         opened = _advect(op, h, u, v, method, wall="open")
-        np.testing.assert_array_equal(closed, _advect(op, h, u, v, method, "closed"))
+        # default vs explicit "closed": the same expressions, but two jit traces
+        # whose fusion (summation order) may differ by an ulp
+        np.testing.assert_allclose(
+            closed, _advect(op, h, u, v, method, "closed"), rtol=1e-14, atol=1e-14
+        )
         # same expressions on [2:-2, 2:-2]; only XLA's fusion can differ (ulp)
         np.testing.assert_allclose(
             opened[2:-2, 2:-2], closed[2:-2, 2:-2], rtol=1e-14, atol=1e-14
