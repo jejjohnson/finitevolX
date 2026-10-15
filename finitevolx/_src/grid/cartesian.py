@@ -119,9 +119,9 @@ class CartesianGrid3D(CurvilinearGrid3D):
     applied independently at each z-level — i.e. ``Difference3D`` and
     related operators act on the ``(y, x)`` plane for fixed ``k``.  The
     vertical axis is **not** staggered within this same-shape array
-    convention; W-point fields (vertical velocity at z-interfaces) live
-    in a separate ``[Nz+1, Ny, Nx]`` array — see
-    ``finitevolx._src.operators.diagnostics.vertical_velocity``.
+    convention.  W-point fields (vertical velocity at z-interfaces) use the same
+    ``[Nz, Ny, Nx]`` shape, ``w[k]`` on the top face of ``T[k]`` (as
+    ``Mask3D.w`` and ``vertical_velocity``).
 
     Notes
     -----
@@ -133,8 +133,8 @@ class CartesianGrid3D(CurvilinearGrid3D):
         X[k, j, i]  NE corner    at  ((i + 1/2) * dx, (j + 1/2) * dy,  k * dz )
 
     All four point types share the same z-coordinate ``k * dz``;
-    vertical staggering (W-points at ``(k + 1/2) * dz``) is handled by
-    separate ``[Nz+1, Ny, Nx]`` fields outside this grid container.
+    W-points at ``(k + 1/2) * dz`` (the top face of ``T[k]``) are stored
+    in the same ``[Nz, Ny, Nx]`` shape.
     """
 
     @classmethod

@@ -12,8 +12,7 @@ Each diagnostic in the table below comes in two forms:
 The domain-integrated `total_energy` / `total_enstrophy` and
 `vertical_velocity` have **no** class form: pass the reductions fields that
 are already masked (e.g. from the class operators), and give
-`vertical_velocity` its per-call `mask=` argument (operator form tracked in
-#210).
+`vertical_velocity` a `Mask3D` as its per-call `mask=` argument.
 
 See [Masks → Operator API](../masks.md#operator-api-how-operators-consume-masks)
 for the stagger → mask mapping.

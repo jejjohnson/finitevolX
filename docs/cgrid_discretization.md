@@ -210,75 +210,41 @@ top/bottom ghost shells, and the physical interior is
 `k = 1 … Nz - 2` (see [Multilayer vs. 3D](multilayer_vs_3d.md) for the
 distinction with multilayer/baroclinic models).
 
-The interesting question is what to do about the **vertical interfaces**
-— the faces between `T[k, j, i]` and `T[k+1, j, i]`, where vertical
-velocity `w` lives.  There are two viable conventions, and `finitevolX`
-currently uses *both* depending on the subsystem.
-
-### Convention A — same-shape `[Nz, Ny, Nx]` (preferred)
-
-Apply the same trick as the horizontal: store w-faces at `[Nz, Ny, Nx]`
-under a positive-half-step rule:
+The vertical interfaces — the faces between `T[k, j, i]` and
+`T[k+1, j, i]`, where vertical velocity `w` lives — follow the same
+same-index rule as the horizontal faces:
 
 ```
 w[k, j, i]  at ( k+½,  j,  i )    ← top face of T[k, j, i]
 ```
 
-`w[k]` is then the top face of cell `k` (equivalently the bottom face of
-cell `k+1`).  Both physical vertical boundaries — the sea floor at the
-bottom and the sea surface at the top — are absorbed into the ghost
-shells, just like the horizontal walls.  An interior cell `T[k, j, i]`
-has two adjacent w-faces: `w[k, j, i]` above and `w[k-1, j, i]` below.
-
-This is what **`Mask3D.w`** uses, and it composes cleanly with the rest
-of the 3D mask machinery: `mask.h`, `mask.u`, `mask.v`, `mask.w`, and
-`mask.xy_corner` all share the same `[Nz, Ny, Nx]` shape, so any field
-arithmetic broadcasts without reshaping.
-
-### Convention B — separate `[Nz+1, Ny, Nx]` array
-
-Store w-faces in a *longer* array, one extra index in z:
+`w[k]` is the top face of cell `k` (equivalently the bottom face of cell
+`k+1`).  With the physical levels `k = 1 … Nz-2`:
 
 ```
-w[0,    :, :]    sea floor             ← bottommost physical interface
-w[1,    :, :]    interface between T[0] and T[1]
-...
-w[Nz,   :, :]    sea surface           ← topmost physical interface
+w[Nz-1]   outside the domain (top face of the top ghost slab)
+w[Nz-2]   surface (top face of the top physical level)
+  ...
+w[1]      interface between T[1] and T[2]
+w[0]      floor (bottom face of T[1]; zero for a rigid bottom)
 ```
 
-Under this convention every physical interface is explicitly indexable.
-Every cell `T[k]` has two adjacent faces: `w[k]` below and `w[k+1]`
-above.  Boundary values can be set directly — `w[0] = 0` for a rigid
-bottom, `w[Nz] = ∂η/∂t` for a free surface.
+just as `U[:, 0]` / `U[:, Nx-2]` are the west / east wall faces and
+`U[:, Nx-1]` is outside the domain.  `Mask3D.w` and
+[`vertical_velocity`](api/diagnostics.md) both use this convention, so
+`h`, `u`, `v`, `w` and every mask share the `[Nz, Ny, Nx]` shape and
+broadcast without reshaping:
 
-This is what **`vertical_velocity`** in
-[`finitevolx._src.operators.diagnostics`](api/diagnostics.md) uses,
-because it integrates the horizontal divergence from bottom to top
-(`w[k+1] = w[k] − div_h[k] · dz`) and benefits from having `w[0] = 0` as
-an explicit initial condition.
+```python
+mask = Mask3D.from_mask(wet)                          # mask.w.shape == (Nz, Ny, Nx)
+w = vertical_velocity(u, v, dx, dy, dz, mask=mask)    # w.shape == (Nz, Ny, Nx)
+```
 
-### Tradeoffs
-
-| Property | Convention A — `[Nz, Ny, Nx]` | Convention B — `[Nz+1, Ny, Nx]` |
-|---|---|---|
-| Broadcasts with `h` / `u` / `v` | ✅ | ❌ |
-| Consistent with horizontal staggering | ✅ | ❌ |
-| `vmap` over z-levels across fields | ✅ | ❌ (shape mismatch) |
-| Number of data-layout categories to learn | 1 | 2 |
-| Explicit bottom boundary index | ❌ (in ghost shell) | ✅ (`w[0]`) |
-| Explicit top boundary index | ❌ (in ghost shell) | ✅ (`w[Nz]`) |
-| Clean free-surface / rigid-lid BC application | Awkward | Natural |
-
-In practice convention **A** wins on code hygiene (uniform shapes,
-broadcasting, vmap, fewer special cases), but convention **B** wins on
-"naturalness" for the one operation that genuinely needs both vertical
-boundaries as first-class indices: `vertical_velocity`.
-
-The intent of `finitevolX` going forward is to standardise on **convention
-A** so that every staggered field — horizontal *and* vertical — has the
-same `[Nz, Ny, Nx]` shape and the same ghost-cell semantics.  See
-[issue #210](https://github.com/jejjohnson/finitevolX/issues/210) for the
-tracking issue and the planned refactor of `vertical_velocity`.
+`vertical_velocity` integrates the horizontal divergence of the physical
+levels upward from `w[0] = 0` (`w[k] = w[k-1] − div_h[k] · dz`) and never
+reads the z-ghost slabs of `u` and `v`.  (Until #210 it returned a separate
+`[Nz+1, Ny, Nx]` array with `w[0]` the floor and also integrated the ghost
+slabs.)
 
 ---
 
