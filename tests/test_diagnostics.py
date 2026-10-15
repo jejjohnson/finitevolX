@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
+from finitevolx._src.mask import Mask3D
 from finitevolx._src.operators.diagnostics import (
     available_potential_energy,
     bernoulli_potential,
@@ -423,11 +424,13 @@ class TestTotalEnstrophy:
 
 
 class TestVerticalVelocity:
+    """``w[k]`` on the top face of ``T[k]``, same shape as ``Mask3D.w`` (#290, #210)."""
+
     def test_output_shape(self, grid3d):
         u = jnp.zeros((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         v = jnp.zeros((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         w = vertical_velocity(u, v, grid3d.dx, grid3d.dy, grid3d.dz)
-        assert w.shape == (grid3d.Nz + 1, grid3d.Ny, grid3d.Nx)
+        assert w.shape == (grid3d.Nz, grid3d.Ny, grid3d.Nx)
 
     def test_zero_divergence(self, grid3d):
         """Non-divergent flow => w = 0 everywhere."""
@@ -436,44 +439,96 @@ class TestVerticalVelocity:
         w = vertical_velocity(u, v, grid3d.dx, grid3d.dy, grid3d.dz)
         np.testing.assert_allclose(w, 0.0, atol=1e-10)
 
-    def test_bottom_boundary_zero(self, grid3d):
-        """Bottom boundary w[0] should always be zero."""
-        # Use a divergent field
+    def test_floor_and_outside_slab_zero(self, grid3d):
+        """w[0] is the rigid floor and w[Nz-1] is outside the domain: both zero."""
         x = jnp.arange(grid3d.Nx, dtype=float) * grid3d.dx
         u = jnp.broadcast_to(x, (grid3d.Nz, grid3d.Ny, grid3d.Nx))
         v = jnp.zeros((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         w = vertical_velocity(u, v, grid3d.dx, grid3d.dy, grid3d.dz)
-        np.testing.assert_allclose(w[0], 0.0, atol=1e-10)
+        np.testing.assert_array_equal(w[0], 0.0)
+        np.testing.assert_array_equal(w[-1], 0.0)
 
     def test_known_w_uniform_divergence(self, grid3d):
-        """Uniform du/dx = c at every interior level => w[k] = -c * k * dz on interior interfaces."""
-        # u = c * x on U-points => du/dx = c at T-points
+        """Uniform du/dx = c on the physical levels => w[k] = -c k dz, k = 1..Nz-2."""
         c = 2.0
         x = jnp.arange(grid3d.Nx, dtype=float) * grid3d.dx
         u = jnp.broadcast_to(c * x, (grid3d.Nz, grid3d.Ny, grid3d.Nx))
         v = jnp.zeros((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         w = vertical_velocity(u, v, grid3d.dx, grid3d.dy, grid3d.dz)
-        # At interior T-points (k = 1..Nz-2): du/dx = c, so div = c.
-        # Ghost z-levels (k=0, k=Nz-1) may have different divergence, so
-        # only verify interior interface levels where the profile is physical.
-        # w[k+1] = -cumsum(div[0..k]) * dz; for k >= 1 the accumulated
-        # divergence from interior levels gives -(k+1)*c*dz.
-        for k in range(grid3d.Nz):
-            expected_w = -(k + 1) * c * grid3d.dz
+        for k in range(1, grid3d.Nz - 1):
             np.testing.assert_allclose(
-                w[k + 1, 1:-1, 1:-1],
-                expected_w,
-                rtol=1e-5,
-                err_msg=f"w mismatch at interface level {k + 1}",
+                w[k, 1:-1, 1:-1], -k * c * grid3d.dz, rtol=1e-12, err_msg=f"w[{k}]"
             )
 
-    def test_mask_zeroes_divergence(self, grid3d):
-        """Masking out all cells => w = 0."""
+    def test_z_ghost_slabs_are_not_read(self, grid3d):
+        """BC-filled (non-zero, divergent) z-ghosts leave w unchanged (#290)."""
+        x = jnp.arange(grid3d.Nx, dtype=float) * grid3d.dx
+        y = jnp.arange(grid3d.Ny, dtype=float)[:, None] * grid3d.dy
+        u = jnp.broadcast_to(x, (grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        v = jnp.zeros((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        w_ref = vertical_velocity(u, v, grid3d.dx, grid3d.dy, grid3d.dz)
+        # put a strongly divergent field in both z-ghost slabs
+        junk_u = 7.0 * x**2 + 3.0 * y
+        junk_v = -5.0 * y**3 + x
+        u_g = u.at[0].set(junk_u).at[-1].set(-junk_u)
+        v_g = v.at[0].set(junk_v).at[-1].set(2.0 * junk_v)
+        w = vertical_velocity(u_g, v_g, grid3d.dx, grid3d.dy, grid3d.dz)
+        np.testing.assert_array_equal(w, w_ref)
+        # the issue's repro: du/dx = 1 everywhere, w[1] = -dz (not -2 dz)
+        np.testing.assert_allclose(w[1, 2, 2], -grid3d.dz, rtol=1e-12)
+
+    def test_mask3d(self, grid3d):
+        """Mask3D: dry columns have zero divergence; output zeroed on dry W-faces."""
+        x = jnp.arange(grid3d.Nx, dtype=float) * grid3d.dx
+        u = jnp.broadcast_to(x, (grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        v = jnp.zeros((grid3d.Nz, grid3d.Ny, grid3d.Nx))
+        wet = np.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx), dtype=bool)
+        wet[:, :, :3] = False  # a land block on the west side, all depths
+        mask = Mask3D.from_mask(wet)
+        w = vertical_velocity(u, v, grid3d.dx, grid3d.dy, grid3d.dz, mask=mask)
+        assert w.shape == mask.w.shape
+        np.testing.assert_array_equal(np.asarray(w)[~np.asarray(mask.w)], 0.0)
+        # = the unmasked result on the masked velocities (no flow through the
+        # coast faces), zeroed on dry W-faces
+        w_ref = vertical_velocity(
+            u * mask.u, v * mask.v, grid3d.dx, grid3d.dy, grid3d.dz
+        )
+        np.testing.assert_allclose(jnp.where(mask.w, w_ref, 0.0), w, rtol=0, atol=1e-14)
+        w_all = vertical_velocity(u, v, grid3d.dx, grid3d.dy, grid3d.dz)
+        # an all-ocean mask equals mask=None
+        ocean = Mask3D.from_mask(np.ones_like(wet))
+        np.testing.assert_array_equal(
+            vertical_velocity(u, v, grid3d.dx, grid3d.dy, grid3d.dz, mask=ocean)[
+                1:-1, 1:-1, 1:-1
+            ],
+            w_all[1:-1, 1:-1, 1:-1],
+        )
+
+    def test_mask3d_nan_land_stays_finite(self, grid3d):
+        """NaN on dry faces never reaches a wet W-face (contract 3)."""
+        x = jnp.arange(grid3d.Nx, dtype=float) * grid3d.dx
+        wet = np.ones((grid3d.Nz, grid3d.Ny, grid3d.Nx), dtype=bool)
+        wet[:, :, :3] = False
+        mask = Mask3D.from_mask(wet)
+        u = jnp.where(mask.u, jnp.broadcast_to(x, wet.shape), jnp.nan)
+        v = jnp.where(mask.v, 0.0, jnp.nan)
+        w = vertical_velocity(u, v, grid3d.dx, grid3d.dy, grid3d.dz, mask=mask)
+        assert bool(jnp.all(jnp.isfinite(w)))
+        grad = jax.grad(
+            lambda a: vertical_velocity(
+                a, v, grid3d.dx, grid3d.dy, grid3d.dz, mask=mask
+            ).sum()
+        )(u)
+        assert bool(jnp.all(jnp.isfinite(grad)))
+
+    def test_float_mask_is_deprecated(self, grid3d):
+        """A raw float mask still zeroes the divergence, with a DeprecationWarning."""
         x = jnp.arange(grid3d.Nx, dtype=float) * grid3d.dx
         u = jnp.broadcast_to(x, (grid3d.Nz, grid3d.Ny, grid3d.Nx))
         v = jnp.zeros((grid3d.Nz, grid3d.Ny, grid3d.Nx))
         mask = jnp.zeros((grid3d.Nz, grid3d.Ny, grid3d.Nx))
-        w = vertical_velocity(u, v, grid3d.dx, grid3d.dy, grid3d.dz, mask=mask)
+        with pytest.warns(DeprecationWarning, match="Mask3D"):
+            w = vertical_velocity(u, v, grid3d.dx, grid3d.dy, grid3d.dz, mask=mask)
         np.testing.assert_allclose(w, 0.0, atol=1e-10)
 
 

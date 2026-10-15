@@ -241,8 +241,9 @@ Diagnostics **without** a class form:
 - `total_energy`, `total_enstrophy` are domain reductions, not stencils.
   Pass them fields that are already masked (e.g. from the class forms
   above) so dry cells contribute zero.
-- `vertical_velocity` still takes a per-call `mask=` argument; its
-  operator form is tracked in #210.
+- `vertical_velocity` takes a per-call `mask=Mask3D`: it zeroes the
+  divergence on dry T-points (`mask.h`) and its output on dry W-faces
+  (`mask.w`); the output has the same `[Nz, Ny, Nx]` shape as `mask.w`.
 
 If you do call a Layer-2 helper directly and want masked output, apply
 the mask at the call site: `ke = jnp.where(mask.h, kinetic_energy(u, v), 0.0)`

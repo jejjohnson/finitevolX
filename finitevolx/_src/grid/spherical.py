@@ -344,10 +344,9 @@ class SphericalGrid3D(CurvilinearGrid3D):
     the horizontal staggering is independent of depth.
 
     As with the Cartesian :class:`CartesianGrid3D`, only the horizontal
-    axes are staggered (T, U, V, X share the same ``k * dz``); W-point
-    fields (vertical velocity at z-interfaces) live in a separate
-    ``[Nz+1, Ny, Nx]`` array — see
-    ``finitevolx._src.operators.diagnostics.vertical_velocity``.
+    axes are staggered (T, U, V, X share the same ``k * dz``); W-point fields (vertical velocity at z-interfaces) use the same
+    ``[Nz, Ny, Nx]`` shape, ``w[k]`` on the top face of ``T[k]`` (as
+    ``Mask3D.w`` and ``vertical_velocity``).
 
     Parameters
     ----------

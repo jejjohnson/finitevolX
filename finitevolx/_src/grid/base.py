@@ -126,9 +126,8 @@ class ArakawaCGrid3D(eqx.Module):
         k=0     +================+  ghost slab (bottom)
 
     Only the horizontal axes are staggered (T, U, V, X share the same
-    z-level); vertical staggering for W-fields uses a separate
-    ``[Nz+1, Ny, Nx]`` array — see
-    ``finitevolx._src.operators.diagnostics.vertical_velocity``.
+    z-level); W-fields use the same ``[Nz, Ny, Nx]`` shape, ``w[k]`` on the
+    top face of ``T[k]`` (as ``Mask3D.w`` and ``vertical_velocity``).
     """
 
     Nx: int

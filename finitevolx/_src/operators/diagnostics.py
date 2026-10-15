@@ -7,6 +7,8 @@ and domain-integrated conservation diagnostics.
 
 from __future__ import annotations
 
+import warnings
+
 import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import (
@@ -14,6 +16,7 @@ from jaxtyping import (
     Float,
 )
 
+from finitevolx._src.mask import Mask3D
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.difference import _curl_2d
 from finitevolx._src.operators.stencils import (
@@ -21,8 +24,10 @@ from finitevolx._src.operators.stencils import (
     avg_xy_fwd,
     avg_y_bwd,
     diff_x_bwd,
+    diff_x_bwd_3d,
     diff_x_fwd,
     diff_y_bwd,
+    diff_y_bwd_3d,
     diff_y_fwd,
 )
 from finitevolx._src.utils.constants import GRAVITY, OMEGA, R_EARTH
@@ -562,16 +567,23 @@ def vertical_velocity(
     dx: float,
     dy: float,
     dz: float,
-    mask: Float[Array, "Nz Ny Nx"] | None = None,
-) -> Float[Array, "Nzp1 Ny Nx"]:
+    mask: Mask3D | Float[Array, "Nz Ny Nx"] | None = None,
+) -> Float[Array, "Nz Ny Nx"]:
     """Vertical velocity from the continuity equation.
 
-    Integrates the horizontal divergence from bottom (w=0) to top:
+    Integrates the horizontal divergence of the physical levels upward from
+    a rigid floor (``w = 0``):
 
-        w[k+1/2] = w[k-1/2] - (du/dx + dv/dy)[k] * dz
+        w[k+1/2] = w[k-1/2] - (du/dx + dv/dy)[k] * dz,   k = 1 .. Nz-2
 
-    where the horizontal divergence is computed at T-points for each
-    z-level.
+    The result uses the same ``[Nz, Ny, Nx]`` convention as ``Mask3D.w``:
+    ``w[k]`` is the **top face** of ``T[k]`` (``k + 1/2``).  So ``w[0]`` is
+    the floor (the bottom face of the first physical level ``T[1]``, zero),
+    ``w[1:-1]`` are the interfaces above the physical levels, ``w[Nz-2]`` is
+    the surface (zero for a rigid lid when the column conserves mass) and
+    ``w[Nz-1]`` is outside the domain (zero).  The z-ghost slabs ``k = 0``
+    and ``k = Nz-1`` of ``u`` and ``v`` are never read, so BC-filled
+    z-ghosts do not change the answer.
 
     Parameters
     ----------
@@ -585,36 +597,55 @@ def vertical_velocity(
         Grid spacing in y.
     dz : float
         Grid spacing in z.
-    mask : Float[Array, "Nz Ny Nx"] | None, optional
-        Binary mask at T-points.  If provided, the horizontal divergence
-        is zeroed where mask is 0 before vertical integration.
+    mask : Mask3D or Float[Array, "Nz Ny Nx"] or None, optional
+        A :class:`Mask3D`: ``u`` / ``v`` are zeroed on dry faces with
+        ``jnp.where`` before the stencil (so NaN-filled land cannot leak),
+        the divergence on dry T-points (``mask.h``) before the integration,
+        and the output on dry W-faces (``mask.w``).  ``mask.w[Nz-2]`` (the
+        surface) is dry wherever the top ghost slab is dry, so a non-zero
+        rigid-lid residual there is masked out too.  A raw float T-point
+        mask (deprecated) only zeroes the divergence.
 
     Returns
     -------
-    Float[Array, "Nzp1 Ny Nx"]
-        Vertical velocity at W-points (cell interfaces in z).
-        Shape is ``(Nz + 1, Ny, Nx)``.  ``w[0]`` is the bottom boundary
-        (zero) and ``w[Nz]`` is the top.  Only the horizontal interior
-        ``[1:-1, 1:-1]`` contains meaningful values.
+    Float[Array, "Nz Ny Nx"]
+        Vertical velocity at W-points, ``w[k]`` on the top face of ``T[k]``,
+        written on ``[1:-1, 1:-1, 1:-1]`` with a zero ghost ring (``w[0]``
+        is the zero floor).
+
+    Examples
+    --------
+    >>> grid = CartesianGrid3D.from_interior(6, 4, 3, Lx=1.0, Ly=1.0, Lz=1.0)
+    >>> u = jnp.broadcast_to(jnp.arange(grid.Nx) * grid.dx, (grid.Nz, grid.Ny, grid.Nx))
+    >>> w = vertical_velocity(u, jnp.zeros_like(u), grid.dx, grid.dy, grid.dz)
+    >>> w.shape, float(w[0, 2, 2]), float(w[1, 2, 2])  # du/dx = 1
+    ((5, 6, 8), 0.0, -0.333...)
     """
-    Nz, Ny, Nx = u.shape
-    # Horizontal divergence at T-points for each z-level
-    # du/dx[k, j, i] = (u[k, j, i] - u[k, j, i-1]) / dx
-    # dv/dy[k, j, i] = (v[k, j, i] - v[k, j-1, i]) / dy
-    du_dx = jnp.zeros_like(u)
-    du_dx = du_dx.at[:, 1:-1, 1:-1].set((u[:, 1:-1, 1:-1] - u[:, 1:-1, :-2]) / dx)
-    dv_dy = jnp.zeros_like(v)
-    dv_dy = dv_dy.at[:, 1:-1, 1:-1].set((v[:, 1:-1, 1:-1] - v[:, :-2, 1:-1]) / dy)
-    div_h = du_dx + dv_dy  # [Nz, Ny, Nx]
+    if isinstance(mask, Mask3D):
+        # zero dry faces before the stencil reads them (NaN-filled land)
+        u = jnp.where(mask.u, u, 0.0)
+        v = jnp.where(mask.v, v, 0.0)
+    # Horizontal divergence at the interior T-points of the physical levels
+    # div[k, j, i] = (u[k, j, i+1/2] - u[k, j, i-1/2]) / dx
+    #              + (v[k, j+1/2, i] - v[k, j-1/2, i]) / dy,   k = 1 .. Nz-2
+    div_h = diff_x_bwd_3d(u) / dx + diff_y_bwd_3d(v) / dy  # [Nz-2, Ny-2, Nx-2]
 
-    if mask is not None:
-        div_h = div_h * mask
+    if isinstance(mask, Mask3D):
+        div_h = jnp.where(mask.h[1:-1, 1:-1, 1:-1], div_h, 0.0)
+    elif mask is not None:
+        warnings.warn(
+            "vertical_velocity(mask=<float array>) is deprecated; pass a "
+            "Mask3D (its h zeroes the divergence and its w the output).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        div_h = div_h * mask[1:-1, 1:-1, 1:-1]
 
-    # Integrate bottom-to-top: w[0] = 0 (bottom)
-    # w[k+1] = w[k] - div_h[k] * dz  for k = 0, ..., Nz-1
-    w = jnp.zeros((Nz + 1, Ny, Nx), dtype=u.dtype)
-    cumsum = jnp.cumsum(div_h, axis=0)  # [Nz, Ny, Nx]
-    w = w.at[1:, :, :].set(-cumsum * dz)
+    # w[k+1/2] = -sum_{k'=1..k} div[k'] * dz  ->  w[k] for k = 1 .. Nz-2
+    w_int = -jnp.cumsum(div_h, axis=0) * dz  # [Nz-2, Ny-2, Nx-2]
+    w = interior(w_int, u)  # [Nz, Ny, Nx]; w[0] = 0 is the floor
+    if isinstance(mask, Mask3D):
+        w = jnp.where(mask.w, w, 0.0)
     return w
 
 
