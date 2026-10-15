@@ -460,3 +460,90 @@ class TestSphericalBiharmonicDiffusion3D:
         g = jax.grad(lambda x: op(x, 1.0).sum())(h)
         assert g.shape == h.shape
         assert jnp.all(jnp.isfinite(g))
+
+
+# ======================================================================
+# #295: variable kappa averaged to the faces (second order)
+# ======================================================================
+
+
+def _sph_kappa_q(lam, phi, walls):
+    """κ and q on the box between the closed walls; ∂q/∂n = 0 there."""
+    lw, le, ps, pn = walls
+    a = jnp.pi * (lam - lw) / (le - lw)
+    b = jnp.pi * (phi - ps) / (pn - ps)
+    return 1.0 + 0.5 * jnp.sin(a) * jnp.cos(0.5 * b), jnp.cos(a) * jnp.cos(b)
+
+
+def _sph_exact(lam, phi, walls, R):
+    """∇·(κ∇q) = [∂λ(κ/cosφ ∂λq) + ∂φ(κ cosφ ∂φq)] / (R² cosφ)."""
+
+    def f_lam(a, b):
+        kap, _ = _sph_kappa_q(a, b, walls)
+        return kap / jnp.cos(b) * jax.grad(lambda s: _sph_kappa_q(s, b, walls)[1])(a)
+
+    def f_phi(a, b):
+        kap, _ = _sph_kappa_q(a, b, walls)
+        return kap * jnp.cos(b) * jax.grad(lambda s: _sph_kappa_q(a, s, walls)[1])(b)
+
+    def div(a, b):
+        return (jax.grad(f_lam, 0)(a, b) + jax.grad(f_phi, 1)(a, b)) / (
+            R**2 * jnp.cos(b)
+        )
+
+    return jax.vmap(jax.vmap(div))(lam, phi)
+
+
+def _sph_variable_kappa_error(n: int) -> float:
+    g = SphericalGrid2D.from_interior(
+        n, n, lon_range=(0.0, 60.0), lat_range=(-30.0, 30.0), R=1.0
+    )
+    lam, phi = g.lon_T, g.lat_T  # radians, [Ny, Nx]
+    # closed walls: the faces half a cell outside the first / last interior T
+    lw = float(lam[1, 1]) - 0.5 * g.dlon
+    ps = float(phi[1, 1]) - 0.5 * g.dlat
+    walls = (lw, lw + n * g.dlon, ps, ps + n * g.dlat)
+    kap, q = _sph_kappa_q(lam, phi, walls)
+    exact = jax.jit(_sph_exact, static_argnums=(2, 3))(lam, phi, walls, 1.0)
+    out = SphericalDiffusion2D(grid=g)(q, kappa=kap)
+    return float(jnp.abs(out - exact)[1:-1, 1:-1].max())
+
+
+class TestSphericalVariableKappa:
+    @pytest.mark.slow
+    def test_convergence_second_order(self):
+        """Manufactured solution, κ varying in lon and lat: rate ≥ 1.9
+        (first order, rate 1, with the pre-#295 source-cell κ)."""
+        errs = [_sph_variable_kappa_error(n) for n in (8, 16, 32)]
+        rates = np.log2(np.array(errs[:-1]) / np.array(errs[1:]))
+        assert np.all(rates >= 1.9), (errs, rates)
+
+    def test_constant_field_bit_identical_to_scalar(self, grid):
+        """Eager: under jit XLA may fold a scalar κ into the metric
+        constants differently from a field (last-ulp reassociation)."""
+        rng = np.random.default_rng(8)
+        h = jnp.asarray(rng.normal(size=(grid.Ny, grid.Nx)))
+        k = jnp.full((grid.Ny, grid.Nx), 0.37)
+        op = SphericalDiffusion2D(grid=grid)
+        np.testing.assert_array_equal(op(h, k), op(h, 0.37))
+        for a, b in zip(op.fluxes(h, k), op.fluxes(h, 0.37), strict=True):
+            np.testing.assert_array_equal(a, b)
+
+    def test_symmetric_area_weighted(self):
+        """diag(cos φ_T) · L is symmetric with zero column sums."""
+        g = SphericalGrid2D.from_interior(
+            6, 6, lon_range=(0.0, 60.0), lat_range=(-30.0, 30.0), R=1.0
+        )
+        shape = (g.Ny, g.Nx)
+        k = jnp.asarray(np.random.default_rng(9).uniform(0.5, 1.5, size=shape))
+        op = SphericalDiffusion2D(grid=g)
+        n = g.Ny * g.Nx
+        M = np.asarray(
+            jax.jit(jax.jacfwd(lambda x: op(x.reshape(shape), k).ravel()))(jnp.zeros(n))
+        )
+        wet = np.zeros(shape, dtype=bool)
+        wet[1:-1, 1:-1] = True
+        wv = wet.ravel()
+        S = np.asarray(g.cos_lat_T).ravel()[wv][:, None] * M[np.ix_(wv, wv)]
+        np.testing.assert_allclose(S, S.T, atol=1e-12 * np.abs(S).max())
+        np.testing.assert_allclose(S.sum(axis=0), 0.0, atol=1e-11 * np.abs(S).max())

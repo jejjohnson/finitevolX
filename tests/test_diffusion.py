@@ -554,3 +554,145 @@ class TestBiharmonicDiffusion3D:
         np.testing.assert_allclose(
             tend2[2:-2, 2:-2, 2:-2], 2.0 * tend1[2:-2, 2:-2, 2:-2], rtol=1e-6
         )
+
+
+# ---------------------------------------------------------------------------
+# #295: variable kappa is averaged to the faces (second order)
+# ---------------------------------------------------------------------------
+
+
+def _kappa_q_2d(x, y, Lx, Ly):
+    """κ(x, y) and q(x, y) on [0, Lx] x [0, Ly]; ∂q/∂n = 0 on the walls."""
+    kap = 1.0 + 0.5 * jnp.sin(jnp.pi * x / Lx) * jnp.cos(0.5 * jnp.pi * y / Ly)
+    q = jnp.cos(jnp.pi * x / Lx) * jnp.cos(jnp.pi * y / Ly)
+    return kap, q
+
+
+def _exact_div_kappa_grad_2d(x, y, Lx, Ly):
+    """∇·(κ∇q) = ∂x(κ ∂x q) + ∂y(κ ∂y q) by automatic differentiation."""
+    import jax
+
+    def fx(a, b):  # κ ∂q/∂x
+        kap, _ = _kappa_q_2d(a, b, Lx, Ly)
+        return kap * jax.grad(lambda s: _kappa_q_2d(s, b, Lx, Ly)[1])(a)
+
+    def fy(a, b):  # κ ∂q/∂y
+        kap, _ = _kappa_q_2d(a, b, Lx, Ly)
+        return kap * jax.grad(lambda s: _kappa_q_2d(a, s, Lx, Ly)[1])(b)
+
+    def div(a, b):
+        return jax.grad(fx, 0)(a, b) + jax.grad(fy, 1)(a, b)
+
+    return jax.vmap(jax.vmap(div))(x, y)
+
+
+def _variable_kappa_error_2d(n: int) -> float:
+    import jax
+
+    grid = CartesianGrid2D.from_interior(n, n, 1.0, 1.0)
+    # T[j, i] sits at (i dx, j dy); the closed walls are the faces at dx/2 and
+    # (n + 1/2) dx, so shift the coordinates to put the walls at 0 and L
+    ii = (jnp.arange(grid.Nx) - 0.5) * grid.dx
+    jj = (jnp.arange(grid.Ny) - 0.5) * grid.dy
+    y, x = jnp.meshgrid(jj, ii, indexing="ij")
+    kap, q = _kappa_q_2d(x, y, 1.0, 1.0)
+    exact = jax.jit(_exact_div_kappa_grad_2d, static_argnums=(2, 3))(x, y, 1.0, 1.0)
+    out = Diffusion2D(grid=grid)(q, kappa=kap)
+    return float(jnp.abs(out - exact)[1:-1, 1:-1].max())
+
+
+class TestVariableKappa:
+    @pytest.mark.slow
+    def test_convergence_second_order(self):
+        """Manufactured solution with κ varying in x and y: second order.
+
+        With the source-cell κ of the pre-#295 operator the error was
+        first order (rate 1.00); the face mean gives rate 2.  ∂q/∂n = 0 on
+        the walls, so the closed walls (zero flux) are exact.
+        """
+        errs = [_variable_kappa_error_2d(n) for n in (8, 16, 32)]
+        rates = np.log2(np.array(errs[:-1]) / np.array(errs[1:]))
+        assert np.all(rates >= 1.9), (errs, rates)
+
+    @pytest.mark.parametrize("wall", ["closed", "open"])
+    def test_constant_field_bit_identical_to_scalar(self, grid, wall):
+        """A constant κ field equals the scalar-κ result bit for bit (the
+        face mean (κ + κ) / 2 is exact), tendency and fluxes, 2-D and 3-D."""
+        rng = np.random.default_rng(3)
+        h = jnp.asarray(rng.normal(size=(grid.Ny, grid.Nx)))
+        k = jnp.full((grid.Ny, grid.Nx), 0.37)
+        op = Diffusion2D(grid=grid)
+        np.testing.assert_array_equal(op(h, k, wall=wall), op(h, 0.37, wall=wall))
+        for a, b in zip(
+            op.fluxes(h, k, wall=wall), op.fluxes(h, 0.37, wall=wall), strict=True
+        ):
+            np.testing.assert_array_equal(a, b)
+
+    def test_constant_field_bit_identical_3d(self, grid3d):
+        rng = np.random.default_rng(4)
+        shape = (grid3d.Nz, grid3d.Ny, grid3d.Nx)
+        h = jnp.asarray(rng.normal(size=shape))
+        op = Diffusion3D(grid=grid3d)  # eager: jit may reassociate a scalar κ
+        np.testing.assert_array_equal(op(h, jnp.full(shape, 0.37)), op(h, 0.37))
+
+    def test_face_kappa_is_mean(self, grid):
+        """flux_x[j, i+1/2] = (κ[j, i] + κ[j, i+1]) / 2 · (h[j, i+1] - h[j, i]) / dx."""
+        rng = np.random.default_rng(5)
+        h = jnp.asarray(rng.normal(size=(grid.Ny, grid.Nx)))
+        k = jnp.asarray(rng.uniform(0.5, 1.5, size=(grid.Ny, grid.Nx)))
+        fx, fy = Diffusion2D(grid=grid).fluxes(h, k)
+        ex = 0.5 * (k[1:-1, 1:-2] + k[1:-1, 2:-1]) * (h[1:-1, 2:-1] - h[1:-1, 1:-2])
+        ey = 0.5 * (k[1:-2, 1:-1] + k[2:-1, 1:-1]) * (h[2:-1, 1:-1] - h[1:-2, 1:-1])
+        np.testing.assert_allclose(fx[1:-1, 1:-2], ex / grid.dx, rtol=1e-14)
+        np.testing.assert_allclose(fy[1:-2, 1:-1], ey / grid.dy, rtol=1e-14)
+
+    def test_open_wall_face_reads_kappa_ghost(self, grid):
+        """wall="open": the wall-face κ is (κ_edge + κ_ghost) / 2, so a
+        zero-gradient κ halo gives the wall face the edge-cell κ."""
+        from finitevolx._src.boundary.boundary import zero_gradient_boundaries
+
+        rng = np.random.default_rng(6)
+        h = jnp.asarray(rng.normal(size=(grid.Ny, grid.Nx)))
+        k = zero_gradient_boundaries(
+            jnp.asarray(rng.uniform(0.5, 1.5, size=(grid.Ny, grid.Nx)))
+        )
+        fx, fy = Diffusion2D(grid=grid).fluxes(h, k, wall="open")
+        # west wall face (j, 1/2) and east wall face (j, Nx-3/2)
+        np.testing.assert_allclose(
+            fx[1:-1, 0], k[1:-1, 1] * (h[1:-1, 1] - h[1:-1, 0]) / grid.dx, rtol=1e-14
+        )
+        np.testing.assert_allclose(
+            fx[1:-1, -2],
+            k[1:-1, -2] * (h[1:-1, -1] - h[1:-1, -2]) / grid.dx,
+            rtol=1e-14,
+        )
+        np.testing.assert_allclose(
+            fy[0, 1:-1], k[1, 1:-1] * (h[1, 1:-1] - h[0, 1:-1]) / grid.dy, rtol=1e-14
+        )
+
+    @pytest.mark.parametrize("masked", [False, True])
+    def test_symmetric_and_conservative(self, masked):
+        """The variable-κ operator stays symmetric with zero column sums."""
+        import jax
+
+        from finitevolx._src.mask import Mask2D
+
+        g = CartesianGrid2D.from_interior(6, 6, 1.0, 1.0)
+        m = np.ones((g.Ny, g.Nx), dtype=bool)
+        m[[0, -1], :] = False
+        m[:, [0, -1]] = False
+        if masked:
+            m[3, 3:5] = False  # an island (unmasked: the interior is all wet)
+        mask = Mask2D.from_mask(m) if masked else None
+        k = jnp.asarray(np.random.default_rng(7).uniform(0.5, 1.5, size=m.shape))
+        op = Diffusion2D(grid=g, mask=mask)
+        n = m.size
+        M = np.asarray(
+            jax.jit(jax.jacfwd(lambda x: op(x.reshape(m.shape), k).ravel()))(
+                jnp.zeros(n)
+            )
+        )
+        wv = m.ravel()
+        A = M[np.ix_(wv, wv)]
+        np.testing.assert_allclose(A, A.T, atol=1e-12 * np.abs(A).max())
+        np.testing.assert_allclose(A.sum(axis=0), 0.0, atol=1e-11 * np.abs(A).max())

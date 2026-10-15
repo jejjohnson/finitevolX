@@ -161,12 +161,12 @@ using forward-then-backward differences:
 
 1. **East-face flux** (forward T → U):
    $$
-   F_{j,i+\frac{1}{2}}^x = \kappa\,\frac{h_{j,i+1} - h_{j,i}}{\Delta x}
+   F_{j,i+\frac{1}{2}}^x = \kappa_{j,i+\frac{1}{2}}\,\frac{h_{j,i+1} - h_{j,i}}{\Delta x}
    $$
 
 2. **North-face flux** (forward T → V):
    $$
-   F_{j+\frac{1}{2},i}^y = \kappa\,\frac{h_{j+1,i} - h_{j,i}}{\Delta y}
+   F_{j+\frac{1}{2},i}^y = \kappa_{j+\frac{1}{2},i}\,\frac{h_{j+1,i} - h_{j,i}}{\Delta y}
    $$
 
 3. **Tendency** (backward U/V → T):
@@ -178,7 +178,14 @@ using forward-then-backward differences:
 
 For uniform $\kappa$ this reduces to $\kappa\,\nabla^2 h$.  For spatially
 varying $\kappa$ (e.g. near coastlines or mixed-layer parameterisations) the
-flux form ensures discrete conservation of the diffused quantity.
+flux form ensures discrete conservation of the diffused quantity.  A
+T-point $\kappa$ field is averaged to each face,
+$\kappa_{j,i+\frac{1}{2}} = \tfrac{1}{2}(\kappa_{j,i} + \kappa_{j,i+1})$ (and
+likewise in $y$), which keeps the operator symmetric and second-order
+accurate; the spherical operators do the same.  With `wall="open"` the wall
+faces average the edge cell with the ghost cell of $\kappa$, so fill the
+$\kappa$ halo consistently with the tracer BC (wrapped for periodic, a copy
+of the edge cell for zero gradient).
 
 **Boundary conditions by default:** Face fluxes at domain walls are zero
 (no-flux, closed-wall), giving a homogeneous Neumann BC $\partial h/\partial n = 0$.

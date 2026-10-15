@@ -12,11 +12,17 @@ Algorithm (2-D uniform grid with spacing dx, dy)
 -------------------------------------------------
 Step 1 – East-face flux at U-points (forward diff T → U):
 
-    flux_x[j, i+1/2] = κ * (h[j, i+1] - h[j, i]) / dx
+    flux_x[j, i+1/2] = κ[j, i+1/2] * (h[j, i+1] - h[j, i]) / dx
 
 Step 2 – North-face flux at V-points (forward diff T → V):
 
-    flux_y[j+1/2, i] = κ * (h[j+1, i] - h[j, i]) / dy
+    flux_y[j+1/2, i] = κ[j+1/2, i] * (h[j+1, i] - h[j, i]) / dy
+
+A spatially varying ``κ`` given at T-points is interpolated to the faces by
+the arithmetic mean of the two cells the face separates,
+``κ[j, i+1/2] = (κ[j, i] + κ[j, i+1]) / 2`` (the ``avg_x_fwd`` /
+``avg_y_fwd`` stencils), which keeps ``∇·(κ∇h)`` second-order accurate; a
+scalar ``κ`` is used as is.
 
 Step 3 – Tendency at T-points (backward diff of fluxes, U → T and V → T):
 
@@ -44,10 +50,14 @@ Dirichlet / periodic boundary applied to the ghost cells (e.g. via
 :class:`~finitevolx.BoundaryConditionSet`) then produces a diffusive flux
 through the wall.  The flux field stays single-valued, so the tendency is
 exactly flux-conservative for a **scalar** ``kappa``.  For a
-**spatially-varying** ``kappa`` the wall face reads the source-cell
-coefficient from the halo, so its halo must be filled consistently with the
-tracer BC (a periodic seam needs the wrapped coefficient) for conservation to
-hold.  ``wall="open"`` is not supported together with a mask.
+**spatially-varying** ``kappa`` the wall-face coefficient is the mean of the
+edge cell and the ghost cell, ``(κ_edge + κ_ghost) / 2``, so the coefficient
+halo must be filled by the caller consistently with the tracer BC: a periodic
+seam needs the wrapped coefficient (then both copies of the seam face get the
+same ``κ`` and conservation holds), and a zero-gradient copy
+``κ_ghost = κ_edge`` gives the wall face the edge-cell ``κ``.  An unfilled
+(zero) halo halves the wall-face ``κ``.  ``wall="open"`` is not supported
+together with a mask.
 
 Custom closed-wall boundary conditions can also be imposed via the tracer
 field ``h``, the diffusivity ``kappa``, or by providing a ``Mask2D`` /
@@ -81,7 +91,7 @@ from jaxtyping import Array, Bool, Float
 from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
 from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
-from finitevolx._src.operators.stencils import _materialize
+from finitevolx._src.operators.stencils import _materialize, avg_x_fwd, avg_y_fwd
 
 
 def _check_diffusion_wall(wall: str, mask: object) -> None:
@@ -94,6 +104,41 @@ def _check_diffusion_wall(wall: str, mask: object) -> None:
             "ghost-flux path assumes a rectangular domain with no interior "
             "land. Use wall='closed' with the mask, or drop the mask."
         )
+
+
+def _face_kappa(
+    kappa: float | Array,
+    wall: str = "closed",
+) -> tuple[float | Array, float | Array]:
+    """Diffusivity at the U / V faces the flux kernels compute.
+
+    A scalar (0-d) ``kappa`` is returned as is.  A T-point field is
+    averaged to the faces (arithmetic mean, second order):
+
+        κ[j, i+1/2] = (κ[j, i] + κ[j, i+1]) / 2
+        κ[j+1/2, i] = (κ[j, i] + κ[j+1, i]) / 2
+
+    ``wall="closed"`` returns the interior faces only, ``[Ny-2, Nx-3]`` and
+    ``[Ny-3, Nx-2]`` (no ghost cell is read); ``wall="open"`` returns every
+    face including the walls, ``[Ny-2, Nx-1]`` and ``[Ny-1, Nx-2]``, whose
+    wall faces read the caller-filled ghost ring of ``kappa``.  For a
+    constant field the mean is exact, so the result equals the scalar path
+    bit for bit.
+    """
+    kappa = jnp.asarray(kappa)
+    if kappa.ndim < 2:
+        return kappa, kappa
+    if wall == "open":
+        # κ[j, i+1/2] for i = 0..Nx-2 (avg_x_fwd extended to the west wall)
+        kx = 0.5 * (kappa[1:-1, :-1] + kappa[1:-1, 1:])  # [Ny-2, Nx-1]
+        # κ[j+1/2, i] for j = 0..Ny-2 (avg_y_fwd extended to the south wall)
+        ky = 0.5 * (kappa[:-1, 1:-1] + kappa[1:, 1:-1])  # [Ny-1, Nx-2]
+    else:
+        # κ[j, i+1/2] for i = 1..Nx-3: avg_x_fwd without the east wall face
+        kx = avg_x_fwd(kappa)[:, :-1]  # [Ny-2, Nx-3]
+        # κ[j+1/2, i] for j = 1..Ny-3: avg_y_fwd without the north wall face
+        ky = avg_y_fwd(kappa)[:-1, :]  # [Ny-3, Nx-2]
+    return kx, ky
 
 
 def diffusion_2d(
@@ -123,8 +168,9 @@ def diffusion_2d(
     kappa : float or Float[Array, "Ny Nx"]
         Diffusion coefficient.  May be a scalar or an array of the same shape
         as ``h`` (spatially varying diffusivity at T-points).  When ``kappa``
-        is an array, the value at the source T-point is used for each face
-        flux (i.e., the western/southern cell value for east/north faces).
+        is an array, each face flux uses the arithmetic mean of the two
+        T-cells the face separates, ``κ[j, i+1/2] = (κ[j, i] + κ[j, i+1]) / 2``
+        (second order); no ghost value of ``kappa`` is read.
     dx : float
         Grid spacing in x.
     dy : float
@@ -168,8 +214,8 @@ def _diffusion_2d_impl(
     """
     if wall not in ("closed", "open"):
         raise ValueError(f"wall must be 'closed' or 'open'; got {wall!r}")
-    kappa_arr = jnp.asarray(kappa)
-    has_kappa_field = kappa_arr.ndim >= 2
+    # κ at the faces computed below (arithmetic mean of the two T cells)
+    kappa_x, kappa_y = _face_kappa(kappa, wall)
 
     # Same face fluxes and divergence as
     #   flux_x, flux_y = _diffusion_2d_fluxes_impl(h, kappa, dx, dy, mu, mv, wall)
@@ -181,17 +227,11 @@ def _diffusion_2d_impl(
     # then fuses into one pass with no intermediate flux arrays.
     if wall == "open":
         # all east faces i+1/2, i = 0..Nx-2 (west/east wall faces read the
-        # ghost ring); κ at the source (western / southern) T-cell
-        fx = (
-            (kappa_arr[1:-1, :-1] if has_kappa_field else kappa_arr)
-            * (h[1:-1, 1:] - h[1:-1, :-1])
-            / dx
-        )  # [Ny-2, Nx-1]
-        fy = (
-            (kappa_arr[:-1, 1:-1] if has_kappa_field else kappa_arr)
-            * (h[1:, 1:-1] - h[:-1, 1:-1])
-            / dy
-        )  # [Ny-1, Nx-2]
+        # ghost ring of h and of a kappa field)
+        # flux_x[j, i+1/2] = κ[j, i+1/2] * (h[j, i+1] - h[j, i]) / dx
+        fx = kappa_x * (h[1:-1, 1:] - h[1:-1, :-1]) / dx  # [Ny-2, Nx-1]
+        # flux_y[j+1/2, i] = κ[j+1/2, i] * (h[j+1, i] - h[j, i]) / dy
+        fy = kappa_y * (h[1:, 1:-1] - h[:-1, 1:-1]) / dy  # [Ny-1, Nx-2]
         # the flux buffers were h-typed (`zeros_like(h).at[...].set(...)`
         # casts): keep that, so a float64 kappa does not promote float32 h
         fx, fy = fx.astype(h.dtype), fy.astype(h.dtype)
@@ -204,16 +244,10 @@ def _diffusion_2d_impl(
         fy_n, fy_s = fy[1:, :], fy[:-1, :]  # [Ny-2, Nx-2]
     else:
         # interior faces only, i+1/2 for i = 1..Nx-3; the wall faces are 0
-        fx = (
-            (kappa_arr[1:-1, 1:-2] if has_kappa_field else kappa_arr)
-            * (h[1:-1, 2:-1] - h[1:-1, 1:-2])
-            / dx
-        )  # [Ny-2, Nx-3]
-        fy = (
-            (kappa_arr[1:-2, 1:-1] if has_kappa_field else kappa_arr)
-            * (h[2:-1, 1:-1] - h[1:-2, 1:-1])
-            / dy
-        )  # [Ny-3, Nx-2]
+        # flux_x[j, i+1/2] = κ[j, i+1/2] * (h[j, i+1] - h[j, i]) / dx
+        fx = kappa_x * (h[1:-1, 2:-1] - h[1:-1, 1:-2]) / dx  # [Ny-2, Nx-3]
+        # flux_y[j+1/2, i] = κ[j+1/2, i] * (h[j+1, i] - h[j, i]) / dy
+        fy = kappa_y * (h[2:-1, 1:-1] - h[1:-2, 1:-1]) / dy  # [Ny-3, Nx-2]
         fx, fy = fx.astype(h.dtype), fy.astype(h.dtype)  # h-typed, as above
         if mu is not None:
             fx = fx * mu[1:-1, 1:-2]
@@ -258,7 +292,8 @@ def _diffusion_2d_fluxes_impl(
     """
     if wall not in ("closed", "open"):
         raise ValueError(f"wall must be 'closed' or 'open'; got {wall!r}")
-    kappa_arr = jnp.asarray(kappa)
+    # κ at the faces written below: the arithmetic mean of the two T cells
+    kappa_x, kappa_y = _face_kappa(kappa, wall)
 
     flux_x = jnp.zeros_like(h)
     flux_y = jnp.zeros_like(h)
@@ -266,25 +301,21 @@ def _diffusion_2d_fluxes_impl(
     if wall == "open":
         # East-face flux at ALL faces i = 0 ... Nx-2, including the west
         # (i=0) and east (i=Nx-2) domain-wall faces, reading the tracer ghost
-        # ring.  The face diffusivity uses the *source* (western/southern)
-        # T-cell value — the same convention as the interior faces — so the
-        # west/south wall faces read the coefficient ghost.  For a
-        # spatially-varying ``kappa`` its halo must therefore be filled
-        # consistently with the tracer BC (periodic kappa halo for a periodic
-        # tracer, etc.); this is unavoidable, because a periodic diffusive
-        # seam needs the *wrapped* coefficient and the paired wall faces would
-        # otherwise use one-sided interior values and stop cancelling.  A
-        # scalar ``kappa`` (the common case) conserves unconditionally.
-        kappa_x = kappa_arr[1:-1, :-1] if kappa_arr.ndim >= 2 else kappa_arr
-        kappa_y = kappa_arr[:-1, 1:-1] if kappa_arr.ndim >= 2 else kappa_arr
+        # ring.  For a spatially-varying ``kappa`` the wall-face diffusivity
+        # (κ_edge + κ_ghost) / 2 reads the coefficient ghost, so its halo
+        # must be filled consistently with the tracer BC (periodic kappa halo
+        # for a periodic tracer, etc.): a periodic diffusive seam needs the
+        # *wrapped* coefficient so that the paired wall faces get the same κ
+        # and cancel.  A scalar ``kappa`` (the common case) conserves
+        # unconditionally.
+        #   flux_x[j, i+1/2] = κ[j, i+1/2] * (h[j, i+1] - h[j, i]) / dx
+        #   flux_y[j+1/2, i] = κ[j+1/2, i] * (h[j+1, i] - h[j, i]) / dy
         flux_x = flux_x.at[1:-1, :-1].set(kappa_x * (h[1:-1, 1:] - h[1:-1, :-1]) / dx)
         flux_y = flux_y.at[:-1, 1:-1].set(kappa_y * (h[1:, 1:-1] - h[:-1, 1:-1]) / dy)
     else:
         # Interior faces only; wall faces stay 0 → no-flux (closed) walls.
-        #   flux_x at (j, i+½) uses κ[j, i] → slice kappa_arr[1:-1, 1:-2]
-        #   flux_y at (j+½, i) uses κ[j, i] → slice kappa_arr[1:-2, 1:-1]
-        kappa_x = kappa_arr[1:-1, 1:-2] if kappa_arr.ndim >= 2 else kappa_arr
-        kappa_y = kappa_arr[1:-2, 1:-1] if kappa_arr.ndim >= 2 else kappa_arr
+        #   flux_x[j, i+1/2] = κ[j, i+1/2] * (h[j, i+1] - h[j, i]) / dx
+        #   flux_y[j+1/2, i] = κ[j+1/2, i] * (h[j+1, i] - h[j, i]) / dy
         flux_x = flux_x.at[1:-1, 1:-2].set(
             kappa_x * (h[1:-1, 2:-1] - h[1:-1, 1:-2]) / dx
         )
@@ -351,15 +382,22 @@ class Diffusion2D(eqx.Module):
                  + (flux_y[j+1/2, i] - flux_y[j-1/2, i]) / dy
 
         where:
-            flux_x[j, i+1/2] = κ * (h[j, i+1] - h[j, i]) / dx
-            flux_y[j+1/2, i] = κ * (h[j+1, i] - h[j, i]) / dy
+            flux_x[j, i+1/2] = κ[j, i+1/2] * (h[j, i+1] - h[j, i]) / dx
+            flux_y[j+1/2, i] = κ[j+1/2, i] * (h[j+1, i] - h[j, i]) / dy
+
+        with the face diffusivity ``κ[j, i+1/2] = (κ[j, i] + κ[j, i+1]) / 2``
+        for a T-point field (a scalar ``κ`` is used as is).
 
         Parameters
         ----------
         h : Float[Array, "Ny Nx"]
             Tracer field at T-points.
         kappa : float or Float[Array, "Ny Nx"]
-            Diffusion coefficient (scalar or T-point field).
+            Diffusion coefficient (scalar or T-point field).  A field is
+            averaged to the faces (arithmetic mean of the two T cells).
+            With ``wall="open"`` the wall faces read its ghost ring, which
+            the caller fills consistently with the tracer BC (see the
+            module docstring).
         wall : {"closed", "open"}, default "closed"
             Domain-wall face treatment.  ``"closed"`` (default, unchanged)
             leaves the four wall faces at zero, giving no-flux (closed-wall)
@@ -413,8 +451,10 @@ class Diffusion2D(eqx.Module):
         divergence step, useful for flux-conservative time-stepping and
         diagnostics.
 
-            flux_x[j, i+1/2] = κ * (h[j, i+1] - h[j, i]) / dx  (U-points)
-            flux_y[j+1/2, i] = κ * (h[j+1, i] - h[j, i]) / dy  (V-points)
+            flux_x[j, i+1/2] = κ[j, i+1/2] * (h[j, i+1] - h[j, i]) / dx  (U-points)
+            flux_y[j+1/2, i] = κ[j+1/2, i] * (h[j+1, i] - h[j, i]) / dy  (V-points)
+
+        with ``κ`` averaged to the faces as in :meth:`__call__`.
 
         Parameters
         ----------
