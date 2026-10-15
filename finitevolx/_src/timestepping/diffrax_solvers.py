@@ -42,6 +42,8 @@ import jax.numpy as jnp
 from jaxtyping import PyTree
 import numpy as np
 
+from finitevolx._src.timestepping.split_explicit import split_explicit_step
+
 # ---------------------------------------------------------------------------
 # Explicit Runge-Kutta solvers (Butcher tableau)
 # ---------------------------------------------------------------------------
@@ -419,9 +421,12 @@ class LeapfrogRAFSolver(eqx.Module):
 class SplitExplicitRKSolver(eqx.Module):
     """Split-explicit barotropic/baroclinic solver.
 
-    Uses Forward-Euler substeps for the fast (2D barotropic) mode and
-    Forward-Euler for the slow (3D baroclinic) mode, with time-averaging
-    of the barotropic solution.
+    The object form of :func:`split_explicit_step`: classical RK4 substeps
+    for the fast (2D barotropic) mode, a trapezoidal time mean of the fast
+    state over the cycle, and one Forward-Euler step of the slow (3D
+    baroclinic) mode with that mean.  The fast subcycle is neutrally stable
+    for oscillatory gravity-wave modes; the Forward-Euler subcycle used
+    before #312 grew without bound.
 
     Parameters
     ----------
@@ -429,7 +434,7 @@ class SplitExplicitRKSolver(eqx.Module):
         Number of barotropic substeps per baroclinic step.
     """
 
-    n_substeps: int = 50
+    n_substeps: int = eqx.field(static=True, default=50)
 
     def step(
         self,
@@ -439,6 +444,8 @@ class SplitExplicitRKSolver(eqx.Module):
         y_3d,
         y_2d,
         dt_slow: float,
+        slow_forcing: Callable | None = None,
+        couple_2d_to_3d: Callable | None = None,
     ):
         """Take one split-explicit step.
 
@@ -447,45 +454,39 @@ class SplitExplicitRKSolver(eqx.Module):
         rhs_slow : Callable[[float, PyTree, PyTree], PyTree]
             Slow RHS: ``rhs_slow(t, y_3d, y_2d_avg) -> tendency_3d``.
         rhs_fast : Callable[[float, PyTree, PyTree], PyTree]
-            Fast RHS: ``rhs_fast(t_sub, y_2d, y_3d) -> tendency_2d``.
+            Fast RHS: ``rhs_fast(t_sub, y_2d, y_3d) -> tendency_2d``, with
+            ``t_sub`` the absolute time of the RK4 stage.
         t : float
             Current time.
         y_3d, y_2d : PyTree
             3D (slow) and 2D (fast) states.
         dt_slow : float
             Slow timestep.
+        slow_forcing : Callable[[PyTree], PyTree] or None, optional
+            ``slow_forcing(y_3d) -> forcing_2d``, evaluated once and added to
+            every fast tendency.
+        couple_2d_to_3d : Callable[[PyTree, PyTree], PyTree] or None, optional
+            ``couple_2d_to_3d(new_y_3d, y_2d_avg) -> corrected_y_3d``,
+            applied after the slow step (see :func:`split_explicit_step` for
+            what the caller owns).
 
         Returns
         -------
         tuple[PyTree, PyTree]
-            ``(new_y_3d, new_y_2d)``.
+            ``(new_y_3d, new_y_2d)``; ``new_y_2d`` is the end-of-cycle fast
+            state at ``t + dt_slow``.
         """
-        dt_fast = dt_slow / self.n_substeps
-
-        def _fast_body(carry, _):
-            y_2d_curr, y_2d_acc, substep = carry
-            t_sub = t + substep * dt_fast
-            f_fast = rhs_fast(t_sub, y_2d_curr, y_3d)
-            y_2d_new = jax.tree.map(lambda y, f: y + dt_fast * f, y_2d_curr, f_fast)
-            y_2d_acc_new = jax.tree.map(lambda s, y: s + y, y_2d_acc, y_2d_new)
-            return (y_2d_new, y_2d_acc_new, substep + 1), None
-
-        y_2d_sum = jax.tree.map(jnp.zeros_like, y_2d)
-        (y_2d_curr, y_2d_sum, _), _ = jax.lax.scan(
-            _fast_body,
-            (y_2d, y_2d_sum, 0),
-            None,
-            length=self.n_substeps,
+        return split_explicit_step(
+            y_3d,
+            y_2d,
+            lambda y3, y2_avg: rhs_slow(t, y3, y2_avg),
+            rhs_fast,
+            (lambda y3, _avg: y3) if couple_2d_to_3d is None else couple_2d_to_3d,
+            dt_slow,
+            self.n_substeps,
+            slow_forcing=slow_forcing,
+            t0=t,
         )
-
-        # Time-average
-        y_2d_avg = jax.tree.map(lambda s: s / self.n_substeps, y_2d_sum)
-
-        # Slow step
-        f_slow = rhs_slow(t, y_3d, y_2d_avg)
-        y_3d_new = jax.tree.map(lambda y, f: y + dt_slow * f, y_3d, f_slow)
-
-        return y_3d_new, y_2d_curr
 
 
 # ---------------------------------------------------------------------------
