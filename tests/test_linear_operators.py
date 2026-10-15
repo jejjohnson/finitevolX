@@ -182,11 +182,10 @@ class TestMaskedHelmholtzOperator:
 
     @pytest.mark.slow
     @pytest.mark.parametrize("edge", [False, True])
-    def test_poisson_capacitance_over_singular_base(self, edge):
-        """λ = 0: the periodic FFT base is singular, but gaussx borders the
-        capacitance system with its null vector, so the masked Poisson solve
-        is exact — for a closed basin and for a mask that wraps the periodic
-        edge (codex review on #341)."""
+    def test_poisson_capacitance_at_zero_lambda(self, edge):
+        """λ = 0: the masked Poisson solve is exact, for a closed basin and
+        for a mask that touches the array edge (codex review on #341; the
+        base was the singular periodic FFT operator until #310)."""
         if edge:
             m = np.ones((NY, NX), dtype=bool)
             m[4:7, 3:9] = False
@@ -200,8 +199,8 @@ class TestMaskedHelmholtzOperator:
         ref = jnp.linalg.solve(A_m.as_matrix(), b)
         np.testing.assert_allclose(np.asarray(y), np.asarray(ref), atol=1e-11)
 
-    def test_mask_touching_the_edge_wraps(self):
-        """masked_laplacian wraps at the rectangle edge; so must the operator."""
+    def test_mask_touching_the_edge_is_dirichlet(self):
+        """masked_laplacian is zero beyond the array edge; so is the operator."""
         m = np.ones((NY, NX), dtype=bool)
         m[4:7, 3:9] = False
         A_m = masked_helmholtz_operator(m, DX, DY, lambda_=LAM)

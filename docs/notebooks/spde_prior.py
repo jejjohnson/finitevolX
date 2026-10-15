@@ -150,7 +150,7 @@ plt.show()
 # With a land mask, $K_m = \kappa^2 - \nabla^2_h$ restricted to the wet
 # points is no longer diagonal in any fast basin, but
 # `masked_helmholtz_operator` solves it exactly with the capacitance method
-# (two FFT solves per right-hand side, after a one-off factorisation over
+# (two DST solves per right-hand side, after a one-off factorisation over
 # the coastal ring). For $\alpha = 2$,
 #
 # $$

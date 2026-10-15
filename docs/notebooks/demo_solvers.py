@@ -303,7 +303,13 @@ print("Saved geometries.png")
 # Conjugate Gradient treats the Helmholtz operator as a black-box
 # matrix-vector product (Krylov method).  The spectral preconditioner
 # approximately inverts each CG step via a DST solve, giving rapid
-# convergence.
+# convergence.  `fvx.masked_laplacian` treats everything beyond the array
+# edge as dry (zero), so on the all-ones rectangle mask it *is* the
+# Dirichlet operator the DST inverts: CG solves the same problem as the
+# spectral solver, and with this single-mode right-hand side (a DST
+# eigenvector) it converges in a couple of iterations, preconditioned or
+# not.  The DST preconditioner is exact here; the FFT one would only be an
+# approximation.
 #
 # ### Multigrid
 #
