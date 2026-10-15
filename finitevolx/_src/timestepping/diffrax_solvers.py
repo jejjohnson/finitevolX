@@ -42,6 +42,7 @@ import jax.numpy as jnp
 from jaxtyping import PyTree
 import numpy as np
 
+from finitevolx._src.timestepping.multistep import ab3_step
 from finitevolx._src.timestepping.split_explicit import split_explicit_step
 
 # ---------------------------------------------------------------------------
@@ -434,11 +435,87 @@ class AB2Solver(eqx.Module):
         return y_next, new_solver
 
 
+class AB3Solver(dfx.AbstractSolver):
+    """Adams-Bashforth 3rd-order solver for ``diffrax.diffeqsolve``.
+
+    ``y_{n+1} = y_n + (dt/12)(23 f_n - 16 f_{n-1} + 5 f_{n-2})``, one RHS
+    evaluation per step.  The two-level RHS history lives in the diffrax
+    solver state, and the first two steps are SSP-RK3 steps (a third-order
+    bootstrap; a first-order start such as ``f_{-2} = f_{-1} = f_0`` drops
+    the global order to 2).
+
+    Fixed, uniform steps only (``dt0=`` or ``StepTo`` with equal spacing):
+    the AB3 weights assume a constant step, and there is no error estimate,
+    so an adaptive controller raises.  Order 3; dense output is linear.
+
+    Examples
+    --------
+    >>> sol = dfx.diffeqsolve(
+    ...     dfx.ODETerm(lambda t, y, a: -y),
+    ...     AB3Solver(),
+    ...     t0=0.0,
+    ...     t1=1.0,
+    ...     dt0=0.01,
+    ...     y0=jnp.array(1.0),
+    ... )
+    """
+
+    term_structure: ClassVar[Any] = dfx.AbstractTerm
+    interpolation_cls: ClassVar[Any] = dfx.LocalLinearInterpolation
+
+    def order(self, terms):
+        return 3
+
+    def init(self, terms, t0, t1, y0, args):
+        # (f_{n-1}, f_{n-2}, number of steps taken)
+        f0 = terms.vf(t0, y0, args)
+        zeros = jax.tree.map(jnp.zeros_like, f0)
+        return zeros, zeros, jnp.asarray(0, dtype=jnp.int32)
+
+    def step(self, terms, t0, t1, y0, args, solver_state, made_jump):
+        del made_jump
+        f_nm1, f_nm2, n_taken = solver_state
+        dt = t1 - t0
+        f_n = terms.vf(t0, y0, args)
+
+        def _rk3(_):
+            # SSP-RK3 bootstrap (reuses f_n as its first stage)
+            y1 = jax.tree.map(lambda y, f: y + dt * f, y0, f_n)
+            k2 = terms.vf(t1, y1, args)
+            y2 = jax.tree.map(
+                lambda y, a, b: 0.75 * y + 0.25 * (a + dt * b), y0, y1, k2
+            )
+            k3 = terms.vf(t0 + 0.5 * dt, y2, args)
+            return jax.tree.map(
+                lambda y, a, b: y / 3.0 + (2.0 / 3.0) * (a + dt * b), y0, y2, k3
+            )
+
+        def _ab3(_):
+            # y_{n+1} = y_n + (dt/12)(23 f_n - 16 f_{n-1} + 5 f_{n-2}); f_n is
+            # already evaluated, so hand ab3_step a constant RHS
+            y_next, _, _ = ab3_step(y0, lambda _y: f_n, dt, f_nm1, f_nm2)
+            return y_next
+
+        y1 = jax.lax.cond(n_taken < 2, _rk3, _ab3, None)
+        dense_info = dict(y0=y0, y1=y1)
+        new_state = (f_n, f_nm1, n_taken + 1)
+        return y1, None, dense_info, new_state, RESULTS.successful
+
+    def func(self, terms, t0, y0, args):
+        return terms.vf(t0, y0, args)
+
+
 class LeapfrogRAFSolver(eqx.Module):
     """Leapfrog with Robert-Asselin filter (equinox Module).
 
     Three-level scheme: ``y_{n+1} = y_{n-1} + 2 dt f(y_n)``, with the RAF
     applied to the middle level to damp the computational mode.
+
+    Second order only for ``alpha = 0``; with the filter the scheme is
+    first order (the well-known Robert-Asselin degradation: measured rates
+    on ``y' = -1.5 y`` are 1.21, 1.14, 1.08 at the default ``alpha = 0.05``
+    and 2.2 at ``alpha = 0``).  The Robert-Asselin-Williams filter would
+    restore second order; it is not implemented.
 
     Usage::
 

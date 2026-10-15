@@ -49,6 +49,8 @@ for time-stepping PDEs on Arakawa C-grids.
 
 ::: finitevolx.IMEX_SSP2
 
+::: finitevolx.AB3Solver
+
 ## Manual Solver Interfaces
 
 ::: finitevolx.AB2Solver

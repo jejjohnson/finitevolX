@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import itertools
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -425,3 +427,67 @@ class TestLeapfrogRAF:
         # Should be within a factor of 2 of exp(-1)
         exact = float(jnp.exp(-1.0))
         assert abs(float(y_curr) - exact) < 0.1
+
+
+def _rates(errors):
+    return [float(np.log2(a / b)) for a, b in itertools.pairwise(errors)]
+
+
+def _decay15(y):
+    return -1.5 * y
+
+
+class TestMultistepStartupAndFilterOrders:
+    """Documented orders of the AB3 start-up and the Robert-Asselin filter (#314)."""
+
+    @staticmethod
+    def _ab3_error(dt, bootstrap):
+        n = int(round(1.0 / dt))
+        y0 = jnp.array(1.0)
+        if bootstrap == "rk3":
+            y1 = rk3_ssp_step(y0, _decay15, dt)
+            y2 = rk3_ssp_step(y1, _decay15, dt)
+            f_nm2, f_nm1, y = _decay15(y0), _decay15(y1), y2
+            n_ab = n - 2
+        else:  # crude: f_{-2} = f_{-1} = f_0, AB3 from y0
+            f_nm2 = f_nm1 = _decay15(y0)
+            y, n_ab = y0, n
+
+        def body(carry, _):
+            y, f1, f2 = carry
+            y, f_n, f1 = ab3_step(y, _decay15, dt, f1, f2)
+            return (y, f_n, f1), None
+
+        (y, _, _), _ = jax.lax.scan(body, (y, f_nm1, f_nm2), None, length=n_ab)
+        return abs(float(y) - float(np.exp(-1.5)))
+
+    def test_ab3_crude_bootstrap_is_second_order(self):
+        rates = _rates([self._ab3_error(dt, "crude") for dt in (0.05, 0.025, 0.0125)])
+        assert all(1.7 < r < 2.2 for r in rates), rates
+
+    def test_ab3_rk3_bootstrap_is_third_order(self):
+        rates = _rates([self._ab3_error(dt, "rk3") for dt in (0.05, 0.025, 0.0125)])
+        assert all(r > 2.8 for r in rates), rates
+
+    @staticmethod
+    def _leapfrog_error(dt, alpha):
+        n = int(round(1.0 / dt))
+        y0 = jnp.array(1.0)
+        y1 = rk3_ssp_step(y0, _decay15, dt)
+
+        def body(carry, _):
+            y_nm1, y = carry
+            y_next, y_filt = leapfrog_raf_step(y, y_nm1, _decay15, dt, alpha=alpha)
+            return (y_filt, y_next), None
+
+        (_, y), _ = jax.lax.scan(body, (y0, y1), None, length=n - 1)
+        return abs(float(y) - float(np.exp(-1.5)))
+
+    def test_leapfrog_order_two_without_filter(self):
+        rates = _rates([self._leapfrog_error(dt, 0.0) for dt in (0.02, 0.01, 0.005)])
+        assert all(r > 1.9 for r in rates), rates
+
+    def test_leapfrog_raf_is_first_order(self):
+        """alpha = 0.05 (the default): the filter's O(alpha dt) error dominates."""
+        rates = _rates([self._leapfrog_error(dt, 0.05) for dt in (0.02, 0.01, 0.005)])
+        assert all(0.9 < r < 1.4 for r in rates), rates

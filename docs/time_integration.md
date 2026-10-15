@@ -70,14 +70,18 @@ The trade-off is that they need history and a bootstrap phase.
 | Method | Order | RHS evals/step | Notes |
 |---|---|---|---|
 | **Adams-Bashforth 2 (AB2)** | 2 | 1 | Used in MITgcm, NEMO |
-| **Adams-Bashforth 3 (AB3)** | 3 | 1 | Higher accuracy, needs 2-step history |
-| **Leapfrog + Robert-Asselin** | 2 | 1 | Classic NWP scheme; computational mode damped by filter |
+| **Adams-Bashforth 3 (AB3)** | 3 | 1 | Needs 2-step history and a ≥ 2nd-order start (RK3 in `AB3Solver`); a first-order start gives order 2 |
+| **Leapfrog + Robert-Asselin** | 2 for $\alpha = 0$, **1** for $\alpha > 0$ | 1 | Classic NWP scheme; computational mode damped by filter |
 
 !!! note "Leapfrog trade-offs"
     Leapfrog is a centred (non-dissipative) scheme, making it attractive for
     wave propagation.  However, it supports a spurious computational mode that
     must be damped by the Robert-Asselin filter (parameter $\alpha$, typically
-    0.01–0.1).  The filter introduces $O(\alpha)$ dissipation.
+    0.01–0.1).  The filter introduces $O(\alpha)$ dissipation and lowers the
+    scheme to **first order** for any $\alpha > 0$ (measured rates 1.21,
+    1.14, 1.08 at $\alpha = 0.05$ on $y' = -1.5y$; 2.2 at $\alpha = 0$).  The
+    Robert–Asselin–Williams (RAW) filter would restore second order; it is
+    not implemented.
 
 ### IMEX (Implicit-Explicit)
 

@@ -104,6 +104,17 @@ for n in range(n_steps):
 ```
 
 `ab3_step` is similar but requires two history levels (`rhs_nm1`, `rhs_nm2`).
+Bootstrap them with at least second-order steps (e.g. two `rk3_ssp_step`s):
+the crude start `rhs_nm2 = rhs_nm1 = f(y0)` lowers AB3 to second order.
+`AB3Solver` does the RK3 bootstrap for you inside `diffrax.diffeqsolve`
+(fixed, uniform steps):
+
+```python
+import diffrax as dfx
+from finitevolx import AB3Solver
+
+sol = dfx.diffeqsolve(dfx.ODETerm(rhs), AB3Solver(), t0=0.0, t1=1.0, dt0=0.01, y0=y0)
+```
 
 ### Leapfrog with Robert-Asselin Filter
 
@@ -250,6 +261,7 @@ sol = dfx.diffeqsolve(
 | `RK4Classic` | 4 | ERK | no (raises) | High accuracy |
 | `SSP_RK104` | 4 | ERK (10 stages) | no (raises) | Large CFL + 4th order |
 | `IMEX_SSP2` | 2 | IMEX (MultiTerm) | yes (embedded 1st order) | Stiff/non-stiff split |
+| `AB3Solver` | 3 | multistep (RK3 start) | no (raises) | One RHS per step, uniform `dt` |
 | `SemiLagrangianSolver` | 1 | semi-Lagrangian (`SemiLagrangianTerm`) | no (raises) | Advection at CFL > 1 |
 
 "Adaptive steps" means `stepsize_controller=dfx.PIDController(...)` works;

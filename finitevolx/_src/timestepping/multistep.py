@@ -72,6 +72,12 @@ def ab3_step(
 
     One RHS evaluation per step.  Requires two previous RHS evaluations.
 
+    The start-up must be at least second-order accurate to keep the global
+    order 3: bootstrap ``y_1``, ``y_2`` with :func:`rk3_ssp_step` (as
+    :class:`~finitevolx.AB3Solver` does).  The crude start
+    ``rhs_nm2 = rhs_nm1 = f(y_0)`` degrades AB3 to second order (measured
+    rates 1.80, 1.92, 1.97 on ``y' = -1.5 y``).
+
     Parameters
     ----------
     state : PyTree
@@ -120,7 +126,9 @@ def leapfrog_raf_step(
         \\bar{y}_n &= y_n + \\alpha (y_{n-1} - 2 y_n + \\tilde{y}_{n+1})
 
     The filtered middle value ``bar{y}_n`` damps the spurious computational
-    mode inherent to the three-level leapfrog scheme.
+    mode inherent to the three-level leapfrog scheme.  The scheme is second
+    order for ``alpha = 0`` and first order for ``alpha > 0`` (the filter's
+    ``O(alpha dt)`` damping; measured rate ~1.1 at the default 0.05).
 
     Parameters
     ----------
