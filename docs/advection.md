@@ -166,11 +166,18 @@ extend into land cells and produce incorrect results.  finitevolX supports
 **mask-aware adaptive stencil selection** via `Mask2D`:
 
 - Each T-point stores a `StencilCapability2D` value indicating the maximum
-  symmetric stencil width supported in each direction (2, 4, or 6 points).
+  symmetric stencil width supported in each direction (tiers 2, 4, 6, 8
+  and 10).
 - The advection operator queries these masks and selects the appropriate
-  sub-scheme (upwind, WENO3, or WENO5) at each cell.
+  sub-scheme (upwind1 → upwind2/3, WENO3 or TVD → WENO5 → WENO7 → WENO9,
+  up to the requested method) at each upwind cell, so no stencil reads a
+  land cell; `naive` reads only the two cells beside the face.
 - Fully ocean cells use the full-order scheme; cells near land fall back
   gracefully to lower-order methods.
+- Every method is land-safe: dry inputs are zeroed with `jnp.where`
+  (`NaN` on land cannot leak) and the face fluxes on dry faces (`mask.u` /
+  `mask.v` false) are zeroed before the divergence, as in `Diffusion2D`,
+  so no mass crosses the coastline.
 
 !!! tip "When to enable mask-aware advection"
     Pass a `Mask2D` to `Advection2D.__call__` (via the `mask=` keyword)
