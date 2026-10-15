@@ -15,11 +15,15 @@ Algorithm (2-D, spacings dlon, dlat in radians, planet radius R)
 ----------------------------------------------------------------
 Step 1 — East-face flux at U-points (forward diff T → U)::
 
-    F_λ[j, i+½] = κ · (h[j, i+1] − h[j, i]) / (R · cos(lat_U) · dlon)
+    F_λ[j, i+½] = κ[j, i+½] · (h[j, i+1] − h[j, i]) / (R · cos(lat_U) · dlon)
 
 Step 2 — North-face flux at V-points (forward diff T → V)::
 
-    F_φ[j+½, i] = κ · (h[j+1, i] − h[j, i]) / (R · dlat)
+    F_φ[j+½, i] = κ[j+½, i] · (h[j+1, i] − h[j, i]) / (R · dlat)
+
+A T-point ``κ`` field is averaged to the faces (arithmetic mean of the two
+cells, ``κ[j, i+½] = (κ[j, i] + κ[j, i+1]) / 2``), as in the Cartesian
+:class:`~finitevolx.Diffusion2D`; a scalar ``κ`` is used as is.
 
 Step 3 — Tendency at T-points (backward diff of fluxes with cosφ weight on
 the meridional term)::
@@ -68,6 +72,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 
+from finitevolx._src.diffusion.diffusion import _face_kappa
 from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
 from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
@@ -88,16 +93,12 @@ def _spherical_diffusion_2d_impl(
     mv: Bool[Array, "Ny Nx"] | Float[Array, "Ny Nx"] | None,
 ) -> Float[Array, "Ny Nx"]:
     """Shared 2-D spherical diffusion kernel with explicit raw-array masks."""
-    kappa_arr = jnp.asarray(kappa)
-    if kappa_arr.ndim >= 2:
-        kappa_x = kappa_arr[1:-1, 1:-2]
-        kappa_y = kappa_arr[1:-2, 1:-1]
-    else:
-        kappa_x = kappa_arr
-        kappa_y = kappa_arr
+    # κ at the interior faces (arithmetic mean of the two T cells)
+    kappa_x, kappa_y = _face_kappa(kappa)  # [Ny-2, Nx-3], [Ny-3, Nx-2]
 
     # Step 1 — east-face flux at U-points.
-    # F_lam at U[j, i+1/2] = kappa * (h[j, i+1] - h[j, i]) / (R * cos(lat_U) * dlon)
+    # F_lam[j, i+1/2] = kappa[j, i+1/2] * (h[j, i+1] - h[j, i])
+    #                   / (R * cos(lat_U) * dlon)
     dh_dlon_raw = kappa_x * (h[1:-1, 2:-1] - h[1:-1, 1:-2])
     cos_U_face = cos_lat_U[1:-1, 1:-2]
     # cast as the h-typed `zeros_like(h).at[...].set(...)` buffer did
@@ -106,7 +107,7 @@ def _spherical_diffusion_2d_impl(
         flux_x_interior = flux_x_interior * mu[1:-1, 1:-2]
 
     # Step 2 — north-face flux at V-points.
-    # F_phi at V[j+1/2, i] = kappa * (h[j+1, i] - h[j, i]) / (R * dlat)
+    # F_phi[j+1/2, i] = kappa[j+1/2, i] * (h[j+1, i] - h[j, i]) / (R * dlat)
     flux_y_interior = (kappa_y * (h[2:-1, 1:-1] - h[1:-2, 1:-1]) / (R * dlat)).astype(
         h.dtype
     )
@@ -149,13 +150,8 @@ def _spherical_diffusion_2d_fluxes_impl(
     mv: Bool[Array, "Ny Nx"] | Float[Array, "Ny Nx"] | None,
 ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
     """Shared diagnostic-flux kernel for :class:`SphericalDiffusion2D`."""
-    kappa_arr = jnp.asarray(kappa)
-    if kappa_arr.ndim >= 2:
-        kappa_x = kappa_arr[1:-1, 1:-2]
-        kappa_y = kappa_arr[1:-2, 1:-1]
-    else:
-        kappa_x = kappa_arr
-        kappa_y = kappa_arr
+    # κ at the interior faces (arithmetic mean of the two T cells)
+    kappa_x, kappa_y = _face_kappa(kappa)  # [Ny-2, Nx-3], [Ny-3, Nx-2]
 
     dh_dlon_raw = kappa_x * (h[1:-1, 2:-1] - h[1:-1, 1:-2])
     cos_U_face = cos_lat_U[1:-1, 1:-2]
@@ -231,8 +227,9 @@ class SphericalDiffusion2D(eqx.Module):
             Tracer field at T-points.
         kappa : float or Float[Array, "Ny Nx"]
             Diffusion coefficient (scalar or T-point field).  When an
-            array, the value at the source (western/southern) T-cell
-            is used for each face flux.
+            array, each face flux uses the arithmetic mean of the two
+            T-cells the face separates (second order); no ghost value is
+            read.
 
         Returns
         -------
@@ -266,8 +263,8 @@ class SphericalDiffusion2D(eqx.Module):
         Returns the metric-scaled east-face and north-face fluxes before
         the spherical divergence step::
 
-            F_λ[j, i+½] = κ · (h[j, i+1] − h[j, i]) / (R · cos(lat_U) · dlon)
-            F_φ[j+½, i] = κ · (h[j+1, i] − h[j, i]) / (R · dlat)
+            F_λ[j, i+½] = κ[j, i+½] · (h[j, i+1] − h[j, i]) / (R · cos(lat_U) · dlon)
+            F_φ[j+½, i] = κ[j+½, i] · (h[j+1, i] − h[j, i]) / (R · dlat)
 
         Parameters
         ----------
