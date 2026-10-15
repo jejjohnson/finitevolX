@@ -207,8 +207,9 @@ The same set can describe the boundary of an **elliptic solve**: pass it as
 `bc=` to `streamfunction_from_vorticity`, `pressure_from_divergence` or
 `pv_inversion`.  All-`Dirichlet1D` faces select the DST, all zero
 `Neumann1D` faces the DCT and all `Periodic1D` faces the FFT; a set's
-`mask` is used by the mask-based methods; and non-zero `Dirichlet1D` values
-are imposed on the wall-adjacent wet cells:
+`mask` is used by the mask-based methods (`method="spectral"` raises on a
+`bc.mask`); and non-zero `Dirichlet1D` values are imposed on each face's
+wall nodes:
 
 ```python
 bc_set = BoundaryConditionSet(
@@ -222,8 +223,11 @@ psi = fvx.streamfunction_from_vorticity(zeta, dx, dy, bc=bc_set, method="cg")
 ```
 
 When time-stepping, a `Dirichlet1D` value sits on the wall face, half a
-cell outside the first wet cell; in a solve it pins that first wet cell
-(the inner boundary ring).  See
+cell outside the first wet T cell.  ψ lives at X points, and the X nodes
+`0` and `N-2` lie **on** the walls, so a solve pins those wall nodes (the
+coast ring of the ψ mask) to the face value: the same wall.  For the
+T-point `pressure_from_divergence` the face is half a cell from any cell
+centre, so non-zero `Dirichlet1D` faces raise there.  See
 [Known Boundary Values](elliptic_solvers_usage.md#known-boundary-values-inhomogeneous-dirichlet)
 for arbitrary per-cell values and interior observations.
 

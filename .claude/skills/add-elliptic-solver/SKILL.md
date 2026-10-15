@@ -37,8 +37,16 @@ the lifting tools `boundary_ring` / `SolveDomain` / `KnownValueLifting`.
   (`"spectral"`, `"cg"`, `"capacitance"`; `_METHODS` lists them). Keep the
   wrappers' shared arguments (`bc`, `lambda_`, `mask`, `known_values`,
   `known_mask`), and route a `BoundaryConditionSet` through `_resolve_bc`.
-- **Masks**: accept a `Mask2D` or an array; a `Mask2D` contributes its
-  `xy_corner_strict` (ψ-point) mask (`_resolve_mask_arr`).
+- **Masks**: accept a `Mask2D` or an array; a `Mask2D` contributes the
+  mask of the wrapper's staggering — `xy_corner_strict` for ψ (`"X"`),
+  `h` for pressure (`"T"`) — cast to the rhs dtype (`_resolve_mask_arr`).
+- **Wall placement**: ψ = 0 (or a known value) sits on the coast ring, the
+  dry cells 4-adjacent to the wet mask — what `masked_laplacian` imposes;
+  for ψ on a rectangle, the X wall nodes `0` and `N-2`.  A spectral path
+  slices the unknowns of its staggering out of the full array
+  (`_SPECTRAL_STAGGERED`, `_solve_spectral`) and must converge at second
+  order against a manufactured solution
+  (`tests/test_solver_wrappers.py::TestWallPlacement`).
 - **Precompute** geometry once, with NumPy on concrete values
   (`build_*` functions); the returned object is an `eqx.Module` that runs
   under `jit` / `vmap` / `grad`.

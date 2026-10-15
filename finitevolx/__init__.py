@@ -363,6 +363,7 @@ from finitevolx._src.solvers.inhomogeneous import (
     KnownValueLifting,
     SolveDomain,
     boundary_ring,
+    coast_ring,
 )
 from finitevolx._src.solvers.linear_operators import (
     helmholtz_operator,
@@ -795,6 +796,7 @@ __all__ = [
     "pressure_from_divergence",
     "pv_inversion",
     # Known-value lifting (inhomogeneous BCs)
+    "coast_ring",
     "boundary_ring",
     "SolveDomain",
     "KnownValueLifting",

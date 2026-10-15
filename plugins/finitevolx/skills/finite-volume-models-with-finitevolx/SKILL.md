@@ -116,9 +116,9 @@ div = diff.divergence(u, v)  # [Ny, Nx] at T-points
 # 3. Invert the discrete Laplacian back to ψ with the periodic (FFT) solver
 lap = diff.laplacian(psi)  # ∇²ψ at T-points, zero ghost ring
 psi_rec = fvx.streamfunction_from_vorticity(
-    lap[1:-1, 1:-1], grid.dx, grid.dy, bc="fft"
-)  # [64, 64], the zero-mean solution
-inv_err = jnp.max(jnp.abs(psi_rec - psi[1:-1, 1:-1]))
+    lap, grid.dx, grid.dy, bc="fft"
+)  # pass the full [Ny, Nx] array: it solves the interior, the zero-mean solution
+inv_err = jnp.max(jnp.abs(psi_rec[1:-1, 1:-1] - psi[1:-1, 1:-1]))
 
 # 4. Advect a tracer with WENO5 fluxes and SSP-RK3, periodic and conservative
 adv = fvx.Advection2D(grid=grid)

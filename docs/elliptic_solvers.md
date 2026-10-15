@@ -36,9 +36,31 @@ The choice of boundary condition determines which spectral transform is used:
 
 | BC type | Physical meaning | Transform | finitevolX solver |
 |---|---|---|---|
-| **Dirichlet** | $\psi = 0$ on all edges | DST-I | `solve_poisson_dst` / `solve_helmholtz_dst` |
-| **Neumann** | $\partial\psi/\partial n = 0$ on all edges | DCT-II | `solve_poisson_dct` / `solve_helmholtz_dct` |
+| **Dirichlet** | $\psi = 0$ on the virtual nodes one step outside the input array | DST-I | `solve_poisson_dst` / `solve_helmholtz_dst` |
+| **Neumann** | $\partial\psi/\partial n = 0$ half a cell outside the first / last input node | DCT-II | `solve_poisson_dct` / `solve_helmholtz_dct` |
 | **Periodic** | $\psi$ wraps in both directions | FFT | `solve_poisson_fft` / `solve_helmholtz_fft` |
+
+The direct solvers treat **every** input node as an unknown, so where the
+wall ends up depends on what you pass them.  The convenience wrappers
+(`streamfunction_from_vorticity`, `pv_inversion`, `pressure_from_divergence`)
+slice the unknowns of their C-grid staggering out of the `[Ny, Nx]` array,
+solve, and embed the result in zeros, so the wall is the C-grid wall.  On a
+`from_interior` grid the T cells are `[1:-1]` and the walls are the faces at
+$x = 0$ and $x = L$; X node $i$ sits at $x = i\,\Delta x$, so the walls are
+the X nodes `0` and `N-2` (index `N-1` is outside the domain):
+
+| Wrapper (staggering) | `bc` | Unknowns | Transform | Wall |
+|---|---|---|---|---|
+| ψ (X) | `"dst"` | `[1:-2, 1:-2]` | DST-I | $\psi = 0$ on the wall nodes `0`, `N-2` |
+| ψ (X) | `"dct"` | `[0:-1, 0:-1]` | DCT-I | $\partial\psi/\partial n = 0$ about the wall nodes `0`, `N-2` |
+| ψ (X) | `"fft"` | `[1:-1, 1:-1]` | FFT | periodic, period `N-2` |
+| p (T) | `"dct"` | `[1:-1, 1:-1]` | DCT-II | $\partial p/\partial n = 0$ on the faces |
+| p (T) | `"dst"` | `[1:-1, 1:-1]` | DST-II | $p = 0$ on the faces |
+| p (T) | `"fft"` | `[1:-1, 1:-1]` | FFT | periodic, period `N-2` |
+
+This is the same wall `method="cg"` imposes through `masked_laplacian` with
+the `Mask2D` of the same staggering (`xy_corner_strict` for ψ, `h` for p),
+so every combination converges at second order.
 
 !!! tip "When to use which BC"
     - **Dirichlet (DST)**: Streamfunction inversion in a closed basin
@@ -64,11 +86,12 @@ $$
 \qquad \psi_{\text{hom}} = 0 \text{ on } \partial\Omega .
 $$
 
-**Discretely**, a mask splits the wet cells $W$ into the *known* cells $K$
-— the inner boundary ring $R$ (wet cells with a dry neighbour) plus any
-observed cells — and the *effective* unknowns $E = W \setminus K$.  Every
-stencil neighbour of an $E$ cell is wet, so the 5-point equations at $E$
-split into
+**Discretely**, the *known* cells $K$ are the coast ring $C$ — the dry
+cells with a wet neighbour, where `masked_laplacian` puts its homogeneous
+wall (for ψ, the C-grid wall nodes) — plus any observed wet cells $O$, and
+the *effective* unknowns are $E = W \setminus O$, every other wet cell.
+Every stencil neighbour of an $E$ cell is in $E$ or $K$, so the 5-point
+equations at $E$ split into
 $A_{EE}\,\psi_E + A_{EK}\,g_K = f_E$, i.e.
 
 $$
@@ -76,16 +99,17 @@ A_{EE}\,\psi_E = f_E - A_{EK}\,g_K .
 $$
 
 This is exact block elimination: the lift is simply "$g$ on $K$, zero
-elsewhere", the correction $A_{EK} g_K$ is the stencil applied to that
-lift with the **wet** mask, and the homogeneous solve runs on the
-**effective** mask.  Accuracy is set by the stencil alone (second order).
+elsewhere", the correction $A_{EK} g_K$ is the unmasked stencil applied to
+that lift (the lift lives on dry coast cells), and the homogeneous solve
+runs on the **effective** mask.  Accuracy is set by the stencil alone
+(second order).
 
 | Solver | How it takes known values |
 |--------|---------------------------|
 | CG | operator on the effective mask ($-A_{EE}$ is SPD for $\lambda \ge 0$) |
 | CG + multigrid | multigrid preconditioner built on the effective mask |
-| Spectral (DST) | rectangular basin only: $E$ is the rectangle `[2:-2, 2:-2]` ($2 \le j \le N_y-3$, $2 \le i \le N_x-3$) |
-| Capacitance | solver built on the **wet** mask (it zeroes its own inner ring, which is $K$) |
+| Spectral (DST) | ψ rectangle only: $E$ is the X basin `[1:-2, 1:-2]` and $K$ its wall nodes (rows / columns `0` and `N-2`) |
+| Capacitance | solver built on the **wet** mask |
 
 In finitevolX, pass `known_values=` (and optionally `known_mask=`) to any
 convenience wrapper, or a `BoundaryConditionSet` as `bc=`; see the

@@ -21,6 +21,18 @@
 # shows how the same algorithm is packaged in finitevolX.  Every claim made
 # along the way is checked numerically in the cell that follows it.
 #
+# !!! warning "The convention changed (#300, #303)"
+#     This tutorial derives the *inner-ring* convention (known values on the
+#     wet cells next to land), which finitevolX used before.  The library now
+#     puts the known values on the **coast ring** — the dry cells next to
+#     water, where `masked_laplacian` and `method="cg"` put their wall (for ψ,
+#     the C-grid wall nodes) — and solves for every wet cell: see
+#     `fvx.coast_ring` and the
+#     [usage guide](../elliptic_solvers_usage.md#known-boundary-values-inhomogeneous-dirichlet).
+#     The algebra of Parts 1-3 is unchanged with $K$ = coast ring; Part 4 and
+#     the API cells of Parts 5-7 describe the old convention and are being
+#     rewritten.
+#
 # **The problem.**  Given a right-hand side $f$ and prescribed boundary data
 # $g$, find $\psi$ with
 #

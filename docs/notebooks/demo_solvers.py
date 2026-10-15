@@ -964,9 +964,10 @@ print("Saved accuracy_timing.png")
 #
 # finitevolX does this for you: every convenience wrapper takes
 # `known_values`.  (The *Known Boundary Values* tutorial notebook derives
-# the method from scratch.)  The known cells are the **inner boundary ring** — the
-# *wet* cells adjacent to land, around the walls and any islands — and the
-# solution equals `known_values` exactly there.
+# the method from scratch.)  The known cells are the **coast ring** — the
+# *dry* cells adjacent to water, around the walls and any islands, exactly
+# where `method="cg"` puts its $\psi = 0$ wall — and the solution equals
+# `known_values` exactly there; every wet cell is solved for.
 #
 # ### Example: prescribed sinusoidal SSH on basin walls
 #
@@ -977,10 +978,10 @@ print("Saved accuracy_timing.png")
 
 # %%
 # --- Prescribed boundary data ---
-# known_values is a full (Ny, Nx) field; only its inner-ring cells are read.
+# known_values is a full (Ny, Nx) field; only its coast cells are read.
 g_field = jnp.asarray(0.1 * np.sin(2 * np.pi * Y / Ny))
-ring = fvx.boundary_ring(mask_basin_jnp)
-print(f"Inner-ring (known) cells: {int(ring.sum())}")
+ring = fvx.coast_ring(mask_basin_jnp)
+print(f"Coast (known) cells: {int(ring.sum())}")
 
 # %%
 # --- One call per solver ---
@@ -1000,10 +1001,12 @@ psi_full_cap = fvx.streamfunction_from_vorticity(
 )
 
 # Checks: boundary data reproduced exactly, PDE satisfied on the solved cells
+# (the stencil reads the coast values, so apply it unmasked)
 domain = fvx.SolveDomain(mask_basin_jnp)
 eff = domain.effective_mask.astype(float)
-residual = (rhs_basin - A_basin(psi_full_inhom)) * eff
-print(f"Max |psi - g| on ring:       {float(jnp.max(jnp.abs((psi_full_inhom - g_field)[ring]))):.2e}")
+A_full = lambda x: fvx.masked_laplacian(x, jnp.ones_like(x), dx, dy, lambda_=lambda_)
+residual = (rhs_basin - A_full(psi_full_inhom)) * eff
+print(f"Max |psi - g| on coast:      {float(jnp.max(jnp.abs((psi_full_inhom - g_field)[ring]))):.2e}")
 print(f"Max residual on solved cells: {float(jnp.max(jnp.abs(residual))):.2e}")
 print(f"CG vs capacitance:           {float(jnp.max(jnp.abs(psi_full_inhom - psi_full_cap))):.2e}")
 
@@ -1018,20 +1021,20 @@ sol_hom = (psi_full_inhom - psi_lift) * eff
 fig, axes = plt.subplots(1, 3, figsize=(16, 4))
 wet = mask_basin > 0.5
 
-# (a) Prescribed boundary data on the inner ring
+# (a) Prescribed boundary data on the coast ring
 lift_np = np.where(np.asarray(ring), np.asarray(psi_lift), np.nan)
 im0 = axes[0].imshow(lift_np, origin="lower", cmap="RdBu_r", interpolation="nearest")
 axes[0].set_title("$\\psi_{\\mathrm{lift}}$ (boundary data $g$ on the ring)", fontsize=11)
 fig.colorbar(im0, ax=axes[0], shrink=0.8)
 
-# (b) Homogeneous correction (cells inside the ring)
+# (b) Homogeneous correction (the wet cells)
 sol_np = np.where(np.asarray(eff) > 0.5, np.asarray(sol_hom), np.nan)
 im1 = axes[1].imshow(sol_np, origin="lower", cmap="RdBu_r", interpolation="nearest")
-axes[1].set_title("$\\psi_{\\mathrm{hom}}$ (correction, $\\psi=0$ on ring)", fontsize=11)
+axes[1].set_title("$\\psi_{\\mathrm{hom}}$ (correction, $\\psi=0$ on the coast)", fontsize=11)
 fig.colorbar(im1, ax=axes[1], shrink=0.8)
 
-# (c) Full solution = lift + hom on the wet domain
-full_np = np.where(wet, np.asarray(psi_full_inhom), np.nan)
+# (c) Full solution = lift + hom on the wet domain and its coast
+full_np = np.where(wet | np.asarray(ring), np.asarray(psi_full_inhom), np.nan)
 im2 = axes[2].imshow(full_np, origin="lower", cmap="RdBu_r", interpolation="nearest")
 axes[2].set_title("$\\psi = \\psi_{\\mathrm{lift}} + \\psi_{\\mathrm{hom}}$", fontsize=11)
 fig.colorbar(im2, ax=axes[2], shrink=0.8)
@@ -1059,7 +1062,7 @@ print("Saved inhomogeneous_bc.png")
 # |--------|----------------|
 # | `cg` | `method="cg", mask=mask, known_values=g` (any mask, islands included) |
 # | `capacitance` | build the solver on the **wet** mask, then `method="capacitance", known_values=g` |
-# | `spectral` | `bc="dst", known_values=g` — the rectangular basin with a dry ghost ring |
+# | `spectral` | `bc="dst", known_values=g` — the ψ basin of the rectangle, values on the wall nodes `0` / `N-2` |
 # | multigrid | `method="cg"` with `preconditioner=make_multigrid_preconditioner(mg)`, `mg` built on `SolveDomain(mask).effective_mask` |
 # | custom | `SolveDomain` + `KnownValueLifting.preprocess` → your solver on `domain.effective_mask` → `postprocess` |
 #

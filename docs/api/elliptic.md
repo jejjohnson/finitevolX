@@ -19,7 +19,10 @@ depending on the ``method`` argument.
 ## Known Values (Inhomogeneous Dirichlet)
 
 Building blocks behind the wrappers' ``known_values`` / ``known_mask``
-arguments, for use with your own solver.
+arguments, for use with your own solver.  The known values sit on the coast
+ring (the dry cells adjacent to the wet mask: the C-grid wall nodes for ψ).
+
+::: finitevolx.coast_ring
 
 ::: finitevolx.boundary_ring
 

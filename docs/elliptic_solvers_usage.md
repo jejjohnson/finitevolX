@@ -44,7 +44,7 @@ Solves $\nabla^2 \psi - \lambda\psi = \zeta$.
 === "Spectral (rectangular domain)"
 
     ```python
-    # Dirichlet BCs (ψ = 0 on boundary) — most common
+    # Dirichlet BCs (ψ = 0 on the C-grid wall nodes, X index 0 and N-2) — most common
     psi = fvx.streamfunction_from_vorticity(zeta, dx, dy, bc="dst")
 
     # With Helmholtz parameter (QG inversion)
@@ -81,9 +81,15 @@ Solves $\nabla^2 \psi - \lambda\psi = \zeta$.
 Solves $\nabla^2 p = \nabla \cdot \mathbf{u}$ (always Poisson, $\lambda = 0$).
 
 ```python
-# Neumann BCs (∂p/∂n = 0) — standard for pressure with solid walls
+# Neumann BCs (∂p/∂n = 0 on the cell faces) — standard for pressure with solid walls
 p = fvx.pressure_from_divergence(div_u, dx, dy, bc="dct")
 ```
+
+The wrappers know the staggering of what they solve for (ψ at X points,
+p at T points), pass only its unknowns to the transform and return them
+embedded in zeros, so the wall is the C-grid wall for every `bc` and
+`method`; see the [wall table](elliptic_solvers.md#boundary-conditions).
+Pass the full `[Ny, Nx]` array: do not slice the interior by hand.
 
 ### PV Inversion (Multi-Layer)
 
@@ -144,11 +150,17 @@ psi = fvx.streamfunction_from_vorticity(
 )
 ```
 
-**Which cells are known.**  The *inner boundary ring* — the wet cells
-adjacent to at least one dry cell, around the outer walls *and* any islands
-— plus any extra cells you mark with `known_mask`.  The returned solution
-equals `known_values` exactly on those cells; values of `known_values`
-elsewhere are ignored.  Inspect the ring with `fvx.boundary_ring(mask)`.
+**Which cells are known.**  The *coast ring* — the dry cells adjacent to at
+least one wet cell, around the outer walls *and* any islands — plus any
+extra wet cells you mark with `known_mask`.  The coast is exactly where
+`method="cg"` puts its ψ = 0 wall: for ψ with a `Mask2D` it is the C-grid
+wall nodes (X rows / columns `0` and `N-2` of a rectangle).  Every wet cell
+is solved for.  The returned solution equals `known_values` exactly on the
+known cells (so ψ carries the prescribed values on the dry wall nodes);
+values of `known_values` elsewhere are ignored.  Inspect the ring with
+`fvx.coast_ring(mask)`.  For the T-point `pressure_from_divergence` the
+coast is the ghost ring, so the values sit at the ghost-cell centres, half a
+cell outside the wall faces; `method="spectral"` refuses known values there.
 
 Under the hood this is the **lifting trick**: put the known values in a
 field $\psi_{\text{lift}}$ (zero elsewhere), solve the homogeneous problem
@@ -187,24 +199,17 @@ $\psi = \psi_{\text{lift}} + \psi_{\text{hom}}$.
 === "Spectral (rectangular basin)"
 
     ```python
-    # No mask: solves the standard basin -- dry ghost ring, wet interior --
-    # with the known values on rows/columns 1 and -2.  Requires bc="dst".
+    # No mask: solves the psi basin of the rectangle -- wet X nodes
+    # [1:-2, 1:-2] -- with the known values on its wall nodes (rows/columns
+    # 0 and N-2).  Requires bc="dst".
     psi = fvx.streamfunction_from_vorticity(
         zeta, dx, dy, bc="dst", lambda_=4.0, known_values=g
     )
     ```
 
 The spectral path solves exactly the problem `method="cg"` solves with the
-basin mask `zeros((Ny, Nx)).at[1:-1, 1:-1].set(1)` (i.e. `mask[j, i] = 1`
-for `1 <= j <= Ny-2`, `1 <= i <= Nx-2`), so the two agree to
-solver tolerance.
-
-!!! note "Known values shift the spectral domain"
-    Without `known_values`, `bc="dst"` treats the whole array as unknown with
-    $\psi = 0$ just outside it.  With `known_values` (even all zeros) the
-    spectral path uses the ghost-ring convention above, so its unknowns are
-    the interior `[2:-2, 2:-2]` (`2 <= j <= Ny-3`, `2 <= i <= Nx-3`), inside
-    the known ring at rows/columns `1` and `N-2`.
+rectangle's `Mask2D` (its `xy_corner_strict` is wet on `[1:-2, 1:-2]`), and
+with `known_values = 0` it is the ordinary `bc="dst"` solve.
 
 #### Sparse observations: `known_mask`
 
@@ -240,12 +245,13 @@ psi = fvx.pv_inversion(
 `bc` also accepts a `BoundaryConditionSet`.  Its face types choose the
 transform (all `Dirichlet1D` → `"dst"`, all zero `Neumann1D` → `"dct"`,
 all `Periodic1D` → `"fft"`), its `mask` feeds the mask-based methods, and
-non-zero `Dirichlet1D` values become known values on the wall-adjacent wet
-cells:
+non-zero `Dirichlet1D` values become known values on each face's wall
+nodes (the coast cells on the row / column just outside the wet cells: X
+rows `0` / `N-2` and columns `0` / `N-2` of a rectangle):
 
 ```python
 bc = fvx.BoundaryConditionSet(
-    mask=mask,
+    mask=mask,                                   # a Mask2D, or omit for method="spectral"
     south=fvx.Dirichlet1D("south", value=0.0),
     north=fvx.Dirichlet1D("north", value=0.1),   # prescribed SSH on the north wall
     west=fvx.Dirichlet1D("west", value=0.0),
@@ -254,9 +260,13 @@ bc = fvx.BoundaryConditionSet(
 psi = fvx.streamfunction_from_vorticity(zeta, dx, dy, bc=bc, method="cg")
 ```
 
-West/east own the corner cells, as when the set fills ghost cells.  An
-explicit `known_values` overrides the face values, and an all-zero set
-(`BoundaryConditionSet.closed()`) is the ordinary homogeneous solve.
+West/east win on a node shared by two faces, as when the set fills ghost
+cells.  An explicit `known_values` overrides the face values, and an
+all-zero set (`BoundaryConditionSet.closed()`) is the ordinary homogeneous
+solve.  `method="spectral"` raises on a `bc.mask` (it solves the
+rectangle), and `pressure_from_divergence` raises on non-zero
+`Dirichlet1D` faces: a T-point Dirichlet value belongs on the face, which
+the cell-centred lifting cannot reach.
 
 #### Using the lifting directly
 
@@ -276,9 +286,9 @@ psi_hom, _ = fvx.solve_cg(A, rhs_corrected)
 psi = lifter.postprocess(psi_hom * eff, value_lift)
 ```
 
-The solver's unknowns must be exactly `domain.effective_mask`: build a CG
-operator on `domain.effective_mask`, but a capacitance solver on
-`domain.wet_mask` (see the Capacitance tab above).
+The solver's unknowns must be exactly `domain.effective_mask` (every wet
+cell not in `known_mask`), with zero on the coast: build a CG operator on
+`domain.effective_mask`.
 
 For **multigrid**, use it as the CG preconditioner — the wrapper then does
 the lifting for you:
@@ -306,10 +316,11 @@ For maximum control, use the spectral solvers directly.
 ### Poisson Solvers
 
 ```python
-# Dirichlet (DST-I): ψ = 0 on all edges
+# The direct solvers take only the unknowns (see the wall table in the theory page).
+# Dirichlet (DST-I): ψ = 0 one node outside the array on every side
 psi = fvx.solve_poisson_dst(rhs, dx, dy)
 
-# Neumann (DCT-II): ∂ψ/∂n = 0 on all edges (zero-mean gauge)
+# Neumann (DCT-II): ∂ψ/∂n = 0 half a cell outside the array (zero-mean gauge)
 psi = fvx.solve_poisson_dct(rhs, dx, dy)
 
 # Periodic (FFT): doubly-periodic domain (zero-mean gauge)

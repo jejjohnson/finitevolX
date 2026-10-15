@@ -6,6 +6,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
+from finitevolx._src.grid import CartesianGrid2D
 from finitevolx._src.mask import Mask2D
 from finitevolx._src.solvers.elliptic import (
     build_capacitance_solver,
@@ -14,6 +15,8 @@ from finitevolx._src.solvers.elliptic import (
     masked_laplacian,
     pressure_from_divergence,
     pv_inversion,
+    solve_cg,
+    solve_helmholtz_dct1,
     solve_poisson_dct,
     streamfunction_from_vorticity,
 )
@@ -25,11 +28,28 @@ from finitevolx._src.solvers.elliptic import (
 
 @pytest.fixture
 def dirichlet_grid():
-    """Interior-only grid for DST-I tests."""
+    """Full [Ny, Nx] C-grid array; ψ's wall nodes are X index 0 and N-2."""
     Ny, Nx = 10, 12
-    dx = 1.0 / (Nx + 1)
-    dy = 1.0 / (Ny + 1)
+    dx = 1.0 / (Nx - 2)
+    dy = 1.0 / (Ny - 2)
     return Ny, Nx, dx, dy
+
+
+def _x_eigenmode(Ny, Nx, dx, dy):
+    """Gravest discrete Dirichlet mode on the X points, and its eigenvalue.
+
+    psi[j, i] = sin(pi j / (Ny-2)) sin(pi i / (Nx-2)) vanishes on the wall
+    nodes 0 and N-2; the unknowns are the N-3 nodes [1:-2] (DST-I), so the
+    eigenvalue is dst1_eigenvalues(N-3, d)[0] per axis.  Index N-1 is outside
+    the domain and the solution is zero there.
+    """
+    j = jnp.arange(Ny)[:, None]
+    i = jnp.arange(Nx)[None, :]
+    psi = jnp.sin(jnp.pi * j / (Ny - 2)) * jnp.sin(jnp.pi * i / (Nx - 2))
+    # psi[Ny-1, :] = psi[:, Nx-1] = 0  (outside the domain)
+    psi = psi.at[-1, :].set(0.0).at[:, -1].set(0.0)
+    eig = dst1_eigenvalues(Nx - 3, dx)[0] + dst1_eigenvalues(Ny - 3, dy)[0]
+    return psi, eig
 
 
 @pytest.fixture
@@ -72,28 +92,30 @@ def cgrid_mask(rect_mask):
 
 
 class TestStreamfunctionSpectral:
-    def test_roundtrip_dst(self, dirichlet_grid):
-        """∇²ψ_exact → ζ, invert via DST → ψ ≈ ψ_exact."""
+    def test_dst_eigenmode_on_x_wall(self, dirichlet_grid):
+        """The discrete X-point eigenmode is recovered, wall nodes held at 0."""
         Ny, Nx, dx, dy = dirichlet_grid
-        j = jnp.arange(Ny)[:, None]
-        i = jnp.arange(Nx)[None, :]
-        psi_exact = jnp.sin(jnp.pi * (j + 1) / (Ny + 1)) * jnp.sin(
-            jnp.pi * (i + 1) / (Nx + 1)
-        )
-        lx0 = dst1_eigenvalues(Nx, dx)[0]
-        ly0 = dst1_eigenvalues(Ny, dy)[0]
-        zeta = (lx0 + ly0) * psi_exact
+        psi_exact, eig = _x_eigenmode(Ny, Nx, dx, dy)
+        zeta = eig * psi_exact
 
         psi = streamfunction_from_vorticity(zeta, dx, dy, bc="dst", method="spectral")
         np.testing.assert_allclose(np.array(psi), np.array(psi_exact), atol=1e-10)
+        # The wall nodes 0 and N-2 (and the outside index N-1) are zero.
+        for k in (0, -2, -1):
+            np.testing.assert_array_equal(np.array(psi[k, :]), 0.0)
+            np.testing.assert_array_equal(np.array(psi[:, k]), 0.0)
 
     def test_roundtrip_dct(self, neumann_grid):
-        """Neumann-BC spectral wrapper matches solve_poisson_dct."""
+        """Neumann ψ: DCT-I on the X nodes [0:-1, 0:-1], reflected about 0 and N-2."""
         Ny, Nx, dx, dy = neumann_grid
         rhs = jnp.sin(jnp.arange(Ny, dtype=float)[:, None]) * jnp.cos(
             jnp.arange(Nx, dtype=float)[None, :]
         )
-        expected = solve_poisson_dct(rhs, dx, dy)
+        expected = (
+            jnp.zeros((Ny, Nx))
+            .at[:-1, :-1]
+            .set(solve_helmholtz_dct1(rhs[:-1, :-1], dx, dy, 0.0))
+        )
         result = streamfunction_from_vorticity(rhs, dx, dy, bc="dct", method="spectral")
         np.testing.assert_allclose(np.array(result), np.array(expected), atol=1e-12)
 
@@ -258,12 +280,16 @@ class TestStreamfunctionInvalidMethod:
 
 class TestPressureFromDivergence:
     def test_spectral_neumann(self, neumann_grid):
-        """Spectral (default) with DCT matches solve_poisson_dct."""
+        """Spectral (default): DCT-II on the T interior [1:-1, 1:-1]."""
         Ny, Nx, dx, dy = neumann_grid
         div_u = jnp.sin(jnp.arange(Ny, dtype=float)[:, None]) * jnp.cos(
             jnp.arange(Nx, dtype=float)[None, :]
         )
-        expected = solve_poisson_dct(div_u, dx, dy)
+        expected = (
+            jnp.zeros((Ny, Nx))
+            .at[1:-1, 1:-1]
+            .set(solve_poisson_dct(div_u[1:-1, 1:-1], dx, dy))
+        )
         result = pressure_from_divergence(div_u, dx, dy, method="spectral")
         np.testing.assert_allclose(np.array(result), np.array(expected), atol=1e-12)
 
@@ -315,15 +341,9 @@ class TestPVInversionSpectral:
     def test_single_layer(self, dirichlet_grid):
         """Scalar lambda with 2-D PV field."""
         Ny, Nx, dx, dy = dirichlet_grid
-        j = jnp.arange(Ny)[:, None]
-        i = jnp.arange(Nx)[None, :]
-        psi_exact = jnp.sin(jnp.pi * (j + 1) / (Ny + 1)) * jnp.sin(
-            jnp.pi * (i + 1) / (Nx + 1)
-        )
-        lx0 = dst1_eigenvalues(Nx, dx)[0]
-        ly0 = dst1_eigenvalues(Ny, dy)[0]
+        psi_exact, eig = _x_eigenmode(Ny, Nx, dx, dy)
         lam = -0.5
-        rhs = (lx0 + ly0 - lam) * psi_exact
+        rhs = (eig - lam) * psi_exact
 
         psi = pv_inversion(rhs, dx, dy, lambda_=lam, bc="dst", method="spectral")
         np.testing.assert_allclose(np.array(psi), np.array(psi_exact), atol=1e-10)
@@ -332,19 +352,11 @@ class TestPVInversionSpectral:
     def test_multilayer_vmap(self, dirichlet_grid):
         """Array of lambda values — each layer inverted independently."""
         Ny, Nx, dx, dy = dirichlet_grid
-        j = jnp.arange(Ny)[:, None]
-        i = jnp.arange(Nx)[None, :]
-        psi_exact = jnp.sin(jnp.pi * (j + 1) / (Ny + 1)) * jnp.sin(
-            jnp.pi * (i + 1) / (Nx + 1)
-        )
-        lx0 = dst1_eigenvalues(Nx, dx)[0]
-        ly0 = dst1_eigenvalues(Ny, dy)[0]
+        psi_exact, eig = _x_eigenmode(Ny, Nx, dx, dy)
 
         lambdas = jnp.array([-0.5, -1.0, -2.0])
         nl = len(lambdas)
-        rhs_layers = jnp.stack(
-            [(lx0 + ly0 - lam) * psi_exact for lam in lambdas], axis=0
-        )
+        rhs_layers = jnp.stack([(eig - lam) * psi_exact for lam in lambdas], axis=0)
         assert rhs_layers.shape == (nl, Ny, Nx)
 
         psi_out = pv_inversion(
@@ -361,15 +373,9 @@ class TestPVInversionSpectral:
     def test_scalar_lambda_batched(self, dirichlet_grid):
         """Scalar lambda with 3-D PV (batch dim) uses vmap."""
         Ny, Nx, dx, dy = dirichlet_grid
-        j = jnp.arange(Ny)[:, None]
-        i = jnp.arange(Nx)[None, :]
-        psi_exact = jnp.sin(jnp.pi * (j + 1) / (Ny + 1)) * jnp.sin(
-            jnp.pi * (i + 1) / (Nx + 1)
-        )
-        lx0 = dst1_eigenvalues(Nx, dx)[0]
-        ly0 = dst1_eigenvalues(Ny, dy)[0]
+        psi_exact, eig = _x_eigenmode(Ny, Nx, dx, dy)
         lam = -0.5
-        rhs = (lx0 + ly0 - lam) * psi_exact
+        rhs = (eig - lam) * psi_exact
         rhs_batch = jnp.stack([rhs, rhs, rhs], axis=0)
 
         psi_out = pv_inversion(rhs_batch, dx, dy, lambda_=lam, bc="dst")
@@ -399,19 +405,11 @@ class TestPVInversionBatchDims:
     def test_array_lambda_with_batch_dims(self, dirichlet_grid):
         """Array lambda with leading batch dims: (batch, nl, Ny, Nx)."""
         Ny, Nx, dx, dy = dirichlet_grid
-        j = jnp.arange(Ny)[:, None]
-        i = jnp.arange(Nx)[None, :]
-        psi_exact = jnp.sin(jnp.pi * (j + 1) / (Ny + 1)) * jnp.sin(
-            jnp.pi * (i + 1) / (Nx + 1)
-        )
-        lx0 = dst1_eigenvalues(Nx, dx)[0]
-        ly0 = dst1_eigenvalues(Ny, dy)[0]
+        psi_exact, eig = _x_eigenmode(Ny, Nx, dx, dy)
 
         lambdas = jnp.array([-0.5, -1.0, -2.0])
         nl = len(lambdas)
-        rhs_layers = jnp.stack(
-            [(lx0 + ly0 - lam) * psi_exact for lam in lambdas], axis=0
-        )
+        rhs_layers = jnp.stack([(eig - lam) * psi_exact for lam in lambdas], axis=0)
         # Add a batch dimension: (2, nl, Ny, Nx)
         rhs_batch = jnp.stack([rhs_layers, rhs_layers], axis=0)
         assert rhs_batch.shape == (2, nl, Ny, Nx)
@@ -530,6 +528,7 @@ class TestMaskDtypeFollowsRhs:
         )
         return rhs, mask, dx
 
+    @pytest.mark.slow
     def test_weak_float64_rhs_with_mask2d_stays_float64(self):
         from finitevolx._src.solvers.elliptic import _resolve_mask_arr, solve_cg
 
@@ -552,6 +551,7 @@ class TestMaskDtypeFollowsRhs:
         assert bool(info.converged)
         assert int(info.iterations) <= 15
 
+    @pytest.mark.slow
     def test_float32_rhs_stays_float32(self):
         rhs, mask, dx = self._problem()
         psi = streamfunction_from_vorticity(
@@ -559,6 +559,7 @@ class TestMaskDtypeFollowsRhs:
         )
         assert psi.dtype == jnp.float32
 
+    @pytest.mark.slow
     def test_known_values_with_mask2d_stays_float64(self):
         rhs, mask, dx = self._problem()
         kv = jnp.ones_like(rhs)
@@ -574,3 +575,137 @@ class TestMaskDtypeFollowsRhs:
         domain = SolveDomain(mask)
         for arr in (domain.wet_mask, domain.boundary_ring, domain.effective_mask):
             assert arr.dtype == jnp.bool_
+
+
+# ---------------------------------------------------------------------------
+# Wall placement on the C-grid (#300)
+# ---------------------------------------------------------------------------
+
+
+def _manufactured(staggering, bc, n):
+    """Manufactured field, its continuous (∇² - 0) source and the unknown slice.
+
+    ``from_interior(n, n, 1, 1)``: dx = 1/n, the walls are at x = 0 and 1.
+    X node i sits at x = i dx (wall nodes 0 and n = N-2); T cell i at
+    x = (i - 1/2) dx (walls on the faces).  Returns ``(exact, k2, sl)`` with
+    ∇² exact = -k2 exact and ``sl`` the slice of the unknowns.
+    """
+    N = n + 2
+    d = 1.0 / n
+    idx = jnp.arange(N, dtype=float)
+    x = idx * d if staggering == "X" else (idx - 0.5) * d
+    X, Y = x[None, :], x[:, None]
+    if bc == "dst":  # zero on the walls
+        exact = jnp.sin(jnp.pi * X) * jnp.sin(2 * jnp.pi * Y)
+        k2 = 5 * jnp.pi**2
+    elif bc == "dct":  # zero normal derivative on the walls
+        exact = jnp.cos(jnp.pi * X) * jnp.cos(2 * jnp.pi * Y)
+        k2 = 5 * jnp.pi**2
+    else:  # periodic with period 1
+        exact = jnp.sin(2 * jnp.pi * X) * jnp.cos(2 * jnp.pi * Y)
+        k2 = 8 * jnp.pi**2
+    sl = {("X", "dst"): slice(1, -2), ("X", "dct"): slice(0, -1)}.get(
+        (staggering, bc), slice(1, -1)
+    )
+    return exact, k2, sl, d
+
+
+def _wall_error(staggering, bc, n, lambda_):
+    exact, k2, sl, d = _manufactured(staggering, bc, n)
+    rhs = -(k2 + lambda_) * exact
+    if staggering == "X":
+        psi = streamfunction_from_vorticity(rhs, d, d, bc=bc, lambda_=lambda_)
+    else:
+        assert lambda_ == 0.0
+        psi = pressure_from_divergence(rhs, d, d, bc=bc)
+    err = psi[sl, sl] - exact[sl, sl]
+    if lambda_ == 0.0 and bc != "dst":
+        err = err - jnp.mean(err)  # the gauge (null mode) is arbitrary
+    return float(jnp.max(jnp.abs(err)))
+
+
+class TestWallPlacement:
+    """Spectral solves put the wall on the C-grid wall: second-order convergence.
+
+    Before the fix the whole array (ghost ring included) went to the
+    transform, which put the wall one cell outside: rate ~ 0.9.
+    """
+
+    @pytest.mark.slow
+    @pytest.mark.parametrize(
+        ("staggering", "bc", "lambda_"),
+        [
+            ("X", "dst", 0.0),
+            ("X", "dst", 4.0),
+            ("X", "dct", 4.0),
+            ("X", "dct", 0.0),
+            ("X", "fft", 4.0),
+            ("T", "dct", 0.0),
+            ("T", "dst", 0.0),
+            ("T", "fft", 0.0),
+        ],
+    )
+    def test_second_order(self, staggering, bc, lambda_):
+        errs = [_wall_error(staggering, bc, n, lambda_) for n in (16, 32, 64)]
+        rates = [np.log2(errs[k] / errs[k + 1]) for k in range(2)]
+        # Measured 1.97-2.01 for every combination (truncation O(dx^2)).
+        assert min(rates) >= 1.9, (errs, rates)
+
+    @pytest.mark.slow
+    def test_x_dst_matches_masked_laplacian_cg(self):
+        """Spectral DST equals CG on the rectangle's Mask2D (dry neighbours = 0)."""
+        n = 16
+        grid = CartesianGrid2D.from_interior(n, n, 1.0, 1.0)
+        m = np.zeros((n + 2, n + 2), dtype=bool)
+        m[1:-1, 1:-1] = True
+        mask = Mask2D.from_mask(m)
+        rng = np.random.default_rng(0)
+        rhs = jnp.asarray(rng.standard_normal((n + 2, n + 2)))
+        lam = 4.0
+        psi_sp = streamfunction_from_vorticity(rhs, grid.dx, grid.dy, lambda_=lam)
+
+        m_psi = jnp.asarray(mask.xy_corner_strict, dtype=float)
+        psi_cg, info = solve_cg(
+            lambda p: masked_laplacian(p, m_psi, grid.dx, grid.dy, lambda_=lam),
+            rhs * m_psi,
+            rtol=1e-14,
+            atol=1e-14,
+            max_steps=2000,
+        )
+        assert bool(info.converged)
+        # Same discrete problem; both exact to round-off (~1e-14 relative).
+        np.testing.assert_allclose(psi_sp, psi_cg * m_psi, atol=1e-10)
+        # The default-tolerance wrapper agrees to CG's rtol/atol (1e-6).
+        psi_cg_w = streamfunction_from_vorticity(
+            rhs, grid.dx, grid.dy, lambda_=lam, method="cg", mask=mask
+        )
+        np.testing.assert_allclose(psi_sp, psi_cg_w, atol=1e-6)
+
+    def test_pv_inversion_array_lambda_uses_same_wall(self, dirichlet_grid):
+        """The per-layer (traced lambda) path solves the same problem."""
+        Ny, Nx, dx, dy = dirichlet_grid
+        rng = np.random.default_rng(1)
+        pv = jnp.asarray(rng.standard_normal((2, Ny, Nx)))
+        lambdas = jnp.array([1.0, 9.0])
+        psi = pv_inversion(pv, dx, dy, lambdas)
+        for k in range(2):
+            ref = streamfunction_from_vorticity(
+                pv[k], dx, dy, lambda_=float(lambdas[k])
+            )
+            np.testing.assert_allclose(psi[k], ref, atol=1e-12)
+
+    @pytest.mark.slow
+    def test_mask2d_pressure_uses_h_mask(self):
+        """pressure_from_divergence(method='cg', Mask2D) solves on mask.h."""
+        n = 8
+        m = np.zeros((n + 2, n + 2), dtype=bool)
+        m[1:-1, 1:-1] = True
+        mask = Mask2D.from_mask(m)
+        rng = np.random.default_rng(2)
+        rhs = jnp.asarray(rng.standard_normal((n + 2, n + 2)))
+        p_m = pressure_from_divergence(rhs, 0.1, 0.1, method="cg", mask=mask)
+        p_h = pressure_from_divergence(
+            rhs, 0.1, 0.1, method="cg", mask=jnp.asarray(mask.h, dtype=float)
+        )
+        np.testing.assert_allclose(p_m, p_h, atol=1e-12)
+        assert float(jnp.max(jnp.abs(p_m[1:-1, -2]))) > 0  # last T column is wet
