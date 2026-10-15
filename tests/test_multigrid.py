@@ -18,6 +18,7 @@ from finitevolx._src.solvers.multigrid import (
     _compute_n_levels,
     _prolongate,
     _restrict,
+    _transfer_operators,
     _weighted_jacobi,
     build_multigrid_solver,
 )
@@ -42,7 +43,7 @@ def mg_grid_16():
 
 @pytest.fixture
 def mg_grid_32():
-    """32x32 square grid (3 multigrid levels with min_coarse=8)."""
+    """32x32 square grid (4 multigrid levels: 32 -> 16 -> 8 -> 4)."""
     ny, nx = 32, 32
     dx = 1.0 / nx
     dy = 1.0 / ny
@@ -114,10 +115,25 @@ class TestBuildMultigridSolver:
         solver = _all_ones_solver(ny, nx, dx, dy, n_levels=2)
         assert solver.n_levels == 2
 
-    def test_non_divisible_raises(self):
-        mask = np.ones((15, 15))
-        with pytest.raises(ValueError, match="not divisible"):
-            build_multigrid_solver(mask, 1.0, 1.0, n_levels=2)
+    @pytest.mark.parametrize(
+        ("n", "minimum"), [(34, 4), (64, 5), (130, 6), (258, 7), (16, 3)]
+    )
+    def test_n_levels_odd_sizes_coarsen(self, n, minimum):
+        """(N+2) grids coarsen as deep as N (#305): (n + 1) // 2 per level."""
+        assert _compute_n_levels(n, n) >= minimum
+
+    def test_odd_shape_any_n_levels(self):
+        """Any shape works with any n_levels (no divisibility constraint)."""
+        solver = build_multigrid_solver(np.ones((15, 15)), 1.0, 1.0, n_levels=3)
+        assert [lv.mask.shape for lv in solver.levels] == [(15, 15), (8, 8), (4, 4)]
+
+    def test_bad_n_levels_raises(self):
+        with pytest.raises(ValueError, match="n_levels"):
+            build_multigrid_solver(np.ones((8, 8)), 1.0, 1.0, n_levels=0)
+
+    def test_too_large_bottom_raises(self):
+        with pytest.raises(ValueError, match="dense bottom"):
+            build_multigrid_solver(np.ones((80, 80)), 1.0, 1.0, n_levels=1)
 
     def test_variable_coefficient(self, mg_grid_16):
         ny, nx, dx, dy = mg_grid_16
@@ -126,12 +142,20 @@ class TestBuildMultigridSolver:
         solver = build_multigrid_solver(mask, dx, dy, coeff=coeff)
         assert isinstance(solver, MultigridSolver)
 
-    def test_level_shapes(self, mg_grid_16):
-        ny, nx, dx, dy = mg_grid_16
-        solver = _all_ones_solver(ny, nx, dx, dy)
-        for i, level in enumerate(solver.levels):
-            factor = 2**i
-            assert level.mask.shape == (ny // factor, nx // factor)
+    def test_level_shapes(self):
+        solver = _all_ones_solver(34, 18, 1.0, 1.0)
+        shapes = [level.mask.shape for level in solver.levels]
+        assert shapes == [(34, 18), (17, 9), (9, 5)]
+
+    def test_coarse_mask_keeps_narrow_channel(self):
+        """Mask-coarsening rule: a coarse point is wet iff any wet fine point
+        lies in its interpolation support, so a one-cell channel survives."""
+        mask = np.zeros((17, 17))
+        mask[8, 1:16] = 1.0  # one-cell-wide channel on an odd row
+        mask_c, _, _ = _transfer_operators(mask, "dirichlet")
+        assert mask_c[4, 1:8].all() and mask_c[4, 0] == 1.0
+        # nothing outside the channel's support
+        assert mask_c[:4].sum() == 0 and mask_c[5:].sum() == 0
 
     def test_bad_bc_raises(self):
         with pytest.raises(ValueError, match="bc must be"):
@@ -195,6 +219,7 @@ class TestBoundaryCondition:
         out = _apply_operator(jnp.ones(mask.shape), solver.levels[0])
         np.testing.assert_allclose(np.asarray(out), 0.0, atol=1e-10)
 
+    @pytest.mark.slow
     def test_dirichlet_lambda0_nonsingular(self):
         """The Dirichlet operator is negative definite at lambda = 0 (the
         Neumann one has a zero eigenvalue per wet component)."""
@@ -255,6 +280,205 @@ class TestBoundaryCondition:
 
 
 # ---------------------------------------------------------------------------
+# TestConvergence (#305, #344)
+# ---------------------------------------------------------------------------
+
+
+class TestConvergence:
+    """Full-depth coarsening, exact bottom solve, R = P^T / 4: the V-cycle
+    contracts at a grid-independent rate and is a symmetric operator."""
+
+    @staticmethod
+    def _contraction(solver, n_cycles=8, rhs=None):
+        """Per-cycle residual ratios ||r_k|| / ||r_{k-1}|| from u = 0."""
+        level = solver.levels[0]
+        if rhs is None:
+            rng = np.random.default_rng(0)
+            rhs = jnp.asarray(rng.standard_normal(level.mask.shape)) * level.mask
+        cycle = eqx.filter_jit(lambda s, u, f: s.v_cycle(u, f))
+        u = jnp.zeros_like(rhs)
+        norms = [float(jnp.linalg.norm(rhs))]
+        for _ in range(n_cycles):
+            u = cycle(solver, u, rhs)
+            norms.append(float(jnp.linalg.norm(rhs - _apply_operator(u, level))))
+        norms = np.asarray(norms)
+        return norms[1:] / norms[:-1]
+
+    @pytest.mark.slow
+    @pytest.mark.parametrize("n", [32, 128, 256])
+    def test_asymptotic_contraction(self, n):
+        """34^2, 130^2, 258^2 basins: <= 0.3 per cycle on cycles 5-8 (measured
+        0.06-0.07, grid independent; before #305: 0.2 / 0.89 / 0.91)."""
+        solver = build_multigrid_solver(_basin_mask2d(n), 1.0 / n, 1.0 / n, 4.0)
+        assert solver.n_levels >= {32: 4, 128: 6, 256: 7}[n]
+        rates = self._contraction(solver)
+        assert rates[4:8].max() <= 0.3
+
+    @pytest.mark.slow
+    @pytest.mark.parametrize(
+        ("bc", "lambda_"), [("dirichlet", 4.0), ("dirichlet", 0.0), ("neumann", 0.0)]
+    )
+    def test_v_cycle_symmetric(self, bc, lambda_):
+        """<M r1, r2> = <r1, M r2> to round-off for M = v_cycle(0, .) (#344)."""
+        n = 30
+        mask2d = _basin_mask2d(n)
+        mask = mask2d if bc == "dirichlet" else np.asarray(mask2d.h, dtype=float)
+        solver = build_multigrid_solver(mask, 1.0 / n, 1.0 / n, lambda_, bc=bc)
+        m = solver.levels[0].mask
+        rng = np.random.default_rng(4)
+        r1, r2 = (jnp.asarray(rng.standard_normal(m.shape)) * m for _ in range(2))
+        pc = make_multigrid_preconditioner(solver)
+        a, b = float(jnp.sum(pc(r1) * r2)), float(jnp.sum(r1 * pc(r2)))
+        assert abs(a - b) <= 1e-12 * abs(a)
+
+    def test_unequal_smoothing_rejected_as_preconditioner(self):
+        solver = build_multigrid_solver(np.ones((16, 16)), 1.0, 1.0, n_pre=2, n_post=1)
+        with pytest.raises(ValueError, match="n_pre == n_post"):
+            make_multigrid_preconditioner(solver)
+
+    def test_single_level_is_exact(self):
+        """n_levels=1 is the exact bottom solve: one cycle solves A u = f."""
+        mask = _basin_mask2d(14)
+        solver = build_multigrid_solver(mask, 0.1, 0.1, lambda_=1.0, n_levels=1)
+        level = solver.levels[0]
+        rhs = jnp.asarray(np.random.default_rng(5).standard_normal(level.mask.shape))
+        rhs = rhs * level.mask
+        u = solver.v_cycle(jnp.zeros_like(rhs), rhs)
+        res = jnp.linalg.norm(rhs - _apply_operator(u, level)) / jnp.linalg.norm(rhs)
+        assert float(res) < 1e-12
+
+    @pytest.mark.slow
+    def test_cg_iterations_circular_basin_128(self):
+        """CG + one V-cycle: <= 15 iterations at 128^2 (measured 6; 146 before
+        #304/#305)."""
+        n = 128
+        dx = 1.0 / n
+        mask = _basin_mask2d(n)
+        m = jnp.asarray(mask.xy_corner_strict, dtype=float)
+        solver = build_multigrid_solver(mask, dx, dx, lambda_=4.0)
+        rhs = jnp.asarray(np.random.default_rng(1).standard_normal(m.shape)) * m
+        _, info = solve_cg(
+            lambda p: masked_laplacian(p, m, dx, dx, 4.0),
+            rhs,
+            preconditioner=make_multigrid_preconditioner(solver),
+            rtol=1e-8,
+            atol=1e-8,
+        )
+        assert info.converged
+        assert int(info.iterations) <= 15
+
+    @pytest.mark.slow
+    def test_onestep_gradient_34_basin(self):
+        """solve_onestep's gradient is within 5% of the implicit gradient on a
+        34^2 basin (measured 3.4%; 68% off before #305)."""
+        n = 32
+        solver = build_multigrid_solver(_basin_mask2d(n), 1.0 / n, 1.0 / n, 4.0)
+        rhs = solver.levels[0].mask
+
+        def grad(solve):
+            return jax.grad(lambda s: jnp.mean(solve(s * rhs)))(1.0)
+
+        g_implicit, g_onestep = grad(solver), grad(solver.solve_onestep)
+        assert abs(float(g_onestep - g_implicit)) <= 0.05 * abs(float(g_implicit))
+
+
+# ---------------------------------------------------------------------------
+# TestNarrowFeatures: one-cell lakes and channels at odd indices
+# ---------------------------------------------------------------------------
+
+
+def _narrow_mask(kind):
+    """psi-style masks whose one-cell features sit at odd fine indices."""
+    if kind == "lake_10":
+        w = np.zeros((10, 10))
+        w[1:-2, 1:-2] = 1.0
+        w[3:8, 3:8] = 0.0
+        w[5, 5] = 1.0  # isolated one-cell lake
+    elif kind == "lake_12x66":
+        w = np.zeros((12, 66))
+        w[1:-2, 1:-2] = 1.0
+        w[3:8, 29:34] = 0.0
+        w[5, 31] = 1.0
+    else:  # two basins joined by a one-cell channel in an odd column
+        w = np.zeros((34, 34))
+        w[1:-2, 1:-2] = 1.0
+        w[10:24, :] = 0.0
+        w[10:24, 15 if kind == "odd_channel" else 16] = 1.0
+    return w
+
+
+class TestNarrowFeatures:
+    """The coarsening keeps the prolongation at full column rank, so the
+    Galerkin coarse operators and the bottom inverse stay well defined (a
+    one-cell lake at an odd index used to give four identical columns)."""
+
+    @pytest.mark.parametrize(
+        ("kind", "n_levels"),
+        [
+            ("lake_10", None),
+            ("lake_12x66", None),
+            ("odd_channel", None),
+            ("odd_channel", 2),
+            ("odd_channel", 3),
+        ],
+    )
+    @pytest.mark.parametrize(
+        ("bc", "lambda_"),
+        [("dirichlet", 0.0), ("dirichlet", 4.0), ("neumann", 0.0), ("neumann", 4.0)],
+    )
+    def test_builds_full_rank_bounded_bottom(self, kind, n_levels, bc, lambda_):
+        w = _narrow_mask(kind)
+        solver = build_multigrid_solver(
+            w, 0.1, 0.1, lambda_=lambda_, bc=bc, n_levels=n_levels
+        )
+        for level in solver.levels[:-1]:
+            mask_f = np.asarray(level.mask)
+            mask_c, _, p = _transfer_operators(mask_f, bc)
+            p_wet = p.toarray()[np.ix_(mask_f.ravel() > 0, mask_c.ravel() > 0)]
+            assert np.linalg.matrix_rank(p_wet) == p_wet.shape[1]
+        # |A_c^-1| |A_c| is a condition-number bound: O(1e2) here, ~1e13 (or a
+        # singular-matrix error) with rank-deficient coarse operators
+        a_max = float(jnp.abs(solver.levels[-1].stencil).max())
+        b_max = float(jnp.abs(solver.bottom_inverse).max())
+        assert np.isfinite(b_max) and b_max * a_max < 1e6
+
+    @pytest.mark.slow
+    @pytest.mark.parametrize("kind", ["odd_channel", "even_channel", "island"])
+    @pytest.mark.parametrize(
+        ("bc", "lambda_"),
+        [("dirichlet", 0.0), ("dirichlet", 4.0), ("neumann", 0.0), ("neumann", 4.0)],
+    )
+    def test_contraction_and_cg(self, kind, bc, lambda_):
+        """Measured per-cycle contraction (cycles 5-8) on these 34^2 masks:
+        Dirichlet 0.05-0.09; Neumann 0.09-0.23 (lambda = 4) and 0.15-0.48
+        (lambda = 0, slowest on the odd channel). CG with the V-cycle as
+        preconditioner takes 5-7 iterations on all of them."""
+        if kind == "island":
+            w = np.zeros((34, 34))
+            w[1:-2, 1:-2] = 1.0
+            w[12:20, 12:20] = 0.0
+        else:
+            w = _narrow_mask(kind)
+        solver = build_multigrid_solver(w, 0.1, 0.1, lambda_=lambda_, bc=bc)
+        level = solver.levels[0]
+        m = level.mask
+        rhs = jnp.asarray(np.random.default_rng(0).standard_normal(w.shape)) * m
+        if bc == "neumann" and lambda_ == 0.0:
+            rhs = solver._project(rhs)  # the solvable part
+        rates = TestConvergence._contraction(solver, rhs=rhs)
+        bound = 0.3 if (bc == "dirichlet" or lambda_ > 0) else 0.6
+        assert rates[4:8].max() <= bound
+        _, info = solve_cg(
+            lambda x: _apply_operator(x, level),
+            rhs,
+            preconditioner=make_multigrid_preconditioner(solver),
+            rtol=1e-8,
+            atol=1e-8 * float(jnp.abs(rhs).max()),
+        )
+        assert info.converged and int(info.iterations) <= 15
+
+
+# ---------------------------------------------------------------------------
 # TestApplyOperator
 # ---------------------------------------------------------------------------
 
@@ -299,48 +523,72 @@ class TestApplyOperator:
 
 
 class TestGridTransfer:
-    def test_restrict_constant(self, mg_grid_16):
-        ny, nx, _, _ = mg_grid_16
-        mask_f = jnp.ones((ny, nx))
-        mask_c = jnp.ones((ny // 2, nx // 2))
-        v = jnp.full((ny, nx), 3.14)
-        result = _restrict(v, mask_f, mask_c)
-        np.testing.assert_allclose(np.array(result), 3.14, atol=1e-12)
+    @staticmethod
+    def _ops(mask, bc="dirichlet"):
+        mask_c, scale, p = _transfer_operators(np.asarray(mask, dtype=float), bc)
+        return jnp.asarray(mask_c), jnp.asarray(scale), p
 
-    def test_restrict_shape(self, mg_grid_16):
-        ny, nx, _, _ = mg_grid_16
-        mask_f = jnp.ones((ny, nx))
-        mask_c = jnp.ones((ny // 2, nx // 2))
-        v = jnp.ones((ny, nx))
-        result = _restrict(v, mask_f, mask_c)
-        assert result.shape == (ny // 2, nx // 2)
+    def test_restrict_constant_interior(self):
+        """Full weighting (4, 2, 2, 1)/16 averages a constant exactly."""
+        mask_c, scale, _ = self._ops(np.ones((16, 16)))
+        result = _restrict(jnp.full((16, 16), 3.14), scale, mask_c)
+        assert result.shape == (8, 8)
+        np.testing.assert_allclose(np.array(result)[1:-1, 1:-1], 3.14, atol=1e-12)
 
-    def test_prolong_constant(self, mg_grid_16):
-        ny, nx, _, _ = mg_grid_16
-        ny_c, nx_c = ny // 2, nx // 2
-        mask_c = jnp.ones((ny_c, nx_c))
-        mask_f = jnp.ones((ny, nx))
-        v = jnp.full((ny_c, nx_c), 2.71)
-        result = _prolongate(v, mask_c, mask_f)
-        np.testing.assert_allclose(np.array(result), 2.71, atol=1e-12)
+    def test_prolong_constant(self):
+        """Neumann interpolation is renormalised over wet coarse points, so a
+        constant is reproduced up to the walls (Dirichlet tapers to the
+        zero wall value instead)."""
+        mask = _circular_mask(17, 17)
+        mask_c, scale, _ = self._ops(mask, "neumann")
+        v = jnp.full(mask_c.shape, 2.71)
+        result = _prolongate(v, mask_c, scale)
+        assert result.shape == (17, 17)
+        np.testing.assert_allclose(np.array(result), 2.71 * mask, atol=1e-12)
 
-    def test_prolong_shape(self, mg_grid_16):
-        ny, nx, _, _ = mg_grid_16
-        ny_c, nx_c = ny // 2, nx // 2
-        mask_c = jnp.ones((ny_c, nx_c))
-        mask_f = jnp.ones((ny, nx))
-        v = jnp.ones((ny_c, nx_c))
-        result = _prolongate(v, mask_c, mask_f)
-        assert result.shape == (ny, nx)
+    @pytest.mark.parametrize("bc", ["dirichlet", "neumann"])
+    @pytest.mark.parametrize("shape", [(16, 16), (17, 15)])
+    def test_matches_sparse_and_is_transpose(self, bc, shape):
+        """_prolongate is the build-time P and _restrict is exactly P^T / 4,
+        on even and odd shapes and an irregular mask (#305, #344)."""
+        mask = _circular_mask(*shape, radius_frac=0.45)
+        mask_c, scale, p = self._ops(mask, bc)
+        rng = np.random.default_rng(0)
+        e_c = rng.standard_normal(mask_c.shape)
+        r_f = rng.standard_normal(shape)
+        pe = np.asarray(_prolongate(jnp.asarray(e_c), mask_c, scale))
+        np.testing.assert_allclose(
+            pe.ravel(), p @ (e_c.ravel() * np.asarray(mask_c).ravel()), atol=1e-14
+        )
+        rr = np.asarray(_restrict(jnp.asarray(r_f), scale, mask_c))
+        np.testing.assert_allclose(rr.ravel(), 0.25 * (p.T @ r_f.ravel()), atol=1e-14)
+        # <R r, e>_c = <r, P e>_f / 4
+        np.testing.assert_allclose(
+            np.sum(rr * e_c), 0.25 * np.sum(r_f * pe), rtol=1e-12
+        )
 
-    def test_masked_restrict_no_contamination(self, mg_grid_16):
-        ny, nx, _, _ = mg_grid_16
-        mask_f = jnp.ones((ny, nx)).at[:, : nx // 2].set(0.0)
-        mask_c = jnp.ones((ny // 2, nx // 2)).at[:, : nx // 4].set(0.0)
-        v = jnp.ones((ny, nx)) * 5.0
-        result = _restrict(v, mask_f, mask_c)
+    def test_masked_restrict_no_contamination(self):
+        mask_f = np.ones((16, 16))
+        mask_f[:, :8] = 0.0
+        mask_c, scale, _ = self._ops(mask_f)
+        result = _restrict(jnp.ones((16, 16)) * 5.0, scale, mask_c)
         outside = np.array(mask_c) == 0
+        assert outside.any()
         np.testing.assert_allclose(np.array(result)[outside], 0.0, atol=1e-15)
+
+    def test_galerkin_coarse_operator(self):
+        """Every coarse level applies A_c = R A P (9-point stencil)."""
+        mask = _basin_mask2d(30)
+        solver = build_multigrid_solver(mask, 1.0 / 30, 1.0 / 30, lambda_=4.0)
+        rng = np.random.default_rng(3)
+        for fine, coarse in zip(solver.levels[:-1], solver.levels[1:], strict=True):
+            e_c = jnp.asarray(rng.standard_normal(coarse.mask.shape)) * coarse.mask
+            pe = _prolongate(e_c, coarse.mask, fine.prolong_scale)
+            rap = _restrict(_apply_operator(pe, fine), fine.prolong_scale, coarse.mask)
+            ac = _apply_operator(e_c, coarse)
+            np.testing.assert_allclose(
+                np.asarray(ac), np.asarray(rap), atol=1e-10 * float(jnp.abs(ac).max())
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -510,9 +758,9 @@ class TestMultigridPreconditioner:
     @pytest.mark.slow
     @pytest.mark.parametrize("masked", [False, True])
     def test_symmetric_positive_definite(self, masked):
-        """CG needs a symmetric positive definite M^-1. One V-cycle V is not
-        symmetric (restriction is not the transpose of prolongation); the
-        preconditioner is the symmetrised two-step iteration
+        """CG needs a symmetric positive definite M^-1. The raw V-cycle V is
+        symmetric (R = P^T / 4, equal pre/post smoothing, #344) and positive
+        definite; the gaussx preconditioner is the two-step iteration
         M^-1 = V + V^T - V^T K V, symmetric to round-off and, for a
         convergent multigrid (default settings), positive definite on the
         wet points."""
@@ -523,8 +771,9 @@ class TestMultigridPreconditioner:
         wet = np.asarray(solver.levels[0].mask).ravel().astype(bool)
         V, K = self._dense_raw_and_k(solver, ny, nx)
         Vw = V[np.ix_(wet, wet)]
-        # the raw V-cycle is measurably non-symmetric (why this exists)
-        assert np.linalg.norm(Vw - Vw.T) > 1e-3 * np.linalg.norm(Vw)
+        # the raw V-cycle is symmetric positive definite on its own
+        np.testing.assert_allclose(Vw, Vw.T, rtol=0, atol=1e-12 * np.abs(Vw).max())
+        assert np.linalg.eigvalsh(Vw).min() > 0.0
 
         M = self._dense(make_gaussx_multigrid_preconditioner(solver), ny * nx)
         np.testing.assert_allclose(
@@ -642,6 +891,43 @@ class TestMultigridPreconditioner:
         )
         assert sol.value.dtype == jnp.float32
         assert sol.result == lx.RESULTS.successful
+
+
+class TestFloat32:
+    """The hierarchy is float64, but a float32 right-hand side gets a float32
+    solve (contract 7): the level arrays are cast where they are used."""
+
+    @pytest.mark.slow
+    @pytest.mark.parametrize(("bc", "lambda_"), [("dirichlet", 4.0), ("neumann", 0.0)])
+    def test_solver_follows_rhs_dtype(self, bc, lambda_):
+        w = np.zeros((18, 18))
+        w[1:-2, 1:-2] = 1.0
+        solver = build_multigrid_solver(w, 1.0 / 16, 1.0 / 16, lambda_, bc=bc)
+        rhs = jnp.asarray(np.random.default_rng(0).standard_normal(w.shape) * w)
+        u64 = solver(rhs)
+        rhs32 = rhs.astype(jnp.float32)
+        for solve in (solver, solver.solve_onestep, solver.solve_unrolled):
+            u32 = solve(rhs32)
+            assert u32.dtype == jnp.float32
+            # float32 round-off on an O(1e-2) solution
+            scale = float(jnp.abs(u64).max())
+            assert float(jnp.abs(u32 - u64).max()) < 1e-4 * scale
+
+    @pytest.mark.slow
+    def test_preconditioner_in_float32_cg(self):
+        w = np.zeros((18, 18))
+        w[1:-2, 1:-2] = 1.0
+        dx = 1.0 / 16
+        solver = build_multigrid_solver(w, dx, dx, lambda_=4.0)
+        m32 = jnp.asarray(w, dtype=jnp.float32)
+        rhs = jnp.asarray(np.random.default_rng(1).standard_normal(w.shape) * w)
+        rhs = rhs.astype(jnp.float32)
+        pc = make_multigrid_preconditioner(solver)
+        assert pc(rhs).dtype == jnp.float32
+        x, info = solve_cg(
+            lambda p: masked_laplacian(p, m32, dx, dx, 4.0), rhs, preconditioner=pc
+        )
+        assert x.dtype == jnp.float32 and info.converged
 
 
 # ---------------------------------------------------------------------------

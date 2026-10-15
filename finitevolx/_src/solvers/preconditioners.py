@@ -15,15 +15,15 @@ Available preconditioners
     Good when the operator is expensive or operator-only access is available.
 
 ``make_multigrid_preconditioner``
-    Single multigrid V-cycle as an approximate inverse.  Captures both
-    high- and low-frequency components.  Best for variable-coefficient
-    problems or when spectral preconditioning is insufficient.
+    Single multigrid V-cycle as an approximate inverse (a symmetric
+    operator).  Captures both high- and low-frequency components.  Best for
+    masked and variable-coefficient problems.
 
 ``make_preconditioner``
     Convenience factory that dispatches to the above based on a string key.
 
 ``make_gaussx_multigrid_preconditioner``
-    The same V-cycle, symmetrised (V, then its adjoint), as a
+    The same V-cycle, as the two-step iteration (V, then its adjoint), as a
     ``gaussx.OperatorPreconditioner`` (positive sign convention, flat
     vectors) for gaussx's CG strategies.  Unlike the other ``make_*``
     factories it returns a gaussx object, not a 2-D closure.
@@ -195,11 +195,9 @@ def make_gaussx_multigrid_preconditioner(
     gaussx works with positive semidefinite systems, so it solves
     ``(−A) x = −b`` for finitevolX's negative (semi)definite Helmholtz
     operator ``A = ∇·(c∇) − λ``. Let ``V(v) = −Vcycle(0, v) ≈ (−A)⁻¹ v``.
-    One V-cycle is **not** symmetric: restriction (mask-normalised 2×2
-    averaging) is not the transpose of prolongation (bilinear), so ``V``
-    differs from ``Vᵀ`` by a few per cent, and CG needs a symmetric positive
-    definite preconditioner. With ``K = −A``, this applies the symmetrised
-    two-step iteration (V, then its adjoint)
+    With restriction the scaled transpose of prolongation and equal pre- and
+    post-smoothing (the defaults), ``V`` is already symmetric; this applies
+    the two-step iteration (V, then its adjoint), with ``K = −A``,
 
     ``M⁻¹ v = V v + Vᵀ v − Vᵀ K V v``,
 
@@ -209,12 +207,12 @@ def make_gaussx_multigrid_preconditioner(
     ``I − M⁻¹K = (I − VᵀK)(I − VK)`` it is positive definite exactly when
     one V-cycle reduces the error in the energy norm, ``‖I − VK‖_K < 1`` —
     i.e. when the multigrid itself converges. The default
-    ``build_multigrid_solver`` settings do; a divergent configuration (one
-    smoothing sweep with ``omega`` near 1, almost no coarse solve, high
-    coefficient contrast) makes no symmetric form of the V-cycle positive
-    definite, so check the solver converges on its own first. On the default
-    settings this takes fewer CG steps than either the raw V-cycle or its
-    symmetric part ``½(V + Vᵀ)``.
+    ``build_multigrid_solver`` settings do (about 0.07 residual reduction per
+    cycle); a divergent configuration (one smoothing sweep with ``omega``
+    near 1, high coefficient contrast) makes no symmetric form of the
+    V-cycle positive definite, so check the solver converges on its own
+    first. It costs two V-cycles per application and takes fewer CG steps
+    than the raw V-cycle, which :func:`make_multigrid_preconditioner` uses.
 
     The V-cycle runs in the hierarchy's dtype (float64); each application
     returns the dtype of the vector it was given. The structure comes from
@@ -285,10 +283,14 @@ def make_multigrid_preconditioner(
     (it doesn't need to converge — it just needs to be a good approximation).
 
     This is compatible with :func:`~finitevolx._src.solvers.iterative.solve_cg`:
-    pass the returned closure as the ``preconditioner`` argument.  CG then
-    converges in very few iterations (typically 5-10 instead of hundreds)
-    because multigrid captures both high- and low-frequency components of
-    the inverse.
+    pass the returned closure as the ``preconditioner`` argument.  The
+    V-cycle is a symmetric operator (restriction is the scaled transpose of
+    prolongation, the coarse operators are Galerkin products and the bottom
+    solve is exact), as CG requires, provided the solver smooths as much
+    before as after (``n_pre == n_post``).  CG then converges in a few
+    iterations independent of the grid size: 6 at 128² and 256² on a
+    circular basin (``rtol = 1e-8``), against 33 and 47 with the FFT
+    preconditioner.
 
     Parameters
     ----------
@@ -303,12 +305,24 @@ def make_multigrid_preconditioner(
         ``(Ny, Nx)`` and the output has the same shape.  For gaussx's
         solvers, use :func:`make_gaussx_multigrid_preconditioner`.
 
+    Raises
+    ------
+    ValueError
+        If ``mg_solver.n_pre != mg_solver.n_post`` (the V-cycle would not be
+        symmetric).
+
     Examples
     --------
     >>> mg = build_multigrid_solver(mask, dx, dy, lambda_=10.0)
     >>> precond = make_multigrid_preconditioner(mg)
     >>> u, info = solve_cg(A, rhs, preconditioner=precond)
     """
+
+    if mg_solver.n_pre != mg_solver.n_post:
+        raise ValueError(
+            "a CG preconditioner must be symmetric: build the multigrid solver "
+            f"with n_pre == n_post (got {mg_solver.n_pre} and {mg_solver.n_post})"
+        )
 
     def _preconditioner(r: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         return mg_solver.v_cycle(jnp.zeros_like(r), r)
