@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -279,3 +280,52 @@ class TestErrors:
     def test_inhomogeneous_neumann(self):
         with pytest.raises(ValueError, match="Inhomogeneous Neumann"):
             fvx.pressure_from_divergence(_rhs(), DX, DY, bc=_neumann(0.5))
+
+
+class TestArrayZeroFaceValues:
+    """Concrete array zeros count as homogeneous face values (#310)."""
+
+    @pytest.mark.parametrize(
+        "zero",
+        [jnp.array(0.0), jnp.float64(0.0), np.zeros(()), np.float64(0.0)],
+        ids=["jnp.array", "jnp.float64", "np.zeros", "np.float64"],
+    )
+    def test_neumann_array_zero_is_dct(self, zero):
+        rhs = _rhs() - jnp.mean(_rhs())
+        p = fvx.pressure_from_divergence(rhs, DX, DY, bc=_neumann(zero))
+        ref = fvx.pressure_from_divergence(rhs, DX, DY, bc="dct")
+        np.testing.assert_array_equal(p, ref)
+
+    @pytest.mark.slow
+    def test_neumann_array_zero_cg_on_mask(self):
+        rhs = _rhs()
+        bc = _neumann(jnp.array(0.0))
+        p = fvx.pressure_from_divergence(
+            rhs, DX, DY, bc=bc, method="cg", mask=_basin_mask2d()
+        )
+        ref = fvx.pressure_from_divergence(
+            rhs, DX, DY, bc="dct", method="cg", mask=_basin_mask2d()
+        )
+        np.testing.assert_array_equal(p, ref)
+
+    def test_dirichlet_array_zero_is_homogeneous(self):
+        """A zero jnp face value must not switch on the known-value lift."""
+        z = jnp.array(0.0)
+        psi = fvx.streamfunction_from_vorticity(
+            _rhs(), DX, DY, bc=_dirichlet(z, z, z, z), lambda_=2.0
+        )
+        ref = fvx.streamfunction_from_vorticity(_rhs(), DX, DY, bc="dst", lambda_=2.0)
+        np.testing.assert_array_equal(psi, ref)
+
+    def test_nonzero_array_still_raises(self):
+        with pytest.raises(ValueError, match="Inhomogeneous Neumann"):
+            fvx.pressure_from_divergence(_rhs(), DX, DY, bc=_neumann(jnp.array(0.5)))
+
+    def test_traced_value_counts_as_nonzero(self):
+        """A tracer cannot be inspected, so it is refused rather than assumed zero."""
+
+        def solve(value):
+            return fvx.pressure_from_divergence(_rhs(), DX, DY, bc=_neumann(value))
+
+        with pytest.raises(ValueError, match="Inhomogeneous Neumann"):
+            jax.jit(solve)(jnp.array(0.0))

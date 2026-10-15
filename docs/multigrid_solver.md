@@ -377,7 +377,13 @@ $\omega = 0.8$, circular basin, $\lambda = 4$, Dirichlet, cycles 5–8):
 | $130^2$ | 6 | 0.066–0.069 |
 | $258^2$ | 7 | 0.068–0.073 |
 
-(The first cycle reduces it by about 0.02.)  This means:
+(The first cycle reduces it by about 0.02.)  Geometry matters: on the
+rectangle of the [Solver Comparison](solver_comparison.md) $\rho$ is
+0.063–0.064, but in its circular basin *with an island* it is 0.14 at
+$130^2$ and 0.17 at $258^2$, so 5 V-cycles leave a relative residual of
+$7 \times 10^{-5}$ / $4 \times 10^{-4}$ there; use more cycles, or CG +
+multigrid (7 iterations at both sizes).  On the plain circular basin this
+means:
 
 - 5 V-cycles reduce the residual by about $3 \times 10^{-7}$
 - The cost per V-cycle is $O(N)$ where $N = N_y \times N_x$ (each

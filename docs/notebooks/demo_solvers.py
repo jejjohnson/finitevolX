@@ -69,9 +69,10 @@ jax.config.update("jax_enable_x64", True)
 
 import finitevolx as fvx
 
-# Internal import: _apply_operator is needed to compute the multigrid residual
-# because the multigrid discretisation (with mask-aware boundary treatment)
-# differs from fvx.masked_laplacian.  There is no public equivalent yet.
+# Internal import: _apply_operator applies the multigrid's finest operator.
+# With coeff=None and the default bc="dirichlet" it equals fvx.masked_laplacian;
+# the variable-coefficient notch (section 6) needs it, since masked_laplacian
+# has no c(x, y).  There is no public equivalent yet.
 from finitevolx._src.solvers.multigrid import _apply_operator
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "demo_solvers"
@@ -82,10 +83,10 @@ IMG_DIR.mkdir(parents=True, exist_ok=True)
 #
 # ### Grid parameters
 #
-# We use a **64 x 64** grid on the unit square $[0,1]^2$.  64 is a power of
-# two, which keeps multigrid coarsening clean (no fractional grid sizes) and
-# is small enough for interactive exploration while large enough for
-# representative timing.
+# We use a **64 x 64** grid on the unit square $[0,1]^2$: small enough for
+# interactive exploration.  (Multigrid coarsens any shape, so the size need
+# not be a power of two.)  For timings at 128² and 256², with errors against
+# a sparse direct solve, see the [Solver Comparison](../solver_comparison.md).
 #
 # ### Helmholtz parameter
 #
@@ -577,9 +578,10 @@ print(f"  MG:       {t_mg_basin * 1000:.2f} ms, rel residual = {rr_mg_basin:.2e}
 # ## 5. Circular Basin — CG, Multigrid
 #
 # A circular ocean basin (radius = 0.4 N cells) inscribed in the grid.  The
-# capacitance method becomes expensive here because the number of boundary
-# points $B$ scales with the circumference, making the $O(B^3)$ factorisation
-# dominant.  Instead we compare:
+# capacitance method still applies (its setup grows with the number of coast
+# points $B$, which scales with the circumference; the
+# [Solver Comparison](../solver_comparison.md) measures it on a circular
+# basin with an island); here we compare the iterative solvers:
 #
 # ### CG with spectral preconditioner (Krylov method)
 #
@@ -733,9 +735,10 @@ print(f"  MG:      {t_mg_circle * 1000:.2f} ms, rel residual = {rr_mg_circle:.2e
 # CG.  Each CG step applies one multigrid V-cycle as an approximate inverse,
 # and CG refines to the requested tolerance.
 #
-# **Important:** The CG operator must use the same discretisation as the
-# multigrid (`_apply_operator`), not `fvx.masked_laplacian`, because the
-# multigrid boundary treatment differs.
+# **Important:** The CG operator must be the variable-coefficient operator
+# the multigrid was built with (`_apply_operator`), not
+# `fvx.masked_laplacian`, which has no $c(x, y)$.  (With a constant
+# coefficient the two are the same operator.)
 
 # %%
 print("\nNotch (variable coeff):")
@@ -1062,7 +1065,9 @@ print("Saved inhomogeneous_bc.png")
 # ![Inhomogeneous Dirichlet BCs via lifting](../../images/demo_solvers/inhomogeneous_bc.png)
 
 # %% [markdown]
-# `known_values` works with every wrapper and method:
+# `known_values` works with the ψ wrappers (`streamfunction_from_vorticity`,
+# `pv_inversion`) and every method; `pressure_from_divergence` refuses it
+# (its T-point Dirichlet wall is on the cell faces):
 #
 # | Method | How to call it |
 # |--------|----------------|
@@ -1087,11 +1092,13 @@ print("Saved inhomogeneous_bc.png")
 # | Geometry | Solver | Recommended when | Complexity |
 # |----------|--------|-----------------|------------|
 # | **Rectangle** | Spectral (DST) | Full grid, constant coeff | $O(N \log N)$, exact |
-# | **Near-rectangular mask** | Capacitance matrix | Few boundary points, constant coeff | $O(N \log N + B^2)$ |
-# | **Complex mask** | CG + spectral PC | Arbitrary mask, constant coeff | $O(k \cdot N \log N)$ |
-# | **Any mask** | Multigrid | Variable coeff, moderate accuracy | $O(N)$ per V-cycle |
-# | **Any mask, high accuracy** | MG + CG | Variable coeff, tight tolerance | $O(k \cdot N)$ |
+# | **Fixed mask, many solves** | Capacitance matrix | Constant coeff, setup affordable | $O(N \log N + B^2)$ |
+# | **Any mask** | MG + CG | Tight tolerance, constant or variable coeff | $O(k \cdot N)$, $k$ independent of $N$ |
+# | **Any mask** | Multigrid | A few V-cycles are accurate enough | $O(N)$ per V-cycle |
+# | **Any mask, no setup** | CG + spectral PC | Constant coeff | $O(k \cdot N \log N)$, $k$ grows with $N$ |
 #
+# Measured timings, iteration counts and errors at 128² and 256² are in the
+# [Solver Comparison](../solver_comparison.md).
 # See the [Elliptic Solvers docs](https://jejjohnson.github.io/finitevolX/elliptic_solvers/)
 # for full theory and the
 # [Preconditioner Guide](https://jejjohnson.github.io/finitevolX/elliptic_solvers/#preconditioners)

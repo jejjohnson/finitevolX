@@ -734,7 +734,7 @@ class MultigridSolver(eqx.Module):
       forward computation exactly, so gradient accuracy matches the
       forward solve accuracy).
 
-    Parameters
+    Attributes
     ----------
     levels : tuple of MultigridLevel
         Precomputed level data, finest (index 0) to coarsest (index L-1).
@@ -1120,9 +1120,11 @@ def build_multigrid_solver(
         Number of V-cycles applied per solve.  Each cycle reduces the
         residual by 0.06-0.07 on the default settings (measured on 34² to
         258² circular basins, independent of the grid size), so 5 cycles
-        reduce it by about 3e-7.  One-cell channels and islands are slower
-        for ``bc="neumann"`` (0.1-0.5 per cycle, measured on 34² masks);
-        use the V-cycle as a CG preconditioner there.
+        reduce it by about 3e-7.  An island is slower: 0.14 / 0.17 per
+        cycle for ``bc="dirichlet"`` in a circular basin with an island at
+        130² / 258² (5 cycles: 7e-5 / 4e-4).  One-cell channels and islands
+        are slower still for ``bc="neumann"`` (0.1-0.5 per cycle, measured on
+        34² masks); use the V-cycle as a CG preconditioner there.
         Default: 5.
     bc : {"dirichlet", "neumann"}
         Condition on wet–dry faces (see above).  Default: ``"dirichlet"``.
