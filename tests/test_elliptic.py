@@ -8,6 +8,7 @@ the re-export smoke tests.
 
 from __future__ import annotations
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -28,6 +29,7 @@ from finitevolx._src.solvers.elliptic import (
     solve_poisson_dct,
     solve_poisson_dst,
     solve_poisson_fft,
+    streamfunction_from_vorticity,
 )
 
 # ---------------------------------------------------------------------------
@@ -391,6 +393,148 @@ class TestSolveCGFloat32:
         x_explicit, info_explicit = solve_cg(A, rhs, atol=1e-6)
         np.testing.assert_array_equal(np.asarray(x_default), np.asarray(x_explicit))
         assert int(info_default.iterations) == int(info_explicit.iterations)
+
+
+class TestSolveCGDiagnostics:
+    """``CGInfo`` reports failure instead of raising or claiming success (#307),
+    and the preconditioned solve differentiates w.r.t. ``lambda_`` / ``dx``."""
+
+    N = 16
+    LAM = 4.0
+
+    @classmethod
+    def _basin(cls, lam=None, dx=None):
+        n = cls.N
+        lam = cls.LAM if lam is None else lam
+        dx = 1.0 / n if dx is None else dx
+        mask = jnp.zeros((n, n)).at[2:-2, 2:-2].set(1.0)  # [Ny, Nx]
+        j = jnp.arange(n)[:, None]
+        i = jnp.arange(n)[None, :]
+        psi = jnp.sin(jnp.pi * j / n) * jnp.sin(2 * jnp.pi * i / n) * mask
+
+        def A(x):
+            return masked_laplacian(x, mask, dx, dx, lambda_=lam)
+
+        return A, psi, mask, dx
+
+    def test_max_steps_reports_not_raises(self):
+        A, psi, _mask, _dx = self._basin()
+        _x, info = solve_cg(A, A(psi), max_steps=3)
+        assert not bool(info.converged)
+        assert int(info.iterations) == 3
+
+    def test_throw_raises_under_jit(self):
+        A, psi, _mask, _dx = self._basin()
+
+        @jax.jit
+        def f(rhs):
+            return solve_cg(A, rhs, max_steps=3, throw=True)[0]
+
+        # Eagerly eqx.error_if raises EquinoxRuntimeError; under jit the
+        # runtime check surfaces as JaxRuntimeError with the same message.
+        with pytest.raises(
+            (eqx.EquinoxRuntimeError, jax.errors.JaxRuntimeError),
+            match="did not converge",
+        ):
+            jax.block_until_ready(f(A(psi)))
+
+    def test_throw_passes_when_converged(self):
+        A, psi, _mask, _dx = self._basin()
+        x, info = solve_cg(A, A(psi), throw=True)
+        assert bool(info.converged)
+        np.testing.assert_allclose(np.asarray(x), np.asarray(psi), atol=1e-6)
+
+    def test_indefinite_operator_not_converged(self):
+        # λ < 0 makes A and its FFT preconditioner indefinite: lineax exits
+        # after 0-1 iterations with |r|/|b| ≈ 0.9-1 and used to say "success".
+        lam = -50.0
+        A, psi, _mask, dx = self._basin(lam=lam)
+        rhs = A(psi)
+        pc = make_spectral_preconditioner(dx, dx, lambda_=lam, bc="fft")
+        _x, info = solve_cg(A, rhs, preconditioner=pc)
+        assert not bool(info.converged)
+        assert float(info.residual_norm) > 0.5 * float(jnp.linalg.norm(rhs))
+
+    def test_wrong_sign_preconditioner_not_converged(self):
+        A, psi, _mask, dx = self._basin()
+        pc = make_spectral_preconditioner(dx, dx, lambda_=self.LAM, bc="fft")
+        _x, info = solve_cg(A, A(psi), preconditioner=lambda r: -pc(r))
+        assert not bool(info.converged)
+
+    def test_residual_norm_is_explicit_residual(self):
+        A, psi, _mask, dx = self._basin()
+        rhs = A(psi)
+        pc = make_spectral_preconditioner(dx, dx, lambda_=self.LAM, bc="fft")
+        x, info = solve_cg(A, rhs, preconditioner=pc)
+        assert bool(info.converged)
+        np.testing.assert_allclose(
+            float(info.residual_norm), float(jnp.linalg.norm(rhs - A(x))), rtol=1e-12
+        )
+
+    @staticmethod
+    def _assert_grad_matches_fd(grad_loss, fd_loss, p0):
+        # Central FD truncation error is O(h²) ≈ 1e-10 relative at h = 1e-5 p0.
+        g = float(jax.grad(grad_loss)(p0))
+        h = 1e-5 * p0
+        fd = float((fd_loss(p0 + h) - fd_loss(p0 - h)) / (2 * h))
+        assert g == pytest.approx(fd, rel=1e-6)
+
+    def _loss(self, wrt, solve):
+        """Scalar loss Σ ψ², with ψ = solve(lam, dx) and p one of (λ, dx)."""
+        _A, _psi, _mask, dx0 = self._basin()
+
+        def loss(p):
+            lam, dx = (p, dx0) if wrt == "lambda_" else (self.LAM, p)
+            return jnp.sum(solve(lam, dx) ** 2)
+
+        return loss, (self.LAM if wrt == "lambda_" else dx0)
+
+    @pytest.mark.slow
+    @pytest.mark.parametrize("wrt", ["lambda_", "dx"])
+    def test_grad_through_preconditioned_solve_cg(self, wrt):
+        _A, psi, mask, _dx = self._basin()
+
+        def solve(lam, dx):
+            def A(x):
+                return masked_laplacian(x, mask, dx, dx, lambda_=lam)
+
+            pc = make_spectral_preconditioner(dx, dx, lambda_=lam, bc="fft")
+            # rtol = atol = 1e-12: the FD of the solve itself is then exact
+            # to ~1e-10, far below the 1e-6 check.
+            x, _info = solve_cg(A, psi, preconditioner=pc, rtol=1e-12, atol=1e-12)
+            return x * mask
+
+        loss, p0 = self._loss(wrt, solve)
+        self._assert_grad_matches_fd(loss, loss, p0)
+
+    @pytest.mark.slow
+    @pytest.mark.parametrize("wrt", ["lambda_", "dx"])
+    def test_grad_through_streamfunction_cg(self, wrt):
+        # Default FFT preconditioner, built inside the wrapper from lambda_/dx.
+        _A, psi, mask, _dx = self._basin()
+        wet = np.asarray(mask, bool).ravel()  # [Ny*Nx]
+        n = mask.shape[0]
+
+        def solve_cg_wrapper(lam, dx):
+            return streamfunction_from_vorticity(
+                psi, dx, dx, lambda_=lam, method="cg", mask=mask
+            )
+
+        def solve_dense(lam, dx):
+            # The same masked operator as a dense wet block, solved exactly.
+            def A(x):  # [Ny*Nx] -> [Ny*Nx]
+                return masked_laplacian(x.reshape(n, n), mask, dx, dx, lam).ravel()
+
+            A_ww = jax.jacfwd(A)(jnp.zeros(n * n))[wet][:, wet]  # [n_wet, n_wet]
+            return jnp.linalg.solve(A_ww, psi.ravel()[wet])
+
+        # The wrapper's CG stops at rtol = atol = 1e-6, so an FD of the
+        # wrapper itself carries ~5e-6 relative truncation noise (measured);
+        # its implicit gradient does not (~1e-8 from the exact derivative).
+        # Difference the exact dense solve instead.
+        grad_loss, p0 = self._loss(wrt, solve_cg_wrapper)
+        fd_loss, _ = self._loss(wrt, solve_dense)
+        self._assert_grad_matches_fd(grad_loss, fd_loss, p0)
 
 
 # ---------------------------------------------------------------------------

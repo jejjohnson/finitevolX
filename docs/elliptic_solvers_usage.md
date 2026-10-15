@@ -439,6 +439,16 @@ print(f"Iterations: {info.iterations}")
 print(f"Residual norm: {info.residual_norm:.2e}")
 ```
 
+`solve_cg` does not raise when CG fails (pass `throw=True` for that):
+hitting `max_steps`, an indefinite operator (`lambda_ < 0`) or a
+preconditioner of the wrong sign all return `converged=False`.
+`converged` is checked on the explicit residual of the un-preconditioned
+system, `max|rhs - A(x)| <= atol + rtol max|rhs|`, and `residual_norm` is
+the L2 norm of that residual. The solve is differentiable with respect to
+`lambda_` and `dx`, also with a preconditioner built from them. Its output
+can be non-zero on land (the spectral preconditioners ignore the mask), so
+multiply by the mask as above; the wrappers do.
+
 ### Preconditioners
 
 === "Spectral (cheapest)"
