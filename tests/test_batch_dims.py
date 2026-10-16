@@ -116,9 +116,11 @@ def _array_params(fn: Callable) -> int | None:
         if p.default is not inspect.Parameter.empty or p.name == "self":
             continue
         ann = str(p.annotation)
+        if ann.startswith("float"):  # float, or float | 0-d array: a scalar
+            continue
         if "Array" in ann or p.annotation is inspect.Parameter.empty:
             n += 1
-        elif ann != "float":
+        else:
             return None
     return n
 
@@ -129,8 +131,9 @@ def _call(fn: Callable, fields: list) -> object:
     for p in inspect.signature(fn).parameters.values():
         if p.default is not inspect.Parameter.empty or p.name == "self":
             continue
-        is_array = (
-            "Array" in str(p.annotation) or p.annotation is inspect.Parameter.empty
+        ann = str(p.annotation)
+        is_array = not ann.startswith("float") and (
+            "Array" in ann or p.annotation is inspect.Parameter.empty
         )
         args.append(next(it) if is_array else SCALAR)
     return fn(*args)
