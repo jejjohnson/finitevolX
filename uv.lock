@@ -506,7 +506,7 @@ wheels = [
 
 [[package]]
 name = "finitevolx"
-version = "0.0.47"
+version = "0.0.48"
 source = { editable = "." }
 dependencies = [
     { name = "beartype" },
@@ -543,6 +543,10 @@ examples = [
     { name = "tqdm" },
     { name = "xarray" },
     { name = "zarr" },
+]
+pipekit = [
+    { name = "pipekit" },
+    { name = "pipekit-jax" },
 ]
 test = [
     { name = "coverage" },
@@ -586,6 +590,8 @@ requires-dist = [
     { name = "numpy", marker = "extra == 'examples'", specifier = ">=2.0.0" },
     { name = "pillow", marker = "extra == 'examples'", specifier = ">=11.0.0" },
     { name = "pillow", marker = "extra == 'test'", specifier = ">=11.0.0" },
+    { name = "pipekit", marker = "extra == 'pipekit'", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit&rev=d1eb41d4ac98c371cb198ee72aedfdf45046127c" },
+    { name = "pipekit-jax", marker = "extra == 'pipekit'", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=d1eb41d4ac98c371cb198ee72aedfdf45046127c" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3.0" },
     { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=5.0.0" },
@@ -601,7 +607,7 @@ requires-dist = [
     { name = "zarr", marker = "extra == 'examples'", specifier = ">=3.1.5" },
     { name = "zarr", marker = "extra == 'test'", specifier = ">=3.1.5" },
 ]
-provides-extras = ["test", "dev", "examples", "docs"]
+provides-extras = ["test", "dev", "examples", "pipekit", "docs"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "finitevolx", extras = ["dev", "test"] }]
@@ -1667,6 +1673,31 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/83/43/6f732ff85743cf746b1361b91665d9f5155e1483817f693f8d57ea93147f/pillow-12.1.1-cp313-cp313t-win32.whl", hash = "sha256:44ce27545b6efcf0fdbdceb31c9a5bdea9333e664cda58a7e674bb74608b3986", size = 6336441, upload-time = "2026-02-11T04:21:48.22Z" },
     { url = "https://files.pythonhosted.org/packages/3b/44/e865ef3986611bb75bfabdf94a590016ea327833f434558801122979cd0e/pillow-12.1.1-cp313-cp313t-win_amd64.whl", hash = "sha256:a285e3eb7a5a45a2ff504e31f4a8d1b12ef62e84e5411c6804a42197c1cf586c", size = 7045383, upload-time = "2026-02-11T04:21:50.015Z" },
     { url = "https://files.pythonhosted.org/packages/a8/c6/f4fb24268d0c6908b9f04143697ea18b0379490cb74ba9e8d41b898bd005/pillow-12.1.1-cp313-cp313t-win_arm64.whl", hash = "sha256:cc7d296b5ea4d29e6570dabeaed58d31c3fea35a633a69679fb03d7664f43fb3", size = 2456104, upload-time = "2026-02-11T04:21:51.633Z" },
+]
+
+[[package]]
+name = "pipekit"
+version = "0.0.2"
+source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit&rev=d1eb41d4ac98c371cb198ee72aedfdf45046127c#d1eb41d4ac98c371cb198ee72aedfdf45046127c" }
+
+[[package]]
+name = "pipekit-cycle"
+version = "0.0.2"
+source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=d1eb41d4ac98c371cb198ee72aedfdf45046127c#d1eb41d4ac98c371cb198ee72aedfdf45046127c" }
+dependencies = [
+    { name = "pipekit" },
+]
+
+[[package]]
+name = "pipekit-jax"
+version = "0.0.2"
+source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=d1eb41d4ac98c371cb198ee72aedfdf45046127c#d1eb41d4ac98c371cb198ee72aedfdf45046127c" }
+dependencies = [
+    { name = "equinox" },
+    { name = "jax" },
+    { name = "jaxtyping" },
+    { name = "pipekit" },
+    { name = "pipekit-cycle" },
 ]
 
 [[package]]

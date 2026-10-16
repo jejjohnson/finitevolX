@@ -48,7 +48,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --extra test
+        run: uv sync --extra test --extra pipekit
 
       - name: Run tests (fast + integration)
         if: github.event_name == 'push' || github.event_name == 'pull_request'
@@ -75,7 +75,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install dependencies
-        run: uv sync --extra test
+        run: uv sync --extra test --extra pipekit
 
       - name: Run tests (slow)
         run: uv run pytest tests -m slow -n 2 --durations=25

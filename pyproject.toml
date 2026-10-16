@@ -40,6 +40,12 @@ dependencies = [
 [tool.uv.sources]
 spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "0.1.1" }
 gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.6.5" }
+# pipekit is a uv workspace: consume its packages from git subdirectories,
+# pinned to the main commit that ships `pipekit_jax.JaxOperator` (no
+# release tag carries it yet). pipekit-cycle comes in through pipekit-jax.
+pipekit = { git = "https://github.com/jejjohnson/pipekit.git", subdirectory = "packages/pipekit", rev = "d1eb41d4ac98c371cb198ee72aedfdf45046127c" }
+pipekit-cycle = { git = "https://github.com/jejjohnson/pipekit.git", subdirectory = "packages/pipekit-cycle", rev = "d1eb41d4ac98c371cb198ee72aedfdf45046127c" }
+pipekit-jax = { git = "https://github.com/jejjohnson/pipekit.git", subdirectory = "packages/pipekit-jax", rev = "d1eb41d4ac98c371cb198ee72aedfdf45046127c" }
 
 # spectraldiffx pins its own gaussx git tag (v0.1.0 at spectraldiffx 0.1.1),
 # which uv treats as a conflicting URL for the same package. Override it so
@@ -84,6 +90,12 @@ examples = [
     "tqdm>=4.66.0",
     "xarray>=2025.1.0",
     "zarr>=3.1.5",
+]
+pipekit = [
+    # Tier-B operator layer, `finitevolx.pipekit` (pipekit Operators over
+    # the C-grid primitives). `import finitevolx` never imports these.
+    "pipekit",
+    "pipekit-jax",
 ]
 docs = [
     "mkdocs>=1.6.0",

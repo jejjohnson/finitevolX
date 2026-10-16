@@ -33,6 +33,7 @@ a logical grouping, not alphabetical: ruff's `RUF022` is off).
 | Solvers | `solvers/` | Spectral solvers re-exported from spectraldiffx (`spectral.py`, `spectral_transforms.py`); capacitance wrapper and the `streamfunction_from_vorticity` / `pressure_from_divergence` / `pv_inversion` wrappers (`elliptic.py`); `solve_cg` on lineax (`iterative.py`); preconditioners (`preconditioners.py`); `MultigridSolver` (`multigrid.py`); known-value lifting (`inhomogeneous.py`); tridiagonal solve re-exported from gaussx (`tridiagonal.py`) |
 | Time integration | `timestepping/` | Pure step functions (`euler_step`, `rk3_ssp_step`, `ab2_step`, `imex_ssp2_step`, …) and solver classes (diffrax's `RK3SSP`, `SSP_RK104`, `IMEX_SSP2`, …; `AB2Solver`, `LeapfrogRAFSolver`, `SplitExplicitRKSolver`) in `diffrax_solvers.py`; `solve_ocean_pde` (`_solve.py`) |
 | Vertical | `vertical/` | `multilayer` (vmap a 2-D operator over layers), vertical modes (`build_coupling_matrix`, `layer_to_mode`, …) |
+| pipekit layer (Tier B) | `pipekit/` (public: `finitevolx/pipekit/`) | `FVXOperator` / `GridOperator` on `pipekit_jax.JaxOperator`, `GridSpec`, `over_leading`, `check_operator` (`finitevolx.pipekit.testing`); behind the `pipekit` extra, never imported by `import finitevolx` |
 | Shared | `utils/constants.py` | `GRAVITY`, `R_EARTH`, `OMEGA`, `RHO`, `DEG2M` (parameter defaults only; see contract 6) |
 
 The three operator layers are the ones `docs/stencils.md` and
