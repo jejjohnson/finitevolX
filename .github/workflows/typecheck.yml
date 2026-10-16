@@ -19,7 +19,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --extra dev --extra pipekit
 
       - name: Type check
         run: uv run ty check finitevolx
