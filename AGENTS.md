@@ -600,6 +600,7 @@ of every `.md` page can hang on the `::: finitevolx.Name` blocks; build with
 | Time integration | `docs/time_integration.md`, `docs/time_integration_usage.md` | `docs/api/time_integration.md` |
 | Elliptic solvers | `docs/elliptic_solvers.md`, `docs/elliptic_solvers_usage.md`, `docs/solver_comparison.md` | `docs/api/{elliptic,spectral_solvers,spectral_transforms,capacitance,iterative}.md` |
 | Multigrid | `docs/multigrid_solver.md`, `docs/multigrid_solver_usage.md` | `docs/api/multigrid.md` |
+| pipekit operators (Tier B) | `docs/notebooks/pipekit_composition.py` | `docs/api/pipekit.md` |
 | Every public name | `docs/capabilities.md` (generated) | |
 
 Writing style:
