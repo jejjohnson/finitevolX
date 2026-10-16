@@ -9,7 +9,9 @@ the reductions keep the leading axes::
 
 so a conservation check over a trajectory is a three-node graph::
 
-    E = TotalEnergy(grid=G)(KineticEnergy(grid=G)(u, v), AvailablePE(grid=G, g_prime=g)(h))
+    E = TotalEnergy(grid=G)(
+        KineticEnergy(grid=G)(u, v), AvailablePE(grid=G, g_prime=g)(h)
+    )
 """
 
 from __future__ import annotations

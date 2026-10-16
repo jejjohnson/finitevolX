@@ -14,6 +14,7 @@ The schemes are finitevolX's pure step functions (`euler_step`, `heun_step`,
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 import equinox as eqx
@@ -30,8 +31,9 @@ from finitevolx._src.timestepping.explicit_rk import (
     rk4_step,
 )
 
-#: ``scheme -> step(state, rhs_fn, dt)``.
-SCHEMES = {
+#: ``scheme -> step(state, rhs_fn, dt)``. ``dt`` may be a 0-d array (a
+#: leaf): the steps only multiply by it.
+SCHEMES: dict[str, Callable[..., Any]] = {
     "euler": euler_step,
     "heun": heun_step,
     "rk3_ssp": rk3_ssp_step,
