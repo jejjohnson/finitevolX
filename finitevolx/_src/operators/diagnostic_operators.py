@@ -80,7 +80,7 @@ def _sanitize(
         return field
     wet = jnp.asarray(wet, dtype=bool)
     # keep[j, i] = True on the ghost ring, wet[j, i] in the interior
-    keep = jnp.ones_like(wet).at[1:-1, 1:-1].set(wet[1:-1, 1:-1])
+    keep = jnp.ones_like(wet).at[..., 1:-1, 1:-1].set(wet[..., 1:-1, 1:-1])
     return jnp.where(keep, field, 0.0)
 
 
@@ -116,26 +116,26 @@ class Energetics2D(eqx.Module):
     mask: Mask2D | None = None
 
     def _uv(
-        self, u: Float[Array, "Ny Nx"], v: Float[Array, "Ny Nx"]
-    ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
+        self, u: Float[Array, "*batch Ny Nx"], v: Float[Array, "*batch Ny Nx"]
+    ) -> tuple[Float[Array, "*batch Ny Nx"], Float[Array, "*batch Ny Nx"]]:
         """Zero velocities on dry interior faces (no-normal-flow)."""
         if self.mask is None:
             return u, v
         return _sanitize(self.mask.u, u), _sanitize(self.mask.v, v)
 
-    def _t(self, field: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def _t(self, field: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny Nx"]:
         """Zero a T-field on dry interior cells."""
         return _sanitize(None if self.mask is None else self.mask.h, field)
 
-    def _out(self, out: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def _out(self, out: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny Nx"]:
         """Zero dry T-cells: out[j, i] = out[j, i] if mask.h[j, i] else 0."""
         return _where(None if self.mask is None else self.mask.h, out)
 
     def kinetic_energy(
         self,
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
-    ) -> Float[Array, "Ny Nx"]:
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Kinetic energy at T-points.
 
         ke[j, i] = 1/2 * (u2_on_T[j, i] + v2_on_T[j, i])
@@ -145,14 +145,14 @@ class Energetics2D(eqx.Module):
 
         Parameters
         ----------
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             x-velocity at U-points.
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             y-velocity at V-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Kinetic energy at T-points, zero in the ghost ring and, when
             ``self.mask`` is set, at dry T-cells.
         """
@@ -161,29 +161,29 @@ class Energetics2D(eqx.Module):
 
     def bernoulli_potential(
         self,
-        h: Float[Array, "Ny Nx"],
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
+        h: Float[Array, "*batch Ny Nx"],
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
         gravity: float = GRAVITY,
-    ) -> Float[Array, "Ny Nx"]:
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Bernoulli potential at T-points.
 
         p[j, i] = ke[j, i] + gravity * h[j, i]
 
         Parameters
         ----------
-        h : Float[Array, "Ny Nx"]
+        h : Float[Array, "*batch Ny Nx"]
             Layer thickness at T-points.
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             x-velocity at U-points.
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             y-velocity at V-points.
         gravity : float, optional
             Gravitational acceleration.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Bernoulli potential at T-points, zero in the ghost ring and,
             when ``self.mask`` is set, at dry T-cells.
         """
@@ -192,10 +192,10 @@ class Energetics2D(eqx.Module):
 
     def available_potential_energy(
         self,
-        h: Float[Array, "Ny Nx"],
-        H: Float[Array, "Ny Nx"],
+        h: Float[Array, "*batch Ny Nx"],
+        H: Float[Array, "*batch Ny Nx"],
         g_prime: float,
-    ) -> Float[Array, "Ny Nx"]:
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Available potential energy at T-points.
 
         ape[j, i] = 1/2 * g_prime * (h[j, i] - H[j, i])^2
@@ -206,16 +206,16 @@ class Energetics2D(eqx.Module):
 
         Parameters
         ----------
-        h : Float[Array, "Ny Nx"]
+        h : Float[Array, "*batch Ny Nx"]
             Layer thickness at T-points.
-        H : Float[Array, "Ny Nx"]
+        H : Float[Array, "*batch Ny Nx"]
             Reference layer thickness at T-points.
         g_prime : float
             Reduced gravity.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Available potential energy at T-points, zero in the ghost ring
             and, when ``self.mask`` is set, at dry T-cells.
         """
@@ -224,8 +224,10 @@ class Energetics2D(eqx.Module):
         # arithmetic (or its gradient):
         # ape[j, i] = 1/2 * g_prime * (h[j, i] - H[j, i])^2
         #             for 1 <= j <= Ny-2, 1 <= i <= Nx-2
-        ape = available_potential_energy(h[1:-1, 1:-1], H[1:-1, 1:-1], g_prime)
-        out = jnp.zeros_like(h, dtype=ape.dtype).at[1:-1, 1:-1].set(ape)
+        ape = available_potential_energy(
+            h[..., 1:-1, 1:-1], H[..., 1:-1, 1:-1], g_prime
+        )
+        out = jnp.zeros_like(h, dtype=ape.dtype).at[..., 1:-1, 1:-1].set(ape)
         return self._out(out)
 
 
@@ -283,8 +285,8 @@ class Strain2D(eqx.Module):
         self.interp = Interpolation2D(grid=grid, mask=mask)
 
     def _uv(
-        self, u: Float[Array, "Ny Nx"], v: Float[Array, "Ny Nx"]
-    ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
+        self, u: Float[Array, "*batch Ny Nx"], v: Float[Array, "*batch Ny Nx"]
+    ) -> tuple[Float[Array, "*batch Ny Nx"], Float[Array, "*batch Ny Nx"]]:
         """Zero velocities on dry interior faces (no-normal-flow)."""
         if self.mask is None:
             return u, v
@@ -292,10 +294,10 @@ class Strain2D(eqx.Module):
 
     def _x_with_ghosts(
         self,
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
         sign: float,
-    ) -> Float[Array, "Ny Nx"]:
+    ) -> Float[Array, "*batch Ny Nx"]:
         """dv/dx + sign * du/dy at X-points, including the BC-owned ghosts.
 
         sign = +1 gives the shear strain, sign = -1 the relative vorticity:
@@ -315,19 +317,19 @@ class Strain2D(eqx.Module):
         the ghost velocities, even where a closed-basin mask marks them dry.
         """
         # dv_dx[j+1/2, i+1/2] = (v[j+1/2, i+1] - v[j+1/2, i]) / dx
-        dv_dx = (v[:-1, 1:] - v[:-1, :-1]) / self.grid.dx
+        dv_dx = (v[..., :-1, 1:] - v[..., :-1, :-1]) / self.grid.dx
         # du_dy[j+1/2, i+1/2] = (u[j+1, i+1/2] - u[j, i+1/2]) / dy
-        du_dy = (u[1:, :-1] - u[:-1, :-1]) / self.grid.dy
+        du_dy = (u[..., 1:, :-1] - u[..., :-1, :-1]) / self.grid.dy
         x = dv_dx + sign * du_dy
         # out[j, i] = x[j, i] for 0 <= j <= Ny-2, 0 <= i <= Nx-2
-        out = jnp.zeros_like(u, dtype=x.dtype).at[:-1, :-1].set(x)
+        out = jnp.zeros_like(u, dtype=x.dtype).at[..., :-1, :-1].set(x)
         return _sanitize(None if self.mask is None else self.mask.xy_corner_strict, out)
 
     def shear(
         self,
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
-    ) -> Float[Array, "Ny Nx"]:
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Shear strain at X-points.
 
         ss[j+1/2, i+1/2] = (v[j+1/2, i+1] - v[j+1/2, i]) / dx
@@ -335,14 +337,14 @@ class Strain2D(eqx.Module):
 
         Parameters
         ----------
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             x-velocity at U-points.
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             y-velocity at V-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Shear strain at X-points, zero in the ghost ring and, when
             ``self.mask`` is set, at dry X-corners.
         """
@@ -352,9 +354,9 @@ class Strain2D(eqx.Module):
 
     def tensor(
         self,
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
-    ) -> Float[Array, "Ny Nx"]:
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Tensor (normal) strain at T-points.
 
         sn[j, i] = (u[j, i+1/2] - u[j, i-1/2]) / dx
@@ -362,14 +364,14 @@ class Strain2D(eqx.Module):
 
         Parameters
         ----------
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             x-velocity at U-points.
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             y-velocity at V-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Tensor strain at T-points, zero in the ghost ring and, when
             ``self.mask`` is set, at dry T-cells.
         """
@@ -379,9 +381,9 @@ class Strain2D(eqx.Module):
 
     def magnitude_squared(
         self,
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
-    ) -> Float[Array, "Ny Nx"]:
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Squared strain magnitude at T-points.
 
         sigma2[j, i] = sn[j, i]^2 + ss_on_T[j, i]^2
@@ -396,14 +398,14 @@ class Strain2D(eqx.Module):
 
         Parameters
         ----------
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             x-velocity at U-points.
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             y-velocity at V-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Squared strain magnitude at T-points, zero in the ghost ring
             and, when ``self.mask`` is set, at dry T-cells.
         """
@@ -415,9 +417,9 @@ class Strain2D(eqx.Module):
 
     def okubo_weiss(
         self,
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
-    ) -> Float[Array, "Ny Nx"]:
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Okubo-Weiss parameter at T-points.
 
         ow[j, i] = sn[j, i]^2 + ss_on_T[j, i]^2 - omega_on_T[j, i]^2
@@ -434,14 +436,14 @@ class Strain2D(eqx.Module):
 
         Parameters
         ----------
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             x-velocity at U-points.
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             y-velocity at V-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Okubo-Weiss parameter at T-points, zero in the ghost ring and,
             when ``self.mask`` is set, at dry T-cells.
         """
@@ -502,12 +504,12 @@ class QGPotentialVorticity2D(eqx.Module):
 
     def __call__(
         self,
-        psi: Float[Array, "Ny Nx"],
+        psi: Float[Array, "*batch Ny Nx"],
         f0: float,
         beta: float,
-        y: Float[Array, "Ny Nx"],
+        y: Float[Array, "*batch Ny Nx"],
         y0: float,
-    ) -> Float[Array, "Ny Nx"]:
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Single-layer QG potential vorticity.
 
         q[j, i] = lap_psi[j, i] / f0 + beta * (y[j, i] - y0) / f0
@@ -517,20 +519,20 @@ class QGPotentialVorticity2D(eqx.Module):
 
         Parameters
         ----------
-        psi : Float[Array, "Ny Nx"]
+        psi : Float[Array, "*batch Ny Nx"]
             Streamfunction at T-points.
         f0 : float
             Reference Coriolis parameter.
         beta : float
             Meridional gradient of the Coriolis parameter.
-        y : Float[Array, "Ny Nx"]
+        y : Float[Array, "*batch Ny Nx"]
             Meridional coordinate at T-points.
         y0 : float
             Reference latitude.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             QG potential vorticity at T-points, zero in the ghost ring and,
             when ``self.mask`` is set, at dry T-cells.
         """

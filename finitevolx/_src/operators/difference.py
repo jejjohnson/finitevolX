@@ -46,11 +46,11 @@ from finitevolx._src.operators.stencils import (
 
 
 def _curl_2d(
-    u: Float[Array, "Ny Nx"],
-    v: Float[Array, "Ny Nx"],
+    u: Float[Array, "*batch Ny Nx"],
+    v: Float[Array, "*batch Ny Nx"],
     dx: float,
     dy: float,
-) -> Float[Array, "Ny Nx"]:
+) -> Float[Array, "*batch Ny Nx"]:
     """Curl (relative vorticity) at X-points.  Shared implementation.
 
     zeta[j+1/2, i+1/2] = (v[j+1/2, i+1] - v[j+1/2, i]) / dx
@@ -61,11 +61,11 @@ def _curl_2d(
 
 
 def _divergence_2d(
-    u: Float[Array, "Ny Nx"],
-    v: Float[Array, "Ny Nx"],
+    u: Float[Array, "*batch Ny Nx"],
+    v: Float[Array, "*batch Ny Nx"],
     dx: float,
     dy: float,
-) -> Float[Array, "Ny Nx"]:
+) -> Float[Array, "*batch Ny Nx"]:
     """Divergence at T-points.  Shared implementation.
 
     delta[j, i] = (u[j, i+1/2] - u[j, i-1/2]) / dx
@@ -196,19 +196,21 @@ class Difference2D(eqx.Module):
     # Forward differences
     # ------------------------------------------------------------------
 
-    def diff_x_T_to_U(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def diff_x_T_to_U(
+        self, h: Float[Array, "*batch Ny Nx"]
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Forward x-difference: T-point -> U-point.
 
         dh_dx[j, i+1/2] = (h[j, i+1] - h[j, i]) / dx
 
         Parameters
         ----------
-        h : Float[Array, "Ny Nx"]
+        h : Float[Array, "*batch Ny Nx"]
             Scalar field at T-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Forward x-difference at U-points.  When ``self.mask`` is
             set, the output is zeroed at dry U-faces via ``* mask.u``.
         """
@@ -217,19 +219,21 @@ class Difference2D(eqx.Module):
             out = out * self.mask.u
         return out
 
-    def diff_y_T_to_V(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def diff_y_T_to_V(
+        self, h: Float[Array, "*batch Ny Nx"]
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Forward y-difference: T-point -> V-point.
 
         dh_dy[j+1/2, i] = (h[j+1, i] - h[j, i]) / dy
 
         Parameters
         ----------
-        h : Float[Array, "Ny Nx"]
+        h : Float[Array, "*batch Ny Nx"]
             Scalar field at T-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Forward y-difference at V-points.  When ``self.mask`` is
             set, the output is zeroed at dry V-faces via ``* mask.v``.
         """
@@ -238,19 +242,21 @@ class Difference2D(eqx.Module):
             out = out * self.mask.v
         return out
 
-    def diff_y_U_to_X(self, u: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def diff_y_U_to_X(
+        self, u: Float[Array, "*batch Ny Nx"]
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Forward y-difference: U-point -> X-point (corner).
 
         du_dy[j+1/2, i+1/2] = (u[j+1, i+1/2] - u[j, i+1/2]) / dy
 
         Parameters
         ----------
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             Velocity field at U-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Forward y-difference at X-points.  When ``self.mask`` is
             set, the output is zeroed at dry X-corners via
             ``* mask.xy_corner_strict``.
@@ -260,19 +266,21 @@ class Difference2D(eqx.Module):
             out = out * self.mask.xy_corner_strict
         return out
 
-    def diff_x_V_to_X(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def diff_x_V_to_X(
+        self, v: Float[Array, "*batch Ny Nx"]
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Forward x-difference: V-point -> X-point (corner).
 
         dv_dx[j+1/2, i+1/2] = (v[j+1/2, i+1] - v[j+1/2, i]) / dx
 
         Parameters
         ----------
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             Velocity field at V-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Forward x-difference at X-points.  When ``self.mask`` is
             set, the output is zeroed at dry X-corners via
             ``* mask.xy_corner_strict``.
@@ -286,19 +294,21 @@ class Difference2D(eqx.Module):
     # Backward differences
     # ------------------------------------------------------------------
 
-    def diff_y_X_to_U(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def diff_y_X_to_U(
+        self, q: Float[Array, "*batch Ny Nx"]
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Backward y-difference: X-point -> U-point.
 
         dq_dy[j, i+1/2] = (q[j+1/2, i+1/2] - q[j-1/2, i+1/2]) / dy
 
         Parameters
         ----------
-        q : Float[Array, "Ny Nx"]
+        q : Float[Array, "*batch Ny Nx"]
             Scalar field at X-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Backward y-difference at U-points.  When ``self.mask`` is
             set, the output is zeroed at dry U-faces via ``* mask.u``.
         """
@@ -307,19 +317,21 @@ class Difference2D(eqx.Module):
             out = out * self.mask.u
         return out
 
-    def diff_x_X_to_V(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def diff_x_X_to_V(
+        self, q: Float[Array, "*batch Ny Nx"]
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Backward x-difference: X-point -> V-point.
 
         dq_dx[j+1/2, i] = (q[j+1/2, i+1/2] - q[j+1/2, i-1/2]) / dx
 
         Parameters
         ----------
-        q : Float[Array, "Ny Nx"]
+        q : Float[Array, "*batch Ny Nx"]
             Scalar field at X-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Backward x-difference at V-points.  When ``self.mask`` is
             set, the output is zeroed at dry V-faces via ``* mask.v``.
         """
@@ -328,19 +340,21 @@ class Difference2D(eqx.Module):
             out = out * self.mask.v
         return out
 
-    def diff_x_U_to_T(self, u: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def diff_x_U_to_T(
+        self, u: Float[Array, "*batch Ny Nx"]
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Backward x-difference: U-point -> T-point.
 
         du_dx[j, i] = (u[j, i+1/2] - u[j, i-1/2]) / dx
 
         Parameters
         ----------
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             Velocity field at U-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Backward x-difference at T-points.  When ``self.mask`` is
             set, the output is zeroed at dry T-cells via ``* mask.h``.
         """
@@ -349,19 +363,21 @@ class Difference2D(eqx.Module):
             out = out * self.mask.h
         return out
 
-    def diff_y_V_to_T(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def diff_y_V_to_T(
+        self, v: Float[Array, "*batch Ny Nx"]
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Backward y-difference: V-point -> T-point.
 
         dv_dy[j, i] = (v[j+1/2, i] - v[j-1/2, i]) / dy
 
         Parameters
         ----------
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             Velocity field at V-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Backward y-difference at T-points.  When ``self.mask`` is
             set, the output is zeroed at dry T-cells via ``* mask.h``.
         """
@@ -376,9 +392,9 @@ class Difference2D(eqx.Module):
 
     def divergence(
         self,
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
-    ) -> Float[Array, "Ny Nx"]:
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Divergence of (u, v) at T-points.
 
         delta[j, i] = du_dx[j, i] + dv_dy[j, i]
@@ -387,14 +403,14 @@ class Difference2D(eqx.Module):
 
         Parameters
         ----------
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             x-velocity at U-points.
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             y-velocity at V-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Divergence at T-points.  When ``self.mask`` is set, the
             output is zeroed at dry T-cells via ``* mask.h``.
         """
@@ -405,9 +421,9 @@ class Difference2D(eqx.Module):
 
     def curl(
         self,
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
-    ) -> Float[Array, "Ny Nx"]:
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Curl (relative vorticity) of (u, v) at X-points (corners).
 
         zeta[j+1/2, i+1/2] = dv_dx[j+1/2, i+1/2] - du_dy[j+1/2, i+1/2]
@@ -416,14 +432,14 @@ class Difference2D(eqx.Module):
 
         Parameters
         ----------
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             x-velocity at U-points.
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             y-velocity at V-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Relative vorticity at X-points (corners).  When
             ``self.mask`` is set, the output is zeroed at dry X-corners
             via ``* mask.xy_corner_strict``.
@@ -433,7 +449,9 @@ class Difference2D(eqx.Module):
             out = out * self.mask.xy_corner_strict
         return out
 
-    def laplacian(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def laplacian(
+        self, h: Float[Array, "*batch Ny Nx"]
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Laplacian at T-points.
 
         nabla2_h[j, i] = (h[j, i+1] - 2*h[j, i] + h[j, i-1]) / dx^2
@@ -441,12 +459,12 @@ class Difference2D(eqx.Module):
 
         Parameters
         ----------
-        h : Float[Array, "Ny Nx"]
+        h : Float[Array, "*batch Ny Nx"]
             Scalar field at T-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Laplacian at T-points.  When ``self.mask`` is set, the
             output is zeroed at dry T-cells via ``* mask.h``.
         """
@@ -464,8 +482,8 @@ class Difference2D(eqx.Module):
 
     def grad_perp(
         self,
-        psi: Float[Array, "Ny Nx"],
-    ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
+        psi: Float[Array, "*batch Ny Nx"],
+    ) -> tuple[Float[Array, "*batch Ny Nx"], Float[Array, "*batch Ny Nx"]]:
         """Perpendicular gradient: T-point streamfunction to geostrophic velocity.
 
         Maps a streamfunction ψ at T-points to face-centred geostrophic
@@ -485,12 +503,12 @@ class Difference2D(eqx.Module):
 
         Parameters
         ----------
-        psi : Float[Array, "Ny Nx"]
+        psi : Float[Array, "*batch Ny Nx"]
             Streamfunction at T-points.
 
         Returns
         -------
-        tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]
+        tuple[Float[Array, "*batch Ny Nx"], Float[Array, "*batch Ny Nx"]]
             (u, v) — zonal velocity at U-points and meridional velocity at
             V-points.
 
@@ -511,14 +529,24 @@ class Difference2D(eqx.Module):
         """
         # u[j, i+1/2] = -(ψ[j+1,i] + ψ[j+1,i+1] - ψ[j-1,i] - ψ[j-1,i+1]) / (4·dy)
         u = interior(
-            -(psi[2:, 1:-1] + psi[2:, 2:] - psi[:-2, 1:-1] - psi[:-2, 2:])
+            -(
+                psi[..., 2:, 1:-1]
+                + psi[..., 2:, 2:]
+                - psi[..., :-2, 1:-1]
+                - psi[..., :-2, 2:]
+            )
             / (4.0 * self.grid.dy),
             psi,
         )
 
         # v[j+1/2, i] = (ψ[j,i+1] + ψ[j+1,i+1] - ψ[j,i-1] - ψ[j+1,i-1]) / (4·dx)
         v = interior(
-            (psi[1:-1, 2:] + psi[2:, 2:] - psi[1:-1, :-2] - psi[2:, :-2])
+            (
+                psi[..., 1:-1, 2:]
+                + psi[..., 2:, 2:]
+                - psi[..., 1:-1, :-2]
+                - psi[..., 2:, :-2]
+            )
             / (4.0 * self.grid.dx),
             psi,
         )

@@ -140,6 +140,13 @@ The long form, with figures, is in `docs/cgrid_discretization.md`,
   3-D). The physical interior is `[1:-1, 1:-1]`; one ghost ring on each side
   is reserved for boundary conditions. Grids are built with
   `CartesianGrid2D.from_interior(nx, ny, Lx, Ly)`, which adds the ring.
+- The 2-D Cartesian operators, diagnostics and BCs also take leading batch
+  axes, `[*batch, Ny, Nx]` (annotated `"*batch Ny Nx"`): slice and index
+  the trailing two axes with a `...` prefix (`h[..., 1:-1, 2:]`,
+  `field.at[..., 0, :]`), reduce over `axis=(-2, -1)`, and let `interior`
+  pad (it pads only the axes that lost a ghost ring).
+  `tests/test_batch_dims.py` checks every entry point annotated `*batch`
+  against a loop over members.
 - Same-index colocation:
   - `T[j, i]` → cell centre `(j, i)`
   - `U[j, i]` → east face `(j, i+1/2)`
@@ -174,6 +181,9 @@ Key asymmetry of the same-index convention:
   pattern: the last interior output reads the far-side ghost of the source.
 
 Stencil slices, each the same shape as `[1:-1, 1:-1]`:
+
+Written for `[Ny, Nx]` below; in code, prefix each with `...`
+(`arr[..., 1:-1, 2:]`) so leading batch axes pass through.
 
 | Slice pattern | Meaning (j = row, i = col) |
 |---|---|
@@ -373,6 +383,7 @@ docstring before changing what it checks.
 | `tests/test_fixture_smoke.py` | The golden-fixture inputs, masks and helpers themselves |
 | `tests/test_convergence.py` | Second-order spatial convergence of the difference operators |
 | `tests/test_jax_transforms.py`, `tests/test_differentiable.py` | `jit` / `vmap` match eager execution; the smooth surrogates differentiate |
+| `tests/test_batch_dims.py` | Every 2-D entry point annotated `*batch Ny Nx` equals a loop over the batch members, masked and unmasked, eager and under `jit` |
 | `tests/test_dtype_behavior.py` | float32 and float64 agree; outputs are finite on extreme inputs |
 | `tests/test_open_walls.py`, conservation tests in `test_advection.py`, `test_jacobian.py`, `test_momentum.py`, `test_diagnostics.py` | Mass / energy / enstrophy conservation of the flux-form and Arakawa schemes, including `wall="open"` |
 | `tests/test_stencils.py`, `tests/test_ghost.py`, `tests/test_grid.py`, `tests/test_cgrid_mask.py` | Raw stencil slices, the ghost-ring helpers, grid and mask construction |

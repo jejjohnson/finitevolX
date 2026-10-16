@@ -84,7 +84,7 @@ def diff_x_bwd_1d(h: Float[Array, "Nx"]) -> Float[Array, "Nx-2"]:
 # =====================================================================
 
 
-def diff_x_fwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
+def diff_x_fwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
     """Forward difference in x (centre → east face).
 
     Δx h[j, i+½] = h[j, i+1] − h[j, i]
@@ -93,12 +93,12 @@ def diff_x_fwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
 
     Parameters
     ----------
-    h : Float[Array, "Ny Nx"]
+    h : Float[Array, "*batch Ny Nx"]
         Field on source points (T or V), including ghost ring.
 
     Returns
     -------
-    Float[Array, "Ny-2 Nx-2"]
+    Float[Array, "*batch Ny-2 Nx-2"]
         Raw difference at interior destination points (U or X).
 
     Notes
@@ -106,10 +106,10 @@ def diff_x_fwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
     No metric scaling is applied.  The caller divides by ``dx``,
     ``R·cos(φ)·dλ``, or whatever metric is appropriate.
     """
-    return h[1:-1, 2:] - h[1:-1, 1:-1]
+    return h[..., 1:-1, 2:] - h[..., 1:-1, 1:-1]
 
 
-def diff_y_fwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
+def diff_y_fwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
     """Forward difference in y (centre → north face).
 
     Δy h[j+½, i] = h[j+1, i] − h[j, i]
@@ -118,12 +118,12 @@ def diff_y_fwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
 
     Parameters
     ----------
-    h : Float[Array, "Ny Nx"]
+    h : Float[Array, "*batch Ny Nx"]
         Field on source points (T or U), including ghost ring.
 
     Returns
     -------
-    Float[Array, "Ny-2 Nx-2"]
+    Float[Array, "*batch Ny-2 Nx-2"]
         Raw difference at interior destination points (V or X).
 
     Notes
@@ -131,10 +131,10 @@ def diff_y_fwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
     No metric scaling is applied.  The caller divides by ``dy``,
     ``R·dφ``, or whatever metric is appropriate.
     """
-    return h[2:, 1:-1] - h[1:-1, 1:-1]
+    return h[..., 2:, 1:-1] - h[..., 1:-1, 1:-1]
 
 
-def diff_x_bwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
+def diff_x_bwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
     """Backward difference in x (east face → centre).
 
     Δx h[j, i] = h[j, i+½] − h[j, i−½]
@@ -143,12 +143,12 @@ def diff_x_bwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
 
     Parameters
     ----------
-    h : Float[Array, "Ny Nx"]
+    h : Float[Array, "*batch Ny Nx"]
         Field on source points (U or X), including ghost ring.
 
     Returns
     -------
-    Float[Array, "Ny-2 Nx-2"]
+    Float[Array, "*batch Ny-2 Nx-2"]
         Raw difference at interior destination points (T or V).
 
     Notes
@@ -156,10 +156,10 @@ def diff_x_bwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
     No metric scaling is applied.  The caller divides by ``dx``,
     ``R·cos(φ)·dλ``, or whatever metric is appropriate.
     """
-    return h[1:-1, 1:-1] - h[1:-1, :-2]
+    return h[..., 1:-1, 1:-1] - h[..., 1:-1, :-2]
 
 
-def diff_y_bwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
+def diff_y_bwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
     """Backward difference in y (north face → centre).
 
     Δy h[j, i] = h[j+½, i] − h[j−½, i]
@@ -168,12 +168,12 @@ def diff_y_bwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
 
     Parameters
     ----------
-    h : Float[Array, "Ny Nx"]
+    h : Float[Array, "*batch Ny Nx"]
         Field on source points (V or X), including ghost ring.
 
     Returns
     -------
-    Float[Array, "Ny-2 Nx-2"]
+    Float[Array, "*batch Ny-2 Nx-2"]
         Raw difference at interior destination points (T or U).
 
     Notes
@@ -181,7 +181,7 @@ def diff_y_bwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
     No metric scaling is applied.  The caller divides by ``dy``,
     ``R·dφ``, or whatever metric is appropriate.
     """
-    return h[1:-1, 1:-1] - h[:-2, 1:-1]
+    return h[..., 1:-1, 1:-1] - h[..., :-2, 1:-1]
 
 
 # =====================================================================
@@ -213,7 +213,7 @@ def diff_x_fwd_3d(
     No metric scaling is applied.  The caller divides by ``dx``,
     ``R·cos(φ)·dλ``, or whatever metric is appropriate.
     """
-    return h[1:-1, 1:-1, 2:] - h[1:-1, 1:-1, 1:-1]
+    return h[..., 1:-1, 1:-1, 2:] - h[..., 1:-1, 1:-1, 1:-1]
 
 
 def diff_y_fwd_3d(
@@ -240,7 +240,7 @@ def diff_y_fwd_3d(
     No metric scaling is applied.  The caller divides by ``dy``,
     ``R·dφ``, or whatever metric is appropriate.
     """
-    return h[1:-1, 2:, 1:-1] - h[1:-1, 1:-1, 1:-1]
+    return h[..., 1:-1, 2:, 1:-1] - h[..., 1:-1, 1:-1, 1:-1]
 
 
 def diff_x_bwd_3d(
@@ -267,7 +267,7 @@ def diff_x_bwd_3d(
     No metric scaling is applied.  The caller divides by ``dx``,
     ``R·cos(φ)·dλ``, or whatever metric is appropriate.
     """
-    return h[1:-1, 1:-1, 1:-1] - h[1:-1, 1:-1, :-2]
+    return h[..., 1:-1, 1:-1, 1:-1] - h[..., 1:-1, 1:-1, :-2]
 
 
 def diff_y_bwd_3d(
@@ -294,7 +294,7 @@ def diff_y_bwd_3d(
     No metric scaling is applied.  The caller divides by ``dy``,
     ``R·dφ``, or whatever metric is appropriate.
     """
-    return h[1:-1, 1:-1, 1:-1] - h[1:-1, :-2, 1:-1]
+    return h[..., 1:-1, 1:-1, 1:-1] - h[..., 1:-1, :-2, 1:-1]
 
 
 # =====================================================================
@@ -347,7 +347,7 @@ def avg_x_bwd_1d(h: Float[Array, "Nx"]) -> Float[Array, "Nx-2"]:
 # =====================================================================
 
 
-def avg_x_fwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
+def avg_x_fwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
     """Forward average in x (centre → east face).
 
     h̄[j, i+½] = ½ (h[j, i] + h[j, i+1])
@@ -356,18 +356,18 @@ def avg_x_fwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
 
     Parameters
     ----------
-    h : Float[Array, "Ny Nx"]
+    h : Float[Array, "*batch Ny Nx"]
         Field on source points (T or V), including ghost ring.
 
     Returns
     -------
-    Float[Array, "Ny-2 Nx-2"]
+    Float[Array, "*batch Ny-2 Nx-2"]
         Averaged values at interior destination points (U or X).
     """
-    return 0.5 * (h[1:-1, 1:-1] + h[1:-1, 2:])
+    return 0.5 * (h[..., 1:-1, 1:-1] + h[..., 1:-1, 2:])
 
 
-def avg_y_fwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
+def avg_y_fwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
     """Forward average in y (centre → north face).
 
     h̄[j+½, i] = ½ (h[j, i] + h[j+1, i])
@@ -376,18 +376,18 @@ def avg_y_fwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
 
     Parameters
     ----------
-    h : Float[Array, "Ny Nx"]
+    h : Float[Array, "*batch Ny Nx"]
         Field on source points (T or U), including ghost ring.
 
     Returns
     -------
-    Float[Array, "Ny-2 Nx-2"]
+    Float[Array, "*batch Ny-2 Nx-2"]
         Averaged values at interior destination points (V or X).
     """
-    return 0.5 * (h[1:-1, 1:-1] + h[2:, 1:-1])
+    return 0.5 * (h[..., 1:-1, 1:-1] + h[..., 2:, 1:-1])
 
 
-def avg_x_bwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
+def avg_x_bwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
     """Backward average in x (east face → centre).
 
     h̄[j, i] = ½ (h[j, i−½] + h[j, i+½])
@@ -396,18 +396,18 @@ def avg_x_bwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
 
     Parameters
     ----------
-    h : Float[Array, "Ny Nx"]
+    h : Float[Array, "*batch Ny Nx"]
         Field on source points (U or X), including ghost ring.
 
     Returns
     -------
-    Float[Array, "Ny-2 Nx-2"]
+    Float[Array, "*batch Ny-2 Nx-2"]
         Averaged values at interior destination points (T or V).
     """
-    return 0.5 * (h[1:-1, 1:-1] + h[1:-1, :-2])
+    return 0.5 * (h[..., 1:-1, 1:-1] + h[..., 1:-1, :-2])
 
 
-def avg_y_bwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
+def avg_y_bwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
     """Backward average in y (north face → centre).
 
     h̄[j, i] = ½ (h[j−½, i] + h[j+½, i])
@@ -416,15 +416,15 @@ def avg_y_bwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
 
     Parameters
     ----------
-    h : Float[Array, "Ny Nx"]
+    h : Float[Array, "*batch Ny Nx"]
         Field on source points (V or X), including ghost ring.
 
     Returns
     -------
-    Float[Array, "Ny-2 Nx-2"]
+    Float[Array, "*batch Ny-2 Nx-2"]
         Averaged values at interior destination points (T or U).
     """
-    return 0.5 * (h[1:-1, 1:-1] + h[:-2, 1:-1])
+    return 0.5 * (h[..., 1:-1, 1:-1] + h[..., :-2, 1:-1])
 
 
 # =====================================================================
@@ -432,7 +432,7 @@ def avg_y_bwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
 # =====================================================================
 
 
-def avg_xy_fwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
+def avg_xy_fwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
     """Bilinear average to NE corner (forward in both x and y).
 
     h̄[j+½, i+½] = ¼ (h[j,i] + h[j,i+1] + h[j+1,i] + h[j+1,i+1])
@@ -441,18 +441,20 @@ def avg_xy_fwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
 
     Parameters
     ----------
-    h : Float[Array, "Ny Nx"]
+    h : Float[Array, "*batch Ny Nx"]
         Field on T-points, including ghost ring.
 
     Returns
     -------
-    Float[Array, "Ny-2 Nx-2"]
+    Float[Array, "*batch Ny-2 Nx-2"]
         Averaged values at interior X-points.
     """
-    return 0.25 * (h[1:-1, 1:-1] + h[1:-1, 2:] + h[2:, 1:-1] + h[2:, 2:])
+    return 0.25 * (
+        h[..., 1:-1, 1:-1] + h[..., 1:-1, 2:] + h[..., 2:, 1:-1] + h[..., 2:, 2:]
+    )
 
 
-def avg_xy_bwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
+def avg_xy_bwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
     """Bilinear average from corners to centre (backward in both x and y).
 
     h̄[j, i] = ¼ (h[j+½,i+½] + h[j−½,i+½] + h[j+½,i−½] + h[j−½,i−½])
@@ -461,51 +463,57 @@ def avg_xy_bwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
 
     Parameters
     ----------
-    h : Float[Array, "Ny Nx"]
+    h : Float[Array, "*batch Ny Nx"]
         Field on X-points, including ghost ring.
 
     Returns
     -------
-    Float[Array, "Ny-2 Nx-2"]
+    Float[Array, "*batch Ny-2 Nx-2"]
         Averaged values at interior T-points.
     """
-    return 0.25 * (h[1:-1, 1:-1] + h[:-2, 1:-1] + h[1:-1, :-2] + h[:-2, :-2])
+    return 0.25 * (
+        h[..., 1:-1, 1:-1] + h[..., :-2, 1:-1] + h[..., 1:-1, :-2] + h[..., :-2, :-2]
+    )
 
 
-def avg_xbwd_yfwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
+def avg_xbwd_yfwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
     """Bilinear average: U-points → V-points (backward-x, forward-y).
 
     h̄[j+½, i] = ¼ (h[j,i+½] + h[j+1,i+½] + h[j,i−½] + h[j+1,i−½])
 
     Parameters
     ----------
-    h : Float[Array, "Ny Nx"]
+    h : Float[Array, "*batch Ny Nx"]
         Field on U-points, including ghost ring.
 
     Returns
     -------
-    Float[Array, "Ny-2 Nx-2"]
+    Float[Array, "*batch Ny-2 Nx-2"]
         Averaged values at interior V-points.
     """
-    return 0.25 * (h[1:-1, 1:-1] + h[2:, 1:-1] + h[1:-1, :-2] + h[2:, :-2])
+    return 0.25 * (
+        h[..., 1:-1, 1:-1] + h[..., 2:, 1:-1] + h[..., 1:-1, :-2] + h[..., 2:, :-2]
+    )
 
 
-def avg_xfwd_ybwd(h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny-2 Nx-2"]:
+def avg_xfwd_ybwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
     """Bilinear average: V-points → U-points (forward-x, backward-y).
 
     h̄[j, i+½] = ¼ (h[j+½,i] + h[j−½,i] + h[j+½,i+1] + h[j−½,i+1])
 
     Parameters
     ----------
-    h : Float[Array, "Ny Nx"]
+    h : Float[Array, "*batch Ny Nx"]
         Field on V-points, including ghost ring.
 
     Returns
     -------
-    Float[Array, "Ny-2 Nx-2"]
+    Float[Array, "*batch Ny-2 Nx-2"]
         Averaged values at interior U-points.
     """
-    return 0.25 * (h[1:-1, 1:-1] + h[:-2, 1:-1] + h[1:-1, 2:] + h[:-2, 2:])
+    return 0.25 * (
+        h[..., 1:-1, 1:-1] + h[..., :-2, 1:-1] + h[..., 1:-1, 2:] + h[..., :-2, 2:]
+    )
 
 
 # =====================================================================
@@ -532,7 +540,7 @@ def avg_x_fwd_3d(
     Float[Array, "Nz-2 Ny-2 Nx-2"]
         Averaged values at interior destination points (U or X).
     """
-    return 0.5 * (h[1:-1, 1:-1, 1:-1] + h[1:-1, 1:-1, 2:])
+    return 0.5 * (h[..., 1:-1, 1:-1, 1:-1] + h[..., 1:-1, 1:-1, 2:])
 
 
 def avg_y_fwd_3d(
@@ -554,7 +562,7 @@ def avg_y_fwd_3d(
     Float[Array, "Nz-2 Ny-2 Nx-2"]
         Averaged values at interior destination points (V or X).
     """
-    return 0.5 * (h[1:-1, 1:-1, 1:-1] + h[1:-1, 2:, 1:-1])
+    return 0.5 * (h[..., 1:-1, 1:-1, 1:-1] + h[..., 1:-1, 2:, 1:-1])
 
 
 def avg_x_bwd_3d(
@@ -576,7 +584,7 @@ def avg_x_bwd_3d(
     Float[Array, "Nz-2 Ny-2 Nx-2"]
         Averaged values at interior destination points (T or V).
     """
-    return 0.5 * (h[1:-1, 1:-1, 1:-1] + h[1:-1, 1:-1, :-2])
+    return 0.5 * (h[..., 1:-1, 1:-1, 1:-1] + h[..., 1:-1, 1:-1, :-2])
 
 
 def avg_y_bwd_3d(
@@ -598,7 +606,7 @@ def avg_y_bwd_3d(
     Float[Array, "Nz-2 Ny-2 Nx-2"]
         Averaged values at interior destination points (T or U).
     """
-    return 0.5 * (h[1:-1, 1:-1, 1:-1] + h[1:-1, :-2, 1:-1])
+    return 0.5 * (h[..., 1:-1, 1:-1, 1:-1] + h[..., 1:-1, :-2, 1:-1])
 
 
 # =====================================================================

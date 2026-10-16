@@ -15,11 +15,11 @@ from finitevolx._src.operators.difference import Difference2D, _divergence_2d
 
 
 def divergence_2d(
-    u: Float[Array, "Ny Nx"],
-    v: Float[Array, "Ny Nx"],
+    u: Float[Array, "*batch Ny Nx"],
+    v: Float[Array, "*batch Ny Nx"],
     dx: float,
     dy: float,
-) -> Float[Array, "Ny Nx"]:
+) -> Float[Array, "*batch Ny Nx"]:
     """Compute ∇·(u, v) at T-points on the 2-D Arakawa C-grid.
 
     delta[j, i] = (u[j, i+1/2] - u[j, i-1/2]) / dx
@@ -34,9 +34,9 @@ def divergence_2d(
 
     Parameters
     ----------
-    u : Float[Array, "Ny Nx"]
+    u : Float[Array, "*batch Ny Nx"]
         x-velocity at U-points (east faces).
-    v : Float[Array, "Ny Nx"]
+    v : Float[Array, "*batch Ny Nx"]
         y-velocity at V-points (north faces).
     dx : float
         Grid spacing in x.
@@ -45,7 +45,7 @@ def divergence_2d(
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Divergence at T-points, same shape as the inputs.
 
     Examples
@@ -103,9 +103,9 @@ class Divergence2D(eqx.Module):
 
     def __call__(
         self,
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
-    ) -> Float[Array, "Ny Nx"]:
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Divergence of (u, v) at T-points.
 
         delta[j, i] = (u[j, i+1/2] - u[j, i-1/2]) / dx
@@ -113,14 +113,14 @@ class Divergence2D(eqx.Module):
 
         Parameters
         ----------
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             x-velocity at U-points.
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             y-velocity at V-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Divergence at T-points.  When ``self.mask`` is set, the
             output is zeroed at dry T-cells via ``* mask.h`` (applied
             inside ``self.diff.divergence``).
@@ -129,9 +129,9 @@ class Divergence2D(eqx.Module):
 
     def noflux(
         self,
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
-    ) -> Float[Array, "Ny Nx"]:
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Divergence with closed-basin no-flux boundary conditions.
 
         Zeros all four normal-flow boundary faces before computing the
@@ -148,16 +148,20 @@ class Divergence2D(eqx.Module):
 
         Parameters
         ----------
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             x-velocity at U-points.
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             y-velocity at V-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Divergence at T-points with closed-basin no-flux BCs applied.
         """
-        u_bc = u.at[:, 0].set(0.0).at[:, -2].set(0.0)  # zero west & east wall U-faces
-        v_bc = v.at[0, :].set(0.0).at[-2, :].set(0.0)  # zero south & north wall V-faces
+        u_bc = (
+            u.at[..., :, 0].set(0.0).at[..., :, -2].set(0.0)
+        )  # zero west & east wall U-faces
+        v_bc = (
+            v.at[..., 0, :].set(0.0).at[..., -2, :].set(0.0)
+        )  # zero south & north wall V-faces
         return self.diff.divergence(u_bc, v_bc)

@@ -38,9 +38,9 @@ from finitevolx._src.utils.constants import GRAVITY, OMEGA, R_EARTH
 
 
 def kinetic_energy(
-    u: Float[Array, "Ny Nx"],
-    v: Float[Array, "Ny Nx"],
-) -> Float[Array, "Ny Nx"]:
+    u: Float[Array, "*batch Ny Nx"],
+    v: Float[Array, "*batch Ny Nx"],
+) -> Float[Array, "*batch Ny Nx"]:
     """Kinetic energy at T-points (cell centers) on an Arakawa C-grid.
 
     Eq:
@@ -79,11 +79,11 @@ def kinetic_energy(
 
 
 def bernoulli_potential(
-    h: Float[Array, "Ny Nx"],
-    u: Float[Array, "Ny Nx"],
-    v: Float[Array, "Ny Nx"],
+    h: Float[Array, "*batch Ny Nx"],
+    u: Float[Array, "*batch Ny Nx"],
+    v: Float[Array, "*batch Ny Nx"],
     gravity: float = GRAVITY,
-) -> Float[Array, "Ny Nx"]:
+) -> Float[Array, "*batch Ny Nx"]:
     """Bernoulli potential at T-points on an Arakawa C-grid.
 
     Eq:
@@ -108,7 +108,7 @@ def bernoulli_potential(
     dtype = jnp.result_type(h, u, v, 0.0)
     h_float = jnp.asarray(h, dtype=dtype)
     ke = kinetic_energy(u=u, v=v)
-    out = interior(ke[1:-1, 1:-1] + gravity * h_float[1:-1, 1:-1], h_float)
+    out = interior(ke[..., 1:-1, 1:-1] + gravity * h_float[..., 1:-1, 1:-1], h_float)
     return out
 
 
@@ -118,11 +118,11 @@ def bernoulli_potential(
 
 
 def relative_vorticity_cgrid(
-    u: Float[Array, "Ny Nx"],
-    v: Float[Array, "Ny Nx"],
+    u: Float[Array, "*batch Ny Nx"],
+    v: Float[Array, "*batch Ny Nx"],
     dx: float,
     dy: float,
-) -> Float[Array, "Ny Nx"]:
+) -> Float[Array, "*batch Ny Nx"]:
     """Relative vorticity at X-points (corners) on an Arakawa C-grid.
 
     zeta[j+1/2, i+1/2] = (v[j+1/2, i+1] - v[j+1/2, i]) / dx
@@ -135,9 +135,9 @@ def relative_vorticity_cgrid(
 
     Parameters
     ----------
-    u : Float[Array, "Ny Nx"]
+    u : Float[Array, "*batch Ny Nx"]
         x-velocity at U-points.
-    v : Float[Array, "Ny Nx"]
+    v : Float[Array, "*batch Ny Nx"]
         y-velocity at V-points.
     dx : float
         Grid spacing in x.
@@ -146,17 +146,17 @@ def relative_vorticity_cgrid(
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Relative vorticity at X-points.  Ghost ring is zero.
     """
     return _curl_2d(u, v, dx, dy)
 
 
 def potential_vorticity(
-    omega: Float[Array, "Ny Nx"],
-    f: Float[Array, "Ny Nx"],
-    h: Float[Array, "Ny Nx"],
-) -> Float[Array, "Ny Nx"]:
+    omega: Float[Array, "*batch Ny Nx"],
+    f: Float[Array, "*batch Ny Nx"],
+    h: Float[Array, "*batch Ny Nx"],
+) -> Float[Array, "*batch Ny Nx"]:
     """Potential vorticity (pointwise).
 
     q = (omega + f) / h
@@ -166,16 +166,16 @@ def potential_vorticity(
 
     Parameters
     ----------
-    omega : Float[Array, "Ny Nx"]
+    omega : Float[Array, "*batch Ny Nx"]
         Relative vorticity.
-    f : Float[Array, "Ny Nx"]
+    f : Float[Array, "*batch Ny Nx"]
         Coriolis parameter.
-    h : Float[Array, "Ny Nx"]
+    h : Float[Array, "*batch Ny Nx"]
         Layer thickness (or depth).
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Potential vorticity.  Where ``h == 0`` the result is NaN.
     """
     return jnp.where(h == 0, jnp.nan, (omega + f) / h)
@@ -187,11 +187,11 @@ def potential_vorticity(
 
 
 def shear_strain(
-    u: Float[Array, "Ny Nx"],
-    v: Float[Array, "Ny Nx"],
+    u: Float[Array, "*batch Ny Nx"],
+    v: Float[Array, "*batch Ny Nx"],
     dx: float,
     dy: float,
-) -> Float[Array, "Ny Nx"]:
+) -> Float[Array, "*batch Ny Nx"]:
     """Shear strain at X-points (corners) on an Arakawa C-grid.
 
     Ss[j+1/2, i+1/2] = dv/dx + du/dy
@@ -200,9 +200,9 @@ def shear_strain(
 
     Parameters
     ----------
-    u : Float[Array, "Ny Nx"]
+    u : Float[Array, "*batch Ny Nx"]
         x-velocity at U-points.
-    v : Float[Array, "Ny Nx"]
+    v : Float[Array, "*batch Ny Nx"]
         y-velocity at V-points.
     dx : float
         Grid spacing in x.
@@ -211,7 +211,7 @@ def shear_strain(
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Shear strain at X-points.  Ghost ring is zero.
     """
     out = interior(diff_x_fwd(v) / dx + diff_y_fwd(u) / dy, u)
@@ -219,11 +219,11 @@ def shear_strain(
 
 
 def tensor_strain(
-    u: Float[Array, "Ny Nx"],
-    v: Float[Array, "Ny Nx"],
+    u: Float[Array, "*batch Ny Nx"],
+    v: Float[Array, "*batch Ny Nx"],
     dx: float,
     dy: float,
-) -> Float[Array, "Ny Nx"]:
+) -> Float[Array, "*batch Ny Nx"]:
     """Tensor (normal) strain at T-points on an Arakawa C-grid.
 
     Sn[j, i] = du/dx - dv/dy
@@ -232,9 +232,9 @@ def tensor_strain(
 
     Parameters
     ----------
-    u : Float[Array, "Ny Nx"]
+    u : Float[Array, "*batch Ny Nx"]
         x-velocity at U-points.
-    v : Float[Array, "Ny Nx"]
+    v : Float[Array, "*batch Ny Nx"]
         y-velocity at V-points.
     dx : float
         Grid spacing in x.
@@ -243,7 +243,7 @@ def tensor_strain(
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Tensor strain at T-points.  Ghost ring is zero.
     """
     out = interior(diff_x_bwd(u) / dx - diff_y_bwd(v) / dy, u)
@@ -251,9 +251,9 @@ def tensor_strain(
 
 
 def strain_magnitude_squared(
-    sn: Float[Array, "Ny Nx"],
-    ss: Float[Array, "Ny Nx"],
-) -> Float[Array, "Ny Nx"]:
+    sn: Float[Array, "*batch Ny Nx"],
+    ss: Float[Array, "*batch Ny Nx"],
+) -> Float[Array, "*batch Ny Nx"]:
     """Squared strain magnitude (pointwise).
 
     sigma^2 = Sn^2 + Ss^2
@@ -263,24 +263,24 @@ def strain_magnitude_squared(
 
     Parameters
     ----------
-    sn : Float[Array, "Ny Nx"]
+    sn : Float[Array, "*batch Ny Nx"]
         Tensor (normal) strain.
-    ss : Float[Array, "Ny Nx"]
+    ss : Float[Array, "*batch Ny Nx"]
         Shear strain.
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Squared strain magnitude.
     """
     return sn**2 + ss**2
 
 
 def okubo_weiss(
-    sn: Float[Array, "Ny Nx"],
-    ss: Float[Array, "Ny Nx"],
-    omega: Float[Array, "Ny Nx"],
-) -> Float[Array, "Ny Nx"]:
+    sn: Float[Array, "*batch Ny Nx"],
+    ss: Float[Array, "*batch Ny Nx"],
+    omega: Float[Array, "*batch Ny Nx"],
+) -> Float[Array, "*batch Ny Nx"]:
     """Okubo-Weiss parameter (pointwise).
 
     OW = Sn^2 + Ss^2 - omega^2
@@ -289,16 +289,16 @@ def okubo_weiss(
 
     Parameters
     ----------
-    sn : Float[Array, "Ny Nx"]
+    sn : Float[Array, "*batch Ny Nx"]
         Tensor (normal) strain.
-    ss : Float[Array, "Ny Nx"]
+    ss : Float[Array, "*batch Ny Nx"]
         Shear strain.
-    omega : Float[Array, "Ny Nx"]
+    omega : Float[Array, "*batch Ny Nx"]
         Relative vorticity.
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Okubo-Weiss parameter.  Positive = strain-dominated,
         negative = vorticity-dominated.
     """
@@ -311,8 +311,8 @@ def okubo_weiss(
 
 
 def enstrophy(
-    omega: Float[Array, "Ny Nx"],
-) -> Float[Array, "Ny Nx"]:
+    omega: Float[Array, "*batch Ny Nx"],
+) -> Float[Array, "*batch Ny Nx"]:
     """Enstrophy (pointwise).
 
     Z = 0.5 * omega^2
@@ -323,21 +323,21 @@ def enstrophy(
 
     Parameters
     ----------
-    omega : Float[Array, "Ny Nx"]
+    omega : Float[Array, "*batch Ny Nx"]
         Relative vorticity (typically at X-points).
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Enstrophy at the same grid points as *omega*.
     """
     return 0.5 * omega**2
 
 
 def potential_enstrophy(
-    q: Float[Array, "Ny Nx"],
-    h: Float[Array, "Ny Nx"],
-) -> Float[Array, "Ny Nx"]:
+    q: Float[Array, "*batch Ny Nx"],
+    h: Float[Array, "*batch Ny Nx"],
+) -> Float[Array, "*batch Ny Nx"]:
     """Potential enstrophy (pointwise).
 
     PE = 0.5 * q^2 * h
@@ -347,14 +347,14 @@ def potential_enstrophy(
 
     Parameters
     ----------
-    q : Float[Array, "Ny Nx"]
+    q : Float[Array, "*batch Ny Nx"]
         Potential vorticity.
-    h : Float[Array, "Ny Nx"]
+    h : Float[Array, "*batch Ny Nx"]
         Layer thickness (or depth).
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Potential enstrophy.
     """
     return 0.5 * q**2 * h
@@ -366,26 +366,26 @@ def potential_enstrophy(
 
 
 def available_potential_energy(
-    h: Float[Array, "Ny Nx"],
-    H: Float[Array, "Ny Nx"],
+    h: Float[Array, "*batch Ny Nx"],
+    H: Float[Array, "*batch Ny Nx"],
     g_prime: float,
-) -> Float[Array, "Ny Nx"]:
+) -> Float[Array, "*batch Ny Nx"]:
     """Available potential energy at T-points.
 
     APE = 0.5 * g' * (h - H)^2
 
     Parameters
     ----------
-    h : Float[Array, "Ny Nx"]
+    h : Float[Array, "*batch Ny Nx"]
         Layer thickness at T-points.
-    H : Float[Array, "Ny Nx"]
+    H : Float[Array, "*batch Ny Nx"]
         Mean (reference) layer thickness at T-points.
     g_prime : float
         Reduced gravity.
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Available potential energy at T-points.
     """
     eta = h - H
@@ -398,14 +398,14 @@ def available_potential_energy(
 
 
 def qg_potential_vorticity(
-    psi: Float[Array, "Ny Nx"],
+    psi: Float[Array, "*batch Ny Nx"],
     f0: float,
     beta: float,
     dx: float,
     dy: float,
-    y: Float[Array, "Ny Nx"],
+    y: Float[Array, "*batch Ny Nx"],
     y0: float,
-) -> Float[Array, "Ny Nx"]:
+) -> Float[Array, "*batch Ny Nx"]:
     """QG potential vorticity at T-points (single layer).
 
     q = nabla^2(psi) / f0 + beta * (y - y0) / f0
@@ -428,7 +428,7 @@ def qg_potential_vorticity(
 
     Parameters
     ----------
-    psi : Float[Array, "Ny Nx"]
+    psi : Float[Array, "*batch Ny Nx"]
         Streamfunction at T-points.
     f0 : float
         Reference Coriolis parameter.
@@ -438,14 +438,14 @@ def qg_potential_vorticity(
         Grid spacing in x.
     dy : float
         Grid spacing in y.
-    y : Float[Array, "Ny Nx"]
+    y : Float[Array, "*batch Ny Nx"]
         Meridional coordinate at T-points.
     y0 : float
         Reference latitude.
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         QG potential vorticity at T-points.
         Ghost ring is zero; interior is ``[1:-1, 1:-1]``.
     """
@@ -453,7 +453,7 @@ def qg_potential_vorticity(
     d2x = (diff_x_fwd(psi) - diff_x_bwd(psi)) / dx**2
     d2y = (diff_y_fwd(psi) - diff_y_bwd(psi)) / dy**2
     # q[j,i] = (d2psi/dx2 + d2psi/dy2) / f0 + beta * (y - y0) / f0
-    q_int = (d2x + d2y) / f0 + beta * (y[1:-1, 1:-1] - y0) / f0
+    q_int = (d2x + d2y) / f0 + beta * (y[..., 1:-1, 1:-1] - y0) / f0
     out = interior(q_int, psi)
     return out
 
@@ -492,7 +492,7 @@ def stretching_term(
     Ap_flat = A @ psi_flat  # [nl, Ny*Nx]
     Ap = Ap_flat.reshape(nl, Ny, Nx)  # [nl, Ny, Nx]
     out = jnp.zeros_like(psi)
-    out = out.at[:, 1:-1, 1:-1].set(Ap[:, 1:-1, 1:-1])
+    out = out.at[..., :, 1:-1, 1:-1].set(Ap[..., :, 1:-1, 1:-1])
     return out
 
 
@@ -502,8 +502,8 @@ def stretching_term(
 
 
 def total_energy(
-    ke: Float[Array, "Ny Nx"],
-    ape: Float[Array, "Ny Nx"],
+    ke: Float[Array, "*batch Ny Nx"],
+    ape: Float[Array, "*batch Ny Nx"],
     dx: float,
     dy: float,
 ) -> Float[Array, ""]:
@@ -513,9 +513,9 @@ def total_energy(
 
     Parameters
     ----------
-    ke : Float[Array, "Ny Nx"]
+    ke : Float[Array, "*batch Ny Nx"]
         Kinetic energy at T-points.
-    ape : Float[Array, "Ny Nx"]
+    ape : Float[Array, "*batch Ny Nx"]
         Available potential energy at T-points.
     dx : float
         Grid spacing in x.
@@ -527,11 +527,11 @@ def total_energy(
     Float[Array, ""]
         Scalar total energy.
     """
-    return jnp.sum(ke[1:-1, 1:-1] + ape[1:-1, 1:-1]) * dx * dy
+    return jnp.sum(ke[..., 1:-1, 1:-1] + ape[..., 1:-1, 1:-1], axis=(-2, -1)) * dx * dy
 
 
 def total_enstrophy(
-    ens: Float[Array, "Ny Nx"],
+    ens: Float[Array, "*batch Ny Nx"],
     dx: float,
     dy: float,
 ) -> Float[Array, ""]:
@@ -541,7 +541,7 @@ def total_enstrophy(
 
     Parameters
     ----------
-    ens : Float[Array, "Ny Nx"]
+    ens : Float[Array, "*batch Ny Nx"]
         Enstrophy field (e.g. from :func:`enstrophy`).
     dx : float
         Grid spacing in x.
@@ -553,7 +553,7 @@ def total_enstrophy(
     Float[Array, ""]
         Scalar total enstrophy.
     """
-    return jnp.sum(ens[1:-1, 1:-1]) * dx * dy
+    return jnp.sum(ens[..., 1:-1, 1:-1], axis=(-2, -1)) * dx * dy
 
 
 # ======================================================================
@@ -631,7 +631,7 @@ def vertical_velocity(
     div_h = diff_x_bwd_3d(u) / dx + diff_y_bwd_3d(v) / dy  # [Nz-2, Ny-2, Nx-2]
 
     if isinstance(mask, Mask3D):
-        div_h = jnp.where(mask.h[1:-1, 1:-1, 1:-1], div_h, 0.0)
+        div_h = jnp.where(mask.h[..., 1:-1, 1:-1, 1:-1], div_h, 0.0)
     elif mask is not None:
         warnings.warn(
             "vertical_velocity(mask=<float array>) is deprecated; pass a "
@@ -639,7 +639,7 @@ def vertical_velocity(
             DeprecationWarning,
             stacklevel=2,
         )
-        div_h = div_h * mask[1:-1, 1:-1, 1:-1]
+        div_h = div_h * mask[..., 1:-1, 1:-1, 1:-1]
 
     # w[k+1/2] = -sum_{k'=1..k} div[k'] * dz  ->  w[k] for k = 1 .. Nz-2
     w_int = -jnp.cumsum(div_h, axis=0) * dz  # [Nz-2, Ny-2, Nx-2]
@@ -856,7 +856,7 @@ def potential_vorticity_multilayer(
 # ======================================================================
 
 
-def _interp_T_to_X(field: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+def _interp_T_to_X(field: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny Nx"]:
     """Interpolate a T-point field to X-points (corners) via 4-point average.
 
     X[j+1/2, i+1/2] = 0.25 * (T[j,i] + T[j,i+1] + T[j+1,i] + T[j+1,i+1])
@@ -867,13 +867,13 @@ def _interp_T_to_X(field: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
 
 
 def sw_potential_vorticity(
-    u: Float[Array, "Ny Nx"],
-    v: Float[Array, "Ny Nx"],
-    h: Float[Array, "Ny Nx"],
-    f: Float[Array, "Ny Nx"],
+    u: Float[Array, "*batch Ny Nx"],
+    v: Float[Array, "*batch Ny Nx"],
+    h: Float[Array, "*batch Ny Nx"],
+    f: Float[Array, "*batch Ny Nx"],
     dx: float,
     dy: float,
-) -> Float[Array, "Ny Nx"]:
+) -> Float[Array, "*batch Ny Nx"]:
     """Shallow-water potential vorticity at X-points on an Arakawa C-grid.
 
     q[j+1/2, i+1/2] = (omega[j+1/2, i+1/2] + f_X[j+1/2, i+1/2])
@@ -884,13 +884,13 @@ def sw_potential_vorticity(
 
     Parameters
     ----------
-    u : Float[Array, "Ny Nx"]
+    u : Float[Array, "*batch Ny Nx"]
         x-velocity at U-points.
-    v : Float[Array, "Ny Nx"]
+    v : Float[Array, "*batch Ny Nx"]
         y-velocity at V-points.
-    h : Float[Array, "Ny Nx"]
+    h : Float[Array, "*batch Ny Nx"]
         Layer thickness at T-points.
-    f : Float[Array, "Ny Nx"]
+    f : Float[Array, "*batch Ny Nx"]
         Coriolis parameter at T-points.
     dx : float
         Grid spacing in x.
@@ -899,7 +899,7 @@ def sw_potential_vorticity(
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Potential vorticity at X-points.  Ghost ring is zero.
         Where ``h_X == 0`` the result is NaN.
     """

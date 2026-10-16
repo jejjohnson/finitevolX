@@ -37,7 +37,7 @@ class BoundaryConditionSet(eqx.Module):
         Boundary condition for the west ghost column.
     east : BoundaryCondition1D | None, optional
         Boundary condition for the east ghost column.
-    mask : Mask2D or Float[Array, "Ny Nx"] or None, optional
+    mask : Mask2D or Float[Array, "*batch Ny Nx"] or None, optional
         Domain mask.  When provided, solvers can extract it from the
         BCSet instead of requiring a separate ``mask=`` argument.
     """
@@ -46,7 +46,7 @@ class BoundaryConditionSet(eqx.Module):
     north: BoundaryCondition1D | None = None
     west: BoundaryCondition1D | None = None
     east: BoundaryCondition1D | None = None
-    mask: Mask2D | Float[Array, "Ny Nx"] | None = None
+    mask: Mask2D | Float[Array, "*batch Ny Nx"] | None = None
 
     @classmethod
     def periodic(cls) -> BoundaryConditionSet:
@@ -61,7 +61,7 @@ class BoundaryConditionSet(eqx.Module):
     @classmethod
     def closed(
         cls,
-        mask: Mask2D | Float[Array, "Ny Nx"] | None = None,
+        mask: Mask2D | Float[Array, "*batch Ny Nx"] | None = None,
         point: Point = "T",
     ) -> BoundaryConditionSet:
         """Return a zero-Dirichlet boundary-condition set on all faces.
@@ -91,8 +91,8 @@ class BoundaryConditionSet(eqx.Module):
         )
 
     def __call__(
-        self, field: Float[Array, "Ny Nx"], dx: float, dy: float
-    ) -> Float[Array, "Ny Nx"]:
+        self, field: Float[Array, "*batch Ny Nx"], dx: float, dy: float
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Return ``field`` with all configured ghost faces updated.
 
         Boundary conditions are applied in south, north, west, east order, so
