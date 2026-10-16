@@ -704,8 +704,8 @@ def beta_param(
 
 def coriolis_fn(
     Y: Float[Array, "..."],
-    f0: float = 9.375e-5,
-    beta: float = 1.754e-11,
+    f0: float | Float[Array, ""] = 9.375e-5,
+    beta: float | Float[Array, ""] = 1.754e-11,
     y0: float | Float[Array, ""] | None = None,
 ) -> Float[Array, "..."]:
     """Beta-plane Coriolis field.
