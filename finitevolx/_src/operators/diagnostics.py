@@ -368,7 +368,7 @@ def potential_enstrophy(
 def available_potential_energy(
     h: Float[Array, "*batch Ny Nx"],
     H: Float[Array, "*batch Ny Nx"],
-    g_prime: float,
+    g_prime: float | Float[Array, ""],
 ) -> Float[Array, "*batch Ny Nx"]:
     """Available potential energy at T-points.
 
@@ -399,8 +399,8 @@ def available_potential_energy(
 
 def qg_potential_vorticity(
     psi: Float[Array, "*batch Ny Nx"],
-    f0: float,
-    beta: float,
+    f0: float | Float[Array, ""],
+    beta: float | Float[Array, ""],
     dx: float,
     dy: float,
     y: Float[Array, "*batch Ny Nx"],

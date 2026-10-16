@@ -194,7 +194,7 @@ class Energetics2D(eqx.Module):
         self,
         h: Float[Array, "*batch Ny Nx"],
         H: Float[Array, "*batch Ny Nx"],
-        g_prime: float,
+        g_prime: float | Float[Array, ""],
     ) -> Float[Array, "*batch Ny Nx"]:
         """Available potential energy at T-points.
 
@@ -505,8 +505,8 @@ class QGPotentialVorticity2D(eqx.Module):
     def __call__(
         self,
         psi: Float[Array, "*batch Ny Nx"],
-        f0: float,
-        beta: float,
+        f0: float | Float[Array, ""],
+        beta: float | Float[Array, ""],
         y: Float[Array, "*batch Ny Nx"],
         y0: float,
     ) -> Float[Array, "*batch Ny Nx"]:

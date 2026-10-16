@@ -28,6 +28,20 @@ from finitevolx._src.pipekit.base import (
     build_grid,
     over_leading,
 )
+from finitevolx._src.pipekit.diagnostics import (
+    STRAIN_COMPONENTS,
+    AvailablePE,
+    DomainIntegral,
+    DomainMean,
+    Enstrophy,
+    KineticEnergy,
+    OkuboWeiss,
+    PotentialVorticity,
+    QGPotentialVorticity,
+    RelativeVorticity,
+    Strain,
+    TotalEnergy,
+)
 from finitevolx._src.pipekit.stencils import (
     DIFFERENCES,
     GHOST_FILLERS,
@@ -45,6 +59,7 @@ from finitevolx._src.pipekit.stencils import (
     LinComb,
     Pick,
 )
+from finitevolx._src.pipekit.timestep import SCHEMES, ExplicitStep
 
 __all__ = [
     # base
@@ -68,6 +83,22 @@ __all__ = [
     "GradPerp",
     "Interp",
     "Laplacian",
+    # diagnostics and reductions
+    "STRAIN_COMPONENTS",
+    "AvailablePE",
+    "DomainIntegral",
+    "DomainMean",
+    "Enstrophy",
+    "KineticEnergy",
+    "OkuboWeiss",
+    "PotentialVorticity",
+    "QGPotentialVorticity",
+    "RelativeVorticity",
+    "Strain",
+    "TotalEnergy",
+    # time stepping
+    "SCHEMES",
+    "ExplicitStep",
     # graph plumbing
     "LinComb",
     "Pick",
