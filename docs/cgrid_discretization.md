@@ -56,10 +56,14 @@ library:
    (kinetic energy, Bernoulli potential, vorticity) that mix all four
    point types.
 
-3. **Uniform `vmap` semantics.**  When a 2D operator is vectorised over a
-   batch axis (multilayer ensembles, ensemble Kalman filters,
-   parameter sweeps), every input has the same leading shape.  No
-   "this one is `Nx+1`-wide and the others are `Nx`" gotchas.
+3. **Leading batch axes for free.**  The 2-D Cartesian operators,
+   diagnostics and boundary conditions take `[*batch, Ny, Nx]`: a time
+   series, an ensemble, a stack of layers, without `vmap`.  Their
+   stencils slice the trailing two axes (`h[..., 1:-1, 2:]`) and
+   `interior` pads back only the axes that lost a ghost ring, so the
+   leading axes pass through untouched.  Because every input has the
+   same leading shape, there are no "this one is `Nx+1`-wide and the
+   others are `Nx`" gotchas, under `vmap` either.
 
 4. **One ghost-cell convention to learn.**  All four point types share
    the same `[1:-1, 1:-1]` interior slice.  Boundary conditions are

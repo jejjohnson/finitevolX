@@ -135,7 +135,7 @@ class Interpolation2D(eqx.Module):
     # T-point -> faces / corners
     # ------------------------------------------------------------------
 
-    def T_to_U(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def T_to_U(self, h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny Nx"]:
         """T-point -> U-point (east face), x-average.
 
         h_on_u[j, i+1/2] = 1/2 * (h[j, i] + h[j, i+1])
@@ -145,7 +145,7 @@ class Interpolation2D(eqx.Module):
             out = out * self.mask.u
         return out
 
-    def T_to_V(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def T_to_V(self, h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny Nx"]:
         """T-point -> V-point (north face), y-average.
 
         h_on_v[j+1/2, i] = 1/2 * (h[j, i] + h[j+1, i])
@@ -155,7 +155,7 @@ class Interpolation2D(eqx.Module):
             out = out * self.mask.v
         return out
 
-    def T_to_X(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def T_to_X(self, h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny Nx"]:
         """T-point -> X-point (NE corner), bilinear average.
 
         h_on_q[j+1/2, i+1/2] = 1/4 * (h[j,i] + h[j,i+1] + h[j+1,i] + h[j+1,i+1])
@@ -169,7 +169,7 @@ class Interpolation2D(eqx.Module):
     # X-point -> face points
     # ------------------------------------------------------------------
 
-    def X_to_U(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def X_to_U(self, q: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny Nx"]:
         """X-point (corner) -> U-point (east face), y-average.
 
         q_on_u[j, i+1/2] = 1/2 * (q[j+1/2, i+1/2] + q[j-1/2, i+1/2])
@@ -179,7 +179,7 @@ class Interpolation2D(eqx.Module):
             out = out * self.mask.u
         return out
 
-    def X_to_V(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def X_to_V(self, q: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny Nx"]:
         """X-point (corner) -> V-point (north face), x-average.
 
         q_on_v[j+1/2, i] = 1/2 * (q[j+1/2, i+1/2] + q[j+1/2, i-1/2])
@@ -193,7 +193,7 @@ class Interpolation2D(eqx.Module):
     # Face points -> T-point
     # ------------------------------------------------------------------
 
-    def U_to_T(self, u: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def U_to_T(self, u: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny Nx"]:
         """U-point -> T-point, x-average.
 
         u_on_h[j, i] = 1/2 * (u[j, i+1/2] + u[j, i-1/2])
@@ -203,7 +203,7 @@ class Interpolation2D(eqx.Module):
             out = out * self.mask.h
         return out
 
-    def V_to_T(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def V_to_T(self, v: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny Nx"]:
         """V-point -> T-point, y-average.
 
         v_on_h[j, i] = 1/2 * (v[j+1/2, i] + v[j-1/2, i])
@@ -213,7 +213,7 @@ class Interpolation2D(eqx.Module):
             out = out * self.mask.h
         return out
 
-    def X_to_T(self, q: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def X_to_T(self, q: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny Nx"]:
         """X-point (corner) -> T-point, bilinear average.
 
         q_on_h[j, i] = 1/4 * (q[j+1/2,i+1/2] + q[j-1/2,i+1/2]
@@ -228,7 +228,7 @@ class Interpolation2D(eqx.Module):
     # Face/center -> X-point (corner)
     # ------------------------------------------------------------------
 
-    def U_to_X(self, u: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def U_to_X(self, u: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny Nx"]:
         """U-point -> X-point (corner), y-average.
 
         u_on_q[j+1/2, i+1/2] = 1/2 * (u[j, i+1/2] + u[j+1, i+1/2])
@@ -238,7 +238,7 @@ class Interpolation2D(eqx.Module):
             out = out * self.mask.xy_corner_strict
         return out
 
-    def V_to_X(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def V_to_X(self, v: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny Nx"]:
         """V-point -> X-point (corner), x-average.
 
         v_on_q[j+1/2, i+1/2] = 1/2 * (v[j+1/2, i] + v[j+1/2, i+1])
@@ -252,7 +252,7 @@ class Interpolation2D(eqx.Module):
     # Cross-face (bilinear 4-point)
     # ------------------------------------------------------------------
 
-    def U_to_V(self, u: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def U_to_V(self, u: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny Nx"]:
         """U-point -> V-point (cross-face bilinear, 4-point).
 
         u_on_v[j+1/2, i] = 1/4 * (u[j,   i+1/2] + u[j+1, i+1/2]
@@ -263,7 +263,7 @@ class Interpolation2D(eqx.Module):
             out = out * self.mask.v
         return out
 
-    def V_to_U(self, v: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
+    def V_to_U(self, v: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny Nx"]:
         """V-point -> U-point (cross-face bilinear, 4-point).
 
         v_on_u[j, i+1/2] = 1/4 * (v[j+1/2, i] + v[j-1/2, i]

@@ -16,8 +16,8 @@ from finitevolx._src.boundary.bc_set import BoundaryConditionSet
 
 
 def pad_interior(
-    field: Float[Array, "Ny Nx"], mode: str = "edge"
-) -> Float[Array, "Ny Nx"]:
+    field: Float[Array, "*batch Ny Nx"], mode: str = "edge"
+) -> Float[Array, "*batch Ny Nx"]:
     """Extract physical interior and re-pad to original size.
 
     Strips the ghost-cell ring, then re-pads using the requested mode.
@@ -25,7 +25,7 @@ def pad_interior(
 
     Parameters
     ----------
-    field : Float[Array, "Ny Nx"]
+    field : Float[Array, "*batch Ny Nx"]
         Input array of shape [Ny, Nx].
     mode : str, optional
         Padding mode passed to ``jnp.pad``.  Defaults to ``'edge'``
@@ -33,7 +33,7 @@ def pad_interior(
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Array of shape [Ny, Nx] with ghost cells re-filled.
 
     Examples
@@ -46,13 +46,13 @@ def pad_interior(
     if mode == "edge":
         # BoundaryConditionSet.open() is zero-gradient and does not use dx/dy.
         return BoundaryConditionSet.open()(field, dx=1.0, dy=1.0)
-    interior = field[1:-1, 1:-1]  # shape [Ny-2, Nx-2]
-    return jnp.pad(interior, pad_width=1, mode=mode)  # shape [Ny, Nx]
+    interior = field[..., 1:-1, 1:-1]  # shape [Ny-2, Nx-2]
+    return jnp.pad(interior, _pad_last2(field.ndim, 1), mode=mode)  # [..., Ny, Nx]
 
 
 def enforce_periodic(
-    field: Float[Array, "Ny Nx"],
-) -> Float[Array, "Ny Nx"]:
+    field: Float[Array, "*batch Ny Nx"],
+) -> Float[Array, "*batch Ny Nx"]:
     """Fill the ghost-cell ring with periodic boundary conditions.
 
     Copies the last interior row/column into the opposite ghost row/column::
@@ -64,12 +64,12 @@ def enforce_periodic(
 
     Parameters
     ----------
-    field : Float[Array, "Ny Nx"]
+    field : Float[Array, "*batch Ny Nx"]
         Input array of shape [Ny, Nx].
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Array with periodic ghost cells.
     """
     # Periodic1D wraps opposite interior values and does not use dx/dy.
@@ -79,11 +79,16 @@ def enforce_periodic(
 # ── Functional padding wrappers ──────────────────────────────────────────────
 
 
+def _pad_last2(ndim: int, width: int) -> tuple[tuple[int, int], ...]:
+    """``jnp.pad`` widths that pad only the trailing ``(Ny, Nx)`` axes."""
+    return ((0, 0),) * (ndim - 2) + ((width, width),) * 2
+
+
 def _validate_pad_width(pad_width: int, field_shape: tuple[int, ...]) -> None:
     """Raise ``ValueError`` if *pad_width* is out of range."""
     if pad_width < 1:
         raise ValueError(f"pad_width must be >= 1, got {pad_width}")
-    Ny, Nx = field_shape
+    Ny, Nx = field_shape[-2:]
     if 2 * pad_width >= Ny or 2 * pad_width >= Nx:
         raise ValueError(
             f"pad_width={pad_width} too large for field shape {field_shape}"
@@ -91,9 +96,9 @@ def _validate_pad_width(pad_width: int, field_shape: tuple[int, ...]) -> None:
 
 
 def zero_boundaries(
-    field: Float[Array, "Ny Nx"],
+    field: Float[Array, "*batch Ny Nx"],
     pad_width: int = 1,
-) -> Float[Array, "Ny Nx"]:
+) -> Float[Array, "*batch Ny Nx"]:
     """Fill ghost ring with zeros (homogeneous Dirichlet).
 
     Strips the interior and re-pads with constant zero.  This is the
@@ -101,25 +106,30 @@ def zero_boundaries(
 
     Parameters
     ----------
-    field : Float[Array, "Ny Nx"]
+    field : Float[Array, "*batch Ny Nx"]
         Input array with ghost ring.
     pad_width : int
         Width of the ghost ring to fill (default 1).  Must be >= 1.
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Array with zero-filled ghost ring.
     """
     _validate_pad_width(pad_width, field.shape)
-    interior = field[pad_width:-pad_width, pad_width:-pad_width]
-    return jnp.pad(interior, pad_width=pad_width, mode="constant", constant_values=0.0)
+    interior = field[..., pad_width:-pad_width, pad_width:-pad_width]
+    return jnp.pad(
+        interior,
+        _pad_last2(field.ndim, pad_width),
+        mode="constant",
+        constant_values=0.0,
+    )
 
 
 def zero_gradient_boundaries(
-    field: Float[Array, "Ny Nx"],
+    field: Float[Array, "*batch Ny Nx"],
     pad_width: int = 1,
-) -> Float[Array, "Ny Nx"]:
+) -> Float[Array, "*batch Ny Nx"]:
     """Fill ghost ring by copying nearest interior value (zero gradient / Neumann).
 
     Ghost cells are set to the adjacent interior value, enforcing
@@ -127,25 +137,25 @@ def zero_gradient_boundaries(
 
     Parameters
     ----------
-    field : Float[Array, "Ny Nx"]
+    field : Float[Array, "*batch Ny Nx"]
         Input array with ghost ring.
     pad_width : int
         Width of the ghost ring to fill (default 1).
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Array with edge-extrapolated ghost ring.
     """
     _validate_pad_width(pad_width, field.shape)
-    interior = field[pad_width:-pad_width, pad_width:-pad_width]
-    return jnp.pad(interior, pad_width=pad_width, mode="edge")
+    interior = field[..., pad_width:-pad_width, pad_width:-pad_width]
+    return jnp.pad(interior, _pad_last2(field.ndim, pad_width), mode="edge")
 
 
 def no_flux_boundaries(
-    field: Float[Array, "Ny Nx"],
+    field: Float[Array, "*batch Ny Nx"],
     pad_width: int = 1,
-) -> Float[Array, "Ny Nx"]:
+) -> Float[Array, "*batch Ny Nx"]:
     """Fill ghost ring with zeros for normal-flux variables.
 
     Alias for :func:`zero_boundaries`.  Use this for velocity components
@@ -154,23 +164,23 @@ def no_flux_boundaries(
 
     Parameters
     ----------
-    field : Float[Array, "Ny Nx"]
+    field : Float[Array, "*batch Ny Nx"]
         Input array with ghost ring.
     pad_width : int
         Width of the ghost ring to fill (default 1).
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Array with zero-filled ghost ring.
     """
     return zero_boundaries(field, pad_width=pad_width)
 
 
 def no_slip_boundaries(
-    field: Float[Array, "Ny Nx"],
+    field: Float[Array, "*batch Ny Nx"],
     pad_width: int = 1,
-) -> Float[Array, "Ny Nx"]:
+) -> Float[Array, "*batch Ny Nx"]:
     """Fill ghost ring with sign-flipped interior values (no-slip wall).
 
     Sets ghost cells to the negative of the adjacent interior value::
@@ -182,7 +192,7 @@ def no_slip_boundaries(
 
     Parameters
     ----------
-    field : Float[Array, "Ny Nx"]
+    field : Float[Array, "*batch Ny Nx"]
         Input array with ghost ring.  Typically a tangential velocity
         component.
     pad_width : int
@@ -190,7 +200,7 @@ def no_slip_boundaries(
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Array with no-slip ghost ring.  Corner cells are left
         unchanged; apply :func:`fix_boundary_corners` afterwards
         if smooth corners are needed.
@@ -202,20 +212,20 @@ def no_slip_boundaries(
         src_row = 2 * p - 1 - k
         src_col = 2 * p - 1 - k
         # South ghost row (excluding corners)
-        out = out.at[k, p:-p].set(-field[src_row, p:-p])
+        out = out.at[..., k, p:-p].set(-field[..., src_row, p:-p])
         # North ghost row (excluding corners)
-        out = out.at[-(k + 1), p:-p].set(-field[-(2 * p - k), p:-p])
+        out = out.at[..., -(k + 1), p:-p].set(-field[..., -(2 * p - k), p:-p])
         # West ghost col (excluding corners)
-        out = out.at[p:-p, k].set(-field[p:-p, src_col])
+        out = out.at[..., p:-p, k].set(-field[..., p:-p, src_col])
         # East ghost col (excluding corners)
-        out = out.at[p:-p, -(k + 1)].set(-field[p:-p, -(2 * p - k)])
+        out = out.at[..., p:-p, -(k + 1)].set(-field[..., p:-p, -(2 * p - k)])
     return out
 
 
 def free_slip_boundaries(
-    field: Float[Array, "Ny Nx"],
+    field: Float[Array, "*batch Ny Nx"],
     pad_width: int = 1,
-) -> Float[Array, "Ny Nx"]:
+) -> Float[Array, "*batch Ny Nx"]:
     """Fill ghost ring with symmetric reflection (free-slip wall).
 
     Sets ghost cells equal to the adjacent interior value::
@@ -227,14 +237,14 @@ def free_slip_boundaries(
 
     Parameters
     ----------
-    field : Float[Array, "Ny Nx"]
+    field : Float[Array, "*batch Ny Nx"]
         Input array with ghost ring.
     pad_width : int
         Width of the ghost ring to fill (default 1).
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Array with free-slip ghost ring.  Corner cells are left
         unchanged; apply :func:`fix_boundary_corners` afterwards
         if smooth corners are needed.
@@ -246,13 +256,13 @@ def free_slip_boundaries(
         src_row = 2 * p - 1 - k
         src_col = 2 * p - 1 - k
         # South ghost row (excluding corners)
-        out = out.at[k, p:-p].set(field[src_row, p:-p])
+        out = out.at[..., k, p:-p].set(field[..., src_row, p:-p])
         # North ghost row (excluding corners)
-        out = out.at[-(k + 1), p:-p].set(field[-(2 * p - k), p:-p])
+        out = out.at[..., -(k + 1), p:-p].set(field[..., -(2 * p - k), p:-p])
         # West ghost col (excluding corners)
-        out = out.at[p:-p, k].set(field[p:-p, src_col])
+        out = out.at[..., p:-p, k].set(field[..., p:-p, src_col])
         # East ghost col (excluding corners)
-        out = out.at[p:-p, -(k + 1)].set(field[p:-p, -(2 * p - k)])
+        out = out.at[..., p:-p, -(k + 1)].set(field[..., p:-p, -(2 * p - k)])
     return out
 
 
@@ -260,8 +270,8 @@ def free_slip_boundaries(
 
 
 def fix_boundary_corners(
-    field: Float[Array, "Ny Nx"],
-) -> Float[Array, "Ny Nx"]:
+    field: Float[Array, "*batch Ny Nx"],
+) -> Float[Array, "*batch Ny Nx"]:
     """Average corner ghost cells from their two face-adjacent ghost neighbours.
 
     Corner ghost cells ``[0,0]``, ``[0,-1]``, ``[-1,0]``, ``[-1,-1]`` are
@@ -270,30 +280,30 @@ def fix_boundary_corners(
 
     Parameters
     ----------
-    field : Float[Array, "Ny Nx"]
+    field : Float[Array, "*batch Ny Nx"]
         Input array whose edge ghost cells are already filled.
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Array with averaged corner ghost cells.
     """
     out = field
     # SW corner: average of south-edge and west-edge ghost cells
-    out = out.at[0, 0].set(0.5 * (field[0, 1] + field[1, 0]))
+    out = out.at[..., 0, 0].set(0.5 * (field[..., 0, 1] + field[..., 1, 0]))
     # SE corner
-    out = out.at[0, -1].set(0.5 * (field[0, -2] + field[1, -1]))
+    out = out.at[..., 0, -1].set(0.5 * (field[..., 0, -2] + field[..., 1, -1]))
     # NW corner
-    out = out.at[-1, 0].set(0.5 * (field[-1, 1] + field[-2, 0]))
+    out = out.at[..., -1, 0].set(0.5 * (field[..., -1, 1] + field[..., -2, 0]))
     # NE corner
-    out = out.at[-1, -1].set(0.5 * (field[-1, -2] + field[-2, -1]))
+    out = out.at[..., -1, -1].set(0.5 * (field[..., -1, -2] + field[..., -2, -1]))
     return out
 
 
 def wall_boundaries(
-    field: Float[Array, "Ny Nx"],
+    field: Float[Array, "*batch Ny Nx"],
     staggering: str = "h",
-) -> Float[Array, "Ny Nx"]:
+) -> Float[Array, "*batch Ny Nx"]:
     """Apply wall boundary conditions appropriate for a C-grid staggering.
 
     A composite helper that selects the correct ghost-cell treatment based
@@ -311,14 +321,14 @@ def wall_boundaries(
 
     Parameters
     ----------
-    field : Float[Array, "Ny Nx"]
+    field : Float[Array, "*batch Ny Nx"]
         Input array with ghost ring.
     staggering : {'h', 'u', 'v', 'q'}
         Which C-grid staggering the field represents.
 
     Returns
     -------
-    Float[Array, "Ny Nx"]
+    Float[Array, "*batch Ny Nx"]
         Array with wall boundary conditions applied.
     """
     if staggering == "h":

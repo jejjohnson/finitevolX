@@ -50,7 +50,7 @@ def _on_wall(face: Face, point: Point) -> bool:
 
 
 def _interior_line(
-    field: Float[Array, "Ny Nx"], face: Face, k: int = 0, point: Point = "T"
+    field: Float[Array, "*batch Ny Nx"], face: Face, k: int = 0, point: Point = "T"
 ) -> BoundarySlice:
     """Return the ``k``-th interior line inward from *face* (``k = 0``: adjacent).
 
@@ -61,31 +61,33 @@ def _interior_line(
     far = 3 if _on_wall(face, point) else 2  # index of the adjacent line from the end
     match face:
         case "south":
-            return field[1 + k, :]
+            return field[..., 1 + k, :]
         case "north":
-            return field[-(far + k), :]
+            return field[..., -(far + k), :]
         case "west":
-            return field[:, 1 + k]
+            return field[..., :, 1 + k]
         case "east":
-            return field[:, -(far + k)]
+            return field[..., :, -(far + k)]
 
 
 def _adjacent_interior(
-    field: Float[Array, "Ny Nx"], face: Face, point: Point = "T"
+    field: Float[Array, "*batch Ny Nx"], face: Face, point: Point = "T"
 ) -> BoundarySlice:
     return _interior_line(field, face, 0, point)
 
 
-def _opposite_interior(field: Float[Array, "Ny Nx"], face: Face) -> BoundarySlice:
+def _opposite_interior(
+    field: Float[Array, "*batch Ny Nx"], face: Face
+) -> BoundarySlice:
     match face:
         case "south":
-            return field[-2, :]
+            return field[..., -2, :]
         case "north":
-            return field[1, :]
+            return field[..., 1, :]
         case "west":
-            return field[:, -2]
+            return field[..., :, -2]
         case "east":
-            return field[:, 1]
+            return field[..., :, 1]
 
 
 def _normal_spacing(face: Face, dx: float, dy: float) -> float:
@@ -97,11 +99,11 @@ def _normal_spacing(face: Face, dx: float, dy: float) -> float:
 
 
 def _set_face(
-    field: Float[Array, "Ny Nx"],
+    field: Float[Array, "*batch Ny Nx"],
     face: Face,
     values: BoundarySlice,
     point: Point = "T",
-) -> Float[Array, "Ny Nx"]:
+) -> Float[Array, "*batch Ny Nx"]:
     """Write the boundary line of *face*: the ghost line, or the wall node.
 
     For a node on the wall the north / east wall node is index ``-2`` and the
@@ -110,25 +112,27 @@ def _set_face(
     if not _on_wall(face, point):
         match face:
             case "south":
-                return field.at[0, :].set(values)
+                return field.at[..., 0, :].set(values)
             case "north":
-                return field.at[-1, :].set(values)
+                return field.at[..., -1, :].set(values)
             case "west":
-                return field.at[:, 0].set(values)
+                return field.at[..., :, 0].set(values)
             case "east":
-                return field.at[:, -1].set(values)
+                return field.at[..., :, -1].set(values)
     # wall node: phi[0] (south / west) or phi[-2] (north / east)
     match face:
         case "south":
-            return field.at[0, :].set(values)
+            return field.at[..., 0, :].set(values)
         case "west":
-            return field.at[:, 0].set(values)
+            return field.at[..., :, 0].set(values)
         case "north":
-            mirror = 2.0 * values - field[-3, :]  # phi[-1] = 2 phi_wall - phi[-3]
-            return field.at[-2, :].set(values).at[-1, :].set(mirror)
+            mirror = 2.0 * values - field[..., -3, :]  # phi[-1] = 2 phi_wall - phi[-3]
+            return field.at[..., -2, :].set(values).at[..., -1, :].set(mirror)
         case "east":
-            mirror = 2.0 * values - field[:, -3]  # phi[:, -1] = 2 phi_wall - phi[:, -3]
-            return field.at[:, -2].set(values).at[:, -1].set(mirror)
+            mirror = (
+                2.0 * values - field[..., :, -3]
+            )  # phi[:, -1] = 2 phi_wall - phi[:, -3]
+            return field.at[..., :, -2].set(values).at[..., :, -1].set(mirror)
 
 
 class Dirichlet1D(eqx.Module):
@@ -175,8 +179,8 @@ class Dirichlet1D(eqx.Module):
     point: Point = eqx.field(static=True, default="T")
 
     def __call__(
-        self, field: Float[Array, "Ny Nx"], dx: float, dy: float
-    ) -> Float[Array, "Ny Nx"]:
+        self, field: Float[Array, "*batch Ny Nx"], dx: float, dy: float
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Return ``field`` with one Dirichlet ghost face (or wall node) updated."""
         interior = _adjacent_interior(field, self.face, self.point)  # [N]
         if _on_wall(self.face, self.point):
@@ -217,8 +221,8 @@ class Neumann1D(eqx.Module):
     point: Point = eqx.field(static=True, default="T")
 
     def __call__(
-        self, field: Float[Array, "Ny Nx"], dx: float, dy: float
-    ) -> Float[Array, "Ny Nx"]:
+        self, field: Float[Array, "*batch Ny Nx"], dx: float, dy: float
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Return ``field`` with one Neumann ghost face updated."""
         spacing = _normal_spacing(self.face, dx=dx, dy=dy)
         interior = _adjacent_interior(field, self.face, self.point)
@@ -245,8 +249,8 @@ class Periodic1D(eqx.Module):
     face: Face = eqx.field(static=True)
 
     def __call__(
-        self, field: Float[Array, "Ny Nx"], dx: float, dy: float
-    ) -> Float[Array, "Ny Nx"]:
+        self, field: Float[Array, "*batch Ny Nx"], dx: float, dy: float
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Return ``field`` with one periodic ghost face updated."""
         del dx, dy
         ghost = _opposite_interior(field, self.face)
@@ -274,8 +278,8 @@ class Outflow1D(eqx.Module):
     point: Point = eqx.field(static=True, default="T")
 
     def __call__(
-        self, field: Float[Array, "Ny Nx"], dx: float, dy: float
-    ) -> Float[Array, "Ny Nx"]:
+        self, field: Float[Array, "*batch Ny Nx"], dx: float, dy: float
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Return ``field`` with one outflow ghost face updated."""
         del dx, dy
         ghost = _adjacent_interior(field, self.face, self.point)
@@ -304,8 +308,8 @@ class Reflective1D(eqx.Module):
     point: Point = eqx.field(static=True, default="T")
 
     def __call__(
-        self, field: Float[Array, "Ny Nx"], dx: float, dy: float
-    ) -> Float[Array, "Ny Nx"]:
+        self, field: Float[Array, "*batch Ny Nx"], dx: float, dy: float
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Return ``field`` with one reflective ghost face updated."""
         del dx, dy
         ghost = _adjacent_interior(field, self.face, self.point)
@@ -344,8 +348,8 @@ class Sponge1D(eqx.Module):
             raise ValueError("Sponge1D weight must lie in [0, 1].")
 
     def __call__(
-        self, field: Float[Array, "Ny Nx"], dx: float, dy: float
-    ) -> Float[Array, "Ny Nx"]:
+        self, field: Float[Array, "*batch Ny Nx"], dx: float, dy: float
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Return ``field`` with one sponge ghost face updated."""
         del dx, dy
         interior = _adjacent_interior(field, self.face, self.point)
@@ -417,8 +421,8 @@ class Robin1D(eqx.Module):
             )
 
     def __call__(
-        self, field: Float[Array, "Ny Nx"], dx: float, dy: float
-    ) -> Float[Array, "Ny Nx"]:
+        self, field: Float[Array, "*batch Ny Nx"], dx: float, dy: float
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Return ``field`` with one Robin ghost face updated."""
         spacing = _normal_spacing(self.face, dx=dx, dy=dy)
         interior = _adjacent_interior(field, self.face, self.point)
@@ -488,8 +492,8 @@ class Extrapolation1D(eqx.Module):
         self._coeffs = tuple(coeffs)
 
     def __call__(
-        self, field: Float[Array, "Ny Nx"], dx: float, dy: float
-    ) -> Float[Array, "Ny Nx"]:
+        self, field: Float[Array, "*batch Ny Nx"], dx: float, dy: float
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Return ``field`` with one extrapolated ghost face updated."""
         del dx, dy
         ghost: BoundarySlice = _adjacent_interior(field, self.face, self.point) * 0.0
@@ -558,13 +562,13 @@ class Slip1D(eqx.Module):
             raise ValueError("Slip1D coefficient must lie in [0, 1].")
 
     def __call__(
-        self, field: Float[Array, "Ny Nx"], dx: float, dy: float
-    ) -> Float[Array, "Ny Nx"]:
+        self, field: Float[Array, "*batch Ny Nx"], dx: float, dy: float
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Return ``field`` with one slip ghost face updated.
 
         Parameters
         ----------
-        field : Float[Array, "Ny Nx"]
+        field : Float[Array, "*batch Ny Nx"]
             Input array with ghost-cell ring.
         dx : float
             Grid spacing in x (unused, kept for interface consistency).
@@ -573,7 +577,7 @@ class Slip1D(eqx.Module):
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Field with the ghost face set according to the slip coefficient.
         """
         del dx, dy

@@ -65,9 +65,9 @@ class Vorticity2D(eqx.Module):
 
     def relative_vorticity(
         self,
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
-    ) -> Float[Array, "Ny Nx"]:
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Relative vorticity at X-points (corners).
 
         zeta[j+1/2, i+1/2] = dv_dx[j+1/2, i+1/2] - du_dy[j+1/2, i+1/2]
@@ -76,25 +76,25 @@ class Vorticity2D(eqx.Module):
 
         Parameters
         ----------
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             x-velocity at U-points.
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             y-velocity at V-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Relative vorticity at X-points.
         """
         return self.diff.curl(u, v)
 
     def potential_vorticity(
         self,
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
-        h: Float[Array, "Ny Nx"],
-        f: Float[Array, "Ny Nx"],
-    ) -> Float[Array, "Ny Nx"]:
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
+        h: Float[Array, "*batch Ny Nx"],
+        f: Float[Array, "*batch Ny Nx"],
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Potential vorticity at X-points (corners).
 
         q[j+1/2, i+1/2] = (zeta[j+1/2, i+1/2] + f_on_q[j+1/2, i+1/2])
@@ -102,18 +102,18 @@ class Vorticity2D(eqx.Module):
 
         Parameters
         ----------
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             x-velocity at U-points.
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             y-velocity at V-points.
-        h : Float[Array, "Ny Nx"]
+        h : Float[Array, "*batch Ny Nx"]
             Layer thickness at T-points.
-        f : Float[Array, "Ny Nx"]
+        f : Float[Array, "*batch Ny Nx"]
             Coriolis parameter at T-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Potential vorticity at X-points.  Zero-thickness X-corners
             produce a ``NaN`` sentinel at *wet* corners (a numerical
             bug signal); under ``self.mask``, dry corners are forced
@@ -124,8 +124,8 @@ class Vorticity2D(eqx.Module):
         f_on_q = self.interp.T_to_X(f)  # f interpolated to X-points
         h_on_q = self.interp.T_to_X(h)  # h interpolated to X-points
         # q[j+1/2, i+1/2] = (zeta + f) / h  at X-points
-        num = zeta[1:-1, 1:-1] + f_on_q[1:-1, 1:-1]
-        den = h_on_q[1:-1, 1:-1]
+        num = zeta[..., 1:-1, 1:-1] + f_on_q[..., 1:-1, 1:-1]
+        den = h_on_q[..., 1:-1, 1:-1]
         if self.mask is not None:
             # Pass-down masking makes h_on_q exactly 0 at every dry corner.
             # Divide by 1 there instead: the output is zeroed below anyway,
@@ -133,7 +133,7 @@ class Vorticity2D(eqx.Module):
             # corners.  Wet corners keep their real denominator (and the
             # NaN sentinel for zero thickness).
             # den[j, i] = den[j, i] if xy_corner_strict[j+1, i+1] else 1
-            den = jnp.where(self.mask.xy_corner_strict[1:-1, 1:-1], den, 1.0)
+            den = jnp.where(self.mask.xy_corner_strict[..., 1:-1, 1:-1], den, 1.0)
         pv = jnp.where(den == 0, jnp.nan, num / den)
         out = interior(pv, h)
         if self.mask is not None:
@@ -147,9 +147,9 @@ class Vorticity2D(eqx.Module):
 
     def enstrophy(
         self,
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
-    ) -> Float[Array, "Ny Nx"]:
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Enstrophy at X-points (corners).
 
         ens[j+1/2, i+1/2] = 1/2 * zeta[j+1/2, i+1/2]^2
@@ -158,14 +158,14 @@ class Vorticity2D(eqx.Module):
 
         Parameters
         ----------
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             x-velocity at U-points.
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             y-velocity at V-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Enstrophy at X-points, zero in the ghost ring and, when
             ``self.mask`` is set, at dry X-corners.  Under a mask ``u`` / ``v``
             are first zeroed on dry interior faces, so ``NaN`` land values
@@ -184,11 +184,11 @@ class Vorticity2D(eqx.Module):
 
     def potential_enstrophy(
         self,
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
-        h: Float[Array, "Ny Nx"],
-        f: Float[Array, "Ny Nx"],
-    ) -> Float[Array, "Ny Nx"]:
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
+        h: Float[Array, "*batch Ny Nx"],
+        f: Float[Array, "*batch Ny Nx"],
+    ) -> Float[Array, "*batch Ny Nx"]:
         """Potential enstrophy at X-points (corners).
 
         pens[j+1/2, i+1/2] = 1/2 * q[j+1/2, i+1/2]^2 * h_on_q[j+1/2, i+1/2]
@@ -201,18 +201,18 @@ class Vorticity2D(eqx.Module):
 
         Parameters
         ----------
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             x-velocity at U-points.
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             y-velocity at V-points.
-        h : Float[Array, "Ny Nx"]
+        h : Float[Array, "*batch Ny Nx"]
             Layer thickness at T-points.
-        f : Float[Array, "Ny Nx"]
+        f : Float[Array, "*batch Ny Nx"]
             Coriolis parameter at T-points.
 
         Returns
         -------
-        Float[Array, "Ny Nx"]
+        Float[Array, "*batch Ny Nx"]
             Potential enstrophy at X-points, zero in the ghost ring and,
             when ``self.mask`` is set, at dry X-corners.  Inherits the
             ``NaN`` sentinel of :meth:`potential_vorticity` at wet corners
@@ -236,9 +236,9 @@ class Vorticity2D(eqx.Module):
 
     def pv_flux_energy_conserving(
         self,
-        q: Float[Array, "Ny Nx"],
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
+        q: Float[Array, "*batch Ny Nx"],
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
     ) -> tuple:
         """Energy-conserving PV flux (Sadourny 1975 E-scheme form).
 
@@ -266,12 +266,12 @@ class Vorticity2D(eqx.Module):
 
         Parameters
         ----------
-        q : Float[Array, "Ny Nx"]
+        q : Float[Array, "*batch Ny Nx"]
             Potential vorticity at X-points, including the BC-owned south /
             west ghost corners.
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             x-velocity (or x mass flux) at U-points.
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             y-velocity (or y mass flux) at V-points.
 
         Returns
@@ -293,9 +293,9 @@ class Vorticity2D(eqx.Module):
 
     def pv_flux_enstrophy_conserving(
         self,
-        q: Float[Array, "Ny Nx"],
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
+        q: Float[Array, "*batch Ny Nx"],
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
     ) -> tuple:
         """Enstrophy-conserving PV flux (Sadourny 1975 Z-scheme form).
 
@@ -312,11 +312,11 @@ class Vorticity2D(eqx.Module):
 
         Parameters
         ----------
-        q : Float[Array, "Ny Nx"]
+        q : Float[Array, "*batch Ny Nx"]
             Potential vorticity at X-points.
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             x-velocity (or x mass flux) at U-points.
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             y-velocity (or y mass flux) at V-points.
 
         Returns
@@ -327,16 +327,16 @@ class Vorticity2D(eqx.Module):
         q_on_u = self.interp.X_to_U(q)  # q_on_u[j, i+1/2] = avg in y
         q_on_v = self.interp.X_to_V(q)  # q_on_v[j+1/2, i] = avg in x
         # qu[j, i+1/2] = q_on_u[j, i+1/2] * u[j, i+1/2]
-        qu = interior(q_on_u[1:-1, 1:-1] * u[1:-1, 1:-1], u)
+        qu = interior(q_on_u[..., 1:-1, 1:-1] * u[..., 1:-1, 1:-1], u)
         # qv[j+1/2, i] = q_on_v[j+1/2, i] * v[j+1/2, i]
-        qv = interior(q_on_v[1:-1, 1:-1] * v[1:-1, 1:-1], v)
+        qv = interior(q_on_v[..., 1:-1, 1:-1] * v[..., 1:-1, 1:-1], v)
         return qu, qv
 
     def pv_flux_blend(
         self,
-        q: Float[Array, "Ny Nx"],
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
+        q: Float[Array, "*batch Ny Nx"],
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
         alpha: float = 1.0 / 3.0,
     ) -> tuple:
         """Linear blend of the energy- and enstrophy-conserving PV fluxes.
@@ -350,11 +350,11 @@ class Vorticity2D(eqx.Module):
 
         Parameters
         ----------
-        q : Float[Array, "Ny Nx"]
+        q : Float[Array, "*batch Ny Nx"]
             Potential vorticity at X-points.
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             x-velocity at U-points.
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             y-velocity at V-points.
         alpha : float
             Weight of the energy-conserving form.  Default 1/3.
@@ -373,9 +373,9 @@ class Vorticity2D(eqx.Module):
 
     def pv_flux_arakawa_lamb(
         self,
-        q: Float[Array, "Ny Nx"],
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
+        q: Float[Array, "*batch Ny Nx"],
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
         alpha: float = 1.0 / 3.0,
     ) -> tuple:
         """Deprecated alias of :meth:`pv_flux_blend` (not Arakawa-Lamb 1981)."""
@@ -384,14 +384,14 @@ class Vorticity2D(eqx.Module):
 
 
 def _pv_flux_corner_product(
-    q: Float[Array, "Ny Nx"],
-    u: Float[Array, "Ny Nx"],
-    v: Float[Array, "Ny Nx"],
+    q: Float[Array, "*batch Ny Nx"],
+    u: Float[Array, "*batch Ny Nx"],
+    v: Float[Array, "*batch Ny Nx"],
     *,
     wet_x: Array | None = None,
     wet_u: Array | None = None,
     wet_v: Array | None = None,
-) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
+) -> tuple[Float[Array, "*batch Ny Nx"], Float[Array, "*batch Ny Nx"]]:
     """Corner-product PV flux: multiply at X-points, then average to faces.
 
     Same arithmetic as ``X_to_U(q * U_to_X(u))`` / ``X_to_V(q * V_to_X(v))``
@@ -407,20 +407,20 @@ def _pv_flux_corner_product(
     """
     # pu[j+1/2, i+1/2] = q[j+1/2, i+1/2] * 1/2 (u[j, i+1/2] + u[j+1, i+1/2])
     #   for 0 <= j <= Ny-2 (south ghost corner row j = 0 included)   [Ny-1, Nx]
-    pu = q[:-1, :] * (0.5 * (u[:-1, :] + u[1:, :]))
+    pu = q[..., :-1, :] * (0.5 * (u[..., :-1, :] + u[..., 1:, :]))
     # pv[j+1/2, i+1/2] = q[j+1/2, i+1/2] * 1/2 (v[j+1/2, i] + v[j+1/2, i+1])
     #   for 0 <= i <= Nx-2 (west ghost corner column i = 0 included)  [Ny, Nx-1]
-    pv = q[:, :-1] * (0.5 * (v[:, :-1] + v[:, 1:]))
+    pv = q[..., :, :-1] * (0.5 * (v[..., :, :-1] + v[..., :, 1:]))
     if wet_x is not None:
         wet_x = jnp.asarray(wet_x, dtype=bool)
         # keep[j, i] = True on the ghost ring, wet_x[j, i] in the interior
-        keep = jnp.ones_like(wet_x).at[1:-1, 1:-1].set(wet_x[1:-1, 1:-1])
-        pu = jnp.where(keep[:-1, :], pu, 0.0)
-        pv = jnp.where(keep[:, :-1], pv, 0.0)
+        keep = jnp.ones_like(wet_x).at[..., 1:-1, 1:-1].set(wet_x[..., 1:-1, 1:-1])
+        pu = jnp.where(keep[..., :-1, :], pu, 0.0)
+        pv = jnp.where(keep[..., :, :-1], pv, 0.0)
     # qu[j, i+1/2] = 1/2 (pu[j+1/2, i+1/2] + pu[j-1/2, i+1/2])   [Ny-2, Nx-2]
-    qu = interior(0.5 * (pu[1:, 1:-1] + pu[:-1, 1:-1]), u)
+    qu = interior(0.5 * (pu[..., 1:, 1:-1] + pu[..., :-1, 1:-1]), u)
     # qv[j+1/2, i] = 1/2 (pv[j+1/2, i+1/2] + pv[j+1/2, i-1/2])   [Ny-2, Nx-2]
-    qv = interior(0.5 * (pv[1:-1, 1:] + pv[1:-1, :-1]), v)
+    qv = interior(0.5 * (pv[..., 1:-1, 1:] + pv[..., 1:-1, :-1]), v)
     if wet_u is not None:
         qu = qu * wet_u
     if wet_v is not None:
@@ -479,12 +479,12 @@ class Vorticity3D(eqx.Module):
 
 
 def pv_flux_blend(
-    q: Float[Array, "Ny Nx"],
-    u: Float[Array, "Ny Nx"],
-    v: Float[Array, "Ny Nx"],
+    q: Float[Array, "*batch Ny Nx"],
+    u: Float[Array, "*batch Ny Nx"],
+    v: Float[Array, "*batch Ny Nx"],
     *,
     alpha: float = 1.0 / 3.0,
-) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
+) -> tuple[Float[Array, "*batch Ny Nx"], Float[Array, "*batch Ny Nx"]]:
     """Blend of the energy- and enstrophy-conserving PV fluxes (grid-free).
 
     Public functional form of :meth:`Vorticity2D.pv_flux_blend`:
@@ -507,18 +507,18 @@ def pv_flux_blend(
 
     Parameters
     ----------
-    q : Float[Array, "Ny Nx"]
+    q : Float[Array, "*batch Ny Nx"]
         Potential vorticity at X-points (corners), including ghost ring.
-    u : Float[Array, "Ny Nx"]
+    u : Float[Array, "*batch Ny Nx"]
         x-velocity (or x mass flux) at U-points.
-    v : Float[Array, "Ny Nx"]
+    v : Float[Array, "*batch Ny Nx"]
         y-velocity (or y mass flux) at V-points.
     alpha : float, optional
         Weight of the energy-conserving form.  Default ``1/3``.
 
     Returns
     -------
-    tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]
+    tuple[Float[Array, "*batch Ny Nx"], Float[Array, "*batch Ny Nx"]]
         ``(qu, qv)`` — the PV flux at U-points and V-points.
     """
     # Energy-conserving: multiply at corners (full arrays), then average.
@@ -527,8 +527,8 @@ def pv_flux_blend(
     # Enstrophy-conserving: average q to the faces, then multiply.
     q_on_u = interior(avg_y_bwd(q), q)  # X_to_U
     q_on_v = interior(avg_x_bwd(q), q)  # X_to_V
-    qu_s = interior(q_on_u[1:-1, 1:-1] * u[1:-1, 1:-1], u)
-    qv_s = interior(q_on_v[1:-1, 1:-1] * v[1:-1, 1:-1], v)
+    qu_s = interior(q_on_u[..., 1:-1, 1:-1] * u[..., 1:-1, 1:-1], u)
+    qv_s = interior(q_on_v[..., 1:-1, 1:-1] * v[..., 1:-1, 1:-1], v)
 
     qu = alpha * qu_e + (1.0 - alpha) * qu_s
     qv = alpha * qv_e + (1.0 - alpha) * qv_s
@@ -536,12 +536,12 @@ def pv_flux_blend(
 
 
 def pv_flux_arakawa_lamb(
-    q: Float[Array, "Ny Nx"],
-    u: Float[Array, "Ny Nx"],
-    v: Float[Array, "Ny Nx"],
+    q: Float[Array, "*batch Ny Nx"],
+    u: Float[Array, "*batch Ny Nx"],
+    v: Float[Array, "*batch Ny Nx"],
     *,
     alpha: float = 1.0 / 3.0,
-) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
+) -> tuple[Float[Array, "*batch Ny Nx"], Float[Array, "*batch Ny Nx"]]:
     """Deprecated alias of :func:`pv_flux_blend` (not Arakawa-Lamb 1981)."""
     _warn_arakawa_lamb("pv_flux_blend")
     return pv_flux_blend(q, u, v, alpha=alpha)
@@ -638,11 +638,11 @@ def _upwind_face_bwd_last(
 
 
 def vorticity_flux_upwind(
-    omega: Float[Array, "Ny Nx"],
-    U: Float[Array, "Ny Nx"],
-    V: Float[Array, "Ny Nx"],
+    omega: Float[Array, "*batch Ny Nx"],
+    U: Float[Array, "*batch Ny Nx"],
+    V: Float[Array, "*batch Ny Nx"],
     order: int = 3,
-) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
+) -> tuple[Float[Array, "*batch Ny Nx"], Float[Array, "*batch Ny Nx"]]:
     r"""Dissipative upwind vortex-force fluxes on a C-grid.
 
     The MASSH-parity alternative to the energy/enstrophy-conserving schemes
@@ -662,12 +662,12 @@ def vorticity_flux_upwind(
 
     Parameters
     ----------
-    omega : Float[Array, "Ny Nx"]
+    omega : Float[Array, "*batch Ny Nx"]
         Absolute vorticity ``zeta + f`` (or PV) at X-points (corners),
         including ghost ring.
-    U : Float[Array, "Ny Nx"]
+    U : Float[Array, "*batch Ny Nx"]
         x mass flux ``h * u`` at U-points.
-    V : Float[Array, "Ny Nx"]
+    V : Float[Array, "*batch Ny Nx"]
         y mass flux ``h * v`` at V-points.
     order : int, optional
         Upwind stencil width, one of ``{1, 3, 5}``.  Default ``3``.  Near the
@@ -676,7 +676,7 @@ def vorticity_flux_upwind(
 
     Returns
     -------
-    tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]
+    tuple[Float[Array, "*batch Ny Nx"], Float[Array, "*batch Ny Nx"]]
         ``(omega_V, omega_U)`` — the vortex-force flux at U-points (for the
         u-equation) and V-points (for the v-equation).  Ghost ring is zero.
 
@@ -692,14 +692,14 @@ def vorticity_flux_upwind(
     v_on_u = interior(avg_xfwd_ybwd(V), V)  # V_to_U: north flux at U-points
     u_on_v = interior(avg_xbwd_yfwd(U), U)  # U_to_V: east flux at V-points
 
-    # omega reconstructed to U-points along y (axis 0): swap y to the last axis.
-    omega_y = jnp.swapaxes(omega, 0, -1)
-    vel_y = jnp.swapaxes(v_on_u, 0, -1)
-    face_y = jnp.swapaxes(_upwind_face_bwd_last(omega_y, vel_y, order), 0, -1)
-    omega_V = interior(face_y[:, 1:-1] * v_on_u[1:-1, 1:-1], omega)
+    # omega reconstructed to U-points along y (axis -2): swap y to the last axis.
+    omega_y = jnp.swapaxes(omega, -2, -1)
+    vel_y = jnp.swapaxes(v_on_u, -2, -1)
+    face_y = jnp.swapaxes(_upwind_face_bwd_last(omega_y, vel_y, order), -2, -1)
+    omega_V = interior(face_y[..., :, 1:-1] * v_on_u[..., 1:-1, 1:-1], omega)
 
     # omega reconstructed to V-points along x (axis -1, already last).
     face_x = _upwind_face_bwd_last(omega, u_on_v, order)
-    omega_U = interior(face_x[1:-1, :] * u_on_v[1:-1, 1:-1], omega)
+    omega_U = interior(face_x[..., 1:-1, :] * u_on_v[..., 1:-1, 1:-1], omega)
 
     return omega_V, omega_U

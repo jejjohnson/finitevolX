@@ -24,10 +24,10 @@ class FieldBCSet(eqx.Module):
     default: BoundaryConditionSet | None = None
 
     def __call__(
-        self, state: dict[str, Float[Array, "Ny Nx"]], dx: float, dy: float
-    ) -> dict[str, Float[Array, "Ny Nx"]]:
+        self, state: dict[str, Float[Array, "*batch Ny Nx"]], dx: float, dy: float
+    ) -> dict[str, Float[Array, "*batch Ny Nx"]]:
         """Return a new state dictionary with boundary conditions applied."""
-        out: dict[str, Float[Array, "Ny Nx"]] = {}
+        out: dict[str, Float[Array, "*batch Ny Nx"]] = {}
         for name, field in state.items():
             bc = self.bc_map.get(name, self.default)
             out[name] = field if bc is None else bc(field, dx=dx, dy=dy)

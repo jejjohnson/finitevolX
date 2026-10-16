@@ -94,10 +94,10 @@ class Coriolis2D(eqx.Module):
 
     def __call__(
         self,
-        u: Float[Array, "Ny Nx"],
-        v: Float[Array, "Ny Nx"],
-        f: Float[Array, "Ny Nx"],
-    ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
+        u: Float[Array, "*batch Ny Nx"],
+        v: Float[Array, "*batch Ny Nx"],
+        f: Float[Array, "*batch Ny Nx"],
+    ) -> tuple[Float[Array, "*batch Ny Nx"], Float[Array, "*batch Ny Nx"]]:
         """Coriolis tendencies (du_cor, dv_cor).
 
         du_cor[j, i+1/2] = +avg_y(f_X * avg_x(v))
@@ -105,16 +105,16 @@ class Coriolis2D(eqx.Module):
 
         Parameters
         ----------
-        u : Float[Array, "Ny Nx"]
+        u : Float[Array, "*batch Ny Nx"]
             x-velocity at U-points (east faces).
-        v : Float[Array, "Ny Nx"]
+        v : Float[Array, "*batch Ny Nx"]
             y-velocity at V-points (north faces).
-        f : Float[Array, "Ny Nx"]
+        f : Float[Array, "*batch Ny Nx"]
             Coriolis parameter at T-points, ghost ring filled.
 
         Returns
         -------
-        tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]
+        tuple[Float[Array, "*batch Ny Nx"], Float[Array, "*batch Ny Nx"]]
             ``(du_cor, dv_cor)`` — Coriolis tendencies at U-points and
             V-points respectively, both zero in the ghost ring.  When
             ``self.mask`` is set, dry U / V faces are zero.
@@ -125,18 +125,20 @@ class Coriolis2D(eqx.Module):
             v = jnp.where(self.mask.v, v, 0.0)
         # f_X[j+1/2, i+1/2] = 1/4 (f[j, i] + f[j+1, i] + f[j, i+1] + f[j+1, i+1])
         #   X rows / cols 0 .. N-2 (the south / west ghost corners included)
-        f_x = 0.25 * (f[:-1, :-1] + f[1:, :-1] + f[:-1, 1:] + f[1:, 1:])  # [Ny-1, Nx-1]
+        f_x = 0.25 * (
+            f[..., :-1, :-1] + f[..., 1:, :-1] + f[..., :-1, 1:] + f[..., 1:, 1:]
+        )  # [Ny-1, Nx-1]
         # v_X[j+1/2, i+1/2] = 1/2 (v[j+1/2, i] + v[j+1/2, i+1])
-        v_x = 0.5 * (v[:-1, :-1] + v[:-1, 1:])  # [Ny-1, Nx-1]
+        v_x = 0.5 * (v[..., :-1, :-1] + v[..., :-1, 1:])  # [Ny-1, Nx-1]
         # u_X[j+1/2, i+1/2] = 1/2 (u[j, i+1/2] + u[j+1, i+1/2])
-        u_x = 0.5 * (u[:-1, :-1] + u[1:, :-1])  # [Ny-1, Nx-1]
+        u_x = 0.5 * (u[..., :-1, :-1] + u[..., 1:, :-1])  # [Ny-1, Nx-1]
         # corner products P = f_X v_X, Q = f_X u_X              [Ny-1, Nx-1]
         p = f_x * v_x
         q = f_x * u_x
         # du_cor[j, i+1/2] = +1/2 (P[j+1/2, i+1/2] + P[j-1/2, i+1/2])  [Ny-2, Nx-2]
-        du_cor = interior(0.5 * (p[1:, 1:] + p[:-1, 1:]), u)
+        du_cor = interior(0.5 * (p[..., 1:, 1:] + p[..., :-1, 1:]), u)
         # dv_cor[j+1/2, i] = -1/2 (Q[j+1/2, i+1/2] + Q[j+1/2, i-1/2])  [Ny-2, Nx-2]
-        dv_cor = interior(-0.5 * (q[1:, 1:] + q[1:, :-1]), v)
+        dv_cor = interior(-0.5 * (q[..., 1:, 1:] + q[..., 1:, :-1]), v)
 
         if self.mask is not None:
             du_cor = jnp.where(self.mask.u, du_cor, 0.0)
