@@ -95,6 +95,7 @@ class TestOverLeading:
 
 
 class TestCheckOperator:
+    @pytest.mark.slow  # compiles the operator several times (~2 s)
     def test_passes_for_a_tier_b_operator(self):
         check_operator(ScaledLaplacian(grid=SPEC, kappa=0.5), _field())
 
@@ -104,6 +105,7 @@ class TestCheckOperator:
         ref = 0.5 * fvx.Difference2D(grid=build_grid(SPEC)).laplacian(h)
         np.testing.assert_array_equal(out, ref)
 
+    @pytest.mark.slow  # compiles the operator several times (~2 s)
     def test_flags_a_gather(self):
         class Gathers(GridOperator):
             def _apply(self, h):
