@@ -28,12 +28,47 @@ from finitevolx._src.pipekit.base import (
     build_grid,
     over_leading,
 )
+from finitevolx._src.pipekit.stencils import (
+    DIFFERENCES,
+    GHOST_FILLERS,
+    INTERPOLATIONS,
+    MASK_ATTRIBUTES,
+    ApplyMask,
+    Coriolis,
+    Curl,
+    Difference,
+    Divergence,
+    FillGhosts,
+    GradPerp,
+    Interp,
+    Laplacian,
+    LinComb,
+    Pick,
+)
 
 __all__ = [
+    # base
     "FVXOperator",
     "GridOperator",
     "GridSpec",
     "as_grid_spec",
     "build_grid",
     "over_leading",
+    # stencils, interpolation, boundaries, masks
+    "DIFFERENCES",
+    "GHOST_FILLERS",
+    "INTERPOLATIONS",
+    "MASK_ATTRIBUTES",
+    "ApplyMask",
+    "Coriolis",
+    "Curl",
+    "Difference",
+    "Divergence",
+    "FillGhosts",
+    "GradPerp",
+    "Interp",
+    "Laplacian",
+    # graph plumbing
+    "LinComb",
+    "Pick",
 ]
