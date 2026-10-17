@@ -57,6 +57,7 @@ ALLOWED: dict[str, str] = {
     "gaussx": "gaussx",
     "geocatalog": "geotoolz-catalog",
     "geocloud": "geotoolz-cloud",
+    "geoops": "geotoolz-ops",
     "geopatcher": "geotoolz-patcher",
     "geoproducts": "geotoolz-products",
     "georeader": "georeader-spaceml",
