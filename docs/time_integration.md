@@ -1,8 +1,10 @@
 # Time Integration for Ocean Models
 
-This page covers the theory behind the time integration schemes in finitevolX,
+This page covers the theory behind the time integration schemes used with finitevolX,
 explains why certain methods are preferred for ocean and atmosphere modelling,
 and provides practical guidance for choosing a scheme.
+
+The generic schemes below live in [integrix](https://github.com/jejjohnson/integrix) (`integrix.march`); their `finitevolx.*` names are deprecated aliases for one release. The semi-Lagrangian scheme stays in finitevolX.
 
 ---
 

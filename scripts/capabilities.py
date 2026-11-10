@@ -2,9 +2,9 @@
 
 ``docs/capabilities.md`` lists each name in ``finitevolx.__all__`` once,
 grouped by the private module that defines it, with the first sentence of
-its docstring; names finitevolX re-exports from spectraldiffx or gaussx are
-grouped by the library they come from. It then lists the public API of those
-two libraries, which finitevolX builds on. Agents and people search it before
+its docstring; names finitevolX re-exports from spectraldiffx, gaussx or
+integrix are grouped by the library they come from. It then lists the public
+API of those libraries, which finitevolX builds on. Agents and people search it before
 writing a helper ("Reuse before you write" in ``AGENTS.md``).
 
 Usage::
@@ -16,8 +16,8 @@ Usage::
 on the installed versions, which the index records; when they differ from
 the installed ones, only the finitevolX part is compared.
 
-``--check`` also fails when finitevolX exports a name that spectraldiffx or
-gaussx exports for a different object, unless ``ALLOWED_SHARED_NAMES`` gives
+``--check`` also fails when finitevolX exports a name that an upstream
+library exports for a different object, unless ``ALLOWED_SHARED_NAMES`` gives
 the reason.
 """
 
@@ -45,6 +45,7 @@ PACKAGES: dict[str, list[str]] = {
 UPSTREAM: dict[str, list[str]] = {
     "spectraldiffx": ["spectraldiffx"],
     "gaussx": ["gaussx"],
+    "integrix": ["integrix.march"],
 }
 UPSTREAM_BLURB = {
     "spectraldiffx": (
@@ -59,6 +60,12 @@ UPSTREAM_BLURB = {
         " the tridiagonal solve and the Nyström preconditioner to it; use it"
         " for any other structured solve, preconditioner or low-rank"
         " approximation instead of writing one here."
+    ),
+    "integrix": (
+        "Time steppers: the diffrax solvers, the pure step functions and the"
+        " history-carrying AbstractSteppers run by integrix.march.run. The"
+        " finitevolX names of these are deprecated aliases (listed above) for"
+        " one release; new code imports them from integrix.march."
     ),
 }
 
@@ -75,6 +82,21 @@ ALLOWED_SHARED_NAMES: dict[str, str] = {
         " placement for a Mask2D), while spectraldiffx's solves the wet cells"
         " off the inner ring with psi = 0 on that ring; both return a"
         " spectraldiffx CapacitanceSolver built on gaussx.MaskedOperator"
+    ),
+    "AB2Solver": (
+        "deprecated finitevolX adapter keeping the old init / step call shape"
+        " with f_prev held in the module; integrix's is an AbstractStepper run"
+        " by integrix.march.run"
+    ),
+    "LeapfrogRAFSolver": (
+        "deprecated finitevolX adapter keeping the old init / step call shape"
+        " with y_prev held in the module; integrix's is an AbstractStepper run"
+        " by integrix.march.run"
+    ),
+    "SplitExplicitRKSolver": (
+        "deprecated finitevolX adapter keeping the old step(rhs_slow, rhs_fast,"
+        " ...) call shape; integrix's is an AbstractStepper run by"
+        " integrix.march.run on SplitExplicitTerms"
     ),
     "CapacitanceSolver": (
         "finitevolX re-exports spectraldiffx's spectral capacitance solver for"
@@ -280,13 +302,13 @@ def render() -> str:
         "",
         f"Every public name in finitevolX ({total} of them), each listed once,",
         "grouped by the module that defines it (names re-exported from",
-        "spectraldiffx and gaussx are grouped by library), with the first",
-        "sentence of its docstring; then the public API of spectraldiffx and",
-        "gaussx, which finitevolX builds on. Search this page before writing a",
-        "helper: if what you need is here, compose it; if it is almost here,",
-        "extend it where it lives. Regenerate with `make capabilities` after",
-        "changing a public API (`tests/test_capabilities.py` checks it is",
-        "current).",
+        "spectraldiffx, gaussx and integrix are grouped by library), with the",
+        "first sentence of its docstring; then the public API of spectraldiffx,",
+        "gaussx and integrix.march, which finitevolX builds on. Search this",
+        "page before writing a helper: if what you need is here, compose it;",
+        "if it is almost here, extend it where it lives. Regenerate with",
+        "`make capabilities` after changing a public API",
+        "(`tests/test_capabilities.py` checks it is current).",
         "",
         *finitevolx_part,
         UPSTREAM_MARKER,

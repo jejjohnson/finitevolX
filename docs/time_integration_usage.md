@@ -1,7 +1,9 @@
 # Time Integration: Usage Guide
 
-This page covers practical usage of finitevolX's time integration module,
+This page covers practical usage of time integration with finitevolX,
 from quick-start examples to building custom diffrax solvers.
+
+The generic time steppers (the pure step functions, the diffrax solvers and the multistep / split-explicit steppers) live in [integrix](https://github.com/jejjohnson/integrix) and are imported from `integrix.march`. Their `finitevolx.*` names still work for one release and emit a `DeprecationWarning`. finitevolX keeps the semi-Lagrangian scheme and `solve_ocean_pde`.
 
 ---
 
@@ -14,6 +16,7 @@ inside a loop.
 import jax
 import jax.numpy as jnp
 import finitevolx as fvx
+from integrix.march import rk3_ssp_step
 
 jax.config.update("jax_enable_x64", True)
 
@@ -35,7 +38,7 @@ state = (h0, u0, v0)
 # 3. Time-step with SSP-RK3
 dt = 10.0  # seconds
 for n in range(1000):
-    state = fvx.rk3_ssp_step(state, rhs, dt)
+    state = rk3_ssp_step(state, rhs, dt)
 ```
 
 All pure functional integrators accept **any JAX pytree** as state — tuples,
@@ -56,7 +59,7 @@ All share the same signature: `step_fn(state, rhs_fn, dt) -> new_state`.
 === "SSP-RK3 (recommended)"
 
     ```python
-    from finitevolx import rk3_ssp_step
+    from integrix.march import rk3_ssp_step
 
     state = rk3_ssp_step(state, rhs, dt)
     ```
@@ -64,7 +67,7 @@ All share the same signature: `step_fn(state, rhs_fn, dt) -> new_state`.
 === "Forward Euler"
 
     ```python
-    from finitevolx import euler_step
+    from integrix.march import euler_step
 
     state = euler_step(state, rhs, dt)
     ```
@@ -72,7 +75,7 @@ All share the same signature: `step_fn(state, rhs_fn, dt) -> new_state`.
 === "Heun (RK2)"
 
     ```python
-    from finitevolx import heun_step
+    from integrix.march import heun_step
 
     state = heun_step(state, rhs, dt)
     ```
@@ -80,7 +83,7 @@ All share the same signature: `step_fn(state, rhs_fn, dt) -> new_state`.
 === "Classic RK4"
 
     ```python
-    from finitevolx import rk4_step
+    from integrix.march import rk4_step
 
     state = rk4_step(state, rhs, dt)
     ```
@@ -91,7 +94,7 @@ Multistep methods require history from previous steps.  The caller must
 thread the history through the loop.
 
 ```python
-from finitevolx import ab2_step, euler_step
+from integrix.march import ab2_step, euler_step
 
 # Bootstrap: one Euler step to get the first RHS history
 rhs_nm1 = rhs(state)
@@ -111,7 +114,7 @@ the crude start `rhs_nm2 = rhs_nm1 = f(y0)` lowers AB3 to second order.
 
 ```python
 import diffrax as dfx
-from finitevolx import AB3Solver
+from integrix.march import AB3Solver
 
 sol = dfx.diffeqsolve(dfx.ODETerm(rhs), AB3Solver(), t0=0.0, t1=1.0, dt0=0.01, y0=y0)
 ```
@@ -122,7 +125,7 @@ A three-level scheme that stores the previous state.  The filter damps the
 computational mode.
 
 ```python
-from finitevolx import leapfrog_raf_step, euler_step
+from integrix.march import leapfrog_raf_step, euler_step
 
 # Bootstrap
 state_nm1 = state
@@ -142,7 +145,7 @@ For problems with stiff + non-stiff splitting (e.g., advection + vertical
 diffusion).
 
 ```python
-from finitevolx import imex_ssp2_step
+from integrix.march import imex_ssp2_step
 
 def rhs_explicit(state):
     """Non-stiff: advection, Coriolis, pressure gradient."""
@@ -171,7 +174,7 @@ for n in range(n_steps):
 For barotropic/baroclinic mode splitting.
 
 ```python
-from finitevolx import split_explicit_step
+from integrix.march import split_explicit_step
 
 def rhs_3d(state_3d, state_2d_avg):
     """Slow (baroclinic) tendency."""
@@ -223,14 +226,14 @@ new_field = semi_lagrangian_step(
 
 [Diffrax](https://docs.kidger.site/diffrax/) is a JAX-native ODE/SDE
 library that provides adaptive stepping, checkpointing, dense output
-(`SaveAt`), and more.  finitevolX provides Butcher-tableau solvers that plug
+(`SaveAt`), and more.  integrix provides Butcher-tableau solvers that plug
 directly into `diffrax.diffeqsolve`.
 
 ### Basic Usage
 
 ```python
 import diffrax as dfx
-from finitevolx import RK3SSP
+from integrix.march import RK3SSP
 
 def rhs(t, y, args):
     """diffrax convention: (t, y, args) -> dy/dt."""
@@ -296,7 +299,9 @@ A thin wrapper around `diffeqsolve` that optionally applies boundary
 conditions to the tendency at each stage evaluation.
 
 ```python
-from finitevolx import solve_ocean_pde, RK3SSP
+from integrix.march import RK3SSP
+
+from finitevolx import solve_ocean_pde
 
 def rhs(t, y, args):
     return compute_tendency(y)
@@ -341,62 +346,59 @@ sol = dfx.diffeqsolve(..., saveat=saveat)
 
 ---
 
-## Manual Solver Interfaces (Advanced)
+## Steppers with History (Advanced)
 
 For schemes that don't fit the standard Runge-Kutta framework (multistep,
-split-explicit), finitevolX provides `equinox.Module`-based solvers with
-explicit `init`/`step` interfaces.
+split-explicit), integrix provides `integrix.march.AbstractStepper`s run by
+`integrix.march.run(stepper, rhs, t0, y0, dt, n_steps)`. They take the diffrax
+vector field `rhs(t, y, args)` and carry their history in the loop.
 
 ### AB2Solver
 
 ```python
-from finitevolx import AB2Solver
+import jax.numpy as jnp
+from integrix.march import AB2Solver, run
 
-def rhs(t, y):
-    """Note: (t, y) signature, not (t, y, args)."""
+def rhs(t, y, args):
     return -y
 
-solver = AB2Solver()
-solver, y = solver.init(rhs, t0=0.0, y0=jnp.array(1.0), dt=0.01)
-
-for n in range(1, n_steps):
-    y, solver = solver.step(rhs, t0 + n * dt, y, dt)
+y = run(AB2Solver(), rhs, 0.0, jnp.array(1.0), 0.01, 100)
 ```
-
-The solver is an immutable equinox Module — `solver.step()` returns a
-*new* solver object with updated history.  This makes it fully compatible
-with `jax.jit` and functional JAX patterns.
 
 ### LeapfrogRAFSolver
 
 ```python
-from finitevolx import LeapfrogRAFSolver
+from integrix.march import LeapfrogRAFSolver, run
 
-solver = LeapfrogRAFSolver(alpha=0.05)
-solver, y = solver.init(rhs, t0=0.0, y0=jnp.array(1.0), dt=0.01)
-
-for n in range(1, n_steps):
-    y, solver = solver.step(rhs, t0 + n * dt, y, dt)
+y = run(LeapfrogRAFSolver(alpha=0.05), rhs, 0.0, jnp.array(1.0), 0.01, 100)
 ```
 
 ### SplitExplicitRKSolver
 
+The state is the pair `(y_3d, y_2d)` and the right-hand side is a
+`SplitExplicitTerms`:
+
 ```python
-from finitevolx import SplitExplicitRKSolver
+from integrix.march import SplitExplicitRKSolver, SplitExplicitTerms, run
 
-solver = SplitExplicitRKSolver(n_substeps=30)
-
-y_3d_new, y_2d_new = solver.step(
-    rhs_slow,   # (t, y_3d, y_2d_avg) -> tendency_3d
-    rhs_fast,   # (t_sub, y_2d, y_3d) -> tendency_2d
-    t=0.0,
-    y_3d=state_3d,
-    y_2d=state_2d,
-    dt_slow=600.0,
-    slow_forcing=slow_forcing,        # optional, (y_3d) -> forcing_2d
-    couple_2d_to_3d=couple,           # optional, (new_y_3d, y_2d_avg) -> y_3d
+terms = SplitExplicitTerms(
+    slow=rhs_slow,                 # (t, y_3d, y_2d_avg, args) -> tendency_3d
+    fast=rhs_fast,                 # (t_sub, y_2d, y_3d, args) -> tendency_2d
+    slow_forcing=slow_forcing,     # optional, (t, y_3d, args) -> forcing_2d
+    couple=couple,                 # optional, (new_y_3d, y_2d_avg, args) -> y_3d
+)
+y_3d, y_2d = run(
+    SplitExplicitRKSolver(n_substeps=30),
+    terms,
+    0.0,
+    (state_3d, state_2d),
+    600.0,  # slow timestep
+    n_steps,
 )
 ```
+
+!!! warning "Deprecated finitevolX adapters"
+    `finitevolx.AB2Solver`, `finitevolx.LeapfrogRAFSolver` and `finitevolx.SplitExplicitRKSolver` keep their old call shapes for one release: `rhs(t, y)` without `args`, `solver.init(rhs, t0, y0, dt) -> (solver, y1)`, `solver.step(rhs, t, y, dt) -> (y, solver)` with the history held in the module, and `SplitExplicitRKSolver.step(rhs_slow, rhs_fast, t, y_3d, y_2d, dt_slow, slow_forcing=None, couple_2d_to_3d=None)`. Their arithmetic is the integrix steppers'.
 
 ---
 
@@ -501,7 +503,7 @@ JIT the entire time-stepping loop:
 @jax.jit
 def integrate(state, n_steps):
     def body(carry, _):
-        return fvx.rk3_ssp_step(carry, rhs, dt), None
+        return rk3_ssp_step(carry, rhs, dt), None
 
     final_state, _ = jax.lax.scan(body, state, None, length=n_steps)
     return final_state

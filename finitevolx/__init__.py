@@ -388,36 +388,17 @@ from finitevolx._src.solvers.tridiagonal import (
     solve_tridiagonal,
     solve_tridiagonal_batched,
 )
+from finitevolx._src.timestepping._deprecated import (
+    ADAPTED as _ADAPTED_STEPPERS,
+    MOVED as _MOVED_STEPPERS,
+    deprecated_stepper as _deprecated_stepper,
+)
 from finitevolx._src.timestepping._solve import solve_ocean_pde
-from finitevolx._src.timestepping.diffrax_solvers import (
-    IMEX_SSP2,
-    RK3SSP,
-    SSP_RK2,
-    SSP_RK104,
-    AB2Solver,
-    AB3Solver,
-    ForwardEulerDfx,
-    LeapfrogRAFSolver,
-    RK2Heun,
-    RK4Classic,
+from finitevolx._src.timestepping.semi_lagrangian import (
     SemiLagrangianSolver,
     SemiLagrangianTerm,
-    SplitExplicitRKSolver,
+    semi_lagrangian_step,
 )
-from finitevolx._src.timestepping.explicit_rk import (
-    euler_step,
-    heun_step,
-    rk3_ssp_step,
-    rk4_step,
-)
-from finitevolx._src.timestepping.imex import imex_ssp2_step
-from finitevolx._src.timestepping.multistep import (
-    ab2_step,
-    ab3_step,
-    leapfrog_raf_step,
-)
-from finitevolx._src.timestepping.semi_lagrangian import semi_lagrangian_step
-from finitevolx._src.timestepping.split_explicit import split_explicit_step
 from finitevolx._src.vertical.multilayer import multilayer
 from finitevolx._src.vertical.vertical_modes import (
     build_coupling_matrix,
@@ -814,7 +795,8 @@ __all__ = [
     # Tridiagonal (TDMA) solver
     "solve_tridiagonal",
     "solve_tridiagonal_batched",
-    # Time integration — pure functional
+    # Time integration — pure functional (deprecated aliases of
+    # integrix.march, served by __getattr__ below, except semi_lagrangian_step)
     "euler_step",
     "heun_step",
     "rk3_ssp_step",
@@ -825,7 +807,8 @@ __all__ = [
     "imex_ssp2_step",
     "split_explicit_step",
     "semi_lagrangian_step",
-    # Time integration — diffrax solvers
+    # Time integration — diffrax solvers (deprecated aliases of integrix.march,
+    # served by __getattr__ below, except the semi-Lagrangian pair)
     "ForwardEulerDfx",
     "RK2Heun",
     "RK3SSP",
@@ -841,3 +824,11 @@ __all__ = [
     "SemiLagrangianTerm",
     "solve_ocean_pde",
 ]
+
+
+def __getattr__(name: str) -> object:
+    # The generic time steppers moved to integrix.march; their old
+    # names stay for one release and warn on access.
+    if name in _MOVED_STEPPERS or name in _ADAPTED_STEPPERS:
+        return _deprecated_stepper(name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
