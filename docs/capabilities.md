@@ -4,13 +4,13 @@
 
 Every public name in finitevolX (346 of them), each listed once,
 grouped by the module that defines it (names re-exported from
-spectraldiffx and gaussx are grouped by library), with the first
-sentence of its docstring; then the public API of spectraldiffx and
-gaussx, which finitevolX builds on. Search this page before writing a
-helper: if what you need is here, compose it; if it is almost here,
-extend it where it lives. Regenerate with `make capabilities` after
-changing a public API (`tests/test_capabilities.py` checks it is
-current).
+spectraldiffx, gaussx and integrix are grouped by library), with the
+first sentence of its docstring; then the public API of spectraldiffx,
+gaussx and integrix.march, which finitevolX builds on. Search this
+page before writing a helper: if what you need is here, compose it;
+if it is almost here, extend it where it lives. Regenerate with
+`make capabilities` after changing a public API
+(`tests/test_capabilities.py` checks it is current).
 
 ## `finitevolx`
 
@@ -503,64 +503,27 @@ current).
 | `make_preconditioner` | function | Convenience factory that builds a preconditioner by name. |
 | `make_spectral_preconditioner` | function | Return a spectral-solve preconditioner for PCG. |
 
+#### Deprecated time steppers, kept for one release after the move to integrix (`finitevolx._src.timestepping._deprecated`)
+
+| Name | Kind | What it does |
+|---|---|---|
+| `AB2Solver` | class | Deprecated: use ``integrix.march.AB2Solver`` with ``integrix.march.run``. |
+| `LeapfrogRAFSolver` | class | Deprecated: use ``integrix.march.LeapfrogRAFSolver`` with ``integrix.march.run``. |
+| `SplitExplicitRKSolver` | class | Deprecated: use ``integrix.march.SplitExplicitRKSolver`` with ``integrix.march.run``. |
+
 #### Convenience wrapper around `diffeqsolve` for ocean PDEs (`finitevolx._src.timestepping._solve`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `solve_ocean_pde` | function | Integrate an ocean PDE using diffrax. |
 
-#### Diffrax-based time integrators for ocean PDEs (`finitevolx._src.timestepping.diffrax_solvers`)
+#### Semi-Lagrangian advection: a pure step and its diffrax solver (`finitevolx._src.timestepping.semi_lagrangian`)
 
 | Name | Kind | What it does |
 |---|---|---|
-| `AB2Solver` | class | Adams-Bashforth 2nd-order solver (equinox Module). |
-| `AB3Solver` | class | Adams-Bashforth 3rd-order solver for ``diffrax.diffeqsolve``. |
-| `ForwardEulerDfx` | class | Forward Euler via the diffrax ``AbstractSolver`` interface. |
-| `IMEX_SSP2` | class | IMEX-SSP2(2,2,2) solver using diffrax MultiTerm. |
-| `LeapfrogRAFSolver` | class | Leapfrog with Robert-Asselin filter (equinox Module). |
-| `RK2Heun` | class | Heun's method (RK2) via Butcher tableau. |
-| `RK3SSP` | class | 3rd-order Strong-Stability-Preserving Runge-Kutta. |
-| `RK4Classic` | class | Classic 4th-order Runge-Kutta. |
-| `SSP_RK104` | class | 4th-order SSP Runge-Kutta with 10 stages (Ketcheson 2008). |
-| `SSP_RK2` | class | 2nd-order SSP Runge-Kutta (same as Heun). |
 | `SemiLagrangianSolver` | class | Semi-Lagrangian advection solver for diffrax. |
 | `SemiLagrangianTerm` | class | Velocity term for `SemiLagrangianSolver` in ``diffeqsolve``. |
-| `SplitExplicitRKSolver` | class | Split-explicit barotropic/baroclinic solver. |
-
-#### Pure functional explicit Runge-Kutta time integrators (`finitevolx._src.timestepping.explicit_rk`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `euler_step` | function | Forward Euler: y_{n+1} = y_n + dt * f(y_n). |
-| `heun_step` | function | Heun (RK2) predictor-corrector. |
-| `rk3_ssp_step` | function | 3rd-order Strong-Stability-Preserving Runge-Kutta (Shu-Osher form). |
-| `rk4_step` | function | Classic 4th-order Runge-Kutta. |
-
-#### Pure functional IMEX (Implicit-Explicit) time integrator (`finitevolx._src.timestepping.imex`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `imex_ssp2_step` | function | IMEX-SSP2(2,2,2) time step. |
-
-#### Pure functional multistep and leapfrog time integrators (`finitevolx._src.timestepping.multistep`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `ab2_step` | function | 2nd-order Adams-Bashforth. |
-| `ab3_step` | function | 3rd-order Adams-Bashforth. |
-| `leapfrog_raf_step` | function | Leapfrog with Robert-Asselin filter. |
-
-#### Pure functional semi-Lagrangian advection step (`finitevolx._src.timestepping.semi_lagrangian`)
-
-| Name | Kind | What it does |
-|---|---|---|
 | `semi_lagrangian_step` | function | Advect a 2D scalar field using semi-Lagrangian backtracking. |
-
-#### Pure functional split-explicit time integrator (`finitevolx._src.timestepping.split_explicit`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `split_explicit_step` | function | Split-explicit barotropic/baroclinic time step. |
 
 #### Convenience wrapper to lift 2D horizontal operators to multilayer fields (`finitevolx._src.vertical.multilayer`)
 
@@ -667,9 +630,31 @@ current).
 | `solve_tridiagonal` | function | Solve a tridiagonal system ``A x = d``. |
 | `solve_tridiagonal_batched` | function | Solve independent tridiagonal systems over leading batch dimensions. |
 
+#### Re-exported from `integrix`
+
+| Name | Kind | What it does |
+|---|---|---|
+| `AB3Solver` | class | Third-order Adams–Bashforth as a diffrax solver, with an SSP-RK3 start. |
+| `ForwardEulerDfx` | class | Forward Euler as a diffrax solver: yₙ₊₁ = yₙ + h F(tₙ, yₙ). |
+| `IMEX_SSP2` | class | IMEX-SSP2(2,2,2) for a `diffrax.MultiTerm` of an explicit and an implicit term. |
+| `RK2Heun` | class | Heun's method (RK2), with an embedded forward-Euler error estimate. |
+| `RK3SSP` | class | Third-order strong-stability-preserving Runge–Kutta (Shu–Osher). |
+| `RK4Classic` | class | The classical fourth-order Runge–Kutta method, fixed steps only. |
+| `SSP_RK104` | class | Ketcheson's ten-stage, fourth-order SSP Runge–Kutta, fixed steps only. |
+| `SSP_RK2` | class | Second-order SSP Runge–Kutta, the same scheme as `RK2Heun`. |
+| `ab2_step` | function | One second-order Adams–Bashforth step. |
+| `ab3_step` | function | One third-order Adams–Bashforth step. |
+| `euler_step` | function | One forward-Euler step: yₙ₊₁ = yₙ + h f(yₙ). |
+| `heun_step` | function | One Heun (RK2) step, order 2, SSP with C = 1. |
+| `imex_ssp2_step` | function | One IMEX-SSP2(2,2,2) step, with the caller's implicit solve. |
+| `leapfrog_raf_step` | function | One leapfrog step with a Robert–Asselin filter on the middle level. |
+| `rk3_ssp_step` | function | One third-order SSP Runge–Kutta step in Shu–Osher form, C = 1. |
+| `rk4_step` | function | One classical fourth-order Runge–Kutta step. |
+| `split_explicit_step` | function | One split-explicit barotropic/baroclinic step. |
+
 <!-- upstream -->
 
-Listed at spectraldiffx 0.1.1, gaussx 0.6.5.
+Listed at spectraldiffx 0.1.1, gaussx 0.6.5, integrix 0.0.3.
 
 ## Upstream: `spectraldiffx`
 
@@ -1161,3 +1146,38 @@ Structured linear algebra and solver strategies. finitevolX delegates the tridia
 | `whiten_covariance` | function | Unwhiten variational covariance: S = L S̃ Lᵀ. |
 | `whitened_svgp_predict` | function | Whitened SVGP prediction: mean and variance at test points. |
 | `woodbury_solve` | function | Standalone Woodbury identity solve: ``(L + U diag(D) U^T)^{-1} b``. |
+
+## Upstream: `integrix`
+
+Time steppers: the diffrax solvers, the pure step functions and the history-carrying AbstractSteppers run by integrix.march.run. The finitevolX names of these are deprecated aliases (listed above) for one release; new code imports them from integrix.march.
+
+### `integrix.march`
+
+| Name | Kind | What it does |
+|---|---|---|
+| `AB2Solver` | class | Second-order Adams–Bashforth, run by `integrix.march.run`. |
+| `AB3Solver` | class | Third-order Adams–Bashforth as a diffrax solver, with an SSP-RK3 start. |
+| `AbstractStepper` | class | A fixed-step scheme whose history lives in the loop carry. |
+| `ForwardEulerDfx` | class | Forward Euler as a diffrax solver: yₙ₊₁ = yₙ + h F(tₙ, yₙ). |
+| `IMEX_SSP2` | class | IMEX-SSP2(2,2,2) for a `diffrax.MultiTerm` of an explicit and an implicit term. |
+| `LeapfrogRAFSolver` | class | Leapfrog with a Robert–Asselin filter, run by `integrix.march.run`. |
+| `RK2Heun` | class | Heun's method (RK2), with an embedded forward-Euler error estimate. |
+| `RK3SSP` | class | Third-order strong-stability-preserving Runge–Kutta (Shu–Osher). |
+| `RK4Classic` | class | The classical fourth-order Runge–Kutta method, fixed steps only. |
+| `SSP_RK104` | class | Ketcheson's ten-stage, fourth-order SSP Runge–Kutta, fixed steps only. |
+| `SSP_RK2` | class | Second-order SSP Runge–Kutta, the same scheme as `RK2Heun`. |
+| `SplitExplicitRKSolver` | class | Split-explicit stepping as an `AbstractStepper`, for `integrix.march.run`. |
+| `SplitExplicitTerms` | class | The vector fields of a split-explicit model, passed to `run` as ``rhs``. |
+| `ab2_step` | function | One second-order Adams–Bashforth step. |
+| `ab3_step` | function | One third-order Adams–Bashforth step. |
+| `euler_step` | function | One forward-Euler step: yₙ₊₁ = yₙ + h f(yₙ). |
+| `heun_step` | function | One Heun (RK2) step, order 2, SSP with C = 1. |
+| `imex_solver` | function | A ``KenCarp3`` IMEX solver whose implicit stage is matrix-free. |
+| `imex_ssp2_step` | function | One IMEX-SSP2(2,2,2) step, with the caller's implicit solve. |
+| `imex_stepsize_controller` | function | An adaptive PID step-size controller for an IMEX solve. |
+| `leapfrog_raf_step` | function | One leapfrog step with a Robert–Asselin filter on the middle level. |
+| `rk3_ssp_step` | function | One third-order SSP Runge–Kutta step in Shu–Osher form, C = 1. |
+| `rk4_step` | function | One classical fourth-order Runge–Kutta step. |
+| `run` | function | March y₀ through ``n_steps`` constant steps of h from t₀. |
+| `split_explicit_step` | function | One split-explicit barotropic/baroclinic step. |
+| `stable_step` | function | The largest stable forward-Euler step for advection and diffusion together. |

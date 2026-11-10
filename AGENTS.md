@@ -31,7 +31,7 @@ a logical grouping, not alphabetical: ruff's `RUF022` is off).
 | Boundary conditions | `boundary/` | Per-face atoms `Dirichlet1D` … `Slip1D` (`bc_1d.py`), `BoundaryConditionSet` (`bc_set.py`), `FieldBCSet` (`bc_field.py`), functional ghost-ring fillers (`boundary.py`) |
 | Forcing | `forcing/` | `AbstractForcing`, `ForcingSum` / `ForcingProduct` / `TimeVaryingForcing` (`_base.py`); wind, drag, Rayleigh operators |
 | Solvers | `solvers/` | Spectral solvers re-exported from spectraldiffx (`spectral.py`, `spectral_transforms.py`); capacitance wrapper and the `streamfunction_from_vorticity` / `pressure_from_divergence` / `pv_inversion` wrappers (`elliptic.py`); `solve_cg` on lineax (`iterative.py`); preconditioners (`preconditioners.py`); `MultigridSolver` (`multigrid.py`); known-value lifting (`inhomogeneous.py`); tridiagonal solve re-exported from gaussx (`tridiagonal.py`) |
-| Time integration | `timestepping/` | Pure step functions (`euler_step`, `rk3_ssp_step`, `ab2_step`, `imex_ssp2_step`, …) and solver classes (diffrax's `RK3SSP`, `SSP_RK104`, `IMEX_SSP2`, …; `AB2Solver`, `LeapfrogRAFSolver`, `SplitExplicitRKSolver`) in `diffrax_solvers.py`; `solve_ocean_pde` (`_solve.py`) |
+| Time integration | `timestepping/` | `semi_lagrangian_step`, `SemiLagrangianSolver`, `SemiLagrangianTerm` (`semi_lagrangian.py`); `solve_ocean_pde` (`_solve.py`); the generic steppers live in `integrix.march`, and their `finitevolx.*` names are deprecated aliases (`_deprecated.py`, served by `__getattr__` in `finitevolx/__init__.py`) |
 | Vertical | `vertical/` | `multilayer` (vmap a 2-D operator over layers), vertical modes (`build_coupling_matrix`, `layer_to_mode`, …) |
 | pipekit layer (Tier B) | `pipekit/` (public: `finitevolx/pipekit/`) | `FVXOperator` / `GridOperator` on `pipekit_jax.JaxOperator`, `GridSpec`, `over_leading`, `check_operator` (`finitevolx.pipekit.testing`); behind the `pipekit` extra, never imported by `import finitevolx` |
 | Shared | `utils/constants.py` | `GRAVITY`, `R_EARTH`, `OMEGA`, `RHO`, `DEG2M` (parameter defaults only; see contract 6) |
@@ -124,7 +124,7 @@ whether it exists:
 | A DCT / DST | `dct`, `dst`, `dctn`, … (spectraldiffx, scipy's unnormalised convention) |
 | A tridiagonal (Thomas) solve | `solve_tridiagonal`, `solve_tridiagonal_batched` (gaussx) |
 | A CG loop or a Nyström preconditioner | `solve_cg`, `make_nystrom_preconditioner`, `make_spectral_preconditioner`, `make_multigrid_preconditioner` |
-| An RK / multistep / IMEX time loop | `rk3_ssp_step`, `ab2_step`, `imex_ssp2_step`, … or the diffrax solvers with `solve_ocean_pde` |
+| An RK / multistep / IMEX time loop | `integrix.march`: `rk3_ssp_step`, `ab2_step`, `imex_ssp2_step`, …, the diffrax solvers with `solve_ocean_pde`, or `AB2Solver` / `LeapfrogRAFSolver` / `SplitExplicitRKSolver` with `integrix.march.run` |
 | Applying a 2-D operator to every layer | `multilayer(fn)`; vertical modes with `decompose_vertical_modes`, `layer_to_mode` |
 | Wind stress, bottom drag, sponge damping | `WindStress2D`, `LinearDrag2D`, `QuadraticDrag2D`, `RayleighDamping2D` (and `3D`), composed with `ForcingSum` / `ForcingProduct` |
 | `jnp.abs` / `jnp.maximum` / `jnp.clip` on a path you differentiate | `smooth_abs`, `smooth_max`, `smooth_clamp` |

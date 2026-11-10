@@ -8,7 +8,7 @@ a pipekit `Graph` RHS composes with ``pipekit_jax.Rollout`` /
     step = ExplicitStep(rhs=rhs, dt=Δt)        s(t) ↦ s(t + Δt)
     traj = Rollout(step=step, n_steps=N)(s0)   {h, u, v: [N + 1, Ny, Nx]}
 
-The schemes are finitevolX's pure step functions (`euler_step`, `heun_step`,
+The schemes are integrix's pure step functions (`euler_step`, `heun_step`,
 `rk3_ssp_step`, `rk4_step`); this module adds no arithmetic.
 """
 
@@ -18,18 +18,13 @@ from collections.abc import Callable
 from typing import Any
 
 import equinox as eqx
+from integrix.march import euler_step, heun_step, rk3_ssp_step, rk4_step
 import jax
 import jax.numpy as jnp
 from pipekit_ops import Operator
 from pipekit_ops._base.operator import nested_config
 
 from finitevolx._src.pipekit.base import FVXOperator
-from finitevolx._src.timestepping.explicit_rk import (
-    euler_step,
-    heun_step,
-    rk3_ssp_step,
-    rk4_step,
-)
 
 #: ``scheme -> step(state, rhs_fn, dt)``. ``dt`` may be a 0-d array (a
 #: leaf): the steps only multiply by it.

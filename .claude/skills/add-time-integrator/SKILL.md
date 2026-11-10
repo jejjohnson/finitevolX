@@ -5,6 +5,8 @@ description: Add a time-integration scheme to finitevolX — a pure functional s
 
 # Add a time integrator
 
+The generic time steppers (explicit RK, multistep, IMEX, split-explicit, their diffrax solvers and the `AbstractStepper`s) now live in integrix (`integrix.march`), and their `finitevolx.*` names are deprecated aliases for one release. Add a generic scheme to integrix, not here; this recipe applies only to schemes tied to the C-grid, such as the semi-Lagrangian step and solver in `finitevolx/_src/timestepping/semi_lagrangian.py`.
+
 Read contract 6 (time integration) in `AGENTS.md`, then
 `docs/time_integration.md` and `docs/time_integration_usage.md`.
 

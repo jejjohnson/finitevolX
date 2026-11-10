@@ -28,6 +28,7 @@
 
 ```python
 import finitevolx as fvx
+from integrix.march import heun_step
 
 # Build an Arakawa C-grid (64x64 interior + 2-cell ghost ring)
 grid = fvx.CartesianGrid2D.from_interior(64, 64, Lx=5.12e6, Ly=5.12e6)
@@ -44,8 +45,8 @@ div_uv = div(u, v)
 # streamfunction (full [Ny, Nx] array in and out; ψ = 0 on the C-grid walls)
 psi = fvx.pv_inversion(q, grid.dx, grid.dy, lambda_=1/Ld**2, bc="dst")
 
-# Time-step with Heun's method (RK2)
-state_next = fvx.heun_step(tendency_fn, state, dt)
+# Time-step with Heun's method (RK2), from integrix
+state_next = heun_step(state, tendency_fn, dt)
 ```
 
 ---
@@ -97,11 +98,9 @@ Convenience wrappers: `streamfunction_from_vorticity`, `pressure_from_divergence
 
 ### Time Integration
 
-**Functional steppers** (pure functions, no hidden state):
+The generic time steppers live in [integrix](https://github.com/jejjohnson/integrix) (`integrix.march`): the pure step functions `euler_step`, `heun_step`, `rk4_step`, `rk3_ssp_step`, `ab2_step`, `ab3_step`, `leapfrog_raf_step`, `imex_ssp2_step` and `split_explicit_step`, the [diffrax](https://docs.kidger.site/diffrax/) solvers `ForwardEulerDfx`, `RK2Heun`, `RK3SSP`, `RK4Classic`, `SSP_RK104`, `IMEX_SSP2` and more, and the `AB2Solver`, `LeapfrogRAFSolver` and `SplitExplicitRKSolver` steppers. Their `finitevolx.*` names are deprecated aliases for one release.
 
-`euler_step` &bull; `heun_step` &bull; `rk4_step` &bull; `rk3_ssp_step` &bull; `ab2_step` &bull; `ab3_step` &bull; `leapfrog_raf_step` &bull; `imex_ssp2_step` &bull; `split_explicit_step` &bull; `semi_lagrangian_step`
-
-**[diffrax](https://docs.kidger.site/diffrax/) integration**: `ForwardEulerDfx`, `RK2Heun`, `RK3SSP`, `RK4Classic`, `SSP_RK104`, `IMEX_SSP2`, and more — with adaptive stepping, checkpointing, and `SaveAt`.
+finitevolX keeps the semi-Lagrangian scheme (`semi_lagrangian_step`, `SemiLagrangianSolver`) and `solve_ocean_pde`, a `diffeqsolve` wrapper that applies boundary conditions to the tendency.
 
 ### Vertical Structure
 
@@ -226,6 +225,7 @@ Full documentation with theory, usage guides, and API reference:
 **Software**
 
 - [spectraldiffx](https://github.com/jejjohnson/spectraldiffx) &mdash; Pseudospectral solvers in JAX (the spectral backend for finitevolX's elliptic solvers)
+- [integrix](https://github.com/jejjohnson/integrix) &mdash; Integration for JAX (the time steppers)
 - [diffrax](https://docs.kidger.site/diffrax/) &mdash; JAX-native ODE/SDE solvers (time integration backend)
 - [equinox](https://docs.kidger.site/equinox/) &mdash; JAX neural network library (Module system used by all operators)
 - [PyFVTool](https://github.com/simulkade/PyFVTool) &mdash; Finite Volume Tool in Python

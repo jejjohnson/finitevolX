@@ -35,7 +35,8 @@ def solve_ocean_pde(
     rhs_fn : Callable
         Right-hand side ``rhs_fn(t, y, args) -> dy/dt``.
     solver : diffrax.AbstractSolver
-        Time integration scheme (e.g. ``RK3SSP()``, ``RK4Classic()``).
+        Time integration scheme (e.g. ``integrix.march.RK3SSP()``,
+        ``integrix.march.RK4Classic()``).
     y0 : PyTree
         Initial condition.
     t0, t1 : float
