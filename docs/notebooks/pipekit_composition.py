@@ -30,7 +30,7 @@
 # ```
 #
 # Tier B is the same arithmetic (each operator is one Tier-A call) with a
-# configuration you can save, a node you can wire into a `pipekit.Graph`,
+# configuration you can save, a node you can wire into a `pipekit_ops.Graph`,
 # and pytree leaves (`f₀`, `β`, `g′`, `Δt`) that `jax.grad` reaches.
 #
 # **When to use which.** A model's right-hand side belongs in your model
@@ -56,7 +56,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from pipekit import Graph, Input, Operator
+from pipekit_ops import Graph, Input, Operator
 from pipekit_jax import Rollout
 
 import finitevolx as fvx

@@ -20,8 +20,8 @@ from typing import Any
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from pipekit import Operator
-from pipekit._base.operator import nested_config
+from pipekit_ops import Operator
+from pipekit_ops._base.operator import nested_config
 
 from finitevolx._src.pipekit.base import FVXOperator
 from finitevolx._src.timestepping.explicit_rk import (
