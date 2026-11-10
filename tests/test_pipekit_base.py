@@ -14,7 +14,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-from pipekit import Operator
+from pipekit_ops import Operator
 
 import finitevolx as fvx
 from finitevolx.pipekit import (

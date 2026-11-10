@@ -10,7 +10,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-from pipekit import Graph, Input
+from pipekit_ops import Graph, Input
 
 import finitevolx as fvx
 from finitevolx import pipekit as fp
