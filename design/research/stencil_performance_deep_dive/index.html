@@ -1,0 +1,4162 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Finite volume operators for JAX on Arakawa C-grids">
+      
+      
+        <meta name="author" content="Juan Emmanuel Johnson, Takaya Uchida">
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>Stencil performance deep dive - finitevolX</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#stencil-performance-deep-dive" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="finitevolX" class="md-header__button md-logo" aria-label="finitevolX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            finitevolX
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Stencil performance deep dive
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jejjohnson/finitevolX" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/finitevolX
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../capabilities/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Capability Index
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../agents/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Building with Agents
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../cgrid_discretization/" class="md-tabs__link">
+          
+  
+  
+  C-Grid Discretization
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../masks/" class="md-tabs__link">
+          
+  
+  
+  Masks
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../multilayer_vs_3d/" class="md-tabs__link">
+          
+  
+  
+  Vertical Structure
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../stencils/" class="md-tabs__link">
+          
+  
+  
+  Raw Stencils
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../difference/" class="md-tabs__link">
+          
+  
+  
+  Difference Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../interpolation/" class="md-tabs__link">
+          
+  
+  
+  Interpolation Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../advection/" class="md-tabs__link">
+          
+  
+  
+  Advection
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../boundary_conditions/" class="md-tabs__link">
+          
+  
+  
+  Boundary Conditions
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../spatial_operators/" class="md-tabs__link">
+          
+  
+  
+  Spatial Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../time_integration/" class="md-tabs__link">
+          
+  
+  
+  Time Integration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../elliptic_solvers/" class="md-tabs__link">
+          
+  
+  
+  Elliptic Solvers
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../multigrid_solver/" class="md-tabs__link">
+          
+  
+  
+  Multigrid Solver
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../solver_comparison/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Solver Comparison
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../notebooks/pipekit_composition/" class="md-tabs__link">
+          
+  
+  
+  pipekit Operators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../examples/" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../CHANGELOG/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="finitevolX" class="md-nav__button md-logo" aria-label="finitevolX" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    finitevolX
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jejjohnson/finitevolX" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jejjohnson/finitevolX
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../capabilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capability Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building with Agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C-Grid Discretization
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    C-Grid Discretization
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cgrid_discretization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/grids/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Masks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Masks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vertical Structure
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Vertical Structure
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../multilayer_vs_3d/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/vertical_modes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Raw Stencils
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Raw Stencils
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../stencils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Fast Stencils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/stencils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Difference Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Difference Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../difference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/difference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interpolation Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Interpolation Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advection
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advection
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../advection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/advection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/reconstruction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reconstruction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Boundary Conditions
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Boundary Conditions
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../boundary_conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/boundary_conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spatial Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Spatial Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../spatial_operators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/divergence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Divergence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/vorticity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vorticity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/diffusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diffusion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/coriolis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coriolis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/forcing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forcing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/momentum/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Momentum Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/diagnostics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time Integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Time Integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../time_integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../time_integration_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/time_integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_14" >
+        
+          
+          <label class="md-nav__link" for="__nav_14" id="__nav_14_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Elliptic Solvers
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Elliptic Solvers
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../elliptic_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../elliptic_solvers_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/inhomogeneous_bcs_tutorial/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial: Known Boundary Values
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/elliptic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convenience Wrappers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/spectral_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/spectral_transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral Transforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/capacitance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacitance Method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/iterative/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Iterative Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_15" >
+        
+          
+          <label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multigrid Solver
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_15">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Multigrid Solver
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../multigrid_solver/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theory & Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../multigrid_solver_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/multigrid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../solver_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Solver Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_17" >
+        
+          
+          <label class="md-nav__link" for="__nav_17" id="__nav_17_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipekit Operators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_17_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_17">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    pipekit Operators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/pipekit_composition/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial: Composing with pipekit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/pipekit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_18" >
+        
+          
+          <label class="md-nav__link" for="__nav_18" id="__nav_18_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_18_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_18">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/demo_masks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Masks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/demo_solvers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Elliptic Solvers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/inhomogeneous_bcs_tutorial/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial: Known Boundary Values
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/pressure_poisson/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pressure Poisson
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/streamfunction_inversion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streamfunction Inversion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/helmholtz_screening/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Helmholtz Screening
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/spde_prior/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SPDE Priors with gaussx
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/advection_1d_schemes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1-D Advection Schemes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/advection_2d_rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2-D Rotating Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/advection_2d_masked/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2-D Masked Advection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/swm_linear/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linear Shallow Water
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/shallow_water/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nonlinear Shallow Water
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/qg_1p5_layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    1.5-Layer QG
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../notebooks/pipekit_composition/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorial: Composing with pipekit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../CHANGELOG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#0-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0. Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Method
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-changed-operators-5142-min-of-3-runs-per-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Changed operators, 514² (min of 3 runs per side)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-changed-operators-10262-memory-bound" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Changed operators, 1026² (memory-bound)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-root-causes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Root causes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Root causes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-the-advection-vjp-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 The advection VJP (open)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-weno-7-weno-9-smoothness-indicators-fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 WENO-7 / WENO-9 smoothness indicators (fixed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-one-pad-per-slice-expression-fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 One pad per slice expression (fixed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-full-size-intermediates-fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Full-size intermediates (fixed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-recomputation-of-a-reused-intermediate-fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 Recomputation of a reused intermediate (fixed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-negative-results-tried-on-the-advection-vjp-not-adopted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Negative results (tried on the advection VJP, not adopted)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-plan-of-attack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Plan of attack
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Plan of attack">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-this-pr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1 — this PR
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-the-advection-adjoint-largest-remaining-cost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2 — the advection adjoint (largest remaining cost)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-validate-the-rules-off-cpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 — validate the rules off CPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-medium-cost-operators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4 — medium-cost operators
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-5-guard-rails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5 — guard rails
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="stencil-performance-deep-dive">Stencil performance deep dive</h1>
+<p><strong>Scope:</strong> every operator in <code>scripts/benchmark_operators.py</code> (58 cases: difference, interpolation,
+divergence, vorticity / PV fluxes, Coriolis, Arakawa Jacobian, diffusion, momentum advection,
+advection and the spherical operators), measured forward, reverse-mode (VJP) and forward-mode
+(JVP). <strong>Date:</strong> 2026-10-14. <strong>Baseline:</strong> <code>main</code> at <code>32ffb45</code>.</p>
+<p>The question: given that finitevolX stencils are plain <code>jnp</code> slicing (no <code>kernex</code>, no
+convolutions, no custom kernels), how fast can each operator be made, and what is left once
+the slicing is written well? Rules distilled from this note live in
+<a href="../../../performance/">Writing fast stencils</a>.</p>
+<div class="admonition warning">
+<p class="admonition-title">One backend measured</p>
+<p>Every number below is <strong>XLA:CPU</strong> (a 2-vCPU cloud VM, JAX 0.10.1, float32). The structural
+quantities (jaxpr <code>slice</code> / <code>pad</code> counts, XLA fusion counts, temporary buffers) explain
+<em>why</em> a rewrite is faster and transfer across backends; the ratios themselves must be
+re-measured on GPU / TPU (§5, phase 3).</p>
+</div>
+<hr />
+<h2 id="0-summary">0. Summary</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Finding</th>
+<th>Cost before</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>Advection VJP is the dominant cost of the library.</strong> WENO-5 2-D: 0.93 ms forward, 34 ms VJP (36×). 83 % of the VJP is a single XLA fusion that sums the transposed <code>pad</code>s.</td>
+<td>10–36× the forward for WENO / TVD / upwind-3</td>
+<td>Root-caused; <strong>not fixed</strong> — seven JAX-level fixes tried and rejected (§4). Plan in §5.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>WENO-7 / WENO-9 smoothness indicators used <code>jnp.stack</code> + <code>jnp.einsum</code> over a 4×4 / 5×5 constant matrix → stack, dot and transposes.</td>
+<td>WENO-7 forward 33.5 ms vs WENO-5 0.93 ms</td>
+<td><strong>Fixed</strong>: forward 11×, JVP 6.3×, VJP 1.65× (WENO-9 forward 14×).</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Composed linear stencils slice the same offset several times (<code>diff_x_fwd(h) - diff_x_bwd(h)</code> reads <code>h[1:-1, 1:-1]</code> twice); each slice expression transposes to its own <code>pad</code>.</td>
+<td>Laplacian VJP 2 fusions</td>
+<td><strong>Fixed</strong> (slice each offset once): Laplacian VJP 1.5–2.3×, spherical Laplacian 2.0–2.3×, Arakawa Jacobian VJP 4.0–4.4×.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Diffusion built full-size zero flux buffers (<code>zeros().at[...].set(...)</code>) only to re-slice them.</td>
+<td>Diffusion 4–6 fusions</td>
+<td><strong>Fixed</strong>: 2-D forward / VJP / JVP ~2×, one fusion; 3-D forward 2–3×.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Sums of padded operators (<code>Difference3D.divergence = diff_x_U_to_T(u) + diff_y_V_to_T(v)</code>)</td>
+<td>two passes + add</td>
+<td><strong>Fixed</strong>: forward 1.5–2.5×.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>3-D z-ghost zeroing by two scatters (<code>.at[0].set(0).at[-1].set(0)</code>)</td>
+<td></td>
+<td><strong>Fixed</strong> (pad of the interior slabs): <code>Coriolis3D</code> forward 1.6×, VJP fusions 6 → 4.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Biharmonic: XLA fused the first Laplacian into each of the four shifted reads of the second.</td>
+<td>11 VJP fusions</td>
+<td><strong>Fixed</strong> (<code>_materialize</code>): 5 fusions, forward 1.2–1.5×, VJP 1.4–1.9×.</td>
+</tr>
+</tbody>
+</table>
+<p>What did <em>not</em> need changing: single-offset differences and averages
+(<code>diff_*</code>, <code>avg_*</code>, <code>Interpolation*</code>, <code>Divergence2D</code>, <code>curl</code>), <code>interior()</code> (XLA turns
+<code>zeros.at[1:-1, 1:-1].set(v)</code> into a fused <code>pad</code>; it is free) and <code>masked_laplacian</code>
+(<code>jnp.roll</code> lowers to the same slices + concatenate a hand-written wrap-pad does; §4).
+These already run at 70–130 % of a <code>2x + 1</code> kernel moving the same number of bytes at 514²
+(cache-resident, where the reference kernel is itself not at peak); after this PR the
+Laplacian runs at 91 % forward and 79 % VJP of that roofline at 1026².</p>
+<h2 id="1-method">1. Method</h2>
+<ul>
+<li><strong>Harness:</strong> <code>scripts/benchmark_operators.py</code> (extended in this PR with JVP timing, <code>--repeat</code>
+  and <code>--profile</code>). Each case is jitted; forward, <code>jax.vjp(op, *x)[1](ct)</code> with a fixed random
+  cotangent, and <code>jax.jvp(op, x, t)</code> are timed as the median of ≥0.3 s of calls, <code>--repeat 3</code>
+  keeps the minimum of three medians.</li>
+<li><strong>Noise control:</strong> <code>main</code> and this branch were each run three times, alternating, and the
+  tables report the minimum per side. Operators whose code did not change are listed as
+  controls; they land at 0.95–1.08×, which is the noise floor. A speedup is only claimed when
+  the fusion count or the slice count moved with it.</li>
+<li><strong>Grids:</strong> 514² (512² interior; 1 MB per float32 field, cache-resident) for everything, 1026²
+  (4 MB, memory-bound) for the changed operators; 3-D cases use 10 levels.</li>
+<li><strong>Profiles:</strong> <code>--profile REGEX</code> runs the jitted VJP under <code>jax.profiler.trace</code> and ranks XLA
+  kernels by time.</li>
+</ul>
+<h2 id="2-results">2. Results</h2>
+<h3 id="21-changed-operators-5142-min-of-3-runs-per-side">2.1 Changed operators, 514² (min of 3 runs per side)</h3>
+<table>
+<thead>
+<tr>
+<th>operator</th>
+<th style="text-align: right;">forward ms</th>
+<th style="text-align: right;">×</th>
+<th style="text-align: right;">VJP ms</th>
+<th style="text-align: right;">×</th>
+<th style="text-align: right;">JVP ms</th>
+<th style="text-align: right;">×</th>
+<th style="text-align: right;">VJP fusions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Difference1D.laplacian</code></td>
+<td style="text-align: right;">0.077 → 0.079</td>
+<td style="text-align: right;">0.97</td>
+<td style="text-align: right;">0.236 → 0.101</td>
+<td style="text-align: right;"><strong>2.34</strong></td>
+<td style="text-align: right;">0.082 → 0.078</td>
+<td style="text-align: right;">1.05</td>
+<td style="text-align: right;">2 → 1</td>
+</tr>
+<tr>
+<td><code>Difference2D.laplacian</code></td>
+<td style="text-align: right;">0.095 → 0.090</td>
+<td style="text-align: right;">1.06</td>
+<td style="text-align: right;">0.230 → 0.130</td>
+<td style="text-align: right;"><strong>1.76</strong></td>
+<td style="text-align: right;">0.087 → 0.091</td>
+<td style="text-align: right;">0.96</td>
+<td style="text-align: right;">2 → 1</td>
+</tr>
+<tr>
+<td><code>Difference3D.divergence</code></td>
+<td style="text-align: right;">1.39 → 0.547</td>
+<td style="text-align: right;"><strong>2.53</strong></td>
+<td style="text-align: right;">1.79 → 1.34</td>
+<td style="text-align: right;">1.34</td>
+<td style="text-align: right;">1.36 → 0.575</td>
+<td style="text-align: right;"><strong>2.37</strong></td>
+<td style="text-align: right;">3 → 3</td>
+</tr>
+<tr>
+<td><code>Difference3D.laplacian</code></td>
+<td style="text-align: right;">0.523 → 0.551</td>
+<td style="text-align: right;">0.95</td>
+<td style="text-align: right;">0.936 → 0.755</td>
+<td style="text-align: right;">1.24</td>
+<td style="text-align: right;">0.527 → 0.539</td>
+<td style="text-align: right;">0.98</td>
+<td style="text-align: right;">2 → 1</td>
+</tr>
+<tr>
+<td><code>Coriolis3D</code></td>
+<td style="text-align: right;">1.38 → 0.848</td>
+<td style="text-align: right;"><strong>1.62</strong></td>
+<td style="text-align: right;">1.96 → 1.82</td>
+<td style="text-align: right;">1.08</td>
+<td style="text-align: right;">1.38 → 0.899</td>
+<td style="text-align: right;"><strong>1.53</strong></td>
+<td style="text-align: right;">6 → 4</td>
+</tr>
+<tr>
+<td><code>ArakawaJacobian2D</code></td>
+<td style="text-align: right;">0.179 → 0.183</td>
+<td style="text-align: right;">0.97</td>
+<td style="text-align: right;">2.76 → 0.638</td>
+<td style="text-align: right;"><strong>4.32</strong></td>
+<td style="text-align: right;">0.355 → 0.362</td>
+<td style="text-align: right;">0.98</td>
+<td style="text-align: right;">3 → 2</td>
+</tr>
+<tr>
+<td><code>arakawa_jacobian</code></td>
+<td style="text-align: right;">0.132 → 0.126</td>
+<td style="text-align: right;">1.05</td>
+<td style="text-align: right;">2.56 → 0.641</td>
+<td style="text-align: right;"><strong>3.99</strong></td>
+<td style="text-align: right;">0.225 → 0.223</td>
+<td style="text-align: right;">1.01</td>
+<td style="text-align: right;">3 → 2</td>
+</tr>
+<tr>
+<td><code>Diffusion2D</code></td>
+<td style="text-align: right;">0.256 → 0.129</td>
+<td style="text-align: right;"><strong>1.98</strong></td>
+<td style="text-align: right;">0.399 → 0.187</td>
+<td style="text-align: right;"><strong>2.13</strong></td>
+<td style="text-align: right;">0.268 → 0.135</td>
+<td style="text-align: right;"><strong>1.98</strong></td>
+<td style="text-align: right;">4 → 1</td>
+</tr>
+<tr>
+<td><code>Diffusion2D[kappa field]</code></td>
+<td style="text-align: right;">0.300 → 0.158</td>
+<td style="text-align: right;"><strong>1.89</strong></td>
+<td style="text-align: right;">0.508 → 0.399</td>
+<td style="text-align: right;">1.27</td>
+<td style="text-align: right;">0.361 → 0.252</td>
+<td style="text-align: right;">1.43</td>
+<td style="text-align: right;">5 → 2</td>
+</tr>
+<tr>
+<td><code>BiharmonicDiffusion2D</code></td>
+<td style="text-align: right;">0.410 → 0.334</td>
+<td style="text-align: right;">1.23</td>
+<td style="text-align: right;">0.842 → 0.602</td>
+<td style="text-align: right;">1.40</td>
+<td style="text-align: right;">0.411 → 0.294</td>
+<td style="text-align: right;">1.40</td>
+<td style="text-align: right;">11 → 5</td>
+</tr>
+<tr>
+<td><code>Diffusion3D</code></td>
+<td style="text-align: right;">1.61 → 0.807</td>
+<td style="text-align: right;"><strong>2.00</strong></td>
+<td style="text-align: right;">2.37 → 1.55</td>
+<td style="text-align: right;">1.53</td>
+<td style="text-align: right;">1.70 → 0.814</td>
+<td style="text-align: right;"><strong>2.09</strong></td>
+<td style="text-align: right;">6 → 2</td>
+</tr>
+<tr>
+<td><code>SphericalLaplacian2D</code></td>
+<td style="text-align: right;">0.152 → 0.160</td>
+<td style="text-align: right;">0.95</td>
+<td style="text-align: right;">0.464 → 0.233</td>
+<td style="text-align: right;"><strong>1.99</strong></td>
+<td style="text-align: right;">0.148 → 0.170</td>
+<td style="text-align: right;">0.87</td>
+<td style="text-align: right;">2 → 1</td>
+</tr>
+<tr>
+<td><code>SphericalDifference2D.laplacian_merid</code></td>
+<td style="text-align: right;">0.143 → 0.131</td>
+<td style="text-align: right;">1.09</td>
+<td style="text-align: right;">0.254 → 0.214</td>
+<td style="text-align: right;">1.19</td>
+<td style="text-align: right;">0.130 → 0.130</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">1 → 1</td>
+</tr>
+<tr>
+<td><code>SphericalDiffusion2D</code></td>
+<td style="text-align: right;">0.341 → 0.362</td>
+<td style="text-align: right;">0.94</td>
+<td style="text-align: right;">0.539 → 0.277</td>
+<td style="text-align: right;"><strong>1.95</strong></td>
+<td style="text-align: right;">0.360 → 0.368</td>
+<td style="text-align: right;">0.98</td>
+<td style="text-align: right;">5 → 1</td>
+</tr>
+<tr>
+<td><code>Advection2D[weno7]</code></td>
+<td style="text-align: right;">33.5 → 3.0</td>
+<td style="text-align: right;"><strong>11.2</strong></td>
+<td style="text-align: right;">183 → 111</td>
+<td style="text-align: right;"><strong>1.65</strong></td>
+<td style="text-align: right;">81.1 → 12.9</td>
+<td style="text-align: right;"><strong>6.27</strong></td>
+<td style="text-align: right;">198 → 133</td>
+</tr>
+<tr>
+<td><code>Advection2D[weno9]</code> (forward only)</td>
+<td style="text-align: right;">57.4 → 4.2</td>
+<td style="text-align: right;"><strong>13.8</strong></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr>
+<td><em>controls (code unchanged)</em></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr>
+<td><code>Interpolation2D.T_to_U</code></td>
+<td style="text-align: right;">0.074 → 0.069</td>
+<td style="text-align: right;">1.07</td>
+<td style="text-align: right;">0.078 → 0.075</td>
+<td style="text-align: right;">1.04</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">1 → 1</td>
+</tr>
+<tr>
+<td><code>Divergence2D</code></td>
+<td style="text-align: right;">0.093 → 0.095</td>
+<td style="text-align: right;">0.98</td>
+<td style="text-align: right;">0.205 → 0.200</td>
+<td style="text-align: right;">1.03</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">3 → 3</td>
+</tr>
+<tr>
+<td><code>Coriolis2D</code></td>
+<td style="text-align: right;">0.218 → 0.224</td>
+<td style="text-align: right;">0.97</td>
+<td style="text-align: right;">0.635 → 0.621</td>
+<td style="text-align: right;">1.02</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">3 → 3</td>
+</tr>
+<tr>
+<td><code>Advection2D[weno5]</code></td>
+<td style="text-align: right;">0.927 → 0.943</td>
+<td style="text-align: right;">0.98</td>
+<td style="text-align: right;">33.9 → 31.4</td>
+<td style="text-align: right;">1.08</td>
+<td style="text-align: right;">2.58 → 2.57</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">48 → 48</td>
+</tr>
+</tbody>
+</table>
+<h3 id="22-changed-operators-10262-memory-bound">2.2 Changed operators, 1026² (memory-bound)</h3>
+<table>
+<thead>
+<tr>
+<th>operator</th>
+<th style="text-align: right;">forward ms</th>
+<th style="text-align: right;">×</th>
+<th style="text-align: right;">VJP ms</th>
+<th style="text-align: right;">×</th>
+<th style="text-align: right;">JVP ms</th>
+<th style="text-align: right;">×</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Difference2D.laplacian</code></td>
+<td style="text-align: right;">0.255 → 0.278</td>
+<td style="text-align: right;">0.92</td>
+<td style="text-align: right;">0.753 → 0.486</td>
+<td style="text-align: right;"><strong>1.55</strong></td>
+<td style="text-align: right;">0.287 → 0.277</td>
+<td style="text-align: right;">1.04</td>
+</tr>
+<tr>
+<td><code>ArakawaJacobian2D</code></td>
+<td style="text-align: right;">0.593 → 0.583</td>
+<td style="text-align: right;">1.02</td>
+<td style="text-align: right;">10.6 → 2.41</td>
+<td style="text-align: right;"><strong>4.40</strong></td>
+<td style="text-align: right;">1.22 → 1.17</td>
+<td style="text-align: right;">1.05</td>
+</tr>
+<tr>
+<td><code>Diffusion2D</code></td>
+<td style="text-align: right;">0.782 → 0.396</td>
+<td style="text-align: right;"><strong>1.97</strong></td>
+<td style="text-align: right;">1.20 → 0.601</td>
+<td style="text-align: right;"><strong>2.00</strong></td>
+<td style="text-align: right;">0.772 → 0.395</td>
+<td style="text-align: right;"><strong>1.95</strong></td>
+</tr>
+<tr>
+<td><code>BiharmonicDiffusion2D</code></td>
+<td style="text-align: right;">1.32 → 0.856</td>
+<td style="text-align: right;"><strong>1.54</strong></td>
+<td style="text-align: right;">3.54 → 1.86</td>
+<td style="text-align: right;"><strong>1.90</strong></td>
+<td style="text-align: right;">1.71 → 0.901</td>
+<td style="text-align: right;"><strong>1.90</strong></td>
+</tr>
+<tr>
+<td><code>Diffusion3D</code></td>
+<td style="text-align: right;">39.2 → 13.1</td>
+<td style="text-align: right;"><strong>2.99</strong></td>
+<td style="text-align: right;">48.9 → 25.6</td>
+<td style="text-align: right;"><strong>1.91</strong></td>
+<td style="text-align: right;">37.3 → 13.8</td>
+<td style="text-align: right;"><strong>2.71</strong></td>
+</tr>
+<tr>
+<td><code>SphericalLaplacian2D</code></td>
+<td style="text-align: right;">0.520 → 0.507</td>
+<td style="text-align: right;">1.02</td>
+<td style="text-align: right;">1.61 → 0.716</td>
+<td style="text-align: right;"><strong>2.25</strong></td>
+<td style="text-align: right;">0.519 → 0.489</td>
+<td style="text-align: right;">1.06</td>
+</tr>
+<tr>
+<td><code>SphericalDifference2D.laplacian_merid</code></td>
+<td style="text-align: right;">0.422 → 0.436</td>
+<td style="text-align: right;">0.97</td>
+<td style="text-align: right;">0.806 → 0.618</td>
+<td style="text-align: right;">1.30</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr>
+<td><code>Difference3D.divergence</code></td>
+<td style="text-align: right;">18.7 → 12.6</td>
+<td style="text-align: right;"><strong>1.48</strong></td>
+<td style="text-align: right;">25.1 → 24.9</td>
+<td style="text-align: right;">1.01</td>
+<td style="text-align: right;">17.6 → 12.6</td>
+<td style="text-align: right;"><strong>1.39</strong></td>
+</tr>
+<tr>
+<td><code>Advection2D[weno7]</code></td>
+<td style="text-align: right;">164 → 15.4</td>
+<td style="text-align: right;"><strong>10.6</strong></td>
+<td style="text-align: right;">961 → 577</td>
+<td style="text-align: right;"><strong>1.67</strong></td>
+<td style="text-align: right;">390 → 89.5</td>
+<td style="text-align: right;"><strong>4.36</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Single runs; the 3-D cases at this size (40 MB per field) are the noisiest rows.</p>
+<h2 id="3-root-causes">3. Root causes</h2>
+<h3 id="31-the-advection-vjp-open">3.1 The advection VJP (open)</h3>
+<p>Reverse-mode AD turns every static slice <code>h[a:b, c:d]</code> into a <code>pad</code> of that slice's cotangent,
+and the input's cotangent is the sum of those pads. For a linear stencil the pad operands are
+cheap (a coefficient times the output cotangent), and XLA:CPU emits one fused loop over the
+input — the Laplacian VJP runs at 79 % of the elementwise roofline at 1026² after this PR.</p>
+<p>For a nonlinear stencil the operand of each pad is the <em>transposed</em> stencil: for WENO-5 the
+derivative of <code>q̂ = Σ ω_r q_r / Σ ω_r</code> with <code>ω_r = γ_r / (β_r + ε)²</code> with respect to one of its
+five inputs, evaluated on both flow signs. XLA:CPU still fuses every pad and its producer into
+one loop over the input (<code>pad_add_fusion</code>), so for each input point it evaluates the transposed
+WENO once <strong>per shifted read</strong> (5 offsets × 2 flow signs), behind per-element bounds checks that
+block vectorisation. Profile of <code>Advection2D(method="weno5")</code> VJP at 514²:</p>
+<table>
+<thead>
+<tr>
+<th>kernel</th>
+<th style="text-align: right;">ms</th>
+<th style="text-align: right;">share</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pad_add_fusion</code></td>
+<td style="text-align: right;">35.1</td>
+<td style="text-align: right;">83 %</td>
+</tr>
+<tr>
+<td>next 7 kernels</td>
+<td style="text-align: right;">3.3</td>
+<td style="text-align: right;">8 %</td>
+</tr>
+<tr>
+<td>total</td>
+<td style="text-align: right;">42.2</td>
+<td style="text-align: right;"></td>
+</tr>
+</tbody>
+</table>
+<p>The boundary fallbacks make it worse. Each reconstruction stitches WENO-3 / first-order columns
+onto the WENO-5 bulk with <code>jnp.concatenate</code>; isolating that on the x-face flux:</p>
+<table>
+<thead>
+<tr>
+<th>x-face WENO-5 flux, 514²</th>
+<th style="text-align: right;">forward</th>
+<th style="text-align: right;">VJP</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>bulk faces only (no fallbacks)</td>
+<td style="text-align: right;">0.28 ms, 1 fusion</td>
+<td style="text-align: right;">4.0 ms</td>
+</tr>
+<tr>
+<td>+ fallbacks stitched with <code>concatenate</code></td>
+<td style="text-align: right;">0.78 ms, 8 fusions</td>
+<td style="text-align: right;">18.2 ms</td>
+</tr>
+<tr>
+<td>+ <code>interior()</code> (= the library's <code>weno5_x</code>)</td>
+<td style="text-align: right;">0.66 ms, 8 fusions</td>
+<td style="text-align: right;">22.4 ms</td>
+</tr>
+</tbody>
+</table>
+<p>So the bulk WENO VJP is ~14× its forward, and the stitching multiplies it by another ~4.5×.
+The same structure explains <code>weno3</code> (12×), <code>wenoz5</code> (46×), <code>van_leer</code> (8.5×), <code>upwind3</code> (5×)
+and the masked path (<code>upwind_flux</code> blends three full-size tiers).</p>
+<h3 id="32-weno-7-weno-9-smoothness-indicators-fixed">3.2 WENO-7 / WENO-9 smoothness indicators (fixed)</h3>
+<p><code>_smoothness_indicator</code> evaluated <code>βᵣ = qᵣᵀ Bᵣ qᵣ</code> as
+<code>jnp.einsum("i...,ij,j...-&gt;...", jnp.stack(q), B, jnp.stack(q))</code>. On a 4×4 or 5×5 constant
+matrix that is a stack (materialised), a <code>dot_general</code> (a library dot call on XLA:CPU,
+<code>ynn_fusion</code>) and transposes of the stacked field; the y-direction added <code>swapaxes</code> copies on top.
+Profile before: <code>concatenate_bitcast_fusion</code> (the stacks), <code>ynn_fusion</code> (the dots) and
+<code>transpose_copy_fusion</code> were the top kernels. After unrolling to
+<code>Σᵢ qᵢ (Σⱼ Bᵢⱼ qⱼ)</code> with Python-float coefficients the indicators are elementwise code inside
+one fusion; float64 results are bitwise identical, float32 within ~3e-6 relative.</p>
+<h3 id="33-one-pad-per-slice-expression-fixed">3.3 One <code>pad</code> per slice <em>expression</em> (fixed)</h3>
+<p><code>(diff_x_fwd(h) - diff_x_bwd(h))</code> slices <code>h[1:-1, 1:-1]</code> twice. Forward, XLA CSEs the two
+reads. Reverse, JAX transposes each <code>slice</code> equation separately, so the VJP sums two pads of
+the same offset; with five offsets the Laplacian VJP had 8 pads and split into 2 fusions with
+an intermediate. Binding each offset to one view (<code>_neighbours(h)</code>) makes JAX accumulate the
+cotangent of that view <em>before</em> transposing (<code>add_any</code>), so the VJP has exactly one pad per
+distinct offset (5 for the Laplacian, 16 for the Arakawa Jacobian, down from 32) and is one
+fusion. The forward arithmetic is unchanged, so outputs are bitwise identical.
+<code>tests/test_stencil_lowering.py</code> pins the pad counts.</p>
+<h3 id="34-full-size-intermediates-fixed">3.4 Full-size intermediates (fixed)</h3>
+<p><code>Diffusion2D</code> built <code>flux_x = zeros_like(h).at[1:-1, 1:-2].set(...)</code>, multiplied by the mask and
+re-sliced at two offsets for the divergence; the spherical diffusion did the same. Computing
+only the faces the divergence reads, and entering the zero closed-wall faces as a <code>pad</code> of the
+<em>face</em> array, removes the buffers: one fusion, forward and VJP. <code>Difference3D.divergence</code>
+summed two full-size padded arrays; writing <code>interior(a + b)</code> fuses them.
+<code>zero_z_ghosts</code> replaced two scatters into the full 3-D array by a pad of the interior slabs,
+which also lets XLA skip computing the two discarded slabs.</p>
+<h3 id="35-recomputation-of-a-reused-intermediate-fixed">3.5 Recomputation of a reused intermediate (fixed)</h3>
+<p>In the biharmonic, the second Laplacian reads the first at four offsets. With the rewritten
+diffusion but without a barrier, XLA splits the forward into 5 fusions around the shifted
+reads; with <code>_materialize</code> (<code>lax.optimization_barrier</code>) the first Laplacian is one buffer and
+the forward is 2 fusions (VJP 11 → 5 fusions for rules 2 and 4 together). Verified by
+comparing the compiled HLO with and without the barrier: they differ, so the barrier is not
+stripped before fusion on CPU (it does not, however, survive on a <em>cotangent</em>; §4).</p>
+<h2 id="4-negative-results-tried-on-the-advection-vjp-not-adopted">4. Negative results (tried on the advection VJP, not adopted)</h2>
+<p>All bitwise-checked against the library where they claim equality; timings at 514².</p>
+<table>
+<thead>
+<tr>
+<th>Idea</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Slice each offset once in WENO-5 (rule 3.3)</td>
+<td>bulk-faces VJP 3.9 → 6.5 ms (worse); library structure 1.2–1.5× faster in two runs, within the noise of that size</td>
+</tr>
+<tr>
+<td>Mirror trick: select the 5 upwind inputs by flow sign, evaluate one WENO-5</td>
+<td>forward ≈ same, VJP 3.9 → 12.4 ms; not bitwise (β summation order)</td>
+</tr>
+<tr>
+<td><code>optimization_barrier</code> on each view's <em>cotangent</em> (identity with a barriered tangent)</td>
+<td>fusion count unchanged (6 → 6), 3.3 → 3.2 ms</td>
+</tr>
+<tr>
+<td><code>jax.checkpoint</code> (default, <code>nothing_saveable</code>, <code>everything_saveable</code>)</td>
+<td>15.0–18.9 ms vs 15.5 ms</td>
+</tr>
+<tr>
+<td><code>custom_jvp</code> with the five partials precomputed (via <code>jvp</code> or <code>vjp</code>) and barriered</td>
+<td>14.8–22.7 ms vs 4.0 ms (XLA re-fuses the partials into the pads)</td>
+</tr>
+<tr>
+<td><code>custom_vjp</code> with a gather-form adjoint</td>
+<td>5.1 vs 5.7 ms; loses forward mode (<code>jax.jvp</code>, 4DVar TLM) → rejected</td>
+</tr>
+<tr>
+<td>Fallback columns by <code>pad</code> + add, or <code>.at[:, k].set</code>, instead of <code>concatenate</code></td>
+<td>bitwise equal; forward 2.4 / 0.97 vs 0.69 ms, VJP unchanged</td>
+</tr>
+<tr>
+<td>Fallbacks by <code>jnp.where</code> on a column index (one shared set of views, no concat)</td>
+<td>bitwise equal; full <code>Advection2D</code> forward 1.1 → 3.0 ms, VJP 46 → 55 ms</td>
+</tr>
+<tr>
+<td><code>masked_laplacian</code>: <code>jnp.roll</code> → wrap-pad + slices, or explicit concatenate</td>
+<td>bitwise equal; identical compiled cost (roll already lowers to slices)</td>
+</tr>
+</tbody>
+</table>
+<p>The common thread: the expensive part is an XLA:CPU fusion decision (inline the transposed
+nonlinear stencil into every pad), and nothing expressible in <code>jnp</code> slicing changed it. The
+only lever that changes the transposed program by construction, <code>custom_vjp</code>, costs forward
+mode and still did not win on CPU.</p>
+<h2 id="5-plan-of-attack">5. Plan of attack</h2>
+<h3 id="phase-1-this-pr">Phase 1 — this PR</h3>
+<p>Rules 1–7 of <a href="../../../performance/">Writing fast stencils</a> applied to the operators in §2,
+each rewrite commented with the composed form it equals; lowering tests (<code>pad</code> per offset,
+equality with the composed form, no <code>dot_general</code> in WENO-7); benchmark harness with JVP,
+repeats and kernel profiles.</p>
+<h3 id="phase-2-the-advection-adjoint-largest-remaining-cost">Phase 2 — the advection adjoint (largest remaining cost)</h3>
+<p>Gate everything on numbers from the target backends first: if XLA:GPU's fusion cost model
+already refuses to duplicate the transposed WENO (it treats <code>divide</code>-heavy producers as
+expensive), the CPU result may not carry over.</p>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>Change</th>
+<th>Gate to merge</th>
+<th>Depends on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2.1</td>
+<td>Run <code>benchmark_operators.py --only Advection --repeat 3</code> on one GPU and one TPU; add the results here</td>
+<td>—</td>
+<td>Phase 1</td>
+</tr>
+<tr>
+<td>2.2</td>
+<td>Restructure the boundary fallbacks so the bulk reconstruction is never stitched with <code>concatenate</code> on the differentiated path (e.g. compute the closed-wall tendency from bulk faces and add the boundary-cell corrections as separate thin tendencies)</td>
+<td>bitwise-equal goldens; VJP ≥ 2× on at least one backend; no forward regression</td>
+<td>2.1</td>
+</tr>
+<tr>
+<td>2.3</td>
+<td>Closed-form WENO partials <code>∂q̂/∂q_k = Σ_r ω_r ∂q_r/∂q_k + Σ_r ω_r (q_r − q̂) ∂ln α_r/∂q_k</code> from at most nine shared intermediates, as a <code>custom_jvp</code> (keeps JVP and VJP, higher-order AD still works)</td>
+<td>VJP ≥ 2× without forward regression; JVP unchanged; second derivatives match autodiff</td>
+<td>2.1</td>
+</tr>
+<tr>
+<td>2.4</td>
+<td>If 2.2–2.3 do not reach ~4× the forward on accelerators: a fused flux kernel (Pallas) behind the same API, with <code>custom_vjp</code> + a separate JVP path</td>
+<td>maintainer decision: AGENTS.md currently says pure <code>jnp</code> slicing</td>
+<td>2.3</td>
+</tr>
+</tbody>
+</table>
+<h3 id="phase-3-validate-the-rules-off-cpu">Phase 3 — validate the rules off CPU</h3>
+<p>Re-run the whole suite on GPU / TPU; in particular check that <code>_materialize</code> (rule 4) and the
+one-view-per-offset rule (rule 1) do not regress there, and record the ratios in
+<code>docs/performance.md</code>.</p>
+<h3 id="phase-4-medium-cost-operators">Phase 4 — medium-cost operators</h3>
+<p>Each is 1–2 ms VJP at 514² with 7–15 fusions; apply rules 1–2:</p>
+<ul>
+<li><code>Strain2D.okubo_weiss</code> (14 VJP fusions): build the X-point <code>∂v/∂x</code> and <code>∂u/∂y</code> once and share
+  them between the shear strain and the vorticity instead of two <code>_x_with_ghosts</code> passes.</li>
+<li><code>MomentumAdvection2D</code> (14–15): curl → vorticity flux → <code>[2:-2]</code> slice chains through
+  full-size <code>interior()</code> buffers.</li>
+<li><code>Vorticity2D.pv_flux_*</code> (7): the same <code>interior()</code> chains (<code>qu_at_q</code> → <code>avg_y_bwd</code>).</li>
+<li><code>Advection2D[weno5, masked]</code>: <code>upwind_flux</code> evaluates three full-size tiers and blends them;
+  restrict each tier to the faces whose mask selects it, or blend inside one fusion.</li>
+</ul>
+<h3 id="phase-5-guard-rails">Phase 5 — guard rails</h3>
+<p><code>tests/test_stencil_lowering.py</code> already fails on a regression to slice-per-term code; add a
+fusion-count check for the Phase 1 operators behind an opt-in marker, and an optional
+benchmark job on a GPU runner that posts <code>--compare</code> against <code>main</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "content.code.copy", "content.code.annotate"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

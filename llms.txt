@@ -1,0 +1,61 @@
+# finitevolX
+
+> Finite-volume operators on staggered Arakawa C-grids in JAX, for ocean and atmosphere models. Grids carry one ghost ring and a same-index staggering (T centres, U east faces, V north faces, X corners); on them sit raw stencils, difference / interpolation / divergence / vorticity operators, upwind / WENO / TVD advection, diffusion, Coriolis and momentum advection, land-sea masks with coastal stencil fallback, boundary conditions, energy and PV diagnostics, wind and drag forcing, spectral / capacitance / CG / multigrid Poisson and Helmholtz solvers, and SSP-RK, multistep, IMEX and diffrax time steppers, in 1-D, 2-D, 3-D, multilayer and on the sphere. Everything is an Equinox module or a pure function, so it runs under jit, vmap and grad. Use these instead of hand-writing shifted slices, ghost-cell fills, Poisson solvers and Runge–Kutta loops.
+
+One package, `finitevolx` (import `finitevolx as fvx`), installed from GitHub: `uv add "finitevolx @ git+https://github.com/jejjohnson/finitevolX.git"` (uv also picks up the tags it pins for its git-only dependencies spectraldiffx and gaussx). Spectral transforms and solvers come from spectraldiffx and are re-exported; structured linear algebra comes from gaussx. Before writing a helper, search the capability index — every public name with a one-line summary, plus the spectraldiffx and gaussx APIs. Code you add should keep three rules:
+
+- **The caller owns the ghost ring:** operators write only the interior `[1:-1, 1:-1]` and leave the ghosts zero; fill them (`fvx.enforce_periodic`, a `fvx.BoundaryConditionSet`, …) on every field before the next operator reads it, including inside a time stepper's right-hand side.
+- **Use the operator that names the stagger:** `fvx.Difference2D(grid=grid).diff_x_T_to_U(h)`, `fvx.Interpolation2D(grid=grid).U_to_T(u)`, `fvx.Advection2D(grid=grid, mask=mask)(q, u, v, method="weno5")`, rather than writing the slice; pass a `fvx.Mask2D` as `mask=` so outputs are zero on land.
+- **Units and JAX:** physical constants are overridable parameters, never baked into operators (so nondimensional models work); pure functions, no Python control flow on traced values, float32 in gives float32 out.
+
+Claude Code users can install the `finitevolx` plugin: `/plugin marketplace add jejjohnson/finitevolX`, then `/plugin install finitevolx@finitevolx`.
+
+## Start here
+
+- [Home](https://jejjohnson.github.io/finitevolX/): what finitevolX is and a quick start
+- [Capability index](https://jejjohnson.github.io/finitevolX/capabilities/): every public name, grouped by module, with a summary; then spectraldiffx and gaussx
+- [Building with agents](https://jejjohnson.github.io/finitevolX/agents/): the Claude Code plugin, this file, and rules to paste into your project's AGENTS.md
+- [C-grid discretization](https://jejjohnson.github.io/finitevolX/cgrid_discretization/): staggering, array shapes and the ghost-cell convention
+- [Raw stencils](https://jejjohnson.github.io/finitevolX/stencils/): the finite-volume derivation and the three operator layers
+- [Masks](https://jejjohnson.github.io/finitevolX/masks/): land-sea masks, staggered masks and coastal stencil fallback
+
+## Theory and usage
+
+- [Difference operators](https://jejjohnson.github.io/finitevolX/difference/)
+- [Interpolation operators](https://jejjohnson.github.io/finitevolX/interpolation/)
+- [Advection](https://jejjohnson.github.io/finitevolX/advection/): reconstruction schemes, limiters, wall treatment
+- [Boundary conditions](https://jejjohnson.github.io/finitevolX/boundary_conditions/)
+- [Spatial operators](https://jejjohnson.github.io/finitevolX/spatial_operators/): divergence, vorticity, diffusion, Coriolis, forcing, momentum, diagnostics
+- [Multilayer vs 3-D](https://jejjohnson.github.io/finitevolX/multilayer_vs_3d/)
+- [Time integration](https://jejjohnson.github.io/finitevolX/time_integration/) and its [usage guide](https://jejjohnson.github.io/finitevolX/time_integration_usage/)
+- [Elliptic solvers](https://jejjohnson.github.io/finitevolX/elliptic_solvers/) and their [usage guide](https://jejjohnson.github.io/finitevolX/elliptic_solvers_usage/)
+- [Multigrid solver](https://jejjohnson.github.io/finitevolX/multigrid_solver/) and its [usage guide](https://jejjohnson.github.io/finitevolX/multigrid_solver_usage/)
+- [Solver comparison](https://jejjohnson.github.io/finitevolX/solver_comparison/): which elliptic solver for which domain
+
+## API reference
+
+- [Grids](https://jejjohnson.github.io/finitevolX/api/grids/)
+- [Masks](https://jejjohnson.github.io/finitevolX/api/masks/)
+- [Raw stencils](https://jejjohnson.github.io/finitevolX/api/stencils/)
+- [Difference](https://jejjohnson.github.io/finitevolX/api/difference/) and [interpolation](https://jejjohnson.github.io/finitevolX/api/interpolation/)
+- [Advection](https://jejjohnson.github.io/finitevolX/api/advection/) and [reconstruction](https://jejjohnson.github.io/finitevolX/api/reconstruction/)
+- [Boundary conditions](https://jejjohnson.github.io/finitevolX/api/boundary_conditions/)
+- [Divergence](https://jejjohnson.github.io/finitevolX/api/divergence/), [vorticity](https://jejjohnson.github.io/finitevolX/api/vorticity/), [diffusion](https://jejjohnson.github.io/finitevolX/api/diffusion/), [Coriolis](https://jejjohnson.github.io/finitevolX/api/coriolis/), [momentum](https://jejjohnson.github.io/finitevolX/api/momentum/), [forcing](https://jejjohnson.github.io/finitevolX/api/forcing/), [diagnostics](https://jejjohnson.github.io/finitevolX/api/diagnostics/)
+- [Vertical modes](https://jejjohnson.github.io/finitevolX/api/vertical_modes/)
+- [Time integration](https://jejjohnson.github.io/finitevolX/api/time_integration/)
+- [Elliptic wrappers](https://jejjohnson.github.io/finitevolX/api/elliptic/), [spectral solvers](https://jejjohnson.github.io/finitevolX/api/spectral_solvers/), [spectral transforms](https://jejjohnson.github.io/finitevolX/api/spectral_transforms/), [capacitance](https://jejjohnson.github.io/finitevolX/api/capacitance/), [iterative](https://jejjohnson.github.io/finitevolX/api/iterative/), [multigrid](https://jejjohnson.github.io/finitevolX/api/multigrid/)
+
+## Optional
+
+- [Example scripts](https://jejjohnson.github.io/finitevolX/examples/): linear and nonlinear shallow water, 1.5-layer QG double gyres
+- [1-D advection schemes](https://jejjohnson.github.io/finitevolX/notebooks/advection_1d_schemes/)
+- [2-D rotating advection](https://jejjohnson.github.io/finitevolX/notebooks/advection_2d_rotation/)
+- [2-D masked advection](https://jejjohnson.github.io/finitevolX/notebooks/advection_2d_masked/)
+- [Masks](https://jejjohnson.github.io/finitevolX/notebooks/demo_masks/)
+- [Elliptic solvers](https://jejjohnson.github.io/finitevolX/notebooks/demo_solvers/)
+- [Known boundary values](https://jejjohnson.github.io/finitevolX/notebooks/inhomogeneous_bcs_tutorial/)
+- [Pressure Poisson](https://jejjohnson.github.io/finitevolX/notebooks/pressure_poisson/)
+- [Streamfunction inversion](https://jejjohnson.github.io/finitevolX/notebooks/streamfunction_inversion/)
+- [Helmholtz screening](https://jejjohnson.github.io/finitevolX/notebooks/helmholtz_screening/)
+- [Linear shallow water](https://jejjohnson.github.io/finitevolX/notebooks/swm_linear/), [nonlinear shallow water](https://jejjohnson.github.io/finitevolX/notebooks/shallow_water/), [1.5-layer QG](https://jejjohnson.github.io/finitevolX/notebooks/qg_1p5_layer/)
+- [Source code](https://github.com/jejjohnson/finitevolX)
