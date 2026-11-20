@@ -11,31 +11,36 @@ Coriolis is coordinate-independent (purely algebraic). Use
 
 from __future__ import annotations
 
-import equinox as eqx
-from gridax import (
-    Mask2D,
-    Mask3D,
-    SphericalGrid2D,
-    SphericalGrid3D,
-)
+from typing import TYPE_CHECKING
+
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.backend import vmap
+from gridax._src.grid import SphericalGrid2D, SphericalGrid3D
+from gridax._src.mask import Mask2D, Mask3D
 from gridax._src.operators._ghost import interior, zero_z_ghosts
 from gridax._src.operators._utils import _metric_like, _safe_div_cos
+from gridax._src.operators.interpolation import Interpolation2D
 from gridax._src.operators.stencils import (
     _neighbours,
     diff_x_bwd_2d,
     diff_x_fwd_2d,
 )
-import jax.numpy as jnp
-from jaxtyping import Array, Float
-
-from gridax_jax._src.operators.interpolation import Interpolation2D
-from gridax_jax._src.operators.vorticity import (
+from gridax._src.operators.vorticity import (
     _pv_flux_corner_product,
     _warn_arakawa_lamb,
 )
+from gridax._src.pytree import array_namespace, pytree_dataclass
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
-class SphericalDivergence2D(eqx.Module):
+@pytree_dataclass
+class SphericalDivergence2D:
     """Horizontal divergence on a 2-D spherical Arakawa C-grid.
 
     div = 1/(R·cosφ) · [du/dλ + d(v·cosφ)/dφ]   at T-points
@@ -86,7 +91,8 @@ class SphericalDivergence2D(eqx.Module):
         return out
 
 
-class SphericalVorticity2D(eqx.Module):
+@pytree_dataclass
+class SphericalVorticity2D:
     """Vorticity and PV-flux operators on a 2-D spherical Arakawa C-grid.
 
     ζ = 1/(R·cosφ) · [dv/dλ − d(u·cosφ)/dφ]   at X-points
@@ -171,6 +177,7 @@ class SphericalVorticity2D(eqx.Module):
 
         q = (ζ + f) / h
         """
+        xp = array_namespace(u, v, h, f)
         zeta = self.relative_vorticity(u, v)
         # f_on_X and h_on_X go through self._interp — pass-down masking applies.
         f_on_X = self._interp.T_to_X(f)
@@ -182,15 +189,15 @@ class SphericalVorticity2D(eqx.Module):
             # 0 at dry corners; divide by 1 there so reverse mode never
             # evaluates 0 * inf (the output is zeroed below anyway).
             # den[j, i] = den[j, i] if xy_corner_strict[j+1, i+1] else 1
-            den = jnp.where(self.mask.xy_corner_strict[1:-1, 1:-1], den, 1.0)
-        pv = jnp.where(den == 0, jnp.nan, num / den)
+            den = xp.where(self.mask.xy_corner_strict[1:-1, 1:-1], den, 1.0)
+        pv = xp.where(den == 0, xp.nan, num / den)
         out = interior(pv, u)
         if self.mask is not None:
             # Under pass-down masking, h_on_X is exactly zero at every dry
             # X-corner, so every dry corner hit the NaN branch.  Replace
             # those mask-induced NaNs with 0 while preserving the NaN
             # sentinel for genuine zero thickness at wet corners.
-            out = jnp.where(self.mask.xy_corner_strict, out, 0.0)
+            out = xp.where(self.mask.xy_corner_strict, out, 0.0)
         return out
 
     def pv_flux_energy_conserving(
@@ -262,7 +269,8 @@ class SphericalVorticity2D(eqx.Module):
         return self.pv_flux_blend(q, u, v, alpha=alpha)
 
 
-class SphericalLaplacian2D(eqx.Module):
+@pytree_dataclass
+class SphericalLaplacian2D:
     """Spherical Laplacian on a 2-D Arakawa C-grid.
 
     ∇²h = 1/(R²cos²φ) · d²h/dλ² + 1/(R²cosφ) · d/dφ(cosφ · dh/dφ)
@@ -359,6 +367,7 @@ def _geostrophic_velocity_sphere(
     those faces' output afterwards.  With both ``None`` it is exactly the
     public function.
     """
+    xp = array_namespace(h, f, wet_u, wet_v)
     R = grid.R
     dlon = grid.dlon
     dlat = grid.dlat
@@ -367,7 +376,7 @@ def _geostrophic_velocity_sphere(
     f_on_U = 0.5 * (f[1:-1, 1:-1] + f[1:-1, 2:])
     if wet_u is not None:
         # f_on_U[j, i+1/2] = f_on_U[j, i+1/2] if wet_u[j, i+1/2] else 1
-        f_on_U = jnp.where(wet_u[1:-1, 1:-1], f_on_U, 1.0)
+        f_on_U = xp.where(wet_u[1:-1, 1:-1], f_on_U, 1.0)
     dh_dlat_U = (h[2:, 1:-1] + h[2:, 2:] - h[:-2, 1:-1] - h[:-2, 2:]) / (4.0 * dlat)
     u_g = interior(-gravity / (f_on_U * R) * dh_dlat_U, h)
 
@@ -375,7 +384,7 @@ def _geostrophic_velocity_sphere(
     f_on_V = 0.5 * (f[1:-1, 1:-1] + f[2:, 1:-1])
     if wet_v is not None:
         # f_on_V[j+1/2, i] = f_on_V[j+1/2, i] if wet_v[j+1/2, i] else 1
-        f_on_V = jnp.where(wet_v[1:-1, 1:-1], f_on_V, 1.0)
+        f_on_V = xp.where(wet_v[1:-1, 1:-1], f_on_V, 1.0)
     cos_on_V = _metric_like(grid.cos_lat_V, h)[1:-1, 1:-1]  # cos(lat_T[j] + dlat/2)
     dh_dlon_V = (h[1:-1, 2:] + h[2:, 2:] - h[1:-1, :-2] - h[2:, :-2]) / (4.0 * dlon)
     v_g = interior(_safe_div_cos(gravity * dh_dlon_V, cos_on_V, f_on_V * R), h)
@@ -388,7 +397,8 @@ def _geostrophic_velocity_sphere(
 # ======================================================================
 
 
-class SphericalDivergence3D(eqx.Module):
+@pytree_dataclass
+class SphericalDivergence3D:
     """3-D spherical divergence (vmap over z-levels).
 
     Pattern A (post-compute) — the inner 2-D op is mask-free and the
@@ -420,13 +430,14 @@ class SphericalDivergence3D(eqx.Module):
         v: Float[Array, "Nz Ny Nx"],
     ) -> Float[Array, "Nz Ny Nx"]:
         """Horizontal divergence at T-points over all z-levels."""
-        out = zero_z_ghosts(eqx.filter_vmap(self._div2d)(u, v))
+        out = zero_z_ghosts(vmap(self._div2d)(u, v))
         if self.mask is not None:
             out = out * self.mask.h
         return out
 
 
-class SphericalVorticity3D(eqx.Module):
+@pytree_dataclass
+class SphericalVorticity3D:
     """3-D spherical vorticity (vmap over z-levels).
 
     Pattern A (post-compute) — the inner 2-D op is mask-free and the
@@ -458,13 +469,14 @@ class SphericalVorticity3D(eqx.Module):
         v: Float[Array, "Nz Ny Nx"],
     ) -> Float[Array, "Nz Ny Nx"]:
         """Relative vorticity at X-points over all z-levels."""
-        out = zero_z_ghosts(eqx.filter_vmap(self._vort2d.relative_vorticity)(u, v))
+        out = zero_z_ghosts(vmap(self._vort2d.relative_vorticity)(u, v))
         if self.mask is not None:
             out = out * self.mask.xy_corner_strict
         return out
 
 
-class SphericalLaplacian3D(eqx.Module):
+@pytree_dataclass
+class SphericalLaplacian3D:
     """3-D spherical Laplacian (vmap over z-levels).
 
     Pattern A (post-compute) — the inner 2-D op is mask-free and the
@@ -492,7 +504,7 @@ class SphericalLaplacian3D(eqx.Module):
 
     def __call__(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Laplacian at T-points over all z-levels."""
-        out = zero_z_ghosts(eqx.filter_vmap(self._lap2d)(h))
+        out = zero_z_ghosts(vmap(self._lap2d)(h))
         if self.mask is not None:
             out = out * self.mask.h
         return out

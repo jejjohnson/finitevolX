@@ -6,11 +6,21 @@ Computes ∇·(u, v) at T-points from staggered face velocities.
 
 from __future__ import annotations
 
-import equinox as eqx
-from gridax import CartesianGrid2D, Mask2D
-from jaxtyping import Array, Float
+from typing import TYPE_CHECKING
 
-from gridax_jax._src.operators.difference import Difference2D, _divergence_2d
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.backend import set_at
+from gridax._src.grid import CartesianGrid2D
+from gridax._src.mask import Mask2D
+from gridax._src.operators.difference import Difference2D, _divergence_2d
+from gridax._src.pytree import pytree_dataclass
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
 def divergence_2d(
@@ -59,7 +69,8 @@ def divergence_2d(
     return _divergence_2d(u, v, dx, dy)
 
 
-class Divergence2D(eqx.Module):
+@pytree_dataclass
+class Divergence2D:
     """Divergence operator on a 2-D Arakawa C-grid.
 
     Computes ∇·(u, v) at T-points from staggered face velocities via
@@ -78,7 +89,7 @@ class Divergence2D(eqx.Module):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import CartesianGrid2D, Divergence2D
+    >>> from gridax import CartesianGrid2D, Divergence2D
     >>> grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> div_op = Divergence2D(grid=grid)
     >>> u = jnp.zeros((grid.Ny, grid.Nx))
@@ -157,10 +168,10 @@ class Divergence2D(eqx.Module):
         Float[Array, "*batch Ny Nx"]
             Divergence at T-points with closed-basin no-flux BCs applied.
         """
-        u_bc = (
-            u.at[..., :, 0].set(0.0).at[..., :, -2].set(0.0)
+        u_bc = set_at(
+            set_at(u, (..., slice(None), 0), 0.0), (..., slice(None), -2), 0.0
         )  # zero west & east wall U-faces
-        v_bc = (
-            v.at[..., 0, :].set(0.0).at[..., -2, :].set(0.0)
+        v_bc = set_at(
+            set_at(v, (..., 0, slice(None)), 0.0), (..., -2, slice(None)), 0.0
         )  # zero south & north wall V-faces
         return self.diff.divergence(u_bc, v_bc)

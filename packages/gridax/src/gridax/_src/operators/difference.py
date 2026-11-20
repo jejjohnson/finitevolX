@@ -15,15 +15,15 @@ Storage index [j, i] encodes:
   X[j, i]  at NE corner      (j+1/2, i+1/2)
 """
 
-import equinox as eqx
-from gridax import (
-    CartesianGrid1D,
-    CartesianGrid2D,
-    CartesianGrid3D,
-    Mask1D,
-    Mask2D,
-    Mask3D,
-)
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.grid import CartesianGrid1D, CartesianGrid2D, CartesianGrid3D
+from gridax._src.mask import Mask1D, Mask2D, Mask3D
 from gridax._src.operators._ghost import interior
 from gridax._src.operators.stencils import (
     _neighbours,
@@ -38,8 +38,12 @@ from gridax._src.operators.stencils import (
     diff_y_fwd_2d,
     diff_y_fwd_3d,
 )
-import jax.numpy as jnp
-from jaxtyping import Array, Float
+from gridax._src.pytree import array_namespace, pytree_dataclass
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 # ======================================================================
 # Shared primitive implementations (used by both class and functional APIs)
@@ -72,11 +76,13 @@ def _divergence_2d(
     delta[j, i] = (u[j, i+1/2] - u[j, i-1/2]) / dx
                 + (v[j+1/2, i] - v[j-1/2, i]) / dy
     """
-    like = jnp.zeros(u.shape, dtype=jnp.result_type(u, v))
+    xp = array_namespace(u, v)
+    like = xp.zeros(u.shape, dtype=xp.result_type(u, v))
     return interior(diff_x_bwd_2d(u) / dx + diff_y_bwd_2d(v) / dy, like)
 
 
-class Difference1D(eqx.Module):
+@pytree_dataclass
+class Difference1D:
     """Finite-difference operators on a 1-D Arakawa C-grid.
 
     Parameters
@@ -168,7 +174,8 @@ class Difference1D(eqx.Module):
         return out
 
 
-class Difference2D(eqx.Module):
+@pytree_dataclass
+class Difference2D:
     """Finite-difference operators on a 2-D Arakawa C-grid.
 
     Parameters
@@ -522,7 +529,7 @@ class Difference2D(eqx.Module):
 
         Examples
         --------
-        >>> from gridax_jax import CartesianGrid2D, Difference2D
+        >>> from gridax import CartesianGrid2D, Difference2D
         >>> grid = CartesianGrid2D.from_interior(8, 8, 1e3, 1e3)
         >>> diff = Difference2D(grid=grid)
         >>> psi = jnp.ones((grid.Ny, grid.Nx))
@@ -559,7 +566,8 @@ class Difference2D(eqx.Module):
         return u, v
 
 
-class Difference3D(eqx.Module):
+@pytree_dataclass
+class Difference3D:
     """Finite-difference operators on a 3-D Arakawa C-grid.
 
     Operates on the horizontal (y, x) plane for each z-level.

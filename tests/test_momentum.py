@@ -110,8 +110,8 @@ class TestMomentumAdvection2D:
         This must be zero (up to floating point) for any velocity field,
         verifying that the scheme conserves kinetic energy from the cross term.
         """
-        from gridax_jax._src.operators.difference import Difference2D
-        from gridax_jax._src.operators.interpolation import Interpolation2D
+        from gridax._src.operators.difference import Difference2D
+        from gridax._src.operators.interpolation import Interpolation2D
 
         diff = Difference2D(grid=grid2d)
         interp = Interpolation2D(grid=grid2d)
@@ -289,7 +289,7 @@ def _compact_nondivergent_flow(n: int = 36, seed: int = 0):
 
 def _budgets(grid, u, v, scheme):
     """(dKE, dZ, scale) for the momentum-advection tendency."""
-    from gridax_jax._src.operators.difference import Difference2D
+    from gridax._src.operators.difference import Difference2D
 
     madv = MomentumAdvection2D(grid=grid)
     du, dv = madv(u, v, scheme=scheme)
@@ -327,7 +327,7 @@ class TestVortexForceConservation:
         assert abs(dke) > 1e-6 * s_ke  # and does not conserve energy
 
     def test_flow_is_non_divergent(self):
-        from gridax_jax._src.operators.difference import Difference2D
+        from gridax._src.operators.difference import Difference2D
 
         grid, u, v = _compact_nondivergent_flow()
         div = Difference2D(grid=grid).divergence(u, v)

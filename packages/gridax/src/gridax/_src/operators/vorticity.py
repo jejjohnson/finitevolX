@@ -6,27 +6,36 @@ Composes Difference2D and Interpolation2D primitives.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import warnings
 
-import equinox as eqx
-from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.backend import set_at, vmap
+from gridax._src.grid import CartesianGrid2D, CartesianGrid3D
+from gridax._src.mask import Mask2D, Mask3D
 from gridax._src.operators._ghost import interior, zero_z_ghosts
+from gridax._src.operators.diagnostic_operators import _sanitize
+from gridax._src.operators.diagnostics import enstrophy, potential_enstrophy
+from gridax._src.operators.difference import Difference2D, _curl_2d
+from gridax._src.operators.interpolation import Interpolation2D
 from gridax._src.operators.stencils import (
     avg_x_bwd_2d,
     avg_xbwd_yfwd_2d,
     avg_xfwd_ybwd_2d,
     avg_y_bwd_2d,
 )
-import jax.numpy as jnp
-from jaxtyping import Array, Float
+from gridax._src.pytree import array_namespace, pytree_dataclass
 
-from gridax_jax._src.operators.diagnostic_operators import _sanitize
-from gridax_jax._src.operators.diagnostics import enstrophy, potential_enstrophy
-from gridax_jax._src.operators.difference import Difference2D, _curl_2d
-from gridax_jax._src.operators.interpolation import Interpolation2D
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
-class Vorticity2D(eqx.Module):
+@pytree_dataclass
+class Vorticity2D:
     """2-D vorticity and PV-flux operators.
 
     Parameters
@@ -119,6 +128,7 @@ class Vorticity2D(eqx.Module):
             to exact ``0`` instead so the NaN only fires where the
             user would care about it.
         """
+        xp = array_namespace(u, v, h, f)
         zeta = self.relative_vorticity(u, v)  # zeta at X-points
         f_on_q = self.interp.T_to_X(f)  # f interpolated to X-points
         h_on_q = self.interp.T_to_X(h)  # h interpolated to X-points
@@ -132,8 +142,8 @@ class Vorticity2D(eqx.Module):
             # corners.  Wet corners keep their real denominator (and the
             # NaN sentinel for zero thickness).
             # den[j, i] = den[j, i] if xy_corner_strict[j+1, i+1] else 1
-            den = jnp.where(self.mask.xy_corner_strict[..., 1:-1, 1:-1], den, 1.0)
-        pv = jnp.where(den == 0, jnp.nan, num / den)
+            den = xp.where(self.mask.xy_corner_strict[..., 1:-1, 1:-1], den, 1.0)
+        pv = xp.where(den == 0, xp.nan, num / den)
         out = interior(pv, h)
         if self.mask is not None:
             # Under pass-down masking, h_on_q is zero at dry X-corners, so
@@ -141,7 +151,7 @@ class Vorticity2D(eqx.Module):
             # mask artefact, not a degenerate-thickness bug.  Restore the
             # post-compute-zero semantic: dry corners exactly 0, wet
             # corners keep any NaN they got.
-            out = jnp.where(self.mask.xy_corner_strict, out, 0.0)
+            out = xp.where(self.mask.xy_corner_strict, out, 0.0)
         return out
 
     def enstrophy(
@@ -170,15 +180,16 @@ class Vorticity2D(eqx.Module):
             are first zeroed on dry interior faces, so ``NaN`` land values
             poison neither the value nor its gradient.
         """
+        xp = array_namespace(u, v)
         if self.mask is not None:
             # u[j, i] = 0 on dry interior U-faces; v[j, i] = 0 on dry V-faces
             u = _sanitize(self.mask.u, u)
             v = _sanitize(self.mask.v, v)
         out = enstrophy(self.relative_vorticity(u, v))
         if self.mask is not None:
-            # jnp.where, not a multiply: a NaN land velocity makes zeta NaN
+            # xp.where, not a multiply: a NaN land velocity makes zeta NaN
             # at dry corners, and NaN * 0 is still NaN.
-            out = jnp.where(self.mask.xy_corner_strict, out, 0.0)
+            out = xp.where(self.mask.xy_corner_strict, out, 0.0)
         return out
 
     def potential_enstrophy(
@@ -217,6 +228,7 @@ class Vorticity2D(eqx.Module):
             ``NaN`` sentinel of :meth:`potential_vorticity` at wet corners
             with zero thickness.
         """
+        xp = array_namespace(u, v, h, f)
         if self.mask is not None:
             # Zero dry interior inputs so NaN land values cannot enter the
             # arithmetic (or its gradient); wet corners only read wet cells.
@@ -230,7 +242,7 @@ class Vorticity2D(eqx.Module):
         if self.mask is not None:
             # q is already exactly 0 at dry corners; the select keeps that
             # guarantee explicit, mirroring potential_vorticity.
-            out = jnp.where(self.mask.xy_corner_strict, out, 0.0)
+            out = xp.where(self.mask.xy_corner_strict, out, 0.0)
         return out
 
     def pv_flux_energy_conserving(
@@ -404,6 +416,7 @@ def _pv_flux_corner_product(
     are BC-owned and pass through); ``wet_u`` / ``wet_v`` multiply the
     outputs, matching the pass-down masks of :class:`Interpolation2D`.
     """
+    xp = array_namespace(q, u, v, wet_x, wet_u, wet_v)
     # pu[j+1/2, i+1/2] = q[j+1/2, i+1/2] * 1/2 (u[j, i+1/2] + u[j+1, i+1/2])
     #   for 0 <= j <= Ny-2 (south ghost corner row j = 0 included)   [Ny-1, Nx]
     pu = q[..., :-1, :] * (0.5 * (u[..., :-1, :] + u[..., 1:, :]))
@@ -411,11 +424,15 @@ def _pv_flux_corner_product(
     #   for 0 <= i <= Nx-2 (west ghost corner column i = 0 included)  [Ny, Nx-1]
     pv = q[..., :, :-1] * (0.5 * (v[..., :, :-1] + v[..., :, 1:]))
     if wet_x is not None:
-        wet_x = jnp.asarray(wet_x, dtype=bool)
+        wet_x = xp.asarray(wet_x, dtype=bool)
         # keep[j, i] = True on the ghost ring, wet_x[j, i] in the interior
-        keep = jnp.ones_like(wet_x).at[..., 1:-1, 1:-1].set(wet_x[..., 1:-1, 1:-1])
-        pu = jnp.where(keep[..., :-1, :], pu, 0.0)
-        pv = jnp.where(keep[..., :, :-1], pv, 0.0)
+        keep = set_at(
+            xp.ones_like(wet_x),
+            (..., slice(1, -1), slice(1, -1)),
+            wet_x[..., 1:-1, 1:-1],
+        )
+        pu = xp.where(keep[..., :-1, :], pu, 0.0)
+        pv = xp.where(keep[..., :, :-1], pv, 0.0)
     # qu[j, i+1/2] = 1/2 (pu[j+1/2, i+1/2] + pu[j-1/2, i+1/2])   [Ny-2, Nx-2]
     qu = interior(0.5 * (pu[..., 1:, 1:-1] + pu[..., :-1, 1:-1]), u)
     # qv[j+1/2, i] = 1/2 (pv[j+1/2, i+1/2] + pv[j+1/2, i-1/2])   [Ny-2, Nx-2]
@@ -427,7 +444,8 @@ def _pv_flux_corner_product(
     return qu, qv
 
 
-class Vorticity3D(eqx.Module):
+@pytree_dataclass
+class Vorticity3D:
     """3-D vorticity operators (horizontal plane per z-level).
 
     Parameters
@@ -467,9 +485,9 @@ class Vorticity3D(eqx.Module):
             Relative vorticity at X-points.  When ``self.mask`` is
             set, dry X-corners are zero via ``* mask.xy_corner_strict``.
         """
-        out = eqx.filter_vmap(
-            lambda u_k, v_k: _curl_2d(u_k, v_k, self.grid.dx, self.grid.dy)
-        )(u, v)
+        out = vmap(lambda u_k, v_k: _curl_2d(u_k, v_k, self.grid.dx, self.grid.dy))(
+            u, v
+        )
         # Zero z-ghost slices to match 3D ghost-ring convention.
         out = zero_z_ghosts(out)
         if self.mask is not None:
@@ -583,10 +601,11 @@ def _upwind_face_bwd_last(
     to a lower-order stencil on the outer face(s) where the wide stencil does
     not fit.
     """
+    xp = array_namespace(omega, vel)
     v = vel[..., 1:-1]  # advecting velocity at interior faces i = 1 .. N-2
 
     # Order 1: pure upwind neighbour.
-    f1 = jnp.where(v >= 0.0, omega[..., 0:-2], omega[..., 1:-1])
+    f1 = xp.where(v >= 0.0, omega[..., 0:-2], omega[..., 1:-1])
     if order == 1:
         return f1
 
@@ -601,9 +620,9 @@ def _upwind_face_bwd_last(
     v3 = vel[..., 2:-1]
     f3_pos = (_UP3_POS[0] * o0 + _UP3_POS[1] * o1 + _UP3_POS[2] * o2) / _UP3_DENOM
     f3_neg = (_UP3_NEG[0] * o1 + _UP3_NEG[1] * o2 + _UP3_NEG[2] * o3) / _UP3_DENOM
-    f3 = jnp.where(v3 >= 0.0, f3_pos, f3_neg)
+    f3 = xp.where(v3 >= 0.0, f3_pos, f3_neg)
     # Outermost interior face (i = 1) falls back to 1st-order upwind.
-    face3 = jnp.concatenate([f1[..., 0:1], f3], axis=-1)
+    face3 = xp.concatenate([f1[..., 0:1], f3], axis=-1)
     if order == 3 or n < 7:
         return face3
 
@@ -631,9 +650,9 @@ def _upwind_face_bwd_last(
         + _UP5_NEG[3] * p4
         + _UP5_NEG[4] * p5
     ) / _UP5_DENOM
-    f5 = jnp.where(v5 >= 0.0, f5_pos, f5_neg)
+    f5 = xp.where(v5 >= 0.0, f5_pos, f5_neg)
     # The two leading and one trailing interior faces fall back to 3rd order.
-    return jnp.concatenate([face3[..., 0:2], f5, face3[..., -1:]], axis=-1)
+    return xp.concatenate([face3[..., 0:2], f5, face3[..., -1:]], axis=-1)
 
 
 def vorticity_flux_upwind(
@@ -684,6 +703,7 @@ def vorticity_flux_upwind(
     ValueError
         If ``order`` is not ``1``, ``3``, or ``5``.
     """
+    xp = array_namespace(omega, U, V)
     if order not in (1, 3, 5):
         raise ValueError(f"order must be 1, 3, or 5, got {order!r}")
 
@@ -692,9 +712,9 @@ def vorticity_flux_upwind(
     u_on_v = interior(avg_xbwd_yfwd_2d(U), U)  # U_to_V: east flux at V-points
 
     # omega reconstructed to U-points along y (axis -2): swap y to the last axis.
-    omega_y = jnp.swapaxes(omega, -2, -1)
-    vel_y = jnp.swapaxes(v_on_u, -2, -1)
-    face_y = jnp.swapaxes(_upwind_face_bwd_last(omega_y, vel_y, order), -2, -1)
+    omega_y = xp.swapaxes(omega, -2, -1)
+    vel_y = xp.swapaxes(v_on_u, -2, -1)
+    face_y = xp.swapaxes(_upwind_face_bwd_last(omega_y, vel_y, order), -2, -1)
     omega_V = interior(face_y[..., :, 1:-1] * v_on_u[..., 1:-1, 1:-1], omega)
 
     # omega reconstructed to V-points along x (axis -1, already last).

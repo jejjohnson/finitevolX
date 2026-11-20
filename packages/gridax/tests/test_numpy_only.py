@@ -38,6 +38,11 @@ CHECKS = textwrap.dedent(
     gridax.interior(gridax.diff_x_fwd_2d(h2) + gridax.avg_y_bwd_2d(h2), h2)
     gridax.smooth_clamp(h2, 3.0)
 
+    g2 = gridax.CartesianGrid2D.from_interior(4, 3, 1.0, 1.0)
+    gridax.Difference2D(grid=g2, mask=gridax.Mask2D.from_mask(np.ones((5, 6), bool))).laplacian(h2)
+    g3 = gridax.CartesianGrid3D.from_interior(4, 3, 2, 1.0, 1.0, 1.0)
+    gridax.Vorticity3D(grid=g3).relative_vorticity(np.stack([h2] * 4), np.stack([h2] * 4))
+
     from gridax import analysis
 
     y, x = np.mgrid[0:6, 0:8].astype(float)

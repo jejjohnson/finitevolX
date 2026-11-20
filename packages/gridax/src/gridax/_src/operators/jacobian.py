@@ -16,13 +16,22 @@ Part I. *Journal of Computational Physics*, 1(1), 119–143.
 
 from __future__ import annotations
 
-import equinox as eqx
-from gridax import CartesianGrid2D, Mask2D
-from gridax._src.operators.stencils import _neighbours
-import jax.numpy as jnp
-from jaxtyping import Array, Float
+from typing import TYPE_CHECKING
 
-from gridax_jax._src.operators.diagnostic_operators import _sanitize
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.backend import set_at
+from gridax._src.grid import CartesianGrid2D
+from gridax._src.mask import Mask2D
+from gridax._src.operators.diagnostic_operators import _sanitize
+from gridax._src.operators.stencils import _neighbours
+from gridax._src.pytree import array_namespace, pytree_dataclass
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
 def arakawa_jacobian(
@@ -99,7 +108,7 @@ def arakawa_jacobian(
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import arakawa_jacobian
+    >>> from gridax import arakawa_jacobian
     >>> Ny, Nx = 12, 10
     >>> x = jnp.linspace(0, 1, Nx)
     >>> y = jnp.linspace(0, 1, Ny)
@@ -145,7 +154,8 @@ def arakawa_jacobian(
     return (Jpp + Jpx + Jxp) / (12.0 * dx * dy)
 
 
-class ArakawaJacobian2D(eqx.Module):
+@pytree_dataclass
+class ArakawaJacobian2D:
     """Arakawa (1966) Jacobian J(f, g) at T-points, on the full grid.
 
     Class form of :func:`arakawa_jacobian`.  Unlike the function, which
@@ -180,7 +190,7 @@ class ArakawaJacobian2D(eqx.Module):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import ArakawaJacobian2D, CartesianGrid2D
+    >>> from gridax import ArakawaJacobian2D, CartesianGrid2D
     >>> grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> psi = jnp.zeros((grid.Ny, grid.Nx))
     >>> ArakawaJacobian2D(grid=grid)(psi, psi).shape
@@ -210,15 +220,16 @@ class ArakawaJacobian2D(eqx.Module):
             J(f, g) at T-points, zero in the ghost ring and, when
             ``self.mask`` is set, at dry T-cells.
         """
+        xp = array_namespace(f, g)
         if self.mask is not None:
             # f[..., j, i] = 0 on dry interior T-cells (same for g)
             f = _sanitize(self.mask.h, f)
             g = _sanitize(self.mask.h, g)
         J = arakawa_jacobian(f, g, self.grid.dx, self.grid.dy)
-        shape = jnp.broadcast_shapes(f.shape, g.shape)
+        shape = xp.broadcast_shapes(f.shape, g.shape)
         # J_full[..., j, i] = J[..., j-1, i-1]  for 1 <= j <= Ny-2, 1 <= i <= Nx-2
-        out = jnp.zeros_like(f, dtype=J.dtype, shape=shape)
-        out = out.at[..., 1:-1, 1:-1].set(J)
+        out = xp.zeros_like(f, dtype=J.dtype, shape=shape)
+        out = set_at(out, (..., slice(1, -1), slice(1, -1)), J)
         if self.mask is not None:
-            out = jnp.where(self.mask.h, out, 0.0)
+            out = xp.where(self.mask.h, out, 0.0)
         return out

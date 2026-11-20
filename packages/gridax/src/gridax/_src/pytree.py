@@ -14,6 +14,7 @@ one retraces. Every other field is a leaf.
 from __future__ import annotations
 
 import dataclasses
+import functools
 from typing import Any, dataclass_transform
 
 import numpy as np
@@ -153,9 +154,9 @@ def _pytree_hash(self: Any) -> int:
     return hash((type(self), scalars))
 
 
-@dataclass_transform(
-    frozen_default=True, field_specifiers=(dataclasses.field, static_field)
-)
+# Not frozen_default: a hand-written __init__ assigns its fields (frozen at
+# run time once it returns), which a frozen hint would flag.
+@dataclass_transform(field_specifiers=(dataclasses.field, static_field))
 def pytree_dataclass[T: type](cls: T) -> T:
     """Make ``cls`` a frozen dataclass, and a JAX pytree when JAX is importable.
 
@@ -183,8 +184,47 @@ def pytree_dataclass[T: type](cls: T) -> T:
     >>> Box(n=3, width=1.5)
     Box(n=3, width=1.5)
     """
-    cls = dataclasses.dataclass(frozen=True, eq=False)(cls)
+    custom_init = "__init__" in cls.__dict__
+    cls = dataclasses.dataclass(frozen=True, eq=False, init=not custom_init)(cls)
+    if custom_init:
+        _allow_assignment_in(cls)
     cls.__eq__ = _pytree_eq
     cls.__hash__ = _pytree_hash
     _register_with_jax(cls)
     return cls
+
+
+_INITIALISING = "_pytree_dataclass_initialising"
+
+
+def _allow_assignment_in(cls: type) -> None:
+    """Let a hand-written ``__init__`` assign fields; freeze the object after it.
+
+    An operator that precomputes in ``__init__`` (an inner operator, an
+    adaptive-mask hierarchy) assigns its fields there, as on an
+    ``eqx.Module``. Outside ``__init__`` the object is frozen as usual, and
+    JAX's unflattening still bypasses ``__init__``.
+    """
+    user_init = cls.__init__
+
+    @functools.wraps(user_init)
+    def __init__(self: Any, *args: Any, **kwargs: Any) -> None:
+        object.__setattr__(self, _INITIALISING, True)
+        try:
+            user_init(self, *args, **kwargs)
+        finally:
+            object.__delattr__(self, _INITIALISING)
+        missing = [
+            f.name for f in dataclasses.fields(self) if f.name not in self.__dict__
+        ]
+        if missing:
+            raise TypeError(f"{type(self).__name__}.__init__ did not set {missing}")
+
+    def __setattr__(self: Any, name: str, value: Any) -> None:
+        if self.__dict__.get(_INITIALISING, False):
+            object.__setattr__(self, name, value)
+            return
+        raise dataclasses.FrozenInstanceError(f"cannot assign to field {name!r}")
+
+    setattr(cls, "__init__", __init__)  # noqa: B010 (the type checker rejects plain assignment)
+    setattr(cls, "__setattr__", __setattr__)  # noqa: B010

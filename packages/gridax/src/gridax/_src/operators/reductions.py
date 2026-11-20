@@ -19,7 +19,7 @@ runtime based on the grid type, so user code can stay grid-agnostic.
 Example
 -------
 >>> import jax.numpy as jnp
->>> from gridax_jax import area_sum, SphericalGrid2D
+>>> from gridax import area_sum, SphericalGrid2D
 >>> grid = SphericalGrid2D.from_interior(64, 32, (0.0, 360.0), (-80.0, 80.0))
 >>> h = jnp.ones((grid.Ny, grid.Nx))
 >>> total = area_sum(h, grid)  # integrated tracer over the basin

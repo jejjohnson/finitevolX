@@ -189,7 +189,7 @@ def upwind_flux(
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import (
+    >>> from gridax import (
     ...     CartesianGrid2D,
     ...     Mask2D,
     ...     Reconstruction2D,

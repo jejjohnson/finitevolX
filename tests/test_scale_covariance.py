@@ -36,6 +36,36 @@ from gridax import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
+from gridax._src.operators.diagnostic_operators import QGPotentialVorticity2D
+from gridax._src.operators.diagnostics import (
+    potential_vorticity_multilayer,
+    stretching_term,
+)
+from gridax._src.operators.difference import (
+    Difference1D,
+    Difference2D,
+    Difference3D,
+)
+from gridax._src.operators.divergence import Divergence2D
+from gridax._src.operators.interpolation import (
+    Interpolation1D,
+    Interpolation2D,
+    Interpolation3D,
+)
+from gridax._src.operators.jacobian import arakawa_jacobian
+from gridax._src.operators.spherical_compound import (
+    SphericalDivergence2D,
+    SphericalDivergence3D,
+    SphericalLaplacian2D,
+    SphericalLaplacian3D,
+    SphericalVorticity2D,
+    SphericalVorticity3D,
+)
+from gridax._src.operators.spherical_difference import (
+    SphericalDifference2D,
+    SphericalDifference3D,
+)
+from gridax._src.operators.vorticity import Vorticity2D, Vorticity3D
 from gridax_jax._src.advection.advection import (
     Advection1D,
     Advection2D,
@@ -57,36 +87,6 @@ from gridax_jax._src.diffusion.spherical_diffusion import (
     SphericalDiffusion2D,
     SphericalDiffusion3D,
 )
-from gridax_jax._src.operators.diagnostic_operators import QGPotentialVorticity2D
-from gridax_jax._src.operators.diagnostics import (
-    potential_vorticity_multilayer,
-    stretching_term,
-)
-from gridax_jax._src.operators.difference import (
-    Difference1D,
-    Difference2D,
-    Difference3D,
-)
-from gridax_jax._src.operators.divergence import Divergence2D
-from gridax_jax._src.operators.interpolation import (
-    Interpolation1D,
-    Interpolation2D,
-    Interpolation3D,
-)
-from gridax_jax._src.operators.jacobian import arakawa_jacobian
-from gridax_jax._src.operators.spherical_compound import (
-    SphericalDivergence2D,
-    SphericalDivergence3D,
-    SphericalLaplacian2D,
-    SphericalLaplacian3D,
-    SphericalVorticity2D,
-    SphericalVorticity3D,
-)
-from gridax_jax._src.operators.spherical_difference import (
-    SphericalDifference2D,
-    SphericalDifference3D,
-)
-from gridax_jax._src.operators.vorticity import Vorticity2D, Vorticity3D
 from gridax_jax._src.solvers.spectral import (
     solve_poisson_dst,
     solve_poisson_fft,
@@ -797,20 +797,19 @@ AUDITED_PACKAGES = ("operators", "advection", "diffusion", "solvers")
 
 
 def _audited_modules():
-    root = (
-        pathlib.Path(__file__).resolve().parents[1]
-        / "packages"
-        / "gridax-jax"
-        / "src"
-        / "gridax_jax"
-        / "_src"
-    )
-    for package in AUDITED_PACKAGES:
-        yield from sorted((root / package).rglob("*.py"))
+    # The operators live in gridax (array-API code) and gridax-jax (solvers,
+    # the JAX-only machinery); the audit covers both.
+    packages = pathlib.Path(__file__).resolve().parents[1] / "packages"
+    for root in (
+        packages / "gridax" / "src" / "gridax" / "_src",
+        packages / "gridax-jax" / "src" / "gridax_jax" / "_src",
+    ):
+        for package in AUDITED_PACKAGES:
+            yield from sorted((root / package).rglob("*.py"))
 
 
-#: Dotted path of the module the constants live in.
-CONSTANTS_MODULE = "gridax_jax._src.utils.constants"
+#: Dotted paths of the modules the constants live in.
+CONSTANTS_MODULES = {"gridax._src.constants", "gridax_jax._src.utils.constants"}
 
 
 def _constant_aliases(tree):
@@ -831,11 +830,11 @@ def _constant_aliases(tree):
             for imported in node.names:
                 if imported.name in PHYSICAL_CONSTANTS:
                     constants[imported.asname or imported.name] = imported.name
-                elif f"{module}.{imported.name}" == CONSTANTS_MODULE:
+                elif f"{module}.{imported.name}" in CONSTANTS_MODULES:
                     modules.add(imported.asname or imported.name)
         elif isinstance(node, ast.Import):
             for imported in node.names:
-                if imported.name == CONSTANTS_MODULE:
+                if imported.name in CONSTANTS_MODULES:
                     # ``import a.b.constants`` binds ``a``; only the
                     # aliased form binds a name we can follow.
                     if imported.asname:

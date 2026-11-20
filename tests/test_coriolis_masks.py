@@ -11,7 +11,7 @@ all-ocean invariant), plus a dry-cell-zero pin per velocity stagger.
 
 from __future__ import annotations
 
-from gridax_jax._src.operators.coriolis import Coriolis2D, Coriolis3D
+from gridax._src.operators.coriolis import Coriolis2D, Coriolis3D
 import numpy as np
 import pytest
 

@@ -7,7 +7,7 @@ from gridax import (
     CartesianGrid2D,
     CartesianGrid3D,
 )
-from gridax_jax._src.operators.interpolation import (
+from gridax._src.operators.interpolation import (
     Interpolation1D,
     Interpolation2D,
     Interpolation3D,

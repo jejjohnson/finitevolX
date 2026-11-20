@@ -13,15 +13,15 @@ Half-index notation
   X[j, i]  NE corner      (j+1/2, i+1/2)
 """
 
-import equinox as eqx
-from gridax import (
-    CurvilinearGrid1D,
-    CurvilinearGrid2D,
-    CurvilinearGrid3D,
-    Mask1D,
-    Mask2D,
-    Mask3D,
-)
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.grid import CurvilinearGrid1D, CurvilinearGrid2D, CurvilinearGrid3D
+from gridax._src.mask import Mask1D, Mask2D, Mask3D
 from gridax._src.operators._ghost import interior
 from gridax._src.operators.stencils import (
     avg_x_bwd_1d,
@@ -39,10 +39,16 @@ from gridax._src.operators.stencils import (
     avg_y_fwd_2d,
     avg_y_fwd_3d,
 )
-from jaxtyping import Array, Float
+from gridax._src.pytree import pytree_dataclass
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
-class Interpolation1D(eqx.Module):
+@pytree_dataclass
+class Interpolation1D:
     """1-D averaging operators on an Arakawa C-grid.
 
     Parameters
@@ -102,7 +108,8 @@ class Interpolation1D(eqx.Module):
         return out
 
 
-class Interpolation2D(eqx.Module):
+@pytree_dataclass
+class Interpolation2D:
     """2-D averaging operators on an Arakawa C-grid.
 
     Parameters
@@ -276,7 +283,8 @@ class Interpolation2D(eqx.Module):
         return out
 
 
-class Interpolation3D(eqx.Module):
+@pytree_dataclass
+class Interpolation3D:
     """3-D averaging operators on an Arakawa C-grid.
 
     Operates on the horizontal (y, x) plane for each z-level.

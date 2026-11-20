@@ -492,7 +492,7 @@ q     = vort.potential_vorticity(u, v, h, f)   # X-points
 qu, qv = vort.pv_flux_energy_conserving(q, u, v)   # U- and V-points
 
 # 3. Kinetic energy and Bernoulli potential
-from gridax_jax._src.operators.diagnostics import bernoulli_potential
+from gridax._src.operators.diagnostics import bernoulli_potential
 p = bernoulli_potential(h=h, u=u, v=v)         # T-points
 
 # 4. Tendencies

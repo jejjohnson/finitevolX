@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
 from gridax._src.operators._ghost import interior
+from gridax._src.operators.interpolation import Interpolation2D
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
@@ -40,7 +41,6 @@ from gridax_jax._src.forcing.functional import (
     linear_drag_tendency,
     quadratic_drag_tendency,
 )
-from gridax_jax._src.operators.interpolation import Interpolation2D
 
 
 class LinearDrag2D(AbstractForcing):

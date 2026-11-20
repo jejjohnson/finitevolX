@@ -7,11 +7,17 @@ and domain-integrated conservation diagnostics.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import warnings
 
-import equinox as eqx
-from gridax import Mask3D
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.backend import set_at, vmap
+from gridax._src.constants import GRAVITY, OMEGA, R_EARTH
+from gridax._src.mask import Mask3D
 from gridax._src.operators._ghost import interior
+from gridax._src.operators.difference import _curl_2d
 from gridax._src.operators.stencils import (
     avg_x_bwd_2d,
     avg_xfwd_yfwd_2d,
@@ -23,14 +29,12 @@ from gridax._src.operators.stencils import (
     diff_y_bwd_3d,
     diff_y_fwd_2d,
 )
-import jax.numpy as jnp
-from jaxtyping import (
-    Array,
-    Float,
-)
+from gridax._src.pytree import array_namespace
 
-from gridax_jax._src.operators.difference import _curl_2d
-from gridax_jax._src.utils.constants import GRAVITY, OMEGA, R_EARTH
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 # ======================================================================
 # Kinetic energy & Bernoulli potential  (existing)
@@ -64,9 +68,10 @@ def kinetic_energy(
         ke (Array): kinetic energy at T-points, shape [Ny, Nx].
             Ghost ring is zero; interior is [1:-1, 1:-1].
     """
-    dtype = jnp.result_type(u, v, 0.0)
-    u_float = jnp.asarray(u, dtype=dtype)
-    v_float = jnp.asarray(v, dtype=dtype)
+    xp = array_namespace(u, v)
+    dtype = xp.result_type(u, v, 0.0)
+    u_float = xp.asarray(u, dtype=dtype)
+    v_float = xp.asarray(v, dtype=dtype)
     u2 = u_float**2
     v2 = v_float**2
     # u²_on_T[j, i] = 0.5 * (u²[j, i] + u²[j, i-1])  (east + west U-faces)
@@ -105,8 +110,9 @@ def bernoulli_potential(
         >>> u, v, h = ...
         >>> p = bernoulli_potential(h=h, u=u, v=v)
     """
-    dtype = jnp.result_type(h, u, v, 0.0)
-    h_float = jnp.asarray(h, dtype=dtype)
+    xp = array_namespace(h, u, v)
+    dtype = xp.result_type(h, u, v, 0.0)
+    h_float = xp.asarray(h, dtype=dtype)
     ke = kinetic_energy(u=u, v=v)
     out = interior(ke[..., 1:-1, 1:-1] + gravity * h_float[..., 1:-1, 1:-1], h_float)
     return out
@@ -131,7 +137,7 @@ def relative_vorticity_cgrid(
     This is a standalone functional form of the class-based
     :meth:`Vorticity2D.relative_vorticity`.  Both share the same
     underlying implementation
-    (:func:`gridax_jax._src.operators.difference._curl_2d`).
+    (:func:`gridax._src.operators.difference._curl_2d`).
 
     Parameters
     ----------
@@ -178,7 +184,8 @@ def potential_vorticity(
     Float[Array, "*batch Ny Nx"]
         Potential vorticity.  Where ``h == 0`` the result is NaN.
     """
-    return jnp.where(h == 0, jnp.nan, (omega + f) / h)
+    xp = array_namespace(omega, f, h)
+    return xp.where(h == 0, xp.nan, (omega + f) / h)
 
 
 # ======================================================================
@@ -484,6 +491,7 @@ def stretching_term(
         Stretching contribution, same shape as ``psi``.
         Ghost ring is zero; interior is ``[:, 1:-1, 1:-1]``.
     """
+    xp = array_namespace(A, psi)
     # (A . psi)_k = sum_j A[k,j] * psi_j  for each spatial point
     # Flatten spatial dims, matmul along layer axis, reshape back.
     nl = A.shape[0]
@@ -491,8 +499,10 @@ def stretching_term(
     psi_flat = psi.reshape(nl, -1)  # [nl, Ny*Nx]
     Ap_flat = A @ psi_flat  # [nl, Ny*Nx]
     Ap = Ap_flat.reshape(nl, Ny, Nx)  # [nl, Ny, Nx]
-    out = jnp.zeros_like(psi)
-    out = out.at[..., :, 1:-1, 1:-1].set(Ap[..., :, 1:-1, 1:-1])
+    out = xp.zeros_like(psi)
+    out = set_at(
+        out, (..., slice(None), slice(1, -1), slice(1, -1)), Ap[..., :, 1:-1, 1:-1]
+    )
     return out
 
 
@@ -527,7 +537,8 @@ def total_energy(
     Float[Array, ""]
         Scalar total energy.
     """
-    return jnp.sum(ke[..., 1:-1, 1:-1] + ape[..., 1:-1, 1:-1], axis=(-2, -1)) * dx * dy
+    xp = array_namespace(ke, ape)
+    return xp.sum(ke[..., 1:-1, 1:-1] + ape[..., 1:-1, 1:-1], axis=(-2, -1)) * dx * dy
 
 
 def total_enstrophy(
@@ -553,7 +564,8 @@ def total_enstrophy(
     Float[Array, ""]
         Scalar total enstrophy.
     """
-    return jnp.sum(ens[..., 1:-1, 1:-1], axis=(-2, -1)) * dx * dy
+    xp = array_namespace(ens)
+    return xp.sum(ens[..., 1:-1, 1:-1], axis=(-2, -1)) * dx * dy
 
 
 # ======================================================================
@@ -621,17 +633,18 @@ def vertical_velocity(
     >>> w.shape, float(w[0, 2, 2]), float(w[1, 2, 2])  # du/dx = 1
     ((5, 6, 8), 0.0, -0.333...)
     """
+    xp = array_namespace(u, v, mask)
     if isinstance(mask, Mask3D):
         # zero dry faces before the stencil reads them (NaN-filled land)
-        u = jnp.where(mask.u, u, 0.0)
-        v = jnp.where(mask.v, v, 0.0)
+        u = xp.where(mask.u, u, 0.0)
+        v = xp.where(mask.v, v, 0.0)
     # Horizontal divergence at the interior T-points of the physical levels
     # div[k, j, i] = (u[k, j, i+1/2] - u[k, j, i-1/2]) / dx
     #              + (v[k, j+1/2, i] - v[k, j-1/2, i]) / dy,   k = 1 .. Nz-2
     div_h = diff_x_bwd_3d(u) / dx + diff_y_bwd_3d(v) / dy  # [Nz-2, Ny-2, Nx-2]
 
     if isinstance(mask, Mask3D):
-        div_h = jnp.where(mask.h[..., 1:-1, 1:-1, 1:-1], div_h, 0.0)
+        div_h = xp.where(mask.h[..., 1:-1, 1:-1, 1:-1], div_h, 0.0)
     elif mask is not None:
         warnings.warn(
             "vertical_velocity(mask=<float array>) is deprecated; pass a "
@@ -642,10 +655,10 @@ def vertical_velocity(
         div_h = div_h * mask[..., 1:-1, 1:-1, 1:-1]
 
     # w[k+1/2] = -sum_{k'=1..k} div[k'] * dz  ->  w[k] for k = 1 .. Nz-2
-    w_int = -jnp.cumsum(div_h, axis=0) * dz  # [Nz-2, Ny-2, Nx-2]
+    w_int = -xp.cumsum(div_h, axis=0) * dz  # [Nz-2, Ny-2, Nx-2]
     w = interior(w_int, u)  # [Nz, Ny, Nx]; w[0] = 0 is the floor
     if isinstance(mask, Mask3D):
-        w = jnp.where(mask.w, w, 0.0)
+        w = xp.where(mask.w, w, 0.0)
     return w
 
 
@@ -673,8 +686,9 @@ def coriolis_param(
     float or scalar Array
         Reference Coriolis parameter f0 (1/s).
     """
-    lat_rad = jnp.deg2rad(jnp.mean(jnp.asarray(lat)))
-    return 2.0 * omega * jnp.sin(lat_rad)
+    xp = array_namespace(lat)
+    lat_rad = xp.deg2rad(xp.mean(xp.asarray(lat)))
+    return 2.0 * omega * xp.sin(lat_rad)
 
 
 def beta_param(
@@ -698,8 +712,9 @@ def beta_param(
     float or scalar Array
         Meridional Coriolis gradient beta (1/(m·s)).
     """
-    lat_rad = jnp.deg2rad(jnp.mean(jnp.asarray(lat)))
-    return (2.0 * omega / radius) * jnp.cos(lat_rad)
+    xp = array_namespace(lat)
+    lat_rad = xp.deg2rad(xp.mean(xp.asarray(lat)))
+    return (2.0 * omega / radius) * xp.cos(lat_rad)
 
 
 def coriolis_fn(
@@ -728,7 +743,8 @@ def coriolis_fn(
     Float[Array, "..."]
         Coriolis parameter field, same shape as *Y*.
     """
-    y0_val: float | Float[Array, ""] = jnp.mean(Y) if y0 is None else y0
+    xp = array_namespace(Y, f0, beta, y0)
+    y0_val: float | Float[Array, ""] = xp.mean(Y) if y0 is None else y0
     return f0 + beta * (Y - y0_val)
 
 
@@ -844,9 +860,7 @@ def potential_vorticity_multilayer(
         QG potential vorticity for all layers.
         Ghost ring is zero; interior is ``[:, 1:-1, 1:-1]``.
     """
-    qg_pv_layer = eqx.filter_vmap(
-        lambda p: qg_potential_vorticity(p, f0, beta, dx, dy, y, y0)
-    )
+    qg_pv_layer = vmap(lambda p: qg_potential_vorticity(p, f0, beta, dx, dy, y, y0))
     # q_k = lap(psi_k)/f0 + beta (y - y0)/f0 - f0 (A psi)_k   [nl, Ny, Nx]
     return qg_pv_layer(psi) - f0 * stretching_term(A, psi)
 
@@ -903,12 +917,13 @@ def sw_potential_vorticity(
         Potential vorticity at X-points.  Ghost ring is zero.
         Where ``h_X == 0`` the result is NaN.
     """
+    xp = array_namespace(u, v, h, f)
     omega = _curl_2d(u, v, dx, dy)
     f_X = _interp_T_to_X(f)
     h_X = _interp_T_to_X(h)
     # Use 0 in ghost ring (where h_X == 0) rather than NaN, matching
     # the ghost-ring-is-zero convention used by all other operators.
-    return jnp.where(h_X == 0, 0.0, (omega + f_X) / h_X)
+    return xp.where(h_X == 0, 0.0, (omega + f_X) / h_X)
 
 
 def sw_potential_vorticity_multilayer(
@@ -948,6 +963,6 @@ def sw_potential_vorticity_multilayer(
         Potential vorticity at X-points for all layers.
         Ghost ring is zero.
     """
-    return eqx.filter_vmap(
-        lambda u_k, v_k, h_k: sw_potential_vorticity(u_k, v_k, h_k, f, dx, dy)
-    )(u, v, h)
+    return vmap(lambda u_k, v_k, h_k: sw_potential_vorticity(u_k, v_k, h_k, f, dx, dy))(
+        u, v, h
+    )

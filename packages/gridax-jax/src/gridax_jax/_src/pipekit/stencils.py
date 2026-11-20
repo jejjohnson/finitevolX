@@ -24,6 +24,10 @@ from typing import Any, ClassVar
 
 import equinox as eqx
 from gridax import Mask2D
+from gridax._src.operators.coriolis import Coriolis2D
+from gridax._src.operators.diagnostics import coriolis_fn
+from gridax._src.operators.difference import Difference2D
+from gridax._src.operators.interpolation import Interpolation2D
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
@@ -37,10 +41,6 @@ from gridax_jax._src.boundary.boundary import (
     zero_boundaries,
     zero_gradient_boundaries,
 )
-from gridax_jax._src.operators.coriolis import Coriolis2D
-from gridax_jax._src.operators.diagnostics import coriolis_fn
-from gridax_jax._src.operators.difference import Difference2D
-from gridax_jax._src.operators.interpolation import Interpolation2D
 from gridax_jax._src.pipekit.base import FVXOperator, GridOperator
 
 Field = Float[Array, "*batch Ny Nx"]

@@ -24,7 +24,7 @@ Per issue #209 Q2/Q3, the spherical operators accept a Cartesian
 
 from __future__ import annotations
 
-from gridax_jax._src.operators.spherical_compound import (
+from gridax._src.operators.spherical_compound import (
     SphericalDivergence2D,
     SphericalDivergence3D,
     SphericalLaplacian2D,
@@ -33,7 +33,7 @@ from gridax_jax._src.operators.spherical_compound import (
     SphericalVorticity3D,
     geostrophic_velocity_sphere,
 )
-from gridax_jax._src.operators.spherical_difference import (
+from gridax._src.operators.spherical_difference import (
     SphericalDifference2D,
     SphericalDifference3D,
 )

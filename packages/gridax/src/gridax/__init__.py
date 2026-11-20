@@ -81,7 +81,60 @@ from gridax._src.mask import (
     pool_bool,
 )
 from gridax._src.operators._ghost import interior
+from gridax._src.operators.coriolis import (
+    Coriolis2D,
+    Coriolis3D,
+)
+from gridax._src.operators.diagnostic_operators import (
+    Energetics2D,
+    QGPotentialVorticity2D,
+    Strain2D,
+)
+from gridax._src.operators.diagnostics import (
+    available_potential_energy,
+    bernoulli_potential,
+    beta_param,
+    coriolis_fn,
+    coriolis_param,
+    enstrophy,
+    kinetic_energy,
+    okubo_weiss,
+    potential_enstrophy,
+    potential_vorticity,
+    potential_vorticity_multilayer,
+    qg_potential_vorticity,
+    relative_vorticity_cgrid,
+    shear_strain,
+    ssh_to_streamfn,
+    strain_magnitude_squared,
+    streamfn_to_ssh,
+    stretching_term,
+    sw_potential_vorticity,
+    sw_potential_vorticity_multilayer,
+    tensor_strain,
+    total_energy,
+    total_enstrophy,
+    vertical_velocity,
+)
+from gridax._src.operators.difference import (
+    Difference1D,
+    Difference2D,
+    Difference3D,
+)
 from gridax._src.operators.differentiable import smooth_abs, smooth_clamp, smooth_max
+from gridax._src.operators.divergence import (
+    Divergence2D,
+    divergence_2d,
+)
+from gridax._src.operators.interpolation import (
+    Interpolation1D,
+    Interpolation2D,
+    Interpolation3D,
+)
+from gridax._src.operators.jacobian import (
+    ArakawaJacobian2D,
+    arakawa_jacobian,
+)
 from gridax._src.operators.reductions import (
     area_mean,
     area_sum,
@@ -104,6 +157,18 @@ from gridax._src.operators.reductions import (
     volume_mean,
     volume_sum,
     volume_weights,
+)
+from gridax._src.operators.spherical_compound import (
+    SphericalDivergence2D,
+    SphericalDivergence3D,
+    SphericalLaplacian2D,
+    SphericalLaplacian3D,
+    SphericalVorticity2D,
+    SphericalVorticity3D,
+)
+from gridax._src.operators.spherical_difference import (
+    SphericalDifference2D,
+    SphericalDifference3D,
 )
 from gridax._src.operators.stencils import (
     avg_x_bwd_1d,
@@ -138,6 +203,13 @@ from gridax._src.operators.stencils import (
     diff_y_fwd_3d,
     diff_z_bwd_3d,
     diff_z_fwd_3d,
+)
+from gridax._src.operators.vorticity import (
+    Vorticity2D,
+    Vorticity3D,
+    pv_flux_arakawa_lamb,
+    pv_flux_blend,
+    vorticity_flux_upwind,
 )
 
 __version__ = "0.0.0"  # x-release-please-version
@@ -262,6 +334,68 @@ __all__ = [
     "volume_mean",
     "volume_sum",
     "volume_weights",
+    # C-grid difference operators
+    "Difference1D",
+    "Difference2D",
+    "Difference3D",
+    # C-grid interpolation operators
+    "Interpolation1D",
+    "Interpolation2D",
+    "Interpolation3D",
+    # Divergence
+    "Divergence2D",
+    "divergence_2d",
+    # Vorticity and PV fluxes
+    "Vorticity2D",
+    "Vorticity3D",
+    "pv_flux_arakawa_lamb",
+    "pv_flux_blend",
+    "vorticity_flux_upwind",
+    # Arakawa Jacobian
+    "ArakawaJacobian2D",
+    "arakawa_jacobian",
+    # Coriolis
+    "Coriolis2D",
+    "Coriolis3D",
+    # Diagnostic operators
+    "Energetics2D",
+    "QGPotentialVorticity2D",
+    "Strain2D",
+    # Functional diagnostics
+    "available_potential_energy",
+    "bernoulli_potential",
+    "beta_param",
+    "coriolis_fn",
+    "coriolis_param",
+    "enstrophy",
+    "kinetic_energy",
+    "okubo_weiss",
+    "potential_enstrophy",
+    "potential_vorticity",
+    "potential_vorticity_multilayer",
+    "qg_potential_vorticity",
+    "relative_vorticity_cgrid",
+    "shear_strain",
+    "ssh_to_streamfn",
+    "strain_magnitude_squared",
+    "streamfn_to_ssh",
+    "stretching_term",
+    "sw_potential_vorticity",
+    "sw_potential_vorticity_multilayer",
+    "tensor_strain",
+    "total_energy",
+    "total_enstrophy",
+    "vertical_velocity",
+    # Spherical differences
+    "SphericalDifference2D",
+    "SphericalDifference3D",
+    # Spherical divergence, vorticity and Laplacian
+    "SphericalDivergence2D",
+    "SphericalDivergence3D",
+    "SphericalLaplacian2D",
+    "SphericalLaplacian3D",
+    "SphericalVorticity2D",
+    "SphericalVorticity3D",
     # Constants
     "R_EARTH",
 ]
