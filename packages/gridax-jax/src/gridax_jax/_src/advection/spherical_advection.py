@@ -80,6 +80,7 @@ from __future__ import annotations
 
 import equinox as eqx
 from gridax import Mask2D, Mask3D, SphericalGrid2D, SphericalGrid3D
+from gridax._src.advection.flux import narrow_mask_hierarchy, upwind_flux
 from gridax._src.operators._ghost import interior
 from gridax._src.operators._utils import _metric_like, _safe_div_cos
 import jax.numpy as jnp
@@ -94,7 +95,6 @@ from gridax_jax._src.advection.advection import (
     _validate_wall,
     _wall_upwind_flux,
 )
-from gridax_jax._src.advection.flux import narrow_mask_hierarchy, upwind_flux
 from gridax_jax._src.advection.reconstruction import (
     Reconstruction2D,
     Reconstruction3D,

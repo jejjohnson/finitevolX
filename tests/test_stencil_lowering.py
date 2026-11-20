@@ -327,7 +327,7 @@ class TestUnrolledSmoothnessIndicator:
         ],
     )
     def test_matches_einsum_form(self, name, npts, monkeypatch):
-        from gridax_jax._src.advection import weno
+        from gridax._src.advection import weno
 
         qs = [_field(NY, NX, seed=k) * (1 + k) for k in range(npts)]
         fn = getattr(weno, name)
@@ -338,7 +338,7 @@ class TestUnrolledSmoothnessIndicator:
         np.testing.assert_allclose(out, ref, rtol=1e-13, atol=1e-13)
 
     def test_keeps_float32(self):
-        from gridax_jax._src.advection.weno import weno_7pts
+        from gridax._src.advection.weno import weno_7pts
 
         qs = [jnp.ones((NY, NX), dtype=jnp.float32) * k for k in range(7)]
         assert weno_7pts(*qs).dtype == jnp.float32

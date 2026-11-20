@@ -23,17 +23,18 @@ Non-Oscillatory Schemes for Hyperbolic Conservation Laws.
 
 from __future__ import annotations
 
-from gridax._src.operators._ghost import interior
-import jax.numpy as jnp
-from jaxtyping import Array, Float
+from typing import TYPE_CHECKING
 
-from gridax_jax._src.advection.linear import (
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.advection.linear import (
     linear_3pts_left,
     linear_3pts_right,
     linear_5pts_left,
     linear_5pts_right,
 )
-from gridax_jax._src.advection.weno import (
+from gridax._src.advection.weno import (
     weno_3pts,
     weno_3pts_improved,
     weno_3pts_improved_right,
@@ -43,6 +44,13 @@ from gridax_jax._src.advection.weno import (
     weno_5pts_improved_right,
     weno_5pts_right,
 )
+from gridax._src.operators._ghost import interior
+from gridax._src.pytree import array_namespace
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
 def plusminus(
@@ -61,7 +69,8 @@ def plusminus(
         ``u_pos = max(u, 0)`` and ``u_neg = min(u, 0)``, so that
         ``u = u_pos + u_neg``.
     """
-    return jnp.maximum(u, 0.0), jnp.minimum(u, 0.0)
+    xp = array_namespace(u)
+    return xp.maximum(u, 0.0), xp.minimum(u, 0.0)
 
 
 # ── Low-level upwind helpers (operate on interior slices) ─────────────────────
@@ -82,8 +91,9 @@ def upwind_1pt(q: Float[Array, "..."], u: Float[Array, "..."]) -> Float[Array, "
     array, shape (..., N-2)
         Face values ``h_face[i+1/2]``, **not** multiplied by velocity.
     """
+    xp = array_namespace(q, u)
     # Interior faces: between cells 1..N-2 and 2..N-1
-    return jnp.where(u >= 0.0, q[..., 1:-1], q[..., 2:])
+    return xp.where(u >= 0.0, q[..., 1:-1], q[..., 2:])
 
 
 # Pointwise stencils: ``method`` -> (left-biased, right-biased) face value.
@@ -137,6 +147,7 @@ def upwind_3pt(
     array, shape (..., N-2)
         Face values at interior faces.
     """
+    xp = array_namespace(q, u)
     left = _stencil(_STENCILS_3PT, 3, method, 0)
     right = _stencil(_STENCILS_3PT, 3, method, 1)
     # j = 1..N-2 (N-2 faces):  h[j+1/2] = L(q[j-1], q[j], q[j+1])
@@ -144,8 +155,8 @@ def upwind_3pt(
     # j = 1..N-3:              h[j+1/2] = R(q[j], q[j+1], q[j+2])
     h_neg_int = right(q[..., 1:-2], q[..., 2:-1], q[..., 3:])
     # j = N-2:                 h[j+1/2] = q[N-1]  (1st-order upwind fallback)
-    h_neg = jnp.concatenate([h_neg_int, q[..., -1:]], axis=-1)
-    return jnp.where(u >= 0.0, h_pos, h_neg)
+    h_neg = xp.concatenate([h_neg_int, q[..., -1:]], axis=-1)
+    return xp.where(u >= 0.0, h_pos, h_neg)
 
 
 def upwind_5pt(
@@ -177,6 +188,7 @@ def upwind_5pt(
     array, shape (..., N-4)
         Face values at deep interior faces (requires 2-cell padding on each side).
     """
+    xp = array_namespace(q, u)
     left = _stencil(_STENCILS_5PT, 5, method, 0)
     right = _stencil(_STENCILS_5PT, 5, method, 1)
     right3 = _stencil(_STENCILS_3PT, 3, method, 1)
@@ -188,8 +200,8 @@ def upwind_5pt(
     )
     # j = N-3:                 h[j+1/2] = R3(q[j], q[j+1], q[j+2])
     h_neg_last = right3(q[..., -3:-2], q[..., -2:-1], q[..., -1:])
-    h_neg = jnp.concatenate([h_neg_int, h_neg_last], axis=-1)
-    return jnp.where(u >= 0.0, h_pos, h_neg)
+    h_neg = xp.concatenate([h_neg_int, h_neg_last], axis=-1)
+    return xp.where(u >= 0.0, h_pos, h_neg)
 
 
 # ── Top-level dispatcher ─────────────────────────────────────────────────────
@@ -254,6 +266,7 @@ def reconstruct(
     >>> flux.shape
     (10, 10)
     """
+    xp = array_namespace(q, u)
     _VALID_METHODS = ("weno", "wenoz", "linear")
     if dim not in (0, 1):
         raise ValueError(f"dim must be 0 (y) or 1 (x), got {dim!r}")
@@ -271,12 +284,12 @@ def reconstruct(
     else:
         # y-direction: swap to operate along last axis, then swap back
         flux_vals_swapped = _reconstruct_last_axis(
-            jnp.swapaxes(q[:, 1:-1], 0, 1),
-            jnp.swapaxes(u[:, 1:-1], 0, 1),
+            xp.swapaxes(q[:, 1:-1], 0, 1),
+            xp.swapaxes(u[:, 1:-1], 0, 1),
             method,
             num_pts,
         )
-        flux_vals = jnp.swapaxes(flux_vals_swapped, 0, 1)
+        flux_vals = xp.swapaxes(flux_vals_swapped, 0, 1)
         return interior(flux_vals, q)
 
 
@@ -300,6 +313,7 @@ def _reconstruct_last_axis(
     array, shape (..., N-2)
         Interior face flux values (``h_face * u`` at each interior face).
     """
+    xp = array_namespace(q, u)
     vel = u[..., 1:-1]  # interior face velocities, shape (..., N-2)
 
     if num_pts == 1:
@@ -330,12 +344,12 @@ def _reconstruct_last_axis(
     h_first_neg = right5(
         q[..., 0:1], q[..., 1:2], q[..., 2:3], q[..., 3:4], q[..., 4:5]
     )
-    h3_first = jnp.where(vel[..., :1] >= 0.0, h_first_pos, h_first_neg)
+    h3_first = xp.where(vel[..., :1] >= 0.0, h_first_pos, h_first_neg)
 
     # Last face (j = N-2): positive flow 3pt left (q[N-3..N-1]); negative flow
     # has no cell j+2, so 1st-order upwind q[N-1].
     h_last_pos = left3(q[..., -3:-2], q[..., -2:-1], q[..., -1:])
-    h3_last = jnp.where(vel[..., -1:] >= 0.0, h_last_pos, q[..., -1:])
+    h3_last = xp.where(vel[..., -1:] >= 0.0, h_last_pos, q[..., -1:])
 
-    h_face = jnp.concatenate([h3_first, h5, h3_last], axis=-1)
+    h_face = xp.concatenate([h3_first, h5, h3_last], axis=-1)
     return h_face * vel

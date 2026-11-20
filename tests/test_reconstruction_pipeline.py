@@ -217,7 +217,7 @@ class TestLinearWENOConsistency:
 
     def test_weno3_smooth_approaches_linear3(self):
         """On smooth data, WENO3 output should match linear_3pts_left closely."""
-        from gridax_jax._src.advection.weno import weno_3pts
+        from gridax._src.advection.weno import weno_3pts
 
         # Smooth data with large offset to ensure smoothness ratios are good
         N = 100
@@ -232,7 +232,7 @@ class TestLinearWENOConsistency:
 
     def test_weno5_smooth_approaches_linear5(self):
         """On smooth data, WENO5 output should match linear_5pts_left closely."""
-        from gridax_jax._src.advection.weno import weno_5pts
+        from gridax._src.advection.weno import weno_5pts
 
         N = 100
         x = jnp.linspace(0, 2 * jnp.pi, N)

@@ -23,7 +23,15 @@ in Mathematics 1697, Springer, pp. 325--432.
 
 from __future__ import annotations
 
-from jaxtyping import Array
+from typing import TYPE_CHECKING
+
+import numpy as np
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
+
 
 # ── 2-point (linear) ─────────────────────────────────────────────────────────
 

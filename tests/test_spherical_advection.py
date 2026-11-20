@@ -10,12 +10,12 @@ from gridax import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
+from gridax._src.operators.reductions import spherical_area_weights
 from gridax_jax._src.advection.advection import Advection2D, Advection3D
 from gridax_jax._src.advection.spherical_advection import (
     SphericalAdvection2D,
     SphericalAdvection3D,
 )
-from gridax_jax._src.operators.reductions import spherical_area_weights
 import jax
 import jax.numpy as jnp
 import numpy as np

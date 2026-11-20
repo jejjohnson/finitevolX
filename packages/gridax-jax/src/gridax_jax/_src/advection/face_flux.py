@@ -21,6 +21,7 @@ See Also
 from __future__ import annotations
 
 from gridax import CartesianGrid2D, Mask2D
+from gridax._src.advection.flux import upwind_flux
 from gridax._src.operators.differentiable import smooth_abs
 import jax.numpy as jnp
 from jaxtyping import Array, Float
@@ -30,7 +31,6 @@ from gridax_jax._src.advection.advection import (
     _TVD_LIMITERS,
     _rec_funcs_for_method_2d,
 )
-from gridax_jax._src.advection.flux import upwind_flux
 from gridax_jax._src.advection.reconstruction import Reconstruction2D
 
 

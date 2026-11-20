@@ -1,6 +1,6 @@
-"""Tests for flux limiter functions in gridax_jax._src.advection.limiters."""
+"""Tests for flux limiter functions in gridax._src.advection.limiters."""
 
-from gridax_jax._src.advection.limiters import mc, minmod, superbee, van_leer
+from gridax._src.advection.limiters import mc, minmod, superbee, van_leer
 import jax.numpy as jnp
 import numpy as np
 import pytest

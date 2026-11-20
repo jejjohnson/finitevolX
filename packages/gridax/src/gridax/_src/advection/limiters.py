@@ -27,8 +27,17 @@ conservation laws", SIAM J. Numer. Anal. 21 (1984), 995-1011.
 
 from __future__ import annotations
 
-import jax.numpy as jnp
-from jaxtyping import Array, Float
+from typing import TYPE_CHECKING
+
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.pytree import array_namespace
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
 def minmod(r: Float[Array, ...]) -> Float[Array, ...]:
@@ -49,7 +58,8 @@ def minmod(r: Float[Array, ...]) -> Float[Array, ...]:
     array
         Limiter values φ(r) ∈ [0, 1].
     """
-    return jnp.maximum(0.0, jnp.minimum(1.0, r))
+    xp = array_namespace(r)
+    return xp.maximum(0.0, xp.minimum(1.0, r))
 
 
 def van_leer(r: Float[Array, ...]) -> Float[Array, ...]:
@@ -70,9 +80,10 @@ def van_leer(r: Float[Array, ...]) -> Float[Array, ...]:
     array
         Limiter values φ(r) ∈ [0, 2).
     """
+    xp = array_namespace(r)
     # (r + |r|) / (1 + |r|) = 2a / (1 + a) with a = max(r, 0); a is capped at
     # 1e20 (phi = 2 to all digits) so phi(inf) = 2, not inf / inf.
-    a = jnp.clip(r, 0.0, 1e20)
+    a = xp.clip(r, 0.0, 1e20)
     return 2.0 * a / (1.0 + a)
 
 
@@ -94,9 +105,10 @@ def superbee(r: Float[Array, ...]) -> Float[Array, ...]:
     array
         Limiter values φ(r) ∈ [0, 2].
     """
-    return jnp.maximum(
+    xp = array_namespace(r)
+    return xp.maximum(
         0.0,
-        jnp.maximum(jnp.minimum(2.0 * r, 1.0), jnp.minimum(r, 2.0)),
+        xp.maximum(xp.minimum(2.0 * r, 1.0), xp.minimum(r, 2.0)),
     )
 
 
@@ -119,7 +131,8 @@ def mc(r: Float[Array, ...]) -> Float[Array, ...]:
     array
         Limiter values φ(r) ∈ [0, 2].
     """
-    return jnp.maximum(
+    xp = array_namespace(r)
+    return xp.maximum(
         0.0,
-        jnp.minimum(jnp.minimum((1.0 + r) / 2.0, 2.0 * r), 2.0),
+        xp.minimum(xp.minimum((1.0 + r) / 2.0, 2.0 * r), 2.0),
     )

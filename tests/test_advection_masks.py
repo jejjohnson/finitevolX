@@ -38,13 +38,13 @@ from gridax import (
     Mask3D,
     SphericalGrid2D,
 )
+from gridax._src.operators.reductions import spherical_area_weights
 from gridax_jax._src.advection.advection import (
     Advection1D,
     Advection2D,
     Advection3D,
 )
 from gridax_jax._src.advection.spherical_advection import SphericalAdvection2D
-from gridax_jax._src.operators.reductions import spherical_area_weights
 import jax
 import jax.numpy as jnp
 import numpy as np
