@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+from gridax import (
+    CartesianGrid2D,
+    CartesianGrid3D,
+    Mask2D,
+    Mask3D,
+    SphericalGrid2D,
+    SphericalGrid3D,
+)
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -12,9 +20,6 @@ from finitevolx._src.advection.spherical_advection import (
     SphericalAdvection2D,
     SphericalAdvection3D,
 )
-from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
-from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
-from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators.reductions import spherical_area_weights
 
 R = 6.371e6

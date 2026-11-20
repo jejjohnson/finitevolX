@@ -1,23 +1,20 @@
 """Tests for Mask1D / Mask2D / Mask3D and StencilCapability1D / 2D / 3D."""
 
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx._src.mask import (
+from gridax import (
     Mask1D,
     Mask2D,
     Mask3D,
     StencilCapability1D,
     StencilCapability2D,
     StencilCapability3D,
-)
-from finitevolx._src.mask.utils import (
     count_contiguous,
     dilate_mask,
     make_sponge,
     pool_bool,
 )
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
 

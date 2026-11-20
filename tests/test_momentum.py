@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+from gridax import CartesianGrid2D, CartesianGrid3D
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
 from finitevolx._src.diffusion.momentum import MomentumAdvection2D, MomentumAdvection3D
-from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
 
 
 @pytest.fixture

@@ -1,10 +1,10 @@
 """Tests for Vorticity2D and Vorticity3D."""
 
+from gridax import CartesianGrid2D, CartesianGrid3D
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
 from finitevolx._src.operators.vorticity import Vorticity2D, Vorticity3D
 
 

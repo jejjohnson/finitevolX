@@ -18,10 +18,21 @@
     ".": {
       "release-type": "python",
       "package-name": "finitevolx",
+      "exclude-paths": ["packages/gridax"],
       "changelog-path": "CHANGELOG.md",
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": true,
       "extra-files": ["pyproject.toml"]
+    },
+    "packages/gridax": {
+      "release-type": "python",
+      "package-name": "gridax",
+      "component": "gridax",
+      "include-component-in-tag": true,
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true,
+      "extra-files": ["pyproject.toml", "src/gridax/__init__.py"]
     }
   }
 }

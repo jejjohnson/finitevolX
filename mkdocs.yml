@@ -31,13 +31,14 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          paths: [.]
+          paths: [., packages/gridax/src]
           options:
             docstring_style: numpy
             show_source: true
             show_root_heading: true
             preload_modules:
               - spectraldiffx
+              - gridax
   - mkdocs-jupyter:
       execute: false
       ignore_h1_titles: true

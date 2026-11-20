@@ -1,14 +1,14 @@
 """Tests for Difference1D, Difference2D, Difference3D."""
 
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx._src.grid.cartesian import (
+from gridax import (
     CartesianGrid1D,
     CartesianGrid2D,
     CartesianGrid3D,
 )
+import jax.numpy as jnp
+import numpy as np
+import pytest
+
 from finitevolx._src.operators.difference import (
     Difference1D,
     Difference2D,
@@ -403,7 +403,7 @@ class TestGradPerp2D:
 
     def test_all_dry_mask_zeros_u(self, grid2d):
         """An all-dry Mask2D zeroes both u and v — here we assert u."""
-        from finitevolx._src.mask import Mask2D
+        from gridax import Mask2D
 
         all_dry = Mask2D.from_mask(np.zeros((grid2d.Ny, grid2d.Nx), dtype=bool))
         diff = Difference2D(grid=grid2d, mask=all_dry)
@@ -414,7 +414,7 @@ class TestGradPerp2D:
 
     def test_all_dry_mask_zeros_v(self, grid2d):
         """An all-dry Mask2D zeroes both u and v — here we assert v."""
-        from finitevolx._src.mask import Mask2D
+        from gridax import Mask2D
 
         all_dry = Mask2D.from_mask(np.zeros((grid2d.Ny, grid2d.Nx), dtype=bool))
         diff = Difference2D(grid=grid2d, mask=all_dry)

@@ -34,11 +34,19 @@ dependencies = [
     "spectraldiffx>=0.1.1",
     "gaussx>=0.6.5",
     "integrix>=0.0.3",
+    # Grids and masks as NumPy data (packages/gridax in this workspace).
+    "gridax>=0.0.0",
 ]
 
 # gaussx provides the shared solver substrate: the Nyström preconditioner and
 # the tridiagonal solve are delegated to it.
+# This repository is a uv workspace: the root project (finitevolx) and
+# packages/gridax, the NumPy-only grid and mask package it builds on.
+[tool.uv.workspace]
+members = ["packages/gridax"]
+
 [tool.uv.sources]
+gridax = { workspace = true }
 spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "0.1.1" }
 gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.6.5" }
 # integrix owns the generic time steppers. Its own gaussx pin (v0.6.12) is
@@ -120,7 +128,7 @@ dev = [
 
 [tool.pytest.ini_options]
 filterwarnings = ["error", "ignore::DeprecationWarning"]
-testpaths = ["finitevolx", "tests"]
+testpaths = ["finitevolx", "tests", "packages/gridax/tests"]
 xfail_strict = true
 addopts = "--strict-markers"
 # Tiers (see tests/conftest.py).  Unmarked tests are the fast tier.
@@ -201,7 +209,7 @@ skip_covered = true
 branch = true
 command_line = "--module pytest"
 data_file = "reports/.coverage"
-source = ["finitevolx"]
+source = ["finitevolx", "gridax"]
 
 [tool.coverage.xml]
 output = "reports/coverage.xml"

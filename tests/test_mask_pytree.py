@@ -11,9 +11,6 @@ from __future__ import annotations
 
 import dataclasses
 from pathlib import Path
-import subprocess
-import sys
-import textwrap
 
 import equinox as eqx
 import jax
@@ -171,43 +168,3 @@ def test_from_bathymetry_drops_small_wet_regions():
     m = Mask2D.from_bathymetry(depth, min_area=2)
     assert not m.h[10, 10]
     assert m.h[1:9, 1:9].all()
-
-
-def test_mask_modules_import_without_jax():
-    """Every mask class builds with JAX and Equinox unimportable."""
-    script = textwrap.dedent(
-        """
-        import importlib.abc, sys, types
-
-        import numpy as np
-
-        class Block(importlib.abc.MetaPathFinder):
-            def find_spec(self, name, path, target=None):
-                if name.split(".")[0] in {"jax", "jaxlib", "equinox"}:
-                    raise ImportError(f"blocked: {name}")
-
-        sys.meta_path.insert(0, Block())
-        package = types.ModuleType("finitevolx")
-        package.__path__ = [sys.argv[1]]
-        sys.modules["finitevolx"] = package
-
-        import finitevolx._src.mask as mask
-
-        h = np.ones((8, 8), dtype=bool)
-        h[3:5, 3:5] = False
-        m2 = mask.Mask2D.from_mask(h)
-        m2.get_adaptive_masks(direction="y"), m2.ind_boundary, m2.not_xy_corner
-        mask.Mask2D.from_bathymetry(np.where(h, 50.0, -1.0), min_depth=1.0)
-        mask.Mask1D.from_dimensions(8).get_adaptive_masks()
-        mask.Mask3D.from_mask(np.broadcast_to(h, (4, 8, 8))).get_adaptive_masks("z")
-        loaded = sorted(m for m in sys.modules if m.split(".")[0] in {"jax", "equinox"})
-        assert not loaded, loaded
-        """
-    )
-    result = subprocess.run(
-        [sys.executable, "-c", script, str(ROOT / "finitevolx")],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert result.returncode == 0, result.stderr

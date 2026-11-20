@@ -7,12 +7,12 @@ east-west / north-south extents of a lat-lon cell, and the reductions
 interior, never the ghost ring.
 """
 
+from gridax import SphericalGrid2D, SphericalGrid3D
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
 from finitevolx._src.utils.constants import R_EARTH
 
 

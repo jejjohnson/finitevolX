@@ -17,6 +17,11 @@ from __future__ import annotations
 
 import itertools
 
+from gridax import (
+    CartesianGrid1D,
+    CartesianGrid2D,
+    CartesianGrid3D,
+)
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -27,11 +32,6 @@ from finitevolx._src.advection.advection import (
     Advection3D,
 )
 from finitevolx._src.diffusion.diffusion import Diffusion2D, Diffusion3D
-from finitevolx._src.grid.cartesian import (
-    CartesianGrid1D,
-    CartesianGrid2D,
-    CartesianGrid3D,
-)
 
 
 # ── fixtures ────────────────────────────────────────────────────────────────
@@ -284,7 +284,7 @@ def test_invalid_wall_raises(grid2d):
 
 
 def test_open_with_mask_raises(grid2d):
-    from finitevolx._src.mask import Mask2D
+    from gridax import Mask2D
 
     mask = Mask2D.from_mask(jnp.ones((grid2d.Ny, grid2d.Nx)))
     op = Advection2D(grid=grid2d, mask=mask)

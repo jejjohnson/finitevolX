@@ -9,11 +9,10 @@ from __future__ import annotations
 import warnings
 
 import equinox as eqx
+from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
-from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators.diagnostic_operators import _sanitize
 from finitevolx._src.operators.diagnostics import enstrophy, potential_enstrophy

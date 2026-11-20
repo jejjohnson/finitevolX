@@ -1,12 +1,11 @@
 """Tests for CartesianGrid1D, CartesianGrid2D, CartesianGrid3D."""
 
-import pytest
-
-from finitevolx._src.grid.cartesian import (
+from gridax import (
     CartesianGrid1D,
     CartesianGrid2D,
     CartesianGrid3D,
 )
+import pytest
 
 
 class TestArakawaCGrid1D:

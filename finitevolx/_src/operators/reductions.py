@@ -27,16 +27,19 @@ Example
 
 from __future__ import annotations
 
+from gridax import (
+    ArakawaCGrid2D,
+    ArakawaCGrid3D,
+    CartesianGrid2D,
+    CartesianGrid3D,
+    Mask2D,
+    Mask3D,
+    SphericalGrid2D,
+    SphericalGrid3D,
+)
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 
-from finitevolx._src.grid.base import (
-    ArakawaCGrid2D,
-    ArakawaCGrid3D,
-)
-from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
-from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
-from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._utils import _metric_like
 
 # ----------------------------------------------------------------------

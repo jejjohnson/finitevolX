@@ -33,17 +33,17 @@ from typing import TYPE_CHECKING, Any
 from jaxtyping import Bool, Float, Int
 import numpy as np
 
-from finitevolx._src.mask.base import (
+from gridax._src.mask.base import (
     StencilCapability1D,
     StencilCapability2D,
     StencilCapability3D,
 )
-from finitevolx._src.mask.utils import (
+from gridax._src.mask.utils import (
     dilate_mask,
     h_from_pooled,
     pool_bool,
 )
-from finitevolx._src.utils.pytree import array_namespace, pytree_dataclass
+from gridax._src.pytree import array_namespace, pytree_dataclass
 
 # The mask arrays are NumPy when a mask is built and JAX arrays (or tracers)
 # once a transform has flattened it. ``jaxtyping.Array`` imports JAX, so it

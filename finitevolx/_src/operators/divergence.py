@@ -7,10 +7,9 @@ Computes ∇·(u, v) at T-points from staggered face velocities.
 from __future__ import annotations
 
 import equinox as eqx
+from gridax import CartesianGrid2D, Mask2D
 from jaxtyping import Array, Float
 
-from finitevolx._src.grid.cartesian import CartesianGrid2D
-from finitevolx._src.mask import Mask2D
 from finitevolx._src.operators.difference import Difference2D, _divergence_2d
 
 

@@ -17,11 +17,10 @@ Part I. *Journal of Computational Physics*, 1(1), 119–143.
 from __future__ import annotations
 
 import equinox as eqx
+from gridax import CartesianGrid2D, Mask2D
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from finitevolx._src.grid.cartesian import CartesianGrid2D
-from finitevolx._src.mask import Mask2D
 from finitevolx._src.operators.diagnostic_operators import _sanitize
 from finitevolx._src.operators.stencils import _neighbours
 

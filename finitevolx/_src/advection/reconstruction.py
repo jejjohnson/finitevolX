@@ -12,6 +12,12 @@ Notation
 from collections.abc import Callable
 
 import equinox as eqx
+from gridax import (
+    ArakawaCGrid1D,
+    ArakawaCGrid2D,
+    ArakawaCGrid3D,
+    Mask2D,
+)
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 import numpy as np
@@ -32,12 +38,6 @@ from finitevolx._src.advection.weno import (
     weno_9pts as _weno9,
     weno_9pts_right as _weno9_right,
 )
-from finitevolx._src.grid.base import (
-    ArakawaCGrid1D,
-    ArakawaCGrid2D,
-    ArakawaCGrid3D,
-)
-from finitevolx._src.mask import Mask2D
 from finitevolx._src.operators._ghost import interior
 
 # Relative TVD floor (#294): ``r = num / (den + copysign(eps, den))`` with

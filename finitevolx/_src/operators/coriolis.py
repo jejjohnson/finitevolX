@@ -29,11 +29,10 @@ References
 from __future__ import annotations
 
 import equinox as eqx
+from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
-from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 
 

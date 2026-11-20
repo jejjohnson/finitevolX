@@ -1,17 +1,18 @@
 """Tests for Advection1D, Advection2D, Advection3D."""
 
+from gridax import (
+    CartesianGrid1D,
+    CartesianGrid2D,
+    CartesianGrid3D,
+    Mask2D,
+    Mask3D,
+)
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
 from finitevolx._src.advection.advection import Advection1D, Advection2D, Advection3D
-from finitevolx._src.grid.cartesian import (
-    CartesianGrid1D,
-    CartesianGrid2D,
-    CartesianGrid3D,
-)
-from finitevolx._src.mask import Mask2D, Mask3D
 
 
 @pytest.fixture

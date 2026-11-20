@@ -9,12 +9,12 @@ the :meth:`horizontal_grid` helper.
 
 from __future__ import annotations
 
-from finitevolx._src.grid.base import (
+from gridax._src.grid.base import (
     CurvilinearGrid1D,
     CurvilinearGrid2D,
     CurvilinearGrid3D,
 )
-from finitevolx._src.utils.pytree import pytree_dataclass
+from gridax._src.pytree import pytree_dataclass
 
 
 @pytree_dataclass

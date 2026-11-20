@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+from gridax import CartesianGrid2D, CartesianGrid3D
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
 from finitevolx._src.diffusion.diffusion import Diffusion2D, Diffusion3D, diffusion_2d
-from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
 
 
 @pytest.fixture
@@ -92,7 +92,7 @@ class TestDiffusion2DFunctional:
         ``Diffusion2D`` class operator — which applies the intermediate
         flux-masking pattern internally — to produce zero output.
         """
-        from finitevolx._src.mask import Mask2D
+        from gridax import Mask2D
 
         all_dry = Mask2D.from_mask(np.zeros((grid.Ny, grid.Nx), dtype=bool))
         diff = Diffusion2D(grid=grid, mask=all_dry)
@@ -108,7 +108,7 @@ class TestDiffusion2DFunctional:
         ``mask_h`` zeroing: construct a ``Mask2D`` with one dry interior
         cell at ``(3, 3)`` and verify the resulting tendency is 0 there.
         """
-        from finitevolx._src.mask import Mask2D
+        from gridax import Mask2D
 
         h_mask = np.ones((grid.Ny, grid.Nx), dtype=bool)
         h_mask[3, 3] = False
@@ -156,7 +156,7 @@ class TestDiffusion2DClass:
         unmasked class API bit-for-bit (since mask.h is 1 at wet cells),
         and the dry 2x2 interior block carries exactly zero tendency.
         """
-        from finitevolx._src.mask import Mask2D
+        from gridax import Mask2D
 
         h_mask = np.ones((grid.Ny, grid.Nx), dtype=bool)
         h_mask[2:4, 2:4] = False  # dry 2x2 interior block
@@ -244,7 +244,7 @@ class TestDiffusion2DFluxes:
 
     def test_all_dry_mask_zeros_east_flux(self, grid):
         """An all-dry Mask2D (mask.u = 0 everywhere) zeros east-face fluxes."""
-        from finitevolx._src.mask import Mask2D
+        from gridax import Mask2D
 
         all_dry = Mask2D.from_mask(np.zeros((grid.Ny, grid.Nx), dtype=bool))
         diff_masked = Diffusion2D(grid=grid, mask=all_dry)
@@ -673,9 +673,8 @@ class TestVariableKappa:
     @pytest.mark.parametrize("masked", [False, True])
     def test_symmetric_and_conservative(self, masked):
         """The variable-κ operator stays symmetric with zero column sums."""
+        from gridax import Mask2D
         import jax
-
-        from finitevolx._src.mask import Mask2D
 
         g = CartesianGrid2D.from_interior(6, 6, 1.0, 1.0)
         m = np.ones((g.Ny, g.Nx), dtype=bool)

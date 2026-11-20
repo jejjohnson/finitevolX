@@ -79,6 +79,7 @@ conservative: the two seam faces then use different boundary fallbacks
 from __future__ import annotations
 
 import equinox as eqx
+from gridax import Mask2D, Mask3D, SphericalGrid2D, SphericalGrid3D
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 
@@ -96,8 +97,6 @@ from finitevolx._src.advection.reconstruction import (
     Reconstruction2D,
     Reconstruction3D,
 )
-from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
-from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators._utils import _metric_like, _safe_div_cos
 

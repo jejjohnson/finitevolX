@@ -20,14 +20,13 @@ import math
 from typing import NamedTuple
 
 import equinox as eqx
+from gridax import Mask2D
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Int
 import lineax as lx
 import numpy as np
 from scipy import ndimage
-
-from finitevolx._src.mask import Mask2D
 
 # ---------------------------------------------------------------------------
 # Convergence diagnostics

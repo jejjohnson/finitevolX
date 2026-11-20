@@ -24,6 +24,14 @@ from __future__ import annotations
 from collections.abc import Callable
 
 import equinox as eqx
+from gridax import (
+    CartesianGrid1D,
+    CartesianGrid2D,
+    CartesianGrid3D,
+    Mask1D,
+    Mask2D,
+    Mask3D,
+)
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 
@@ -33,12 +41,6 @@ from finitevolx._src.advection.reconstruction import (
     Reconstruction2D,
     Reconstruction3D,
 )
-from finitevolx._src.grid.cartesian import (
-    CartesianGrid1D,
-    CartesianGrid2D,
-    CartesianGrid3D,
-)
-from finitevolx._src.mask import Mask1D, Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior
 
 # TVD limiter names supported by the advection operators.

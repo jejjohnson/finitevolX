@@ -29,6 +29,15 @@ the wet tendencies do not depend on the land values (``1e10``, ``0`` or
 
 from __future__ import annotations
 
+from gridax import (
+    CartesianGrid1D,
+    CartesianGrid2D,
+    CartesianGrid3D,
+    Mask1D,
+    Mask2D,
+    Mask3D,
+    SphericalGrid2D,
+)
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -40,13 +49,6 @@ from finitevolx._src.advection.advection import (
     Advection3D,
 )
 from finitevolx._src.advection.spherical_advection import SphericalAdvection2D
-from finitevolx._src.grid.cartesian import (
-    CartesianGrid1D,
-    CartesianGrid2D,
-    CartesianGrid3D,
-)
-from finitevolx._src.grid.spherical import SphericalGrid2D
-from finitevolx._src.mask import Mask1D, Mask2D, Mask3D
 from finitevolx._src.operators.reductions import spherical_area_weights
 from tests.fixtures._helpers import assert_matches_golden
 from tests.fixtures.inputs import (

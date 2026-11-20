@@ -7,11 +7,11 @@ side.  U-points live at east faces (j, i+1/2), V-points at north faces
 
 from __future__ import annotations
 
+from gridax import CartesianGrid2D
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.grid.cartesian import CartesianGrid2D
 from finitevolx._src.operators.diagnostics import (
     bernoulli_potential,
     kinetic_energy,

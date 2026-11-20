@@ -11,6 +11,10 @@ resolution-markers = [
 ]
 
 [manifest]
+members = [
+    "finitevolx",
+    "gridax",
+]
 overrides = [{ name = "gaussx", git = "https://github.com/jejjohnson/gaussx?tag=v0.6.5" }]
 
 [[package]]
@@ -513,6 +517,7 @@ dependencies = [
     { name = "diffrax" },
     { name = "equinox" },
     { name = "gaussx" },
+    { name = "gridax" },
     { name = "integrix" },
     { name = "jax" },
     { name = "jaxlib" },
@@ -575,6 +580,7 @@ requires-dist = [
     { name = "diffrax", specifier = ">=0.6.0" },
     { name = "equinox", specifier = ">=0.11.0" },
     { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?tag=v0.6.5" },
+    { name = "gridax", editable = "packages/gridax" },
     { name = "integrix", git = "https://github.com/jejjohnson/integrix?tag=v0.0.3" },
     { name = "jax", specifier = ">=0.4.38" },
     { name = "jaxlib", specifier = ">=0.4.38" },
@@ -708,6 +714,23 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/ce/42/b468aec74a0354b34c8cbf748db20d6e350a68a2b0912e128cabee49806c/google_crc32c-1.8.0-cp313-cp313-manylinux1_x86_64.manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:3b9776774b24ba76831609ffbabce8cdf6fa2bd5e9df37b594221c7e333a81fa", size = 33344, upload-time = "2025-12-16T00:40:24.742Z" },
     { url = "https://files.pythonhosted.org/packages/1c/e8/b33784d6fc77fb5062a8a7854e43e1e618b87d5ddf610a88025e4de6226e/google_crc32c-1.8.0-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:89c17d53d75562edfff86679244830599ee0a48efc216200691de8b02ab6b2b8", size = 33694, upload-time = "2025-12-16T00:40:25.505Z" },
     { url = "https://files.pythonhosted.org/packages/92/b1/d3cbd4d988afb3d8e4db94ca953df429ed6db7282ed0e700d25e6c7bfc8d/google_crc32c-1.8.0-cp313-cp313-win_amd64.whl", hash = "sha256:57a50a9035b75643996fbf224d6661e386c7162d1dfdab9bc4ca790947d1007f", size = 34435, upload-time = "2025-12-16T00:35:22.107Z" },
+]
+
+[[package]]
+name = "gridax"
+version = "0.0.0"
+source = { editable = "packages/gridax" }
+dependencies = [
+    { name = "jaxtyping" },
+    { name = "numpy" },
+    { name = "scipy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "jaxtyping", specifier = ">=0.3.0" },
+    { name = "numpy", specifier = ">=2.0.0" },
+    { name = "scipy", specifier = ">=1.14.0" },
 ]
 
 [[package]]

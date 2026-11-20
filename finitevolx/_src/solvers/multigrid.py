@@ -47,6 +47,7 @@ from collections.abc import Callable
 from typing import Literal
 
 import equinox as eqx
+from gridax import Mask2D
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Int
@@ -54,7 +55,6 @@ import numpy as np
 from scipy import linalg, sparse
 from scipy.sparse import csgraph
 
-from finitevolx._src.mask import Mask2D
 from finitevolx._src.solvers.iterative import _project_zero_mean, _wet_components
 
 # Stencil offsets (dj, di): the finest operator is 5-point, the Galerkin

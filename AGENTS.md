@@ -16,15 +16,22 @@ Everything is an Equinox module or a pure function, so it runs under `jit`,
 library of primitives**: new code composes what is here, and anything
 genuinely new lands where the next person will find it.
 
-It is one package, `finitevolx/` at the repo root (flat layout, no `src/`).
-Everything under `finitevolx/_src/` is private; the public API is the flat
+The repository is a uv workspace with two packages. `finitevolx/` at the
+repo root (flat layout, no `src/`) holds everything applied to a field and
+runs on JAX. `packages/gridax/` (`src/gridax/`, import `gridax`) holds the
+grids and masks as data and runs on NumPy alone: it depends on NumPy, SciPy
+and jaxtyping, never on JAX or Equinox, and CI installs it alone to check
+that (`gridax-numpy-only` in `ci.yml`). Everything under `finitevolx/_src/`
+and `gridax/_src/` is private; the public API is the flat
 `finitevolx.__all__`, re-exported from `finitevolx/__init__.py` (its order is
-a logical grouping, not alphabetical: ruff's `RUF022` is off).
+a logical grouping, not alphabetical: ruff's `RUF022` is off), which includes
+the grid and mask classes of `gridax` (the mask construction helpers stay
+`gridax`-only).
 
-| Area | Path (`finitevolx/_src/`) | Owns |
+| Area | Path (`finitevolx/_src/`, or `gridax/_src/`) | Owns |
 |---|---|---|
-| Grids | `grid/` | `ArakawaCGrid*` (topology) → `CurvilinearGrid*` (uniform metric) → `CartesianGrid1D/2D/3D`, `SphericalGrid2D/3D` (`base.py`, `cartesian.py`, `spherical.py`): frozen dataclasses built with NumPy, registered as JAX pytrees by `utils/pytree.py` when JAX is importable |
-| Masks | `mask/` | `Mask1D/2D/3D` (`cartesian.py`), frozen NumPy dataclasses like the grids: staggered wet masks, coast classification, `StencilCapability*` (`base.py`), adaptive stencil hierarchies; numpy / scipy construction helpers (`utils.py`) |
+| Grids | `gridax/_src/grid/` | `ArakawaCGrid*` (topology) → `CurvilinearGrid*` (uniform metric) → `CartesianGrid1D/2D/3D`, `SphericalGrid2D/3D` (`base.py`, `cartesian.py`, `spherical.py`): frozen dataclasses built with NumPy, registered as JAX pytrees by `gridax/_src/pytree.py` when JAX is importable |
+| Masks | `gridax/_src/mask/` | `Mask1D/2D/3D` (`cartesian.py`), frozen NumPy dataclasses like the grids: staggered wet masks, coast classification, `StencilCapability*` (`base.py`), adaptive stencil hierarchies; numpy / scipy construction helpers (`utils.py`) |
 | Layer 1: raw stencils | `operators/stencils.py`, `operators/_ghost.py` | `diff_*` / `avg_*` index arithmetic with no metric and no padding; `interior` pads a result back to the full shape |
 | Layer 2: functional helpers | `operators/diagnostics.py`, `operators/jacobian.py`, `operators/eos.py`, `operators/reductions.py`, `forcing/functional.py`, `advection/{weno,linear,limiters,reconstruct_fn,face_flux,flux}.py`, … | Pure functions on arrays (`kinetic_energy`, `arakawa_jacobian`, `area_mean`, `weno_5pts`, `upwind_flux`, `linear_drag_tendency`, …); they never take a `Mask2D`, except the reductions (`area_sum`, `masked_mean`, … accept `mask=`) |
 | Layer 3: class operators | `operators/` (`difference.py`, `interpolation.py`, `divergence.py`, `vorticity.py`, `coriolis.py`, `diagnostic_operators.py`, `spherical_*.py`), `advection/` (`advection.py`, `reconstruction.py`, `spherical_advection.py`), `diffusion/` | `Difference*`, `Interpolation*`, `Advection*`, `Reconstruction*`, `Diffusion*`, `MomentumAdvection*`, `Vorticity*`, `Coriolis*`, `Energetics2D`, … and their `Spherical*` siblings; mask-aware through a `mask` field |
@@ -77,7 +84,7 @@ model.
 | Library | finitevolX uses it for | The rule it brings |
 |---|---|---|
 | **jax** | Arrays, `jit`, `vmap`, `grad`, `lax.fori_loop` (multigrid V-cycles) | Pure functions; `.at[...].set` instead of mutation; no Python control flow on traced values; build outputs with the input's dtype (`interior` uses `jnp.result_type`). |
-| **equinox** | Every operator, BC, forcing and solver is an `eqx.Module`; `eqx.filter_vmap` (`multilayer`) | Never a dataclass or plain class for anything holding arrays, except the grids and masks: they are `pytree_dataclass`es (`utils/pytree.py`) built with NumPy, so they import without JAX; grid sizes are static metadata. Settings that pick a code path are `eqx.field(static=True)` (e.g. `Dirichlet1D.face`). An operator holds its grid, its mask and any precomputed hierarchy as fields, built once in `__init__`. |
+| **equinox** | Every operator, BC, forcing and solver is an `eqx.Module`; `eqx.filter_vmap` (`multilayer`) | Never a dataclass or plain class for anything holding arrays, except the grids and masks: they are `pytree_dataclass`es (`gridax/_src/pytree.py`) built with NumPy, so they import without JAX; grid sizes are static metadata. Settings that pick a code path are `eqx.field(static=True)` (e.g. `Dirichlet1D.face`). An operator holds its grid, its mask and any precomputed hierarchy as fields, built once in `__init__`. |
 | **jaxtyping** | Shape annotations (`Float[Array, "Ny Nx"]`) | Annotate public array arguments and returns; shape strings stay quoted (`UP037` and `F722` are off for that reason). They are documentation: nothing checks them at run time (beartype is a declared dependency but is not imported). |
 | **lineax** | `solve_cg` (`lx.CG` on a `FunctionLinearOperator`) | Elliptic operators here are negative (semi)definite: tag them `negative_semidefinite_tag`; a preconditioner approximates `A⁻¹` and `solve_cg` flips its sign for lineax. |
 | **diffrax** | Butcher-tableau solvers (`dfx.AbstractERK`), custom `dfx.AbstractSolver`s, `solve_ocean_pde` | A new integrator is a diffrax solver (or a pure step function); forcings live inside the vector field, not as extra diffrax terms. |

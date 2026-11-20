@@ -1,3 +1,23 @@
+from gridax import (
+    ArakawaCGrid1D,
+    ArakawaCGrid2D,
+    ArakawaCGrid3D,
+    CartesianGrid1D,
+    CartesianGrid2D,
+    CartesianGrid3D,
+    CurvilinearGrid1D,
+    CurvilinearGrid2D,
+    CurvilinearGrid3D,
+    Mask1D,
+    Mask2D,
+    Mask3D,
+    SphericalGrid2D,
+    SphericalGrid3D,
+    StencilCapability1D,
+    StencilCapability2D,
+    StencilCapability3D,
+)
+
 from finitevolx._src.advection.advection import Advection1D, Advection2D, Advection3D
 from finitevolx._src.advection.face_flux import (
     rusanov_flux,
@@ -107,31 +127,6 @@ from finitevolx._src.forcing.functional import (
 )
 from finitevolx._src.forcing.rayleigh import RayleighDamping2D, RayleighDamping3D
 from finitevolx._src.forcing.wind import WindCurl2D, WindStress2D, WindStress3D
-from finitevolx._src.grid.base import (
-    ArakawaCGrid1D,
-    ArakawaCGrid2D,
-    ArakawaCGrid3D,
-    CurvilinearGrid1D,
-    CurvilinearGrid2D,
-    CurvilinearGrid3D,
-)
-from finitevolx._src.grid.cartesian import (
-    CartesianGrid1D,
-    CartesianGrid2D,
-    CartesianGrid3D,
-)
-from finitevolx._src.grid.spherical import (
-    SphericalGrid2D,
-    SphericalGrid3D,
-)
-from finitevolx._src.mask import (
-    Mask1D,
-    Mask2D,
-    Mask3D,
-    StencilCapability1D,
-    StencilCapability2D,
-    StencilCapability3D,
-)
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.barotropic import barotropic_filter
 from finitevolx._src.operators.coriolis import Coriolis2D, Coriolis3D

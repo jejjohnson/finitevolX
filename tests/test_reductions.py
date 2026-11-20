@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+from gridax import (
+    CartesianGrid2D,
+    CartesianGrid3D,
+    Mask2D,
+    Mask3D,
+    SphericalGrid2D,
+    SphericalGrid3D,
+)
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
-from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
-from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators.reductions import (
     area_mean,
     area_sum,

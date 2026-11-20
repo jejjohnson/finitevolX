@@ -25,20 +25,19 @@ row ``j = NY // 2``.
 
 from __future__ import annotations
 
-import jax.numpy as jnp
-from jaxtyping import Array, Bool, Float
-import numpy as np
-
-from finitevolx._src.grid.cartesian import (
+from gridax import (
     CartesianGrid1D,
     CartesianGrid2D,
     CartesianGrid3D,
-)
-from finitevolx._src.grid.spherical import (
+    Mask1D,
+    Mask2D,
+    Mask3D,
     SphericalGrid2D,
     SphericalGrid3D,
 )
-from finitevolx._src.mask import Mask1D, Mask2D, Mask3D
+import jax.numpy as jnp
+from jaxtyping import Array, Bool, Float
+import numpy as np
 
 # ----------------------------------------------------------------------
 # Domain dimensions — total array shape (interior + 2 ghost cells per axis)

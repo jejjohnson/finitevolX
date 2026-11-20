@@ -69,12 +69,11 @@ pending a dedicated ``SphericalMask2D`` follow-up.
 from __future__ import annotations
 
 import equinox as eqx
+from gridax import Mask2D, Mask3D, SphericalGrid2D, SphericalGrid3D
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 
 from finitevolx._src.diffusion.diffusion import _face_kappa
-from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
-from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators._utils import _metric_like, _safe_div_cos
 
