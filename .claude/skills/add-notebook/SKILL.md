@@ -66,4 +66,4 @@ uv run python docs/notebooks/<name>.py      # writes docs/images/<name>/*.png
 make docs        # needs mystmd: npm install -g mystmd
 ```
 
-It fails on any MyST warning and any broken link. Then open the page with `make docs-serve` to check that every image renders.
+It fails on MyST errors and any broken link, and lists MyST warnings without failing, so read its log for your page. Then open the page with `make docs-serve` to check that every image renders.

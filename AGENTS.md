@@ -523,7 +523,7 @@ All of these must pass, from the repo root:
    (`uv run python tests/fixtures/_gen_golden.py`) and explain the diff in
    the PR.
 7. After changing a dependency: `uv lock`, and commit `uv.lock`.
-8. After changing docs or docstrings: `make docs` (needs mystmd: `npm install -g mystmd`). It fails on any MyST warning and any broken link; the `Docs` workflow runs it on every pull request.
+8. After changing docs or docstrings: `make docs` (needs mystmd: `npm install -g mystmd`). It fails on MyST errors and any broken link, and lists MyST warnings without failing, so read its log for new ones; the `Docs` workflow runs it on every pull request.
 
 ## Coding principles
 

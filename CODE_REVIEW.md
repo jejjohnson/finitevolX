@@ -127,7 +127,7 @@ order); review what they cannot see.
   `docs/capabilities.md` regenerated.
 - NumPy-style docstrings with the formula, shapes and an `Examples` section
   that actually runs (doctests are not collected, so run it).
-- A new theory page or notebook is in the `toc` of `docs/myst.yml`, and `make docs` passes (it fails on any MyST warning and any broken link).
+- A new theory page or notebook is in the `toc` of `docs/myst.yml`, and `make docs` passes (it fails on MyST errors and any broken link) with no new MyST warnings in its log.
 
 ### 8. Tests
 
