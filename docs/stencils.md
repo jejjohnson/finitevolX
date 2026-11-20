@@ -113,7 +113,7 @@ This is the **semi-discrete finite-volume equation**: continuous in time,
 discrete in space.  Two things are now apparent:
 
 1. **Cell averages** ($\bar{q}_{j,i}$) naturally live at cell centres.
-2. **Face fluxes** ($F^x_{j,i+½}$, $F^y_{j+½,i}$) naturally live at cell faces.
+2. **Face fluxes** ($F^x_{j,i+1/2}$, $F^y_{j+1/2,i}$) naturally live at cell faces.
 
 This is *exactly* the Arakawa C-grid staggering — it is not an arbitrary
 choice but a direct consequence of the Gauss divergence theorem.
@@ -167,7 +167,7 @@ $$
 Each term is a **backward difference** of a face quantity returning to
 the cell centre — this is `diff_x_bwd_2d(u) / dx + diff_y_bwd_2d(v) / dy`.
 
-Similarly, the **curl** (relative vorticity) at X-point $(j+½, i+½)$
+Similarly, the **curl** (relative vorticity) at X-point $(j+1/2, i+1/2)$
 reads the four surrounding face values:
 
 $$
@@ -179,12 +179,13 @@ $$
 Each term is a **forward difference** of a face quantity advancing to
 the corner — this is `diff_x_fwd_2d(v) / dx - diff_y_fwd_2d(u) / dy`.
 
-!!! note "Discrete conservation"
-    Because the east-face flux of cell $(j,i)$ is identically the west-face
-    flux of cell $(j, i+1)$, the finite-volume scheme conserves the
-    total integral of $q$ over the domain to machine precision (up to
-    boundary fluxes).  This **telescoping property** is built into the
-    C-grid layout and is preserved by the raw stencils.
+:::{note} Discrete conservation
+Because the east-face flux of cell $(j,i)$ is identically the west-face
+flux of cell $(j, i+1)$, the finite-volume scheme conserves the
+total integral of $q$ over the domain to machine precision (up to
+boundary fluxes).  This **telescoping property** is built into the
+C-grid layout and is preserved by the raw stencils.
+:::
 
 ### Ghost cells and the `interior()` helper
 
@@ -365,14 +366,14 @@ $$
 |----------|---------|------|
 | `diff_x_fwd_2d` | $h_{j,i+1} - h_{j,i}$ | T→U, V→X |
 | `diff_y_fwd_2d` | $h_{j+1,i} - h_{j,i}$ | T→V, U→X |
-| `diff_x_bwd_2d` | $h_{j,i+½} - h_{j,i-½}$ | U→T, X→V |
-| `diff_y_bwd_2d` | $h_{j+½,i} - h_{j-½,i}$ | V→T, X→U |
+| `diff_x_bwd_2d` | $h_{j,i+1/2} - h_{j,i-1/2}$ | U→T, X→V |
+| `diff_y_bwd_2d` | $h_{j+1/2,i} - h_{j-1/2,i}$ | V→T, X→U |
 | `diff_x_fwd_1d` | $h_{i+1} - h_i$ | T→U (1D) |
-| `diff_x_bwd_1d` | $h_{i+½} - h_{i-½}$ | U→T (1D) |
+| `diff_x_bwd_1d` | $h_{i+1/2} - h_{i-1/2}$ | U→T (1D) |
 | `diff_x_fwd_3d` | $h_{k,j,i+1} - h_{k,j,i}$ | T→U (3D) |
 | `diff_y_fwd_3d` | $h_{k,j+1,i} - h_{k,j,i}$ | T→V (3D) |
-| `diff_x_bwd_3d` | $h_{k,j,i+½} - h_{k,j,i-½}$ | U→T (3D) |
-| `diff_y_bwd_3d` | $h_{k,j+½,i} - h_{k,j-½,i}$ | V→T (3D) |
+| `diff_x_bwd_3d` | $h_{k,j,i+1/2} - h_{k,j,i-1/2}$ | U→T (3D) |
+| `diff_y_bwd_3d` | $h_{k,j+1/2,i} - h_{k,j-1/2,i}$ | V→T (3D) |
 
 ### Averaging stencils
 
@@ -380,18 +381,18 @@ $$
 |----------|---------|------|
 | `avg_x_fwd_2d` | $\frac{1}{2}(h_{j,i} + h_{j,i+1})$ | T→U, V→X |
 | `avg_y_fwd_2d` | $\frac{1}{2}(h_{j,i} + h_{j+1,i})$ | T→V, U→X |
-| `avg_x_bwd_2d` | $\frac{1}{2}(h_{j,i-½} + h_{j,i+½})$ | U→T, X→V |
-| `avg_y_bwd_2d` | $\frac{1}{2}(h_{j-½,i} + h_{j+½,i})$ | V→T, X→U |
+| `avg_x_bwd_2d` | $\frac{1}{2}(h_{j,i-1/2} + h_{j,i+1/2})$ | U→T, X→V |
+| `avg_y_bwd_2d` | $\frac{1}{2}(h_{j-1/2,i} + h_{j+1/2,i})$ | V→T, X→U |
 | `avg_xfwd_yfwd_2d` | $\frac{1}{4}\sum$ (NE quad) | T→X |
 | `avg_xbwd_ybwd_2d` | $\frac{1}{4}\sum$ (SW quad) | X→T |
 | `avg_xbwd_yfwd_2d` | $\frac{1}{4}\sum$ (bwd-x, fwd-y) | U→V |
 | `avg_xfwd_ybwd_2d` | $\frac{1}{4}\sum$ (fwd-x, bwd-y) | V→U |
 | `avg_x_fwd_1d` | $\frac{1}{2}(h_i + h_{i+1})$ | T→U (1D) |
-| `avg_x_bwd_1d` | $\frac{1}{2}(h_{i-½} + h_{i+½})$ | U→T (1D) |
+| `avg_x_bwd_1d` | $\frac{1}{2}(h_{i-1/2} + h_{i+1/2})$ | U→T (1D) |
 | `avg_x_fwd_3d` | $\frac{1}{2}(h_{k,j,i} + h_{k,j,i+1})$ | T→U (3D) |
 | `avg_y_fwd_3d` | $\frac{1}{2}(h_{k,j,i} + h_{k,j+1,i})$ | T→V (3D) |
-| `avg_x_bwd_3d` | $\frac{1}{2}(h_{k,j,i-½} + h_{k,j,i+½})$ | U→T (3D) |
-| `avg_y_bwd_3d` | $\frac{1}{2}(h_{k,j-½,i} + h_{k,j+½,i})$ | V→T (3D) |
+| `avg_x_bwd_3d` | $\frac{1}{2}(h_{k,j,i-1/2} + h_{k,j,i+1/2})$ | U→T (3D) |
+| `avg_y_bwd_3d` | $\frac{1}{2}(h_{k,j-1/2,i} + h_{k,j+1/2,i})$ | V→T (3D) |
 
 ---
 

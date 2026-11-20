@@ -290,6 +290,7 @@ within noise; gradient about +25 % for weno5, unchanged for weno9, and
 
 ---
 
+(measured-accuracy-and-cost)=
 ## Measured Accuracy and Cost
 
 Solid-body rotation of a Gaussian, $q_0 = e^{-r^2 / 2\sigma^2}$ with
@@ -336,6 +337,7 @@ What it says:
 
 ---
 
+(masks-land-safe-advection)=
 ## Masks: Land-Safe Advection
 
 Every method of `Advection1D/2D/3D` and `SphericalAdvection2D/3D` is
@@ -386,6 +388,7 @@ for method in ("naive", "upwind3", "weno5", "weno9", "van_leer"):
 
 ---
 
+(walls-write-region-and-periodic-halos)=
 ## Walls, Write Region and Periodic Halos
 
 All advection operators take `wall="closed"` (default) or `wall="open"`.

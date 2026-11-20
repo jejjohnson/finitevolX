@@ -219,7 +219,7 @@ fig.savefig(IMG_DIR / "index_sets.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
-# ![Index sets on a basin with an island](../../images/inhomogeneous_bcs_tutorial/index_sets.png)
+# ![Index sets on a basin with an island](../images/inhomogeneous_bcs_tutorial/index_sets.png)
 #
 # The coast ring $C$ is dry: it wraps **both** the outer walls and the
 # island, one cell outside the water (the array corners and the island's
@@ -346,7 +346,7 @@ fig.savefig(IMG_DIR / "block_structure.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
-# ![Block structure of the discrete operator](../../images/inhomogeneous_bcs_tutorial/block_structure.png)
+# ![Block structure of the discrete operator](../images/inhomogeneous_bcs_tutorial/block_structure.png)
 #
 # The top-left block is $A_{EE}$ (what the solver inverts); the top-right
 # block $A_{EK}$ is the coupling that becomes the right-hand-side
@@ -752,7 +752,7 @@ fig.savefig(IMG_DIR / "lift_decomposition.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
-# ![Lift, correction, homogeneous part and full solution](../../images/inhomogeneous_bcs_tutorial/lift_decomposition.png)
+# ![Lift, correction, homogeneous part and full solution](../images/inhomogeneous_bcs_tutorial/lift_decomposition.png)
 #
 # The correction (second panel) is non-zero only on the single layer of
 # wet cells touching the coast — the rows of $A_{EK}$ are that sparse.
@@ -829,7 +829,7 @@ fig.savefig(IMG_DIR / "convergence.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
-# ![Second-order convergence](../../images/inhomogeneous_bcs_tutorial/convergence.png)
+# ![Second-order convergence](../images/inhomogeneous_bcs_tutorial/convergence.png)
 #
 # The observed order is 2: the known-value machinery adds no error of its
 # own — the only error is the 5-point stencil's truncation error.
@@ -879,7 +879,7 @@ fig.savefig(IMG_DIR / "observations.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
-# ![Pinning interior observations](../../images/inhomogeneous_bcs_tutorial/observations.png)
+# ![Pinning interior observations](../images/inhomogeneous_bcs_tutorial/observations.png)
 #
 # ### 8.2 Multi-layer PV inversion
 #
@@ -987,7 +987,7 @@ fig.savefig(IMG_DIR / "sensitivity.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
-# ![Sensitivity of an interior value to the boundary data](../../images/inhomogeneous_bcs_tutorial/sensitivity.png)
+# ![Sensitivity of an interior value to the boundary data](../images/inhomogeneous_bcs_tutorial/sensitivity.png)
 #
 # Two details worth noticing:
 #

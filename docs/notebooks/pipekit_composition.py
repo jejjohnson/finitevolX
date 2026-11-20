@@ -229,7 +229,7 @@ fig.savefig(IMG_DIR / "diagnostics.png", dpi=110, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
-# ![Final state, vorticity, Okubo–Weiss and energy drift](../../images/pipekit_composition/diagnostics.png)
+# ![Final state, vorticity, Okubo–Weiss and energy drift](../images/pipekit_composition/diagnostics.png)
 #
 # The energy drift is RK4 time error alone: halving Δt divides it by about
 # 32 (see `tests/test_pipekit_diagnostics.py`).
@@ -285,7 +285,7 @@ fig.savefig(IMG_DIR / "misfit.png", dpi=110, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
-# ![Misfit against f0](../../images/pipekit_composition/misfit.png)
+# ![Misfit against f0](../images/pipekit_composition/misfit.png)
 
 # %% [markdown]
 # ## 4. Configuration round trip

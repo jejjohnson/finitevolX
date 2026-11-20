@@ -62,13 +62,14 @@ This is the same wall `method="cg"` imposes through `masked_laplacian` with
 the `Mask2D` of the same staggering (`xy_corner_strict` for ψ, `h` for p),
 so every combination converges at second order.
 
-!!! tip "When to use which BC"
-    - **Dirichlet (DST)**: Streamfunction inversion in a closed basin
-      ($\psi = 0$ on coastline).  Most common for vorticity inversion.
-    - **Neumann (DCT)**: Pressure correction with solid walls
-      ($\partial p / \partial n = 0$).
-    - **Periodic (FFT)**: Doubly-periodic domains (idealised studies,
-      turbulence simulations).
+:::{tip} When to use which BC
+- **Dirichlet (DST)**: Streamfunction inversion in a closed basin
+  ($\psi = 0$ on coastline).  Most common for vorticity inversion.
+- **Neumann (DCT)**: Pressure correction with solid walls
+  ($\partial p / \partial n = 0$).
+- **Periodic (FFT)**: Doubly-periodic domains (idealised studies,
+  turbulence simulations).
+:::
 
 ---
 
@@ -116,7 +117,7 @@ In finitevolX, pass `known_values=` (and optionally `known_mask=`) to
 `BoundaryConditionSet` as `bc=` (the T-point `pressure_from_divergence`
 refuses known values: its Dirichlet wall is on the cell faces); see the
 [usage guide](elliptic_solvers_usage.md#known-boundary-values-inhomogeneous-dirichlet).
-The [Known Boundary Values tutorial](notebooks/inhomogeneous_bcs_tutorial.py)
+The [Known Boundary Values tutorial](notebooks/inhomogeneous_bcs_tutorial.ipynb)
 derives all of this from scratch — notation, block structure, pseudocode, a
 NumPy implementation, a convergence study, and gradients with respect to
 the boundary data.
@@ -147,10 +148,11 @@ $(0,0)$ eigenvalue is zero (null space = constant solution).  The solvers
 handle this by enforcing a **zero-mean gauge**: the $(0,0)$ spectral
 coefficient is set to zero, selecting the unique zero-mean solution.
 
-!!! note "Complexity"
-    All spectral solvers run in $O(N_y N_x \log(N_y N_x))$ time —
-    the cost of the forward and inverse transforms.  There is no iterative
-    convergence loop.
+:::{note} Complexity
+All spectral solvers run in $O(N_y N_x \log(N_y N_x))$ time —
+the cost of the forward and inverse transforms.  There is no iterative
+convergence loop.
+:::
 
 ---
 
@@ -183,13 +185,14 @@ back-substitution: measured on a 2-vCPU CPU it is 5–11× the spectral solve
 on a rectangle, as fast as CG + multigrid at 128² and 2–3.6× faster at 256²
 (see the [Solver Comparison](solver_comparison.md)).
 
-!!! warning "Setup cost and memory"
-    The solver stores the $N_b \times N_b$ capacitance matrix, and the setup
-    costs $N_b$ rectangular solves plus an $O(N_b^3)$ factorisation.  For a
-    circular basin with an island at 256² ($N_b = 795$) that is 5.8 MiB and
-    about 4 s (9 MiB and 5 s for the 1 020 coast nodes of the 256²
-    rectangle); both grow with the length of the coastline, so for very
-    long coastlines or a mask that changes, use CG + multigrid.
+:::{warning} Setup cost and memory
+The solver stores the $N_b \times N_b$ capacitance matrix, and the setup
+costs $N_b$ rectangular solves plus an $O(N_b^3)$ factorisation.  For a
+circular basin with an island at 256² ($N_b = 795$) that is 5.8 MiB and
+about 4 s (9 MiB and 5 s for the 1 020 coast nodes of the 256²
+rectangle); both grow with the length of the coastline, so for very
+long coastlines or a mask that changes, use CG + multigrid.
+:::
 
 ---
 

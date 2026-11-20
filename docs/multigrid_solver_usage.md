@@ -109,12 +109,13 @@ solver = fvx.build_multigrid_solver(
 )
 ```
 
-!!! tip "Auto level detection"
-    When `n_levels=None` (default), the factory coarsens both dimensions
-    with `n -> (n + 1) // 2` while both stay >= 4.  For a 64x64 grid this
-    gives 5 levels (64 -> 32 -> 16 -> 8 -> 4), for a 34x34 grid
-    (32 interior cells plus the ghost ring) 4 levels (34 -> 17 -> 9 -> 5).
-    The coarsest level is solved exactly.
+:::{tip} Auto level detection
+When `n_levels=None` (default), the factory coarsens both dimensions
+with `n -> (n + 1) // 2` while both stay >= 4.  For a 64x64 grid this
+gives 5 levels (64 -> 32 -> 16 -> 8 -> 4), for a 34x34 grid
+(32 interior cells plus the ghost ring) 4 levels (34 -> 17 -> 9 -> 5).
+The coarsest level is solved exactly.
+:::
 
 ---
 
@@ -283,10 +284,11 @@ u_batch = batch_solve(solver, rhs_batch)  # (3, Ny, Nx)
 | `n_levels` | auto | Any shape, any `n_levels`; fewer levels make the dense bottom solve larger (at most 4096 wet points). |
 | `bc` | `"dirichlet"` | `"neumann"` for zero flux at the coast (T-point pressure / free surface). |
 
-!!! tip "Quick convergence check"
-    ```python
-    u = solver(rhs)
-    from gridax_jax._src.solvers.multigrid import _apply_operator
-    residual = jnp.linalg.norm(rhs - _apply_operator(u, solver.levels[0]))
-    print(f"Residual norm: {residual:.2e}")
-    ```
+:::{tip} Quick convergence check
+```python
+u = solver(rhs)
+from gridax_jax._src.solvers.multigrid import _apply_operator
+residual = jnp.linalg.norm(rhs - _apply_operator(u, solver.levels[0]))
+print(f"Residual norm: {residual:.2e}")
+```
+:::

@@ -1,7 +1,7 @@
 # Raw Stencil Primitives
 
 Pure index-arithmetic stencils for Arakawa C-grids.  No metric scaling,
-no ghost-ring padding.  See the [theory page](../stencils.md) for the
+no ghost-ring padding.  See the [theory page](../stencils/) for the
 mathematical background.
 
 ## 1-D Difference Stencils

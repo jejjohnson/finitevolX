@@ -212,14 +212,14 @@ Full documentation with theory, usage guides, and API reference:
 
 | Section | Content |
 |---------|---------|
-| [C-Grid Discretization](https://jejjohnson.github.io/finitevolX/cgrid_discretization/) | Theory of Arakawa C-grid staggering |
-| [Operators](https://jejjohnson.github.io/finitevolX/spatial_operators/) | Divergence, vorticity, Coriolis, diffusion |
+| [C-Grid Discretization](https://jejjohnson.github.io/finitevolX/cgrid-discretization/) | Theory of Arakawa C-grid staggering |
+| [Operators](https://jejjohnson.github.io/finitevolX/spatial-operators/) | Divergence, vorticity, Coriolis, diffusion |
 | [Advection](https://jejjohnson.github.io/finitevolX/advection/) | TVD and WENO reconstruction theory |
-| [Boundary Conditions](https://jejjohnson.github.io/finitevolX/boundary_conditions/) | Per-face BC composition |
-| [Elliptic Solvers](https://jejjohnson.github.io/finitevolX/elliptic_solvers/) | Spectral, capacitance, CG, multigrid theory |
-| [Time Integration](https://jejjohnson.github.io/finitevolX/time_integration/) | Explicit, IMEX, and diffrax-based steppers |
-| [Solver Comparison](https://jejjohnson.github.io/finitevolX/solver_comparison/) | Visual benchmark across geometries |
-| [API Reference](https://jejjohnson.github.io/finitevolX/api/grids/) | Auto-generated from docstrings |
+| [Boundary Conditions](https://jejjohnson.github.io/finitevolX/boundary-conditions/) | Per-face BC composition |
+| [Elliptic Solvers](https://jejjohnson.github.io/finitevolX/elliptic-solvers/) | Spectral, capacitance, CG, multigrid theory |
+| [Time Integration](https://jejjohnson.github.io/finitevolX/time-integration/) | Explicit, IMEX, and diffrax-based steppers |
+| [Solver Comparison](https://jejjohnson.github.io/finitevolX/solver-comparison/) | Visual benchmark across geometries |
+| [API Reference](https://jejjohnson.github.io/finitevolX/reference/grids/) | Auto-generated from docstrings |
 
 ---
 

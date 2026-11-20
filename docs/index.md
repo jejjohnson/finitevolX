@@ -81,7 +81,7 @@ artifacts written by each script.
 
 ## Documentation
 
-For detailed API documentation, see the [API Reference](api/index.md).
+For detailed API documentation, see the [API Reference](https://jejjohnson.github.io/finitevolX/reference/).
 
 ## Citation
 

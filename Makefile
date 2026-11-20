@@ -1,4 +1,4 @@
-.PHONY: help install uv-format uv-lint uv-pre-commit test test-all test-slow test-integration test-cov typecheck ci docs docs-serve docs-deploy capabilities clean version
+.PHONY: help install uv-format uv-lint uv-pre-commit test test-all test-slow test-integration test-cov typecheck ci docs docs-check docs-api docs-serve capabilities clean version
 .DEFAULT_GOAL = help
 
 # ANSI Color Codes for pretty terminal output
@@ -99,21 +99,20 @@ ci: ## Run all CI checks locally (lint + format + typecheck + tests)
 
 ##@ Documentation
 .PHONY: docs
-docs: ## Build documentation
-	@printf "$(YELLOW)>>> Building documentation...$(RESET)\n"
-	@uv run mkdocs build
-	@printf "$(GREEN)>>> Documentation built successfully.$(RESET)\n"
+docs: ## Build the site (MyST prose + Zensical API) into public/ and check its links
+	@uv run --extra docs --extra pipekit python scripts/build_docs.py
+
+.PHONY: docs-check
+docs-check: ## Validate the docs sources without rendering the MyST theme
+	@uv run --extra docs --extra pipekit python scripts/build_docs.py --check
+
+.PHONY: docs-api
+docs-api: ## Build only the Zensical API reference into site/
+	@uv run --extra docs --extra pipekit zensical build --strict
 
 .PHONY: docs-serve
-docs-serve: ## Serve documentation locally
-	@printf "$(YELLOW)>>> Starting local documentation server...$(RESET)\n"
-	@uv run mkdocs serve
-
-.PHONY: docs-deploy
-docs-deploy: ## Deploy documentation to GitHub Pages
-	@printf "$(YELLOW)>>> Deploying documentation to GitHub Pages...$(RESET)\n"
-	@uv run mkdocs gh-deploy --force
-	@printf "$(GREEN)>>> Documentation deployed successfully.$(RESET)\n"
+docs-serve: docs ## Build, then serve the assembled site at http://127.0.0.1:8000
+	@uv run python -m http.server 8000 --directory public
 
 .PHONY: capabilities
 capabilities: ## Regenerate docs/capabilities.md (every public name, for reuse)

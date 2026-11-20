@@ -436,7 +436,7 @@ agent can read and follow them):
 
 Downstream users get finitevolX's guidance through the Claude Code plugin
 in `plugins/finitevolx/` (published by `.claude-plugin/marketplace.json`)
-and `docs/llms.txt` (MkDocs copies it to the site root); see
+and `docs/llms.txt` (`scripts/build_docs.py` copies it to the site root); see
 `docs/agents.md`. When the public API or the headline usage changes, update
 `plugins/finitevolx/skills/finite-volume-models-with-finitevolx/` too:
 `tests/test_plugin_skill.py` runs its worked example and checks that every
@@ -458,8 +458,8 @@ make uv-format            # ruff format . && ruff check --fix .
 make typecheck            # uv run ty check packages/gridax-jax/src packages/gridax/src finitevolx
 make ci                   # lint, format check, ty, tests
 make capabilities         # regenerate docs/capabilities.md
-make docs                 # uv run mkdocs build
-make docs-serve           # local MkDocs preview
+make docs                 # build the docs site into public/ and check every link
+make docs-serve           # build, then serve the docs at http://127.0.0.1:8000
 make uv-pre-commit        # every pre-commit hook on every file
 ```
 
@@ -523,10 +523,7 @@ All of these must pass, from the repo root:
    (`uv run python tests/fixtures/_gen_golden.py`) and explain the diff in
    the PR.
 7. After changing a dependency: `uv lock`, and commit `uv.lock`.
-8. After changing docs or docstrings: `uv run mkdocs build` (what
-   `pages.yml` runs) and check that the log has no new `WARNING` lines.
-   `--strict` does not pass yet: the existing docstrings raise about 115
-   griffe warnings, so compare against `main` rather than expecting zero.
+8. After changing docs or docstrings: `make docs` (needs mystmd: `npm install -g mystmd`). It fails on MyST errors and any broken link, and lists MyST warnings without failing, so read its log for new ones; the `Docs` workflow runs it on every pull request.
 
 ## Coding principles
 
@@ -599,12 +596,7 @@ operations.
 
 ## Documentation
 
-MkDocs + Material + mkdocstrings (NumPy docstring style) + mkdocs-jupyter,
-configured in `mkdocs.yml`; `pages.yml` runs `mkdocs gh-deploy` on every
-push to `main` (no workflow builds the docs on a pull request, so build them
-yourself). If `pandoc` is installed locally, mkdocs-jupyter's jupytext probe
-of every `.md` page can hang on the `::: gridax_jax.Name` blocks; build with
-`pandoc` off your `PATH`. The nav pairs a theory page with an API page per topic:
+Two tools build one site (`docs/README.md` has the details): mystmd builds the theory pages, usage guides, research notes and notebooks from `docs/myst.yml`, and Zensical + mkdocstrings (NumPy docstring style) builds the API reference from `mkdocs.yml` into `/reference/`. `scripts/build_docs.py` (`make docs`) builds both, assembles them into `public/` and fails on any broken link; `docs.yml` runs it on every pull request, and `pages.yml` deploys on every push to `main`. Each topic has a theory page in the MyST `toc` and an API page in the Zensical nav:
 
 | Topic | Theory / usage | API |
 |---|---|---|
@@ -628,21 +620,14 @@ Writing style:
 - Be pedantic and pedagogical: every stencil carries a comment with its
   half-index formula, in ASCII math (`dh_dx[j, i+1/2] = ...`), and array
   shapes are tracked in comments (`[Ny, Nx]`).
-- Theory pages use MathJax (`pymdownx.arithmatex`); admonitions with `!!!`.
+- Theory pages are MyST: maths in `$…$` and `$$…$$` is rendered by KaTeX (write `1/2`, not `½`, inside maths), admonitions are `:::{note}` (MkDocs' `!!!` renders as plain text), and a link to a section uses an explicit `(label)=` above its heading.
+- Link from prose to an API object with `[name](xref:api#gridax_jax.Name)` and to an API page by its deployed URL (`https://jejjohnson.github.io/finitevolX/reference/masks/`). A relative link into `docs/api/` publishes the Markdown source as a download, and the build fails on it.
 
-Example notebooks live in `docs/notebooks/` as **jupytext percent-format
-`.py` files**, rendered by mkdocs-jupyter with `execute: false`, so the
-rendered page shows no cell outputs. Figures are saved by the notebook
-itself (`matplotlib.use("Agg")`, `fig.savefig(IMG_DIR / "name.png")` into
-`docs/images/<notebook>/`) and embedded from a markdown cell
-(`![...](../../images/<notebook>/name.png)`); regenerate them by running the
-script (`uv run python docs/notebooks/<name>.py`) and commit the PNGs. Add
-each notebook to the `Examples` section of the `mkdocs.yml` nav. The
+Example notebooks live in `docs/notebooks/` as **jupytext percent-format `.py` files**. mystmd cannot read them, so `scripts/build_docs.py` writes an unexecuted `.ipynb` beside each one (gitignored) and mystmd renders that, so the rendered page shows no cell outputs. Figures are saved by the notebook itself (`matplotlib.use("Agg")`, `fig.savefig(IMG_DIR / "name.png")` into `docs/images/<notebook>/`) and embedded from a markdown cell (`![...](../images/<notebook>/name.png)`, relative to the notebook file); regenerate them by running the script (`uv run python docs/notebooks/<name>.py`) and commit the PNGs. Add each notebook to its topic under `Examples` in the `toc` of `docs/myst.yml`, as `notebooks/<name>.ipynb`, and link to it from prose as `notebooks/<name>.ipynb` too. The
 double-gyre models in `scripts/` write their GIFs and Zarr stores to
 `--output-dir`; `docs/examples.md` shows the committed GIFs.
 
-Research and design notes (boundary-condition design, gap analyses) live in
-`docs/design/`, outside the nav.
+Research and design notes (boundary-condition design, gap analyses) live in `docs/design/` and are listed under "Research notes" in the `toc`.
 
 ## Plans
 

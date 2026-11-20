@@ -1,17 +1,40 @@
-site_name: finitevolX
-site_description: Finite volume operators for JAX on Arakawa C-grids
+# ---------------------------------------------------------------------------
+# Zensical builds ONLY the API reference from this file (it reads mkdocs.yml
+# as is), and it is deployed as the `/reference/` subtree of the MyST site.
+# The home page, theory pages, usage guides and notebooks are built by mystmd
+# from `docs/myst.yml`. See `docs/README.md` for the split and the rationale.
+#
+# mkdocstrings publishes a Sphinx-compatible `objects.inv` into `site/`, and
+# that inventory is what lets the MyST prose cross-reference into these pages.
+# ---------------------------------------------------------------------------
+site_name: finitevolX API reference
+site_description: API reference for finitevolX, finite volume operators for JAX on Arakawa C-grids, generated from NumPy-style docstrings.
 site_author: Juan Emmanuel Johnson, Takaya Uchida
 repo_url: https://github.com/jejjohnson/finitevolX
 repo_name: jejjohnson/finitevolX
 
+docs_dir: docs/api
+site_dir: site
+
+# The guide pages live in the MyST half of the site, so links to them point
+# outside `docs_dir` by design. The assembled-site link checker in
+# `scripts/build_docs.py` validates them instead, across both halves, which
+# neither tool can do on its own.
+validation:
+  links:
+    unrecognized_links: ignore
+    absolute_links: ignore
+
 theme:
   name: material
+  # Zensical's Material-compatible look; `modern` is its newer default.
+  variant: classic
   features:
-    - navigation.tabs
     - navigation.sections
     - navigation.top
     - content.code.copy
     - content.code.annotate
+    - toc.follow
   palette:
     - scheme: default
       primary: indigo
@@ -39,88 +62,38 @@ plugins:
             preload_modules:
               - spectraldiffx
               - gridax
-  - mkdocs-jupyter:
-      execute: false
-      ignore_h1_titles: true
 
 nav:
-  - Home: index.md
-  - Capability Index: capabilities.md
-  - Building with Agents: agents.md
-  - C-Grid Discretization:
-      - Theory & Overview: cgrid_discretization.md
-      - API Reference: api/grids.md
-      - Analysis Kernels (gridax): api/analysis.md
-  - Masks:
-      - Theory & Overview: masks.md
-      - API Reference: api/masks.md
-  - Vertical Structure:
-      - Theory & Overview: multilayer_vs_3d.md
-      - API Reference: api/vertical_modes.md
-  - Raw Stencils:
-      - Theory & Overview: stencils.md
-      - Writing Fast Stencils: performance.md
-      - API Reference: api/stencils.md
-  - Difference Operators:
-      - Theory & Overview: difference.md
-      - API Reference: api/difference.md
-  - Interpolation Operators:
-      - Theory & Overview: interpolation.md
-      - API Reference: api/interpolation.md
+  - Overview: index.md
+  - Grids and masks:
+      - Grids: grids.md
+      - Analysis kernels (gridax): analysis.md
+      - Masks: masks.md
+      - Vertical modes: vertical_modes.md
+  - Stencils and operators:
+      - Raw stencils: stencils.md
+      - Difference: difference.md
+      - Interpolation: interpolation.md
+      - Divergence: divergence.md
+      - Vorticity: vorticity.md
+      - Diffusion: diffusion.md
+      - Coriolis: coriolis.md
+      - Forcing: forcing.md
+      - Momentum advection: momentum.md
+      - Diagnostics: diagnostics.md
   - Advection:
-      - Theory & Overview: advection.md
-      - API Reference: api/advection.md
-      - Reconstruction: api/reconstruction.md
-  - Boundary Conditions:
-      - Theory & Overview: boundary_conditions.md
-      - API Reference: api/boundary_conditions.md
-  - Spatial Operators:
-      - Theory & Overview: spatial_operators.md
-      - Divergence: api/divergence.md
-      - Vorticity: api/vorticity.md
-      - Diffusion: api/diffusion.md
-      - Coriolis: api/coriolis.md
-      - Forcing: api/forcing.md
-      - Momentum Advection: api/momentum.md
-      - Diagnostics: api/diagnostics.md
-  - Time Integration:
-      - Theory & Overview: time_integration.md
-      - Usage Guide: time_integration_usage.md
-      - API Reference: api/time_integration.md
-  - Elliptic Solvers:
-      - Theory & Overview: elliptic_solvers.md
-      - Usage Guide: elliptic_solvers_usage.md
-      - "Tutorial: Known Boundary Values": notebooks/inhomogeneous_bcs_tutorial.py
-      - Convenience Wrappers: api/elliptic.md
-      - Spectral Solvers: api/spectral_solvers.md
-      - Spectral Transforms: api/spectral_transforms.md
-      - Capacitance Method: api/capacitance.md
-      - Iterative Solvers: api/iterative.md
-  - Multigrid Solver:
-      - Theory & Overview: multigrid_solver.md
-      - Usage Guide: multigrid_solver_usage.md
-      - API Reference: api/multigrid.md
-  - Solver Comparison: solver_comparison.md
-  - pipekit Operators:
-      - "Tutorial: Composing with pipekit": notebooks/pipekit_composition.py
-      - API Reference: api/pipekit.md
-  - Examples:
-      - Overview: examples.md
-      - Masks: notebooks/demo_masks.py
-      - Elliptic Solvers: notebooks/demo_solvers.py
-      - Known Boundary Values: notebooks/inhomogeneous_bcs_tutorial.py
-      - Pressure Poisson: notebooks/pressure_poisson.py
-      - Streamfunction Inversion: notebooks/streamfunction_inversion.py
-      - Helmholtz Screening: notebooks/helmholtz_screening.py
-      - SPDE Priors with gaussx: notebooks/spde_prior.py
-      - 1-D Advection Schemes: notebooks/advection_1d_schemes.py
-      - 2-D Rotating Advection: notebooks/advection_2d_rotation.py
-      - 2-D Masked Advection: notebooks/advection_2d_masked.py
-      - Linear Shallow Water: notebooks/swm_linear.py
-      - Nonlinear Shallow Water: notebooks/shallow_water.py
-      - 1.5-Layer QG: notebooks/qg_1p5_layer.py
-      - Composing with pipekit: notebooks/pipekit_composition.py
-  - Changelog: CHANGELOG.md
+      - Advection: advection.md
+      - Reconstruction: reconstruction.md
+  - Boundary conditions: boundary_conditions.md
+  - Time integration: time_integration.md
+  - Elliptic solvers:
+      - Convenience wrappers: elliptic.md
+      - Spectral solvers: spectral_solvers.md
+      - Spectral transforms: spectral_transforms.md
+      - Capacitance method: capacitance.md
+      - Iterative solvers: iterative.md
+      - Multigrid: multigrid.md
+  - pipekit operators: pipekit.md
 
 markdown_extensions:
   - admonition
@@ -132,8 +105,6 @@ markdown_extensions:
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.details
-  - pymdownx.snippets:
-      base_path: ['.']
   - attr_list
   - md_in_html
 
