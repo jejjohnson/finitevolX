@@ -5,8 +5,8 @@ description: Write finite-volume ocean and atmosphere models in JAX on finitevol
 
 # Finite-volume models on finitevolX
 
-finitevolX gives every piece of a C-grid model as an Equinox module or a
-pure JAX function: grids that carry the ghost ring, stencils that know
+finitevolX gives every piece of a C-grid model as a JAX pytree or a pure
+function: grids that carry the ghost ring, stencils that know
 which face they map to, masks that switch stencils off at the coast,
 boundary conditions that fill ghosts at the right half-cell, solvers and
 time steppers. Everything runs under `jit`, `vmap` and `grad`. Before
@@ -184,7 +184,7 @@ tendency is exactly zero on every land cell.
   RHS.
 
 If finitevolX lacks what you need, keep your addition small and shaped like
-finitevolX (an `eqx.Module` holding `grid` and `mask`, built on the raw
+finitevolX (a pytree holding `grid` and `mask`, built on the raw
 stencils and writing only the interior) and consider proposing it upstream
 at <https://github.com/jejjohnson/finitevolX/issues>.
 

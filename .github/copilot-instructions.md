@@ -22,15 +22,14 @@ The essentials, in case you only read this file:
     NE corner; backward operators read the BC-owned west / south ghost;
   - **operators** write only `[1:-1, 1:-1]` via `interior(...)`
     (advection `[2:-2, 2:-2]` with closed walls); Layer 1 raw stencils,
-    Layer 2 functional helpers (mask-free), Layer 3 `eqx.Module` classes
+    Layer 2 functional helpers (mask-free), Layer 3 `pytree_dataclass` classes
     holding `grid` and `mask`;
   - **masks** are built once with `Mask2D.from_mask` (numpy / scipy);
     outputs are zeroed on the dry points of their stagger; `mask=None` is
     bit-identical to before; `if mask is not None:`, never `if mask:`;
   - **units**: physical constants only as parameter defaults, so operators
     stay scale-covariant (`tests/test_scale_covariance.py`);
-  - pure `jnp` slicing (no `finitediffx` / `kernex`); `eqx.Module`, not
-    dataclasses; dtype follows the input.
+  - gridax code is array-API slicing in the input's namespace (no `finitediffx` / `kernex`, no `jnp`, no `.at[]`: use `gridax/_src/backend.py`); a `pytree_dataclass` in gridax, an `eqx.Module` in gridax-jax; dtype follows the input.
 - NumPy-style docstrings; every stencil commented with its half-index
   formula (`dh_dx[j, i+1/2] = ...`) and array shapes (`[Ny, Nx]`).
 - Before committing, from the repo root: `make test`, `uv run ruff check .`,

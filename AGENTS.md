@@ -11,8 +11,9 @@ grids and land / ocean masks, raw stencils, difference / interpolation /
 advection / diffusion operators, boundary conditions, diagnostics and
 forcing, elliptic and multigrid solvers, and time integrators built on
 diffrax, for 1-D, 2-D, 3-D and multilayer ocean and atmosphere models.
-Everything is an Equinox module or a pure function, so it runs under `jit`,
-`vmap` and `grad`. Ocean models are built on it, so **finitevolX is a
+Everything is a pytree (a `pytree_dataclass` in gridax, an `eqx.Module` in
+gridax-jax) or a pure function, so it runs under `jit`, `vmap` and `grad`;
+the gridax half also runs on NumPy. Ocean models are built on it, so **finitevolX is a
 library of primitives**: new code composes what is here, and anything
 genuinely new lands where the next person will find it.
 
@@ -37,15 +38,15 @@ the grid and mask classes of `gridax` (the mask construction helpers stay
 | Masks | `gridax/_src/mask/` | `Mask1D/2D/3D` (`cartesian.py`), frozen NumPy dataclasses like the grids: staggered wet masks, coast classification, `StencilCapability*` (`base.py`), adaptive stencil hierarchies; numpy / scipy construction helpers (`utils.py`) |
 | Analysis kernels | `gridax/_src/analysis/` (public: `gridax.analysis`) | Finite differences on collocated grids (`difference`, `adaptive_difference`, 1-D / 2-D / 3-D gradient, divergence, curl, Laplacian) and axis remapping (`remap_axis`, `remap_axis_columns`), array-API code that runs on NumPy, JAX or any backend; the kernels behind geoops' and xrops' calculus and remap operators |
 | Layer 1: raw stencils | `gridax/_src/operators/stencils.py`, `gridax/_src/operators/_ghost.py` | `<op>_<axis>_<side>_<d>d` index arithmetic with no metric and no padding, on any backend (the old unsuffixed 2-D names are deprecated aliases in `gridax_jax`); `interior` pads a result back to the full shape |
-| Layer 2: functional helpers | `operators/diagnostics.py`, `operators/jacobian.py`, `operators/eos.py`, `operators/reductions.py`, `forcing/functional.py`, `advection/{weno,linear,limiters,reconstruct_fn,face_flux,flux}.py`, … | Pure functions on arrays (`kinetic_energy`, `arakawa_jacobian`, `area_mean`, `weno_5pts`, `upwind_flux`, `linear_drag_tendency`, …); they never take a `Mask2D`, except the reductions (`area_sum`, `masked_mean`, … accept `mask=`) |
-| Layer 3: class operators | `operators/` (`difference.py`, `interpolation.py`, `divergence.py`, `vorticity.py`, `coriolis.py`, `diagnostic_operators.py`, `spherical_*.py`), `advection/` (`advection.py`, `reconstruction.py`, `spherical_advection.py`), `diffusion/` | `Difference*`, `Interpolation*`, `Advection*`, `Reconstruction*`, `Diffusion*`, `MomentumAdvection*`, `Vorticity*`, `Coriolis*`, `Energetics2D`, … and their `Spherical*` siblings; mask-aware through a `mask` field |
-| Boundary conditions | `boundary/` | Per-face atoms `Dirichlet1D` … `Slip1D` (`bc_1d.py`), `BoundaryConditionSet` (`bc_set.py`), `FieldBCSet` (`bc_field.py`), functional ghost-ring fillers (`boundary.py`) |
+| Layer 2: functional helpers | `gridax/_src/operators/{diagnostics,jacobian,reductions}.py`, `gridax/_src/advection/{weno,linear,limiters,reconstruct_fn,face_flux,flux}.py`; in gridax-jax `operators/eos.py`, `forcing/functional.py`, … | Pure functions on arrays (`kinetic_energy`, `arakawa_jacobian`, `area_mean`, `weno_5pts`, `upwind_flux`, `linear_drag_tendency`, …); they never take a `Mask2D`, except the reductions (`area_sum`, `masked_mean`, … accept `mask=`) |
+| Layer 3: class operators | `gridax/_src/operators/` (`difference.py`, `interpolation.py`, `divergence.py`, `vorticity.py`, `coriolis.py`, `diagnostic_operators.py`, `spherical_*.py`), `gridax/_src/advection/` (`advection.py`, `reconstruction.py`, `spherical_advection.py`), `gridax/_src/diffusion/` | `Difference*`, `Interpolation*`, `Advection*`, `Reconstruction*`, `Diffusion*`, `MomentumAdvection*`, `Vorticity*`, `Coriolis*`, `Energetics2D`, … and their `Spherical*` siblings; mask-aware through a `mask` field |
+| Boundary conditions | `gridax/_src/boundary/` | Per-face atoms `Dirichlet1D` … `Slip1D` (`bc_1d.py`), `BoundaryConditionSet` (`bc_set.py`), `FieldBCSet` (`bc_field.py`), functional ghost-ring fillers (`boundary.py`) |
 | Forcing | `forcing/` | `AbstractForcing`, `ForcingSum` / `ForcingProduct` / `TimeVaryingForcing` (`_base.py`); wind, drag, Rayleigh operators |
 | Solvers | `solvers/` | Spectral solvers re-exported from spectraldiffx (`spectral.py`, `spectral_transforms.py`); capacitance wrapper and the `streamfunction_from_vorticity` / `pressure_from_divergence` / `pv_inversion` wrappers (`elliptic.py`); `solve_cg` on lineax (`iterative.py`); preconditioners (`preconditioners.py`); `MultigridSolver` (`multigrid.py`); known-value lifting (`inhomogeneous.py`); tridiagonal solve re-exported from gaussx (`tridiagonal.py`) |
 | Time integration | `timestepping/` | `semi_lagrangian_step`, `SemiLagrangianSolver`, `SemiLagrangianTerm` (`semi_lagrangian.py`); `solve_ocean_pde` (`_solve.py`); the generic steppers live in `integrix.march`, and their `gridax_jax.*` (formerly `finitevolx.*`) names are deprecated aliases (`_deprecated.py`, served by `__getattr__` in `gridax_jax/__init__.py`) |
 | Vertical | `vertical/` | `multilayer` (vmap a 2-D operator over layers), vertical modes (`build_coupling_matrix`, `layer_to_mode`, …) |
 | pipekit layer (Tier B) | `pipekit/` (public: `gridax_jax/pipekit/`) | `FVXOperator` / `GridOperator` on `pipekit_jax.JaxOperator`, `GridSpec`, `over_leading`, `check_operator` (`gridax_jax.pipekit.testing`); behind the `pipekit` extra, never imported by `import gridax_jax` |
-| Shared | `utils/constants.py` | `GRAVITY`, `R_EARTH`, `OMEGA`, `RHO`, `DEG2M` (parameter defaults only; see contract 6) |
+| Shared | `gridax/_src/constants.py` (re-exported by `gridax_jax/_src/utils/constants.py`), `gridax/_src/backend.py`, `gridax/_src/pytree.py` | `GRAVITY`, `R_EARTH`, `OMEGA`, `RHO`, `DEG2M` (parameter defaults only; see contract 6); the backend hooks and `pytree_dataclass` (see Boundaries) |
 
 The three operator layers are the ones `docs/stencils.md` and
 `docs/masks.md` describe: Layer 1 raw stencils, Layer 2 functional helpers
@@ -60,6 +61,7 @@ builds the capability index.
 
 ### Boundaries
 
+- **Backends.** Everything in `gridax` is written against the array API, so it runs on NumPy, JAX, CuPy or anything `array-api-compat` knows, and must import without JAX (the `gridax-numpy-only` CI job and `tests/test_numpy_parity.py` check it). A function takes `xp = array_namespace(<its array arguments>)` and calls `xp.*`, never `jnp.*`. The few operations the standard lacks go through `gridax/_src/backend.py`: `set_at` (for `.at[...].set`), `pad`, `vmap` (for `eqx.filter_vmap` over levels), `optimization_barrier` and `stop_gradient`. On JAX inputs each hook calls JAX's own primitive, so jitted code lowers as if written in `jax.numpy`. Code that needs JAX itself (solvers, diffrax and integrix glue, the pipekit layer) belongs in `gridax-jax`.
 - **Upstream: spectraldiffx and gaussx**, both pinned to a release tag in
   `[tool.uv.sources]` plus a `>=` floor in `dependencies` (neither is on
   PyPI). spectraldiffx owns the spectral transforms, the rectangular
@@ -88,7 +90,7 @@ model.
 | Library | finitevolX uses it for | The rule it brings |
 |---|---|---|
 | **jax** | Arrays, `jit`, `vmap`, `grad`, `lax.fori_loop` (multigrid V-cycles) | Pure functions; `.at[...].set` instead of mutation; no Python control flow on traced values; build outputs with the input's dtype (`interior` uses `jnp.result_type`). |
-| **equinox** | Every operator, BC, forcing and solver is an `eqx.Module`; `eqx.filter_vmap` (`multilayer`) | Never a dataclass or plain class for anything holding arrays, except the grids and masks: they are `pytree_dataclass`es (`gridax/_src/pytree.py`) built with NumPy, so they import without JAX; grid sizes are static metadata. Settings that pick a code path are `eqx.field(static=True)` (e.g. `Dirichlet1D.face`). An operator holds its grid, its mask and any precomputed hierarchy as fields, built once in `__init__`. |
+| **equinox** | The forcing operators, solvers and pipekit operators in gridax-jax are `eqx.Module`s; `eqx.filter_vmap` (`multilayer`) | Never a plain dataclass or class for anything holding arrays. In gridax (grids, masks, operators, BCs) that is a `pytree_dataclass` (`gridax/_src/pytree.py`): settings that pick a code path or a shape are `static_field()` (e.g. `Dirichlet1D.face`, the grid sizes), a hand-written `__init__` may precompute, and `__check_init__` validates. In gridax-jax it is an `eqx.Module`, with `eqx.field(static=True)` for settings. An operator holds its grid, its mask and any precomputed hierarchy as fields, built once in `__init__`. |
 | **jaxtyping** | Shape annotations (`Float[Array, "Ny Nx"]`) | Annotate public array arguments and returns; shape strings stay quoted (`UP037` and `F722` are off for that reason). They are documentation: nothing checks them at run time (beartype is a declared dependency but is not imported). |
 | **lineax** | `solve_cg` (`lx.CG` on a `FunctionLinearOperator`) | Elliptic operators here are negative (semi)definite: tag them `negative_semidefinite_tag`; a preconditioner approximates `A⁻¹` and `solve_cg` flips its sign for lineax. |
 | **diffrax** | Butcher-tableau solvers (`dfx.AbstractERK`), custom `dfx.AbstractSolver`s, `solve_ocean_pde` | A new integrator is a diffrax solver (or a pure step function); forcings live inside the vector field, not as extra diffrax terms. |
@@ -245,7 +247,7 @@ apply BCs to intermediate fields before chaining operators.
   `interior`.
 - **Layer 2 functions** apply the metric and take no `Mask2D` (the
   reductions' optional `mask=` aside).
-- **Layer 3 classes** are `eqx.Module`s holding `grid` and `mask` (default
+- **Layer 3 classes** are `pytree_dataclass`es (in gridax) holding `grid` and `mask` (default
   `None`), with any precomputation (adaptive-stencil hierarchies, an inner
   `Interpolation2D`, …) done once in `__init__`. Cartesian operators are
   annotated with `CartesianGrid*` (coordinate-agnostic ones such as
@@ -294,7 +296,7 @@ apply BCs to intermediate fields before chaining operators.
 
 ### 4. Boundary conditions
 
-- A BC atom is an `eqx.Module` with a static `face` (`"south" | "north" |
+- A BC atom is a `pytree_dataclass` (in gridax) with a static `face` (`"south" | "north" |
   "west" | "east"`) whose `__call__(field, dx, dy)` returns the field with
   that one ghost row / column set; it is listed in the `BoundaryCondition1D`
   union in `boundary/bc_1d.py`.
@@ -544,7 +546,8 @@ All of these must pass, from the repo root:
    each with its check.
 
 Also: type hints on every public function, NumPy-style docstrings,
-`eqx.Module` (not dataclasses) for anything that holds arrays, and
+a `pytree_dataclass` in gridax and an `eqx.Module` in gridax-jax (never a plain
+dataclass) for anything that holds arrays, and
 `from __future__ import annotations` in new modules.
 
 ## Git, commits and pull requests
