@@ -22,7 +22,7 @@ from gridax import (
     CartesianGrid2D,
     CartesianGrid3D,
 )
-from gridax_jax._src.advection.advection import (
+from gridax._src.advection.advection import (
     Advection1D,
     Advection2D,
     Advection3D,

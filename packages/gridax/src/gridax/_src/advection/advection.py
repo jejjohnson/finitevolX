@@ -22,26 +22,27 @@ tier-selection (a few ``jnp.where``) plus the reconstruction.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-import equinox as eqx
-from gridax import (
-    CartesianGrid1D,
-    CartesianGrid2D,
-    CartesianGrid3D,
-    Mask1D,
-    Mask2D,
-    Mask3D,
-)
+from jaxtyping import Bool, Float
+import numpy as np
+
 from gridax._src.advection.flux import narrow_mask_hierarchy, upwind_flux
-from gridax._src.operators._ghost import interior
-import jax.numpy as jnp
-from jaxtyping import Array, Bool, Float
-
-from gridax_jax._src.advection.reconstruction import (
+from gridax._src.advection.reconstruction import (
     Reconstruction1D,
     Reconstruction2D,
     Reconstruction3D,
 )
+from gridax._src.backend import set_at
+from gridax._src.grid import CartesianGrid1D, CartesianGrid2D, CartesianGrid3D
+from gridax._src.mask import Mask1D, Mask2D, Mask3D
+from gridax._src.operators._ghost import interior
+from gridax._src.pytree import array_namespace, pytree_dataclass
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 # TVD limiter names supported by the advection operators.
 _TVD_LIMITERS = frozenset({"minmod", "van_leer", "superbee", "mc"})
@@ -118,7 +119,8 @@ def _wall_upwind_flux(
     face-Dirichlet conventions at once, so this is resolved by the ghost fill,
     not the operator.
     """
-    return jnp.where(vel_wall >= 0.0, q_lo, q_hi) * vel_wall
+    xp = array_namespace(vel_wall, q_lo, q_hi)
+    return xp.where(vel_wall >= 0.0, q_lo, q_hi) * vel_wall
 
 
 def _tier_funcs(recon: object, method: str, axis: str) -> dict[int, Callable]:
@@ -220,7 +222,8 @@ def _rec_funcs_for_method_3d(
     return rfx, rfy, tuple(sorted(rfx))
 
 
-class Advection1D(eqx.Module):
+@pytree_dataclass
+class Advection1D:
     """1-D advection operator.
 
     Parameters
@@ -299,12 +302,13 @@ class Advection1D(eqx.Module):
         Float[Array, "Nx"]
             Advective tendency at T-points.
         """
+        xp = array_namespace(h, u)
         _validate_wall(wall, self.mask)
         if self.mask is not None:
             # Zero the dry inputs before any stencil reads them, so land
             # values (even NaN) reach neither the output nor its gradient.
-            h = jnp.where(self.mask.h, h, 0.0)  # [Nx]
-            u = jnp.where(self.mask.u, u, 0.0)  # [Nx]
+            h = xp.where(self.mask.h, h, 0.0)  # [Nx]
+            u = xp.where(self.mask.u, u, 0.0)  # [Nx]
         # ── masked path: route through upwind_flux with adaptive stencils ─
         if self._mask_hierarchy_x is not None and method in _MASK_DISPATCHABLE:
             rfx, sizes = _rec_funcs_for_method_1d(self.recon, method)
@@ -336,9 +340,9 @@ class Advection1D(eqx.Module):
         if self.mask is not None:
             # No flux through a dry face: fe[i+1/2] = 0 unless both h[i]
             # and h[i+1] are wet (mask.u), as in Diffusion2D.
-            fe = jnp.where(self.mask.u, fe, 0.0)  # [Nx]
+            fe = xp.where(self.mask.u, fe, 0.0)  # [Nx]
 
-        out = jnp.zeros_like(h)
+        out = xp.zeros_like(h)
         # dh[i] = -(fe[i+1/2] - fe[i-1/2]) / dx
         # fe[i] represents the flux at the east face of cell i (at i+1/2)
         # For cell i, we need fe[i] (east) and fe[i-1] (west)
@@ -346,19 +350,20 @@ class Advection1D(eqx.Module):
             # Overwrite the two domain-wall faces (west face 1/2 == fe[0],
             # east face Nx-3/2 == fe[-2]) with a first-order upwind flux that
             # reads the ghost ring, then write the full interior [1:-1].
-            fe = fe.at[0].set(_wall_upwind_flux(u[0], h[0], h[1]))
-            fe = fe.at[-2].set(_wall_upwind_flux(u[-2], h[-2], h[-1]))
-            out = out.at[1:-1].set(-(fe[1:-1] - fe[0:-2]) / self.grid.dx)
+            fe = set_at(fe, np.s_[0], _wall_upwind_flux(u[0], h[0], h[1]))
+            fe = set_at(fe, np.s_[-2], _wall_upwind_flux(u[-2], h[-2], h[-1]))
+            out = set_at(out, np.s_[1:-1], -(fe[1:-1] - fe[0:-2]) / self.grid.dx)
         else:
             # Only use face fluxes that are defined by the reconstruction
             # scheme, avoiding the ghost-ring entries fe[0] and fe[-1].
-            out = out.at[2:-2].set(-(fe[2:-2] - fe[1:-3]) / self.grid.dx)
+            out = set_at(out, np.s_[2:-2], -(fe[2:-2] - fe[1:-3]) / self.grid.dx)
         if self.mask is not None:
-            out = jnp.where(self.mask.h, out, 0.0)
+            out = xp.where(self.mask.h, out, 0.0)
         return out
 
 
-class Advection2D(eqx.Module):
+@pytree_dataclass
+class Advection2D:
     """2-D advection operator.
 
     Parameters
@@ -450,13 +455,14 @@ class Advection2D(eqx.Module):
         Float[Array, "Ny Nx"]
             Advective tendency at T-points.
         """
+        xp = array_namespace(h, u, v)
         _validate_wall(wall, self.mask)
         if self.mask is not None:
             # Zero the dry inputs before any stencil reads them, so land
             # values (even NaN) reach neither the output nor its gradient.
-            h = jnp.where(self.mask.h, h, 0.0)  # [Ny, Nx]
-            u = jnp.where(self.mask.u, u, 0.0)  # [Ny, Nx]
-            v = jnp.where(self.mask.v, v, 0.0)  # [Ny, Nx]
+            h = xp.where(self.mask.h, h, 0.0)  # [Ny, Nx]
+            u = xp.where(self.mask.u, u, 0.0)  # [Ny, Nx]
+            v = xp.where(self.mask.v, v, 0.0)  # [Ny, Nx]
         # ── masked path: route through upwind_flux with pre-built hier. ──
         mh_x = self._mask_hierarchy_x
         mh_y = self._mask_hierarchy_y
@@ -503,8 +509,8 @@ class Advection2D(eqx.Module):
             # No flux through a dry face: fe[j, i+1/2] = 0 unless h[j, i] and
             # h[j, i+1] are both wet (mask.u), fn[j+1/2, i] likewise with
             # mask.v — the Diffusion2D face-flux masking.
-            fe = jnp.where(self.mask.u, fe, 0.0)  # [Ny, Nx]
-            fn = jnp.where(self.mask.v, fn, 0.0)  # [Ny, Nx]
+            fe = xp.where(self.mask.u, fe, 0.0)  # [Ny, Nx]
+            fn = xp.where(self.mask.v, fn, 0.0)  # [Ny, Nx]
 
         # dh[j, i] = -( (fe[j, i+1/2] - fe[j, i-1/2])/dx
         #             + (fn[j+1/2, i] - fn[j-1/2, i])/dy )
@@ -515,16 +521,22 @@ class Advection2D(eqx.Module):
             # Overwrite the west/east (fe cols 0, -2) and south/north
             # (fn rows 0, -2) domain-wall faces with a first-order upwind
             # flux that reads the ghost ring, then write the full interior.
-            fe = fe.at[:, 0].set(_wall_upwind_flux(u[:, 0], h[:, 0], h[:, 1]))
-            fe = fe.at[:, -2].set(_wall_upwind_flux(u[:, -2], h[:, -2], h[:, -1]))
-            fn = fn.at[0, :].set(_wall_upwind_flux(v[0, :], h[0, :], h[1, :]))
-            fn = fn.at[-2, :].set(_wall_upwind_flux(v[-2, :], h[-2, :], h[-1, :]))
-            out = jnp.zeros_like(h)
-            out = out.at[1:-1, 1:-1].set(
+            fe = set_at(fe, np.s_[:, 0], _wall_upwind_flux(u[:, 0], h[:, 0], h[:, 1]))
+            fe = set_at(
+                fe, np.s_[:, -2], _wall_upwind_flux(u[:, -2], h[:, -2], h[:, -1])
+            )
+            fn = set_at(fn, np.s_[0, :], _wall_upwind_flux(v[0, :], h[0, :], h[1, :]))
+            fn = set_at(
+                fn, np.s_[-2, :], _wall_upwind_flux(v[-2, :], h[-2, :], h[-1, :])
+            )
+            out = xp.zeros_like(h)
+            out = set_at(
+                out,
+                np.s_[1:-1, 1:-1],
                 -(
                     (fe[1:-1, 1:-1] - fe[1:-1, 0:-2]) / self.grid.dx
                     + (fn[1:-1, 1:-1] - fn[0:-2, 1:-1]) / self.grid.dy
-                )
+                ),
             )
         else:
             # Only use face fluxes defined by the reconstruction scheme,
@@ -538,11 +550,12 @@ class Advection2D(eqx.Module):
                 ghost=2,
             )
         if self.mask is not None:
-            out = jnp.where(self.mask.h, out, 0.0)
+            out = xp.where(self.mask.h, out, 0.0)
         return out
 
 
-class Advection3D(eqx.Module):
+@pytree_dataclass
+class Advection3D:
     """3-D advection operator (horizontal plane per z-level).
 
     Parameters
@@ -636,13 +649,14 @@ class Advection3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             Advective tendency at T-points.
         """
+        xp = array_namespace(h, u, v)
         _validate_wall(wall, self.mask)
         if self.mask is not None:
             # Zero the dry inputs before any stencil reads them, so land
             # values (even NaN) reach neither the output nor its gradient.
-            h = jnp.where(self.mask.h, h, 0.0)  # [Nz, Ny, Nx]
-            u = jnp.where(self.mask.u, u, 0.0)  # [Nz, Ny, Nx]
-            v = jnp.where(self.mask.v, v, 0.0)  # [Nz, Ny, Nx]
+            h = xp.where(self.mask.h, h, 0.0)  # [Nz, Ny, Nx]
+            u = xp.where(self.mask.u, u, 0.0)  # [Nz, Ny, Nx]
+            v = xp.where(self.mask.v, v, 0.0)  # [Nz, Ny, Nx]
         # ── masked path: route through upwind_flux with pre-built 3-D hier. ──
         mh_x = self._mask_hierarchy_x
         mh_y = self._mask_hierarchy_y
@@ -682,10 +696,10 @@ class Advection3D(eqx.Module):
             raise ValueError(f"Unknown method: {method!r}")
         if self.mask is not None:
             # No flux through a dry face (mask.u / mask.v false).
-            fe = jnp.where(self.mask.u, fe, 0.0)  # [Nz, Ny, Nx]
-            fn = jnp.where(self.mask.v, fn, 0.0)  # [Nz, Ny, Nx]
+            fe = xp.where(self.mask.u, fe, 0.0)  # [Nz, Ny, Nx]
+            fn = xp.where(self.mask.v, fn, 0.0)  # [Nz, Ny, Nx]
 
-        out = jnp.zeros_like(h)
+        out = xp.zeros_like(h)
         # dh[k, j, i] = -( (fe[k,j,i+1/2] - fe[k,j,i-1/2])/dx
         #                 + (fn[k,j+1/2,i] - fn[k,j-1/2,i])/dy )
         if wall == "open":
@@ -693,23 +707,33 @@ class Advection3D(eqx.Module):
             # (fn rows 0, -2) lateral wall faces with a first-order upwind
             # flux that reads the ghost ring, then write the full horizontal
             # interior.  z is a batch dimension and keeps the full [1:-1].
-            fe = fe.at[:, :, 0].set(
-                _wall_upwind_flux(u[:, :, 0], h[:, :, 0], h[:, :, 1])
+            fe = set_at(
+                fe,
+                np.s_[:, :, 0],
+                _wall_upwind_flux(u[:, :, 0], h[:, :, 0], h[:, :, 1]),
             )
-            fe = fe.at[:, :, -2].set(
-                _wall_upwind_flux(u[:, :, -2], h[:, :, -2], h[:, :, -1])
+            fe = set_at(
+                fe,
+                np.s_[:, :, -2],
+                _wall_upwind_flux(u[:, :, -2], h[:, :, -2], h[:, :, -1]),
             )
-            fn = fn.at[:, 0, :].set(
-                _wall_upwind_flux(v[:, 0, :], h[:, 0, :], h[:, 1, :])
+            fn = set_at(
+                fn,
+                np.s_[:, 0, :],
+                _wall_upwind_flux(v[:, 0, :], h[:, 0, :], h[:, 1, :]),
             )
-            fn = fn.at[:, -2, :].set(
-                _wall_upwind_flux(v[:, -2, :], h[:, -2, :], h[:, -1, :])
+            fn = set_at(
+                fn,
+                np.s_[:, -2, :],
+                _wall_upwind_flux(v[:, -2, :], h[:, -2, :], h[:, -1, :]),
             )
-            out = out.at[1:-1, 1:-1, 1:-1].set(
+            out = set_at(
+                out,
+                np.s_[1:-1, 1:-1, 1:-1],
                 -(
                     (fe[1:-1, 1:-1, 1:-1] - fe[1:-1, 1:-1, 0:-2]) / self.grid.dx
                     + (fn[1:-1, 1:-1, 1:-1] - fn[1:-1, 0:-2, 1:-1]) / self.grid.dy
-                )
+                ),
             )
         else:
             # Reconstruction writes to [1:-1, 1:-1, 1:-1]; the west flux at i=0
@@ -717,12 +741,14 @@ class Advection3D(eqx.Module):
             # Consistent with 1D/2D operators, skip the ghost-adjacent interior
             # ring in the horizontal plane so we never read ghost flux cells.
             # All z-levels are independent, so z uses the full interior [1:-1].
-            out = out.at[1:-1, 2:-2, 2:-2].set(
+            out = set_at(
+                out,
+                np.s_[1:-1, 2:-2, 2:-2],
                 -(
                     (fe[1:-1, 2:-2, 2:-2] - fe[1:-1, 2:-2, 1:-3]) / self.grid.dx
                     + (fn[1:-1, 2:-2, 2:-2] - fn[1:-1, 1:-3, 2:-2]) / self.grid.dy
-                )
+                ),
             )
         if self.mask is not None:
-            out = jnp.where(self.mask.h, out, 0.0)
+            out = xp.where(self.mask.h, out, 0.0)
         return out

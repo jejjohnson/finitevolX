@@ -14,6 +14,16 @@ C-grid operations (differences on T / U / V / X points, advection, boundary
 conditions, solvers) live in gridax-jax, which builds on this package.
 """
 
+from gridax._src.advection.advection import (
+    Advection1D,
+    Advection2D,
+    Advection3D,
+)
+from gridax._src.advection.face_flux import (
+    rusanov_flux,
+    uv_center_flux,
+    uv_node_flux,
+)
 from gridax._src.advection.flux import (
     upwind_flux,
 )
@@ -38,6 +48,15 @@ from gridax._src.advection.reconstruct_fn import (
     upwind_1pt,
     upwind_3pt,
     upwind_5pt,
+)
+from gridax._src.advection.reconstruction import (
+    Reconstruction1D,
+    Reconstruction2D,
+    Reconstruction3D,
+)
+from gridax._src.advection.spherical_advection import (
+    SphericalAdvection2D,
+    SphericalAdvection3D,
 )
 from gridax._src.advection.weno import (
     weno_3pts,
@@ -396,6 +415,21 @@ __all__ = [
     "SphericalLaplacian3D",
     "SphericalVorticity2D",
     "SphericalVorticity3D",
+    # Advection
+    "Advection1D",
+    "Advection2D",
+    "Advection3D",
+    # Reconstruction operators
+    "Reconstruction1D",
+    "Reconstruction2D",
+    "Reconstruction3D",
+    # Spherical advection
+    "SphericalAdvection2D",
+    "SphericalAdvection3D",
+    # Face fluxes
+    "rusanov_flux",
+    "uv_center_flux",
+    "uv_node_flux",
     # Constants
     "R_EARTH",
 ]

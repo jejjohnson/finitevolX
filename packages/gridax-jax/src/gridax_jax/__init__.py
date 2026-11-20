@@ -1,5 +1,8 @@
 import gridax as _gridax
 from gridax import (
+    Advection1D,
+    Advection2D,
+    Advection3D,
     ArakawaCGrid1D,
     ArakawaCGrid2D,
     ArakawaCGrid3D,
@@ -24,6 +27,11 @@ from gridax import (
     Mask2D,
     Mask3D,
     QGPotentialVorticity2D,
+    Reconstruction1D,
+    Reconstruction2D,
+    Reconstruction3D,
+    SphericalAdvection2D,
+    SphericalAdvection3D,
     SphericalDifference2D,
     SphericalDifference3D,
     SphericalDivergence2D,
@@ -105,6 +113,7 @@ from gridax import (
     qg_potential_vorticity,
     reconstruct,
     relative_vorticity_cgrid,
+    rusanov_flux,
     shear_strain,
     smooth_abs,
     smooth_clamp,
@@ -129,6 +138,8 @@ from gridax import (
     upwind_3pt,
     upwind_5pt,
     upwind_flux,
+    uv_center_flux,
+    uv_node_flux,
     van_leer,
     vertical_velocity,
     volume_mean,
@@ -150,21 +161,6 @@ from gridax import (
 )
 from gridax._src.operators.stencils import RENAMED as _RENAMED_STENCILS
 
-from gridax_jax._src.advection.advection import Advection1D, Advection2D, Advection3D
-from gridax_jax._src.advection.face_flux import (
-    rusanov_flux,
-    uv_center_flux,
-    uv_node_flux,
-)
-from gridax_jax._src.advection.reconstruction import (
-    Reconstruction1D,
-    Reconstruction2D,
-    Reconstruction3D,
-)
-from gridax_jax._src.advection.spherical_advection import (
-    SphericalAdvection2D,
-    SphericalAdvection3D,
-)
 from gridax_jax._src.boundary.bc_1d import (
     Dirichlet1D,
     Extrapolation1D,

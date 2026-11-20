@@ -36,6 +36,15 @@ from gridax import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
+from gridax._src.advection.advection import (
+    Advection1D,
+    Advection2D,
+    Advection3D,
+)
+from gridax._src.advection.spherical_advection import (
+    SphericalAdvection2D,
+    SphericalAdvection3D,
+)
 from gridax._src.operators.diagnostic_operators import QGPotentialVorticity2D
 from gridax._src.operators.diagnostics import (
     potential_vorticity_multilayer,
@@ -66,15 +75,6 @@ from gridax._src.operators.spherical_difference import (
     SphericalDifference3D,
 )
 from gridax._src.operators.vorticity import Vorticity2D, Vorticity3D
-from gridax_jax._src.advection.advection import (
-    Advection1D,
-    Advection2D,
-    Advection3D,
-)
-from gridax_jax._src.advection.spherical_advection import (
-    SphericalAdvection2D,
-    SphericalAdvection3D,
-)
 from gridax_jax._src.diffusion.diffusion import (
     BiharmonicDiffusion2D,
     BiharmonicDiffusion3D,

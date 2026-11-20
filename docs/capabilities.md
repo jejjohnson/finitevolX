@@ -17,37 +17,6 @@ if it is almost here, extend it where it lives. Regenerate with
 
 ### `gridax_jax`
 
-#### Advection operators for Arakawa C-grids (`gridax_jax._src.advection.advection`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `Advection1D` | class | 1-D advection operator. |
-| `Advection2D` | class | 2-D advection operator. |
-| `Advection3D` | class | 3-D advection operator (horizontal plane per z-level). |
-
-#### Public functional API for raw face fluxes on Arakawa C-grids (`gridax_jax._src.advection.face_flux`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `rusanov_flux` | function | Local Lax--Friedrichs (Rusanov) numerical flux at faces along ``axis``. |
-| `uv_center_flux` | function | Compute raw face fluxes for a cell-centred scalar on a C-grid. |
-| `uv_node_flux` | function | Compute raw face fluxes for a node-centred tracer on a C-grid. |
-
-#### Face-value reconstruction operators for advective fluxes on Arakawa C-grids (`gridax_jax._src.advection.reconstruction`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `Reconstruction1D` | class | 1-D face-value reconstruction. |
-| `Reconstruction2D` | class | 2-D face-value reconstruction for advective fluxes. |
-| `Reconstruction3D` | class | 3-D face-value reconstruction. |
-
-#### Spherical-coordinate advection operators for Arakawa C-grids (`gridax_jax._src.advection.spherical_advection`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `SphericalAdvection2D` | class | 2-D tracer advection on a spherical Arakawa C-grid. |
-| `SphericalAdvection3D` | class | 3-D tracer advection on a spherical Arakawa C-grid. |
-
 #### Single-face boundary condition atoms for 2-D ghost-ring arrays (`gridax_jax._src.boundary.bc_1d`)
 
 | Name | Kind | What it does |
@@ -284,6 +253,9 @@ if it is almost here, extend it where it lives. Regenerate with
 
 | Name | Kind | What it does |
 |---|---|---|
+| `Advection1D` | class | 1-D advection operator. |
+| `Advection2D` | class | 2-D advection operator. |
+| `Advection3D` | class | 3-D advection operator (horizontal plane per z-level). |
 | `ArakawaCGrid1D` | class | 1-D Arakawa C-grid topology (no metric). |
 | `ArakawaCGrid2D` | class | 2-D Arakawa C-grid topology (no metric). |
 | `ArakawaCGrid3D` | class | 3-D Arakawa C-grid topology (no metric). |
@@ -308,6 +280,11 @@ if it is almost here, extend it where it lives. Regenerate with
 | `Mask2D` | class | Unified Arakawa C-grid mask for a 2-D Cartesian domain. |
 | `Mask3D` | class | Unified Arakawa C-grid mask for a 3-D Cartesian domain. |
 | `QGPotentialVorticity2D` | class | Quasi-geostrophic potential vorticity at T-points. |
+| `Reconstruction1D` | class | 1-D face-value reconstruction. |
+| `Reconstruction2D` | class | 2-D face-value reconstruction for advective fluxes. |
+| `Reconstruction3D` | class | 3-D face-value reconstruction. |
+| `SphericalAdvection2D` | class | 2-D tracer advection on a spherical Arakawa C-grid. |
+| `SphericalAdvection3D` | class | 3-D tracer advection on a spherical Arakawa C-grid. |
 | `SphericalDifference2D` | class | Spherical finite-difference operators on a 2-D Arakawa C-grid. |
 | `SphericalDifference3D` | class | Spherical finite-difference operators on a 3-D Arakawa C-grid. |
 | `SphericalDivergence2D` | class | Horizontal divergence on a 2-D spherical Arakawa C-grid. |
@@ -389,6 +366,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `qg_potential_vorticity` | function | QG potential vorticity at T-points (single layer). |
 | `reconstruct` | function | Compute upwind face flux along *dim* using the given reconstruction method. |
 | `relative_vorticity_cgrid` | function | Relative vorticity at X-points (corners) on an Arakawa C-grid. |
+| `rusanov_flux` | function | Local Lax--Friedrichs (Rusanov) numerical flux at faces along ``axis``. |
 | `shear_strain` | function | Shear strain at X-points (corners) on an Arakawa C-grid. |
 | `smooth_abs` | function | Smooth approximation of ``\|x\|`` with a nonzero gradient at the origin. |
 | `smooth_clamp` | function | Smooth approximation of ``max(x, x_min)`` (a soft lower clamp). |
@@ -413,6 +391,8 @@ if it is almost here, extend it where it lives. Regenerate with
 | `upwind_3pt` | function | 3-point upwind face value at i+1/2 along the last axis. |
 | `upwind_5pt` | function | 5-point upwind face value at i+1/2 along the last axis. |
 | `upwind_flux` | function | Compute upwind flux with automatic stencil fallback near boundaries. |
+| `uv_center_flux` | function | Compute raw face fluxes for a cell-centred scalar on a C-grid. |
+| `uv_node_flux` | function | Compute raw face fluxes for a node-centred tracer on a C-grid. |
 | `van_leer` | function | Van Leer flux limiter. |
 | `vertical_velocity` | function | Vertical velocity from the continuity equation. |
 | `volume_mean` | function | Volume-weighted mean over physical interior T-cells (3-D). |
@@ -556,6 +536,9 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 
 | Name | Kind | What it does |
 |---|---|---|
+| `Advection1D` | class | 1-D advection operator. |
+| `Advection2D` | class | 2-D advection operator. |
+| `Advection3D` | class | 3-D advection operator (horizontal plane per z-level). |
 | `ArakawaCGrid1D` | class | 1-D Arakawa C-grid topology (no metric). |
 | `ArakawaCGrid2D` | class | 2-D Arakawa C-grid topology (no metric). |
 | `ArakawaCGrid3D` | class | 3-D Arakawa C-grid topology (no metric). |
@@ -581,6 +564,11 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `Mask3D` | class | Unified Arakawa C-grid mask for a 3-D Cartesian domain. |
 | `QGPotentialVorticity2D` | class | Quasi-geostrophic potential vorticity at T-points. |
 | `R_EARTH` | constant | `6371200.0` |
+| `Reconstruction1D` | class | 1-D face-value reconstruction. |
+| `Reconstruction2D` | class | 2-D face-value reconstruction for advective fluxes. |
+| `Reconstruction3D` | class | 3-D face-value reconstruction. |
+| `SphericalAdvection2D` | class | 2-D tracer advection on a spherical Arakawa C-grid. |
+| `SphericalAdvection3D` | class | 3-D tracer advection on a spherical Arakawa C-grid. |
 | `SphericalDifference2D` | class | Spherical finite-difference operators on a 2-D Arakawa C-grid. |
 | `SphericalDifference3D` | class | Spherical finite-difference operators on a 3-D Arakawa C-grid. |
 | `SphericalDivergence2D` | class | Horizontal divergence on a 2-D spherical Arakawa C-grid. |
@@ -675,6 +663,7 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `qg_potential_vorticity` | function | QG potential vorticity at T-points (single layer). |
 | `reconstruct` | function | Compute upwind face flux along *dim* using the given reconstruction method. |
 | `relative_vorticity_cgrid` | function | Relative vorticity at X-points (corners) on an Arakawa C-grid. |
+| `rusanov_flux` | function | Local Lax--Friedrichs (Rusanov) numerical flux at faces along ``axis``. |
 | `shear_strain` | function | Shear strain at X-points (corners) on an Arakawa C-grid. |
 | `smooth_abs` | function | Smooth approximation of ``\|x\|`` with a nonzero gradient at the origin. |
 | `smooth_clamp` | function | Smooth approximation of ``max(x, x_min)`` (a soft lower clamp). |
@@ -699,6 +688,8 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `upwind_3pt` | function | 3-point upwind face value at i+1/2 along the last axis. |
 | `upwind_5pt` | function | 5-point upwind face value at i+1/2 along the last axis. |
 | `upwind_flux` | function | Compute upwind flux with automatic stencil fallback near boundaries. |
+| `uv_center_flux` | function | Compute raw face fluxes for a cell-centred scalar on a C-grid. |
+| `uv_node_flux` | function | Compute raw face fluxes for a node-centred tracer on a C-grid. |
 | `van_leer` | function | Van Leer flux limiter. |
 | `vertical_velocity` | function | Vertical velocity from the continuity equation. |
 | `volume_mean` | function | Volume-weighted mean over physical interior T-cells (3-D). |
