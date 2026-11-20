@@ -78,15 +78,12 @@ conservative: the two seam faces then use different boundary fallbacks
 
 from __future__ import annotations
 
-import equinox as eqx
-from gridax import Mask2D, Mask3D, SphericalGrid2D, SphericalGrid3D
-from gridax._src.advection.flux import narrow_mask_hierarchy, upwind_flux
-from gridax._src.operators._ghost import interior
-from gridax._src.operators._utils import _metric_like, _safe_div_cos
-import jax.numpy as jnp
-from jaxtyping import Array, Bool, Float
+from typing import TYPE_CHECKING
 
-from gridax_jax._src.advection.advection import (
+from jaxtyping import Bool, Float
+import numpy as np
+
+from gridax._src.advection.advection import (
     _HIERARCHY_SIZES,
     _MASK_DISPATCHABLE,
     _TVD_LIMITERS,
@@ -95,10 +92,22 @@ from gridax_jax._src.advection.advection import (
     _validate_wall,
     _wall_upwind_flux,
 )
-from gridax_jax._src.advection.reconstruction import (
+from gridax._src.advection.flux import narrow_mask_hierarchy, upwind_flux
+from gridax._src.advection.reconstruction import (
     Reconstruction2D,
     Reconstruction3D,
 )
+from gridax._src.backend import set_at
+from gridax._src.grid import SphericalGrid2D, SphericalGrid3D
+from gridax._src.mask import Mask2D, Mask3D
+from gridax._src.operators._ghost import interior
+from gridax._src.operators._utils import _metric_like, _safe_div_cos
+from gridax._src.pytree import array_namespace, pytree_dataclass
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
 def _open_wall_fluxes(
@@ -116,16 +125,22 @@ def _open_wall_fluxes(
     exactly as :class:`~finitevolx.Advection2D` (``_wall_upwind_flux``).
     """
     # fe[j, 1/2] = upwind(h[j, 0], h[j, 1]) · u[j, 1/2]   (west wall)
-    fe = fe.at[..., 0].set(_wall_upwind_flux(u[..., 0], h[..., 0], h[..., 1]))
+    fe = set_at(fe, np.s_[..., 0], _wall_upwind_flux(u[..., 0], h[..., 0], h[..., 1]))
     # fe[j, Nx-3/2] = upwind(h[j, Nx-2], h[j, Nx-1]) · u   (east wall)
-    fe = fe.at[..., -2].set(_wall_upwind_flux(u[..., -2], h[..., -2], h[..., -1]))
+    fe = set_at(
+        fe, np.s_[..., -2], _wall_upwind_flux(u[..., -2], h[..., -2], h[..., -1])
+    )
     # fn[1/2, i] = upwind(h[0, i], h[1, i]) · v[1/2, i]   (south wall)
-    fn = fn.at[..., 0, :].set(
-        _wall_upwind_flux(v[..., 0, :], h[..., 0, :], h[..., 1, :])
+    fn = set_at(
+        fn,
+        np.s_[..., 0, :],
+        _wall_upwind_flux(v[..., 0, :], h[..., 0, :], h[..., 1, :]),
     )
     # fn[Ny-3/2, i] = upwind(h[Ny-2, i], h[Ny-1, i]) · v   (north wall)
-    fn = fn.at[..., -2, :].set(
-        _wall_upwind_flux(v[..., -2, :], h[..., -2, :], h[..., -1, :])
+    fn = set_at(
+        fn,
+        np.s_[..., -2, :],
+        _wall_upwind_flux(v[..., -2, :], h[..., -2, :], h[..., -1, :]),
     )
     return fe, fn
 
@@ -221,7 +236,8 @@ def _reconstruct_faces_3d(
     raise ValueError(f"Unknown method: {method!r}")
 
 
-class SphericalAdvection2D(eqx.Module):
+@pytree_dataclass
+class SphericalAdvection2D:
     """2-D tracer advection on a spherical Arakawa C-grid.
 
     Computes ``∂h/∂t = −∇·(h·u_vec)`` on the sphere, using the same
@@ -334,12 +350,13 @@ class SphericalAdvection2D(eqx.Module):
             Advective tendency at T-points.  The ghost ring is zero, and
             with ``wall="closed"`` the outermost interior ring too.
         """
+        xp = array_namespace(h, u, v)
         _validate_wall(wall, self.mask)
         if self.mask is not None:
             # Zero the dry inputs before any stencil reads them (NaN-safe).
-            h = jnp.where(self.mask.h, h, 0.0)  # [Ny, Nx]
-            u = jnp.where(self.mask.u, u, 0.0)  # [Ny, Nx]
-            v = jnp.where(self.mask.v, v, 0.0)  # [Ny, Nx]
+            h = xp.where(self.mask.h, h, 0.0)  # [Ny, Nx]
+            u = xp.where(self.mask.u, u, 0.0)  # [Ny, Nx]
+            v = xp.where(self.mask.v, v, 0.0)  # [Ny, Nx]
         mh_x = self._mask_hierarchy_x
         mh_y = self._mask_hierarchy_y
         if mh_x is not None and mh_y is not None and method in _MASK_DISPATCHABLE:
@@ -352,8 +369,8 @@ class SphericalAdvection2D(eqx.Module):
             fe, fn = _reconstruct_faces_2d(self.recon, h, u, v, method)
         if self.mask is not None:
             # No flux through a dry face (mask.u / mask.v false).
-            fe = jnp.where(self.mask.u, fe, 0.0)  # [Ny, Nx]
-            fn = jnp.where(self.mask.v, fn, 0.0)  # [Ny, Nx]
+            fe = xp.where(self.mask.u, fe, 0.0)  # [Ny, Nx]
+            fn = xp.where(self.mask.v, fn, 0.0)  # [Ny, Nx]
 
         if wall == "open":
             fe, fn = _open_wall_fluxes(h, u, v, fe, fn)
@@ -364,11 +381,12 @@ class SphericalAdvection2D(eqx.Module):
             _spherical_flux_divergence(fe, fn, self.grid, ghost), h, ghost=ghost
         )
         if self.mask is not None:
-            out = jnp.where(self.mask.h, out, 0.0)
+            out = xp.where(self.mask.h, out, 0.0)
         return out
 
 
-class SphericalAdvection3D(eqx.Module):
+@pytree_dataclass
+class SphericalAdvection3D:
     """3-D tracer advection on a spherical Arakawa C-grid.
 
     Applies the 2-D spherical advection stencil independently at each
@@ -451,12 +469,13 @@ class SphericalAdvection3D(eqx.Module):
         Float[Array, "Nz Ny Nx"]
             Advective tendency at T-points.
         """
+        xp = array_namespace(h, u, v)
         _validate_wall(wall, self.mask)
         if self.mask is not None:
             # Zero the dry inputs before any stencil reads them (NaN-safe).
-            h = jnp.where(self.mask.h, h, 0.0)  # [Nz, Ny, Nx]
-            u = jnp.where(self.mask.u, u, 0.0)  # [Nz, Ny, Nx]
-            v = jnp.where(self.mask.v, v, 0.0)  # [Nz, Ny, Nx]
+            h = xp.where(self.mask.h, h, 0.0)  # [Nz, Ny, Nx]
+            u = xp.where(self.mask.u, u, 0.0)  # [Nz, Ny, Nx]
+            v = xp.where(self.mask.v, v, 0.0)  # [Nz, Ny, Nx]
         mh_x = self._mask_hierarchy_x
         mh_y = self._mask_hierarchy_y
         if mh_x is not None and mh_y is not None and method in _MASK_DISPATCHABLE:
@@ -469,8 +488,8 @@ class SphericalAdvection3D(eqx.Module):
             fe, fn = _reconstruct_faces_3d(self.recon, h, u, v, method)
         if self.mask is not None:
             # No flux through a dry face (mask.u / mask.v false).
-            fe = jnp.where(self.mask.u, fe, 0.0)  # [Nz, Ny, Nx]
-            fn = jnp.where(self.mask.v, fn, 0.0)  # [Nz, Ny, Nx]
+            fe = xp.where(self.mask.u, fe, 0.0)  # [Nz, Ny, Nx]
+            fn = xp.where(self.mask.v, fn, 0.0)  # [Nz, Ny, Nx]
 
         if wall == "open":
             fe, fn = _open_wall_fluxes(h, u, v, fe, fn)
@@ -480,7 +499,7 @@ class SphericalAdvection3D(eqx.Module):
         # cos_* arrays are 2-D; they broadcast over the leading Nz axis,
         # whose ghost slabs k = 0, Nz-1 are skipped (z is a batch axis).
         horiz = _spherical_flux_divergence(fe[1:-1], fn[1:-1], self.grid, g)
-        out = jnp.zeros_like(h).at[1:-1, g:-g, g:-g].set(horiz)
+        out = set_at(xp.zeros_like(h), np.s_[1:-1, g:-g, g:-g], horiz)
         if self.mask is not None:
-            out = jnp.where(self.mask.h, out, 0.0)
+            out = xp.where(self.mask.h, out, 0.0)
         return out

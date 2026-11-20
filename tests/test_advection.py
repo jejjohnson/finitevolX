@@ -7,7 +7,7 @@ from gridax import (
     Mask2D,
     Mask3D,
 )
-from gridax_jax._src.advection.advection import Advection1D, Advection2D, Advection3D
+from gridax._src.advection.advection import Advection1D, Advection2D, Advection3D
 import jax
 import jax.numpy as jnp
 import numpy as np

@@ -11,9 +11,8 @@ tiny downwind slope, and ``van_leer(inf)``.
 
 from __future__ import annotations
 
-from gridax._src.advection import limiters, weno
+from gridax._src.advection import limiters, reconstruction, weno
 import gridax_jax as fvx
-from gridax_jax._src.advection import reconstruction
 import jax
 import jax.numpy as jnp
 import numpy as np

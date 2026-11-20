@@ -11,6 +11,7 @@ from gridax import (
     CartesianGrid2D,
     CartesianGrid3D,
 )
+from gridax._src.advection.reconstruction import Reconstruction1D, Reconstruction2D
 from gridax._src.operators.difference import (
     Difference1D,
     Difference2D,
@@ -22,7 +23,6 @@ from gridax._src.operators.interpolation import (
     Interpolation2D,
 )
 from gridax._src.operators.vorticity import Vorticity2D
-from gridax_jax._src.advection.reconstruction import Reconstruction1D, Reconstruction2D
 from gridax_jax._src.diffusion.diffusion import Diffusion2D, diffusion_2d
 import jax
 import jax.numpy as jnp

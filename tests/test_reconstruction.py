@@ -6,7 +6,7 @@ from gridax import (
     CartesianGrid3D,
     Mask2D,
 )
-from gridax_jax._src.advection.reconstruction import (
+from gridax._src.advection.reconstruction import (
     Reconstruction1D,
     Reconstruction2D,
     Reconstruction3D,

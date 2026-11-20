@@ -938,7 +938,7 @@ def _advection_entries(
     * ``weno5`` — the mask-dispatchable path (adaptive tier selection +
       post-compute mask.h).
     """
-    from gridax_jax._src.advection.advection import (
+    from gridax._src.advection.advection import (
         Advection1D,
         Advection2D,
         Advection3D,

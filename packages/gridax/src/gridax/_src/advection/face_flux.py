@@ -20,18 +20,27 @@ See Also
 
 from __future__ import annotations
 
-from gridax import CartesianGrid2D, Mask2D
-from gridax._src.advection.flux import upwind_flux
-from gridax._src.operators.differentiable import smooth_abs
-import jax.numpy as jnp
-from jaxtyping import Array, Float
+from typing import TYPE_CHECKING
 
-from gridax_jax._src.advection.advection import (
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.advection.advection import (
     _MASK_DISPATCHABLE_2D,
     _TVD_LIMITERS,
     _rec_funcs_for_method_2d,
 )
-from gridax_jax._src.advection.reconstruction import Reconstruction2D
+from gridax._src.advection.flux import upwind_flux
+from gridax._src.advection.reconstruction import Reconstruction2D
+from gridax._src.grid import CartesianGrid2D
+from gridax._src.mask import Mask2D
+from gridax._src.operators.differentiable import smooth_abs
+from gridax._src.pytree import array_namespace
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
 def uv_center_flux(
@@ -192,6 +201,7 @@ def rusanov_flux(
     >>> fx.shape
     (6, 5)
     """
+    xp = array_namespace(q, a)
     ndim = q.ndim
     ax = axis % ndim
     left = [slice(None)] * ndim
@@ -200,7 +210,7 @@ def rusanov_flux(
     right[ax] = slice(1, None)
     q_l = q[tuple(left)]
     q_r = q[tuple(right)]
-    speed = smooth_abs(a, eps) if eps > 0.0 else jnp.abs(a)
+    speed = smooth_abs(a, eps) if eps > 0.0 else xp.abs(a)
     return 0.5 * a * (q_l + q_r) - 0.5 * speed * (q_r - q_l)
 
 
