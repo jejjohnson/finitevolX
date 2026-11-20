@@ -8,20 +8,38 @@ TVD reconstruction code in the advection module.
 
 Construction is numpy-only (the recurrence does not vectorise without
 extra machinery, and masks are built once at setup time, not inside
-JIT-traced step functions).  Stored arrays are JAX int32.
+JIT-traced step functions).  Stored arrays are NumPy int8: a count
+saturates at 127, far above the widest stencil half-width (5), so every
+consumer's comparison ``count >= half_width`` is unchanged.
 """
 
 from __future__ import annotations
 
-import equinox as eqx
-import jax.numpy as jnp
-from jaxtyping import Array, Bool, Int
+from typing import TYPE_CHECKING, Any
+
+from jaxtyping import Bool, Int
 import numpy as np
 
 from finitevolx._src.mask.utils import count_contiguous
+from finitevolx._src.utils.pytree import pytree_dataclass
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
+
+#: Counts saturate here; it bounds the int8 storage, not any stencil.
+_COUNT_CAP = np.iinfo(np.int8).max
 
 
-class StencilCapability1D(eqx.Module):
+def _counts(h: np.ndarray, axis: int, forward: bool) -> np.ndarray:
+    """Contiguous wet counts along ``axis``, saturated at 127, as int8."""
+    counts = count_contiguous(h, axis=axis, forward=forward)
+    return np.minimum(counts, _COUNT_CAP).astype(np.int8)
+
+
+@pytree_dataclass
+class StencilCapability1D:
     """Directional count of contiguous wet neighbours for each 1-D grid cell.
 
     At each cell ``i``, stores the number of consecutive wet cells (including
@@ -51,13 +69,17 @@ class StencilCapability1D(eqx.Module):
         StencilCapability1D
         """
         h_np = np.asarray(h, dtype=bool)
-        return cls(
-            x_pos=jnp.asarray(count_contiguous(h_np, axis=0, forward=True)),
-            x_neg=jnp.asarray(count_contiguous(h_np, axis=0, forward=False)),
-        )
+        # NumPy arrays fill fields the type checker reads as JAX arrays: the
+        # type a consumer sees once JAX has flattened the mask.
+        fields: dict[str, Any] = {
+            "x_pos": _counts(h_np, axis=0, forward=True),
+            "x_neg": _counts(h_np, axis=0, forward=False),
+        }
+        return cls(**fields)
 
 
-class StencilCapability2D(eqx.Module):
+@pytree_dataclass
+class StencilCapability2D:
     """Directional count of contiguous wet neighbours for each 2-D grid cell.
 
     At each cell ``(j, i)``, stores the number of consecutive wet cells
@@ -85,7 +107,7 @@ class StencilCapability2D(eqx.Module):
     def from_mask(cls, h: np.ndarray | Bool[Array, "Ny Nx"]) -> StencilCapability2D:
         """Build stencil capability from a 2-D wet/dry mask.
 
-        Construction uses numpy; stored arrays are JAX int32.
+        Construction uses numpy; stored arrays are NumPy int8.
 
         Parameters
         ----------
@@ -97,15 +119,19 @@ class StencilCapability2D(eqx.Module):
         StencilCapability2D
         """
         h_np = np.asarray(h, dtype=bool)
-        return cls(
-            x_pos=jnp.asarray(count_contiguous(h_np, axis=1, forward=True)),
-            x_neg=jnp.asarray(count_contiguous(h_np, axis=1, forward=False)),
-            y_pos=jnp.asarray(count_contiguous(h_np, axis=0, forward=True)),
-            y_neg=jnp.asarray(count_contiguous(h_np, axis=0, forward=False)),
-        )
+        # NumPy arrays fill fields the type checker reads as JAX arrays: the
+        # type a consumer sees once JAX has flattened the mask.
+        fields: dict[str, Any] = {
+            "x_pos": _counts(h_np, axis=1, forward=True),
+            "x_neg": _counts(h_np, axis=1, forward=False),
+            "y_pos": _counts(h_np, axis=0, forward=True),
+            "y_neg": _counts(h_np, axis=0, forward=False),
+        }
+        return cls(**fields)
 
 
-class StencilCapability3D(eqx.Module):
+@pytree_dataclass
+class StencilCapability3D:
     """Directional count of contiguous wet neighbours for each 3-D grid cell.
 
     At each cell ``(k, j, i)``, stores the number of consecutive wet cells
@@ -148,11 +174,14 @@ class StencilCapability3D(eqx.Module):
         StencilCapability3D
         """
         h_np = np.asarray(h, dtype=bool)
-        return cls(
-            x_pos=jnp.asarray(count_contiguous(h_np, axis=2, forward=True)),
-            x_neg=jnp.asarray(count_contiguous(h_np, axis=2, forward=False)),
-            y_pos=jnp.asarray(count_contiguous(h_np, axis=1, forward=True)),
-            y_neg=jnp.asarray(count_contiguous(h_np, axis=1, forward=False)),
-            z_pos=jnp.asarray(count_contiguous(h_np, axis=0, forward=True)),
-            z_neg=jnp.asarray(count_contiguous(h_np, axis=0, forward=False)),
-        )
+        # NumPy arrays fill fields the type checker reads as JAX arrays: the
+        # type a consumer sees once JAX has flattened the mask.
+        fields: dict[str, Any] = {
+            "x_pos": _counts(h_np, axis=2, forward=True),
+            "x_neg": _counts(h_np, axis=2, forward=False),
+            "y_pos": _counts(h_np, axis=1, forward=True),
+            "y_neg": _counts(h_np, axis=1, forward=False),
+            "z_pos": _counts(h_np, axis=0, forward=True),
+            "z_neg": _counts(h_np, axis=0, forward=False),
+        }
+        return cls(**fields)

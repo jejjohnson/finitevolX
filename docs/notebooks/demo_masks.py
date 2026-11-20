@@ -144,7 +144,7 @@ print(
     f"Irregular: h shape = {masks_irregular.h.shape}, Wet h-cells = {int(masks_irregular.h.sum())}"
 )
 print(
-    f"  Irregular boundary xy_corner_strict indices: {len(masks_irregular.xy_corner_strict_irrbound_cols)} cells"
+    f"  Coast cells: {int(masks_irregular.ind_coast.sum())}, strict-corner wet cells: {int(masks_irregular.xy_corner_strict.sum())}"
 )
 
 # %% [markdown]
