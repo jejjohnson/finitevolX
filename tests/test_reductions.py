@@ -191,8 +191,8 @@ class TestCartesianArea:
 
 class TestSphericalArea:
     @pytest.mark.slow
-    def test_full_sphere_area_sum_approaches_4piR2(self):
-        """Integrating 1 over the full sphere approximates 4πR²."""
+    def test_full_sphere_area_sum_is_4piR2(self):
+        """Integrating 1 over the full sphere gives 4πR² (exact cell areas, #322)."""
         grid = SphericalGrid2D.from_interior(
             nx_interior=128,
             ny_interior=64,
@@ -203,12 +203,16 @@ class TestSphericalArea:
         h = jnp.ones((grid.Ny, grid.Nx))
         total = area_sum(h, grid)
         expected = 4.0 * jnp.pi * R**2
-        # Discretization introduces a ~1% error at this resolution; the
-        # key property we care about is the right order of magnitude and
-        # that refining the grid reduces the error.
-        np.testing.assert_allclose(float(total), float(expected), rtol=0.02)
+        # The cell areas are exact, so only round-off separates the two.
+        np.testing.assert_allclose(float(total), float(expected), rtol=1e-12)
 
-    def test_refining_grid_reduces_error(self):
+    def test_lat_band_area_is_exact_at_any_resolution(self):
+        """A constant integrates to the band's area on a coarse and a fine grid.
+
+        With the midpoint rule this test asked that refining the grid reduce
+        the error. The exact cell areas leave only round-off (~1e-16) at both
+        resolutions, and the order of two round-off errors is not a property.
+        """
         coarse = SphericalGrid2D.from_interior(
             32,
             16,
@@ -232,9 +236,12 @@ class TestSphericalArea:
         lat_max_rad = jnp.deg2rad(80.0)
         expected = 2.0 * jnp.pi * R**2 * (jnp.sin(lat_max_rad) - jnp.sin(lat_min_rad))
 
-        err_c = abs(float(area_sum(h_c, coarse)) - float(expected)) / float(expected)
-        err_f = abs(float(area_sum(h_f, fine)) - float(expected)) / float(expected)
-        assert err_f < err_c
+        np.testing.assert_allclose(
+            float(area_sum(h_c, coarse)), float(expected), rtol=1e-12
+        )
+        np.testing.assert_allclose(
+            float(area_sum(h_f, fine)), float(expected), rtol=1e-12
+        )
 
     def test_constant_mean_is_field_value(self):
         grid = SphericalGrid2D.from_interior(
