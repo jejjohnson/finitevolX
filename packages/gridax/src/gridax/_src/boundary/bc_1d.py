@@ -21,11 +21,18 @@ contract 1):
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-import equinox as eqx
-import jax.numpy as jnp
-from jaxtyping import Array, Float
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.backend import set_at
+from gridax._src.pytree import array_namespace, pytree_dataclass, static_field
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 type Face = Literal["south", "north", "west", "east"]
 type Point = Literal["T", "U", "V", "X"]
@@ -112,30 +119,35 @@ def _set_face(
     if not _on_wall(face, point):
         match face:
             case "south":
-                return field.at[..., 0, :].set(values)
+                return set_at(field, np.s_[..., 0, :], values)
             case "north":
-                return field.at[..., -1, :].set(values)
+                return set_at(field, np.s_[..., -1, :], values)
             case "west":
-                return field.at[..., :, 0].set(values)
+                return set_at(field, np.s_[..., :, 0], values)
             case "east":
-                return field.at[..., :, -1].set(values)
+                return set_at(field, np.s_[..., :, -1], values)
     # wall node: phi[0] (south / west) or phi[-2] (north / east)
     match face:
         case "south":
-            return field.at[..., 0, :].set(values)
+            return set_at(field, np.s_[..., 0, :], values)
         case "west":
-            return field.at[..., :, 0].set(values)
+            return set_at(field, np.s_[..., :, 0], values)
         case "north":
             mirror = 2.0 * values - field[..., -3, :]  # phi[-1] = 2 phi_wall - phi[-3]
-            return field.at[..., -2, :].set(values).at[..., -1, :].set(mirror)
+            return set_at(
+                set_at(field, np.s_[..., -2, :], values), np.s_[..., -1, :], mirror
+            )
         case "east":
             mirror = (
                 2.0 * values - field[..., :, -3]
             )  # phi[:, -1] = 2 phi_wall - phi[:, -3]
-            return field.at[..., :, -2].set(values).at[..., :, -1].set(mirror)
+            return set_at(
+                set_at(field, np.s_[..., :, -2], values), np.s_[..., :, -1], mirror
+            )
 
 
-class Dirichlet1D(eqx.Module):
+@pytree_dataclass
+class Dirichlet1D:
     """Apply a Dirichlet value on one domain face.
 
     For a cell-centred field (``point="T"``, the default) the value is
@@ -174,25 +186,27 @@ class Dirichlet1D(eqx.Module):
     (0.0, 0.0)
     """
 
-    face: Face = eqx.field(static=True)
+    face: Face = static_field()
     value: float
-    point: Point = eqx.field(static=True, default="T")
+    point: Point = static_field(default="T")
 
     def __call__(
         self, field: Float[Array, "*batch Ny Nx"], dx: float, dy: float
     ) -> Float[Array, "*batch Ny Nx"]:
         """Return ``field`` with one Dirichlet ghost face (or wall node) updated."""
+        xp = array_namespace(field)
         interior = _adjacent_interior(field, self.face, self.point)  # [N]
         if _on_wall(self.face, self.point):
             # the node is on the wall: phi_wall = value
-            wall = jnp.zeros_like(interior) + self.value  # [N]
+            wall = xp.zeros_like(interior) + self.value  # [N]
             return _set_face(field, self.face, wall, self.point)
         # phi_wall = (phi_ghost + phi_interior) / 2 = value
         ghost = (2.0 * self.value) - interior  # [N]
         return _set_face(field, self.face, ghost)
 
 
-class Neumann1D(eqx.Module):
+@pytree_dataclass
+class Neumann1D:
     """Apply an outward-normal gradient on one domain face.
 
     The gradient is interpreted as ``dphi/dn`` along the outward normal,
@@ -216,9 +230,9 @@ class Neumann1D(eqx.Module):
         module docstring).
     """
 
-    face: Face = eqx.field(static=True)
+    face: Face = static_field()
     value: float = 0.0
-    point: Point = eqx.field(static=True, default="T")
+    point: Point = static_field(default="T")
 
     def __call__(
         self, field: Float[Array, "*batch Ny Nx"], dx: float, dy: float
@@ -233,7 +247,8 @@ class Neumann1D(eqx.Module):
         return _set_face(field, self.face, boundary, self.point)
 
 
-class Periodic1D(eqx.Module):
+@pytree_dataclass
+class Periodic1D:
     """Apply periodic wrapping on one domain face.
 
     Periodic wrapping copies the interior line one period away, which is the
@@ -246,7 +261,7 @@ class Periodic1D(eqx.Module):
         Domain face to update.
     """
 
-    face: Face = eqx.field(static=True)
+    face: Face = static_field()
 
     def __call__(
         self, field: Float[Array, "*batch Ny Nx"], dx: float, dy: float
@@ -257,7 +272,8 @@ class Periodic1D(eqx.Module):
         return _set_face(field, self.face, ghost)
 
 
-class Outflow1D(eqx.Module):
+@pytree_dataclass
+class Outflow1D:
     """Apply a one-face outflow boundary condition.
 
     Outflow is modelled here as a zero-gradient copy from the nearest
@@ -274,8 +290,8 @@ class Outflow1D(eqx.Module):
         module docstring).
     """
 
-    face: Face = eqx.field(static=True)
-    point: Point = eqx.field(static=True, default="T")
+    face: Face = static_field()
+    point: Point = static_field(default="T")
 
     def __call__(
         self, field: Float[Array, "*batch Ny Nx"], dx: float, dy: float
@@ -286,7 +302,8 @@ class Outflow1D(eqx.Module):
         return _set_face(field, self.face, ghost, self.point)
 
 
-class Reflective1D(eqx.Module):
+@pytree_dataclass
+class Reflective1D:
     """Apply an even-symmetry reflective boundary on one face.
 
     This mirrors the nearest interior values into the ghost cells, which is
@@ -304,8 +321,8 @@ class Reflective1D(eqx.Module):
         module docstring).
     """
 
-    face: Face = eqx.field(static=True)
-    point: Point = eqx.field(static=True, default="T")
+    face: Face = static_field()
+    point: Point = static_field(default="T")
 
     def __call__(
         self, field: Float[Array, "*batch Ny Nx"], dx: float, dy: float
@@ -316,7 +333,8 @@ class Reflective1D(eqx.Module):
         return _set_face(field, self.face, ghost, self.point)
 
 
-class Sponge1D(eqx.Module):
+@pytree_dataclass
+class Sponge1D:
     """Relax one ghost face toward a background value.
 
     The ghost cells are updated as:
@@ -338,10 +356,10 @@ class Sponge1D(eqx.Module):
         module docstring).
     """
 
-    face: Face = eqx.field(static=True)
+    face: Face = static_field()
     background: float
     weight: float
-    point: Point = eqx.field(static=True, default="T")
+    point: Point = static_field(default="T")
 
     def __check_init__(self) -> None:
         if not 0.0 <= self.weight <= 1.0:
@@ -357,7 +375,8 @@ class Sponge1D(eqx.Module):
         return _set_face(field, self.face, ghost, self.point)
 
 
-class Robin1D(eqx.Module):
+@pytree_dataclass
+class Robin1D:
     """Robin (mixed) boundary condition: α·u + β·∂u/∂n = γ.
 
     The Robin condition is a linear combination of Dirichlet and Neumann:
@@ -408,11 +427,11 @@ class Robin1D(eqx.Module):
         module docstring).
     """
 
-    face: Face = eqx.field(static=True)
+    face: Face = static_field()
     alpha: float
     beta: float
     gamma: float
-    point: Point = eqx.field(static=True, default="T")
+    point: Point = static_field(default="T")
 
     def __check_init__(self) -> None:
         if self.alpha == 0.0 and self.beta == 0.0:
@@ -437,7 +456,8 @@ class Robin1D(eqx.Module):
         return _set_face(field, self.face, ghost)
 
 
-class Extrapolation1D(eqx.Module):
+@pytree_dataclass
+class Extrapolation1D:
     """High-order polynomial extrapolation for ghost cells.
 
     Uses Lagrange polynomial extrapolation from ``order + 1`` interior points
@@ -470,10 +490,10 @@ class Extrapolation1D(eqx.Module):
         module docstring).
     """
 
-    face: Face = eqx.field(static=True)
-    order: int = eqx.field(static=True)
-    _coeffs: tuple[float, ...] = eqx.field(static=True)
-    point: Point = eqx.field(static=True)
+    face: Face = static_field()
+    order: int = static_field()
+    _coeffs: tuple[float, ...] = static_field()
+    point: Point = static_field()
 
     def __init__(self, face: Face, order: int = 1, point: Point = "T") -> None:
         if not 1 <= order <= 5:
@@ -503,7 +523,8 @@ class Extrapolation1D(eqx.Module):
         return _set_face(field, self.face, ghost, self.point)
 
 
-class Slip1D(eqx.Module):
+@pytree_dataclass
+class Slip1D:
     """Slip boundary condition for tangential velocity at a solid wall.
 
     Controls the tangential velocity at the wall via a slip coefficient
@@ -553,9 +574,9 @@ class Slip1D(eqx.Module):
     >>> field_out = bc(field, dx=1.0, dy=1.0)
     """
 
-    face: Face = eqx.field(static=True)
+    face: Face = static_field()
     coefficient: float = 1.0
-    point: Point = eqx.field(static=True, default="T")
+    point: Point = static_field(default="T")
 
     def __check_init__(self) -> None:
         if not 0.0 <= self.coefficient <= 1.0:

@@ -8,11 +8,20 @@ The physical interior lives at [1:-1, 1:-1].
 
 from __future__ import annotations
 
-import jax.numpy as jnp
-from jaxtyping import Array, Float
+from typing import TYPE_CHECKING
 
-from gridax_jax._src.boundary.bc_1d import Dirichlet1D, Outflow1D
-from gridax_jax._src.boundary.bc_set import BoundaryConditionSet
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.backend import set_at
+from gridax._src.boundary.bc_1d import Dirichlet1D, Outflow1D
+from gridax._src.boundary.bc_set import BoundaryConditionSet
+from gridax._src.pytree import array_namespace
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
 def pad_interior(
@@ -43,11 +52,12 @@ def pad_interior(
     >>> pad_interior(f).shape
     (6, 6)
     """
+    xp = array_namespace(field)
     if mode == "edge":
         # BoundaryConditionSet.open() is zero-gradient and does not use dx/dy.
         return BoundaryConditionSet.open()(field, dx=1.0, dy=1.0)
     interior = field[..., 1:-1, 1:-1]  # shape [Ny-2, Nx-2]
-    return jnp.pad(interior, _pad_last2(field.ndim, 1), mode=mode)  # [..., Ny, Nx]
+    return xp.pad(interior, _pad_last2(field.ndim, 1), mode=mode)  # [..., Ny, Nx]
 
 
 def enforce_periodic(
@@ -116,9 +126,10 @@ def zero_boundaries(
     Float[Array, "*batch Ny Nx"]
         Array with zero-filled ghost ring.
     """
+    xp = array_namespace(field)
     _validate_pad_width(pad_width, field.shape)
     interior = field[..., pad_width:-pad_width, pad_width:-pad_width]
-    return jnp.pad(
+    return xp.pad(
         interior,
         _pad_last2(field.ndim, pad_width),
         mode="constant",
@@ -147,9 +158,10 @@ def zero_gradient_boundaries(
     Float[Array, "*batch Ny Nx"]
         Array with edge-extrapolated ghost ring.
     """
+    xp = array_namespace(field)
     _validate_pad_width(pad_width, field.shape)
     interior = field[..., pad_width:-pad_width, pad_width:-pad_width]
-    return jnp.pad(interior, _pad_last2(field.ndim, pad_width), mode="edge")
+    return xp.pad(interior, _pad_last2(field.ndim, pad_width), mode="edge")
 
 
 def no_flux_boundaries(
@@ -212,13 +224,13 @@ def no_slip_boundaries(
         src_row = 2 * p - 1 - k
         src_col = 2 * p - 1 - k
         # South ghost row (excluding corners)
-        out = out.at[..., k, p:-p].set(-field[..., src_row, p:-p])
+        out = set_at(out, np.s_[..., k, p:-p], -field[..., src_row, p:-p])
         # North ghost row (excluding corners)
-        out = out.at[..., -(k + 1), p:-p].set(-field[..., -(2 * p - k), p:-p])
+        out = set_at(out, np.s_[..., -(k + 1), p:-p], -field[..., -(2 * p - k), p:-p])
         # West ghost col (excluding corners)
-        out = out.at[..., p:-p, k].set(-field[..., p:-p, src_col])
+        out = set_at(out, np.s_[..., p:-p, k], -field[..., p:-p, src_col])
         # East ghost col (excluding corners)
-        out = out.at[..., p:-p, -(k + 1)].set(-field[..., p:-p, -(2 * p - k)])
+        out = set_at(out, np.s_[..., p:-p, -(k + 1)], -field[..., p:-p, -(2 * p - k)])
     return out
 
 
@@ -256,13 +268,13 @@ def free_slip_boundaries(
         src_row = 2 * p - 1 - k
         src_col = 2 * p - 1 - k
         # South ghost row (excluding corners)
-        out = out.at[..., k, p:-p].set(field[..., src_row, p:-p])
+        out = set_at(out, np.s_[..., k, p:-p], field[..., src_row, p:-p])
         # North ghost row (excluding corners)
-        out = out.at[..., -(k + 1), p:-p].set(field[..., -(2 * p - k), p:-p])
+        out = set_at(out, np.s_[..., -(k + 1), p:-p], field[..., -(2 * p - k), p:-p])
         # West ghost col (excluding corners)
-        out = out.at[..., p:-p, k].set(field[..., p:-p, src_col])
+        out = set_at(out, np.s_[..., p:-p, k], field[..., p:-p, src_col])
         # East ghost col (excluding corners)
-        out = out.at[..., p:-p, -(k + 1)].set(field[..., p:-p, -(2 * p - k)])
+        out = set_at(out, np.s_[..., p:-p, -(k + 1)], field[..., p:-p, -(2 * p - k)])
     return out
 
 
@@ -290,13 +302,15 @@ def fix_boundary_corners(
     """
     out = field
     # SW corner: average of south-edge and west-edge ghost cells
-    out = out.at[..., 0, 0].set(0.5 * (field[..., 0, 1] + field[..., 1, 0]))
+    out = set_at(out, np.s_[..., 0, 0], 0.5 * (field[..., 0, 1] + field[..., 1, 0]))
     # SE corner
-    out = out.at[..., 0, -1].set(0.5 * (field[..., 0, -2] + field[..., 1, -1]))
+    out = set_at(out, np.s_[..., 0, -1], 0.5 * (field[..., 0, -2] + field[..., 1, -1]))
     # NW corner
-    out = out.at[..., -1, 0].set(0.5 * (field[..., -1, 1] + field[..., -2, 0]))
+    out = set_at(out, np.s_[..., -1, 0], 0.5 * (field[..., -1, 1] + field[..., -2, 0]))
     # NE corner
-    out = out.at[..., -1, -1].set(0.5 * (field[..., -1, -2] + field[..., -2, -1]))
+    out = set_at(
+        out, np.s_[..., -1, -1], 0.5 * (field[..., -1, -2] + field[..., -2, -1])
+    )
     return out
 
 

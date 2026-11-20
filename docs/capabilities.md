@@ -17,46 +17,6 @@ if it is almost here, extend it where it lives. Regenerate with
 
 ### `gridax_jax`
 
-#### Single-face boundary condition atoms for 2-D ghost-ring arrays (`gridax_jax._src.boundary.bc_1d`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `Dirichlet1D` | class | Apply a Dirichlet value on one domain face. |
-| `Extrapolation1D` | class | High-order polynomial extrapolation for ghost cells. |
-| `Neumann1D` | class | Apply an outward-normal gradient on one domain face. |
-| `Outflow1D` | class | Apply a one-face outflow boundary condition. |
-| `Periodic1D` | class | Apply periodic wrapping on one domain face. |
-| `Reflective1D` | class | Apply an even-symmetry reflective boundary on one face. |
-| `Robin1D` | class | Robin (mixed) boundary condition: α·u + β·∂u/∂n = γ. |
-| `Slip1D` | class | Slip boundary condition for tangential velocity at a solid wall. |
-| `Sponge1D` | class | Relax one ghost face toward a background value. |
-
-#### Boundary-condition dispatchers for state dictionaries (`gridax_jax._src.boundary.bc_field`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `FieldBCSet` | class | Dispatch per-face boundary conditions across multiple fields. |
-
-#### Per-face boundary condition containers for 2-D ghost-ring arrays (`gridax_jax._src.boundary.bc_set`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `BoundaryConditionSet` | class | Apply a different boundary condition on each domain face. |
-
-#### Boundary condition helpers for finitevolX (`gridax_jax._src.boundary.boundary`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `enforce_periodic` | function | Fill the ghost-cell ring with periodic boundary conditions. |
-| `fix_boundary_corners` | function | Average corner ghost cells from their two face-adjacent ghost neighbours. |
-| `free_slip_boundaries` | function | Fill ghost ring with symmetric reflection (free-slip wall). |
-| `no_flux_boundaries` | function | Fill ghost ring with zeros for normal-flux variables. |
-| `no_slip_boundaries` | function | Fill ghost ring with sign-flipped interior values (no-slip wall). |
-| `pad_interior` | function | Extract physical interior and re-pad to original size. |
-| `wall_boundaries` | function | Apply wall boundary conditions appropriate for a C-grid staggering. |
-| `zero_boundaries` | function | Fill ghost ring with zeros (homogeneous Dirichlet). |
-| `zero_gradient_boundaries` | function | Fill ghost ring by copying nearest interior value (zero gradient / Neumann). |
-
 #### Forcing base class (Layer 1) and composition wrappers (Layer 3) (`gridax_jax._src.forcing._base`)
 
 | Name | Kind | What it does |
@@ -229,6 +189,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `ArakawaJacobian2D` | class | Arakawa (1966) Jacobian J(f, g) at T-points, on the full grid. |
 | `BiharmonicDiffusion2D` | class | Biharmonic (∇⁴) diffusion operator on a 2-D Arakawa C-grid. |
 | `BiharmonicDiffusion3D` | class | Biharmonic (nabla^4) diffusion operator on a 3-D Arakawa C-grid. |
+| `BoundaryConditionSet` | class | Apply a different boundary condition on each domain face. |
 | `CartesianGrid1D` | class | 1-D Cartesian Arakawa C-grid (uniform spacing). |
 | `CartesianGrid2D` | class | 2-D Cartesian Arakawa C-grid (uniform spacing). |
 | `CartesianGrid3D` | class | 3-D Cartesian Arakawa C-grid (uniform spacing). |
@@ -242,8 +203,11 @@ if it is almost here, extend it where it lives. Regenerate with
 | `Difference3D` | class | Finite-difference operators on a 3-D Arakawa C-grid. |
 | `Diffusion2D` | class | Horizontal diffusion operator (flux form) on a 2-D Arakawa C-grid. |
 | `Diffusion3D` | class | Horizontal diffusion operator (flux form) on a 3-D Arakawa C-grid. |
+| `Dirichlet1D` | class | Apply a Dirichlet value on one domain face. |
 | `Divergence2D` | class | Divergence operator on a 2-D Arakawa C-grid. |
 | `Energetics2D` | class | Energy diagnostics at T-points on a 2-D Arakawa C-grid. |
+| `Extrapolation1D` | class | High-order polynomial extrapolation for ghost cells. |
+| `FieldBCSet` | class | Dispatch per-face boundary conditions across multiple fields. |
 | `Interpolation1D` | class | 1-D averaging operators on an Arakawa C-grid. |
 | `Interpolation2D` | class | 2-D averaging operators on an Arakawa C-grid. |
 | `Interpolation3D` | class | 3-D averaging operators on an Arakawa C-grid. |
@@ -252,10 +216,16 @@ if it is almost here, extend it where it lives. Regenerate with
 | `Mask3D` | class | Unified Arakawa C-grid mask for a 3-D Cartesian domain. |
 | `MomentumAdvection2D` | class | Energy-conserving momentum advection on a 2-D Arakawa C-grid. |
 | `MomentumAdvection3D` | class | Energy-conserving momentum advection on a 3-D Arakawa C-grid. |
+| `Neumann1D` | class | Apply an outward-normal gradient on one domain face. |
+| `Outflow1D` | class | Apply a one-face outflow boundary condition. |
+| `Periodic1D` | class | Apply periodic wrapping on one domain face. |
 | `QGPotentialVorticity2D` | class | Quasi-geostrophic potential vorticity at T-points. |
 | `Reconstruction1D` | class | 1-D face-value reconstruction. |
 | `Reconstruction2D` | class | 2-D face-value reconstruction for advective fluxes. |
 | `Reconstruction3D` | class | 3-D face-value reconstruction. |
+| `Reflective1D` | class | Apply an even-symmetry reflective boundary on one face. |
+| `Robin1D` | class | Robin (mixed) boundary condition: α·u + β·∂u/∂n = γ. |
+| `Slip1D` | class | Slip boundary condition for tangential velocity at a solid wall. |
 | `SphericalAdvection2D` | class | 2-D tracer advection on a spherical Arakawa C-grid. |
 | `SphericalAdvection3D` | class | 3-D tracer advection on a spherical Arakawa C-grid. |
 | `SphericalBiharmonicDiffusion2D` | class | Biharmonic (spherical ∇⁴) diffusion on a 2-D spherical C-grid. |
@@ -274,6 +244,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `SphericalMomentumAdvection3D` | class | Energy-conserving momentum advection on a 3-D spherical C-grid. |
 | `SphericalVorticity2D` | class | Vorticity and PV-flux operators on a 2-D spherical Arakawa C-grid. |
 | `SphericalVorticity3D` | class | 3-D spherical vorticity (vmap over z-levels). |
+| `Sponge1D` | class | Relax one ghost face toward a background value. |
 | `StencilCapability1D` | class | Directional count of contiguous wet neighbours for each 1-D grid cell. |
 | `StencilCapability2D` | class | Directional count of contiguous wet neighbours for each 2-D grid cell. |
 | `StencilCapability3D` | class | Directional count of contiguous wet neighbours for each 3-D grid cell. |
@@ -321,7 +292,10 @@ if it is almost here, extend it where it lives. Regenerate with
 | `diff_y_fwd_3d` | function | Forward difference in y, 3-D: T (or U) → V (or X) points. |
 | `diffusion_2d` | function | Horizontal tracer diffusion tendency at T-points (flux form). |
 | `divergence_2d` | function | Compute ∇·(u, v) at T-points on the 2-D Arakawa C-grid. |
+| `enforce_periodic` | function | Fill the ghost-cell ring with periodic boundary conditions. |
 | `enstrophy` | function | Enstrophy (pointwise). |
+| `fix_boundary_corners` | function | Average corner ghost cells from their two face-adjacent ghost neighbours. |
+| `free_slip_boundaries` | function | Fill ghost ring with symmetric reflection (free-slip wall). |
 | `interior` | function | Create an array shaped like ``like``, zero everywhere except the interior. |
 | `kinetic_energy` | function | Kinetic energy at T-points (cell centers) on an Arakawa C-grid. |
 | `linear_2pts` | function | 2-point centred reconstruction at face i+1/2. |
@@ -336,7 +310,10 @@ if it is almost here, extend it where it lives. Regenerate with
 | `masked_std` | function | Standard deviation over ``axis``, excluding dry cells, floored at ``eps``. |
 | `mc` | function | Monotonized Central (MC) flux limiter. |
 | `minmod` | function | Minmod flux limiter. |
+| `no_flux_boundaries` | function | Fill ghost ring with zeros for normal-flux variables. |
+| `no_slip_boundaries` | function | Fill ghost ring with sign-flipped interior values (no-slip wall). |
 | `okubo_weiss` | function | Okubo-Weiss parameter (pointwise). |
+| `pad_interior` | function | Extract physical interior and re-pad to original size. |
 | `plusminus` | function | Split velocity into positive and negative parts. |
 | `potential_enstrophy` | function | Potential enstrophy (pointwise). |
 | `potential_vorticity` | function | Potential vorticity (pointwise). |
@@ -379,6 +356,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `volume_sum` | function | Volume-weighted sum over physical interior T-cells (3-D). |
 | `volume_weights` | function | Dispatch to Cartesian/spherical volume weights (``xp`` as in `area_weights`). |
 | `vorticity_flux_upwind` | function | Dissipative upwind vortex-force fluxes on a C-grid. |
+| `wall_boundaries` | function | Apply wall boundary conditions appropriate for a C-grid staggering. |
 | `weno_3pts` | function | 3-points non-linear left-biased stencil reconstruction: |
 | `weno_3pts_improved` | function | 3-points non-linear left-biased stencil reconstruction: |
 | `weno_3pts_improved_right` | function | 3-points non-linear right-biased WENO-Z stencil reconstruction at face q0+1/2: |
@@ -391,6 +369,8 @@ if it is almost here, extend it where it lives. Regenerate with
 | `weno_7pts_right` | function | 7-points non-linear right-biased stencil reconstruction at face q0+1/2: |
 | `weno_9pts` | function | 9-points non-linear left-biased stencil reconstruction |
 | `weno_9pts_right` | function | 9-points non-linear right-biased stencil reconstruction at face q0+1/2: |
+| `zero_boundaries` | function | Fill ghost ring with zeros (homogeneous Dirichlet). |
+| `zero_gradient_boundaries` | function | Fill ghost ring by copying nearest interior value (zero gradient / Neumann). |
 
 #### Re-exported from `spectraldiffx`
 
@@ -525,6 +505,7 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `ArakawaJacobian2D` | class | Arakawa (1966) Jacobian J(f, g) at T-points, on the full grid. |
 | `BiharmonicDiffusion2D` | class | Biharmonic (∇⁴) diffusion operator on a 2-D Arakawa C-grid. |
 | `BiharmonicDiffusion3D` | class | Biharmonic (nabla^4) diffusion operator on a 3-D Arakawa C-grid. |
+| `BoundaryConditionSet` | class | Apply a different boundary condition on each domain face. |
 | `CartesianGrid1D` | class | 1-D Cartesian Arakawa C-grid (uniform spacing). |
 | `CartesianGrid2D` | class | 2-D Cartesian Arakawa C-grid (uniform spacing). |
 | `CartesianGrid3D` | class | 3-D Cartesian Arakawa C-grid (uniform spacing). |
@@ -538,8 +519,11 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `Difference3D` | class | Finite-difference operators on a 3-D Arakawa C-grid. |
 | `Diffusion2D` | class | Horizontal diffusion operator (flux form) on a 2-D Arakawa C-grid. |
 | `Diffusion3D` | class | Horizontal diffusion operator (flux form) on a 3-D Arakawa C-grid. |
+| `Dirichlet1D` | class | Apply a Dirichlet value on one domain face. |
 | `Divergence2D` | class | Divergence operator on a 2-D Arakawa C-grid. |
 | `Energetics2D` | class | Energy diagnostics at T-points on a 2-D Arakawa C-grid. |
+| `Extrapolation1D` | class | High-order polynomial extrapolation for ghost cells. |
+| `FieldBCSet` | class | Dispatch per-face boundary conditions across multiple fields. |
 | `Interpolation1D` | class | 1-D averaging operators on an Arakawa C-grid. |
 | `Interpolation2D` | class | 2-D averaging operators on an Arakawa C-grid. |
 | `Interpolation3D` | class | 3-D averaging operators on an Arakawa C-grid. |
@@ -548,11 +532,17 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `Mask3D` | class | Unified Arakawa C-grid mask for a 3-D Cartesian domain. |
 | `MomentumAdvection2D` | class | Energy-conserving momentum advection on a 2-D Arakawa C-grid. |
 | `MomentumAdvection3D` | class | Energy-conserving momentum advection on a 3-D Arakawa C-grid. |
+| `Neumann1D` | class | Apply an outward-normal gradient on one domain face. |
+| `Outflow1D` | class | Apply a one-face outflow boundary condition. |
+| `Periodic1D` | class | Apply periodic wrapping on one domain face. |
 | `QGPotentialVorticity2D` | class | Quasi-geostrophic potential vorticity at T-points. |
 | `R_EARTH` | constant | `6371200.0` |
 | `Reconstruction1D` | class | 1-D face-value reconstruction. |
 | `Reconstruction2D` | class | 2-D face-value reconstruction for advective fluxes. |
 | `Reconstruction3D` | class | 3-D face-value reconstruction. |
+| `Reflective1D` | class | Apply an even-symmetry reflective boundary on one face. |
+| `Robin1D` | class | Robin (mixed) boundary condition: α·u + β·∂u/∂n = γ. |
+| `Slip1D` | class | Slip boundary condition for tangential velocity at a solid wall. |
 | `SphericalAdvection2D` | class | 2-D tracer advection on a spherical Arakawa C-grid. |
 | `SphericalAdvection3D` | class | 3-D tracer advection on a spherical Arakawa C-grid. |
 | `SphericalBiharmonicDiffusion2D` | class | Biharmonic (spherical ∇⁴) diffusion on a 2-D spherical C-grid. |
@@ -571,6 +561,7 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `SphericalMomentumAdvection3D` | class | Energy-conserving momentum advection on a 3-D spherical C-grid. |
 | `SphericalVorticity2D` | class | Vorticity and PV-flux operators on a 2-D spherical Arakawa C-grid. |
 | `SphericalVorticity3D` | class | 3-D spherical vorticity (vmap over z-levels). |
+| `Sponge1D` | class | Relax one ghost face toward a background value. |
 | `StencilCapability1D` | class | Directional count of contiguous wet neighbours for each 1-D grid cell. |
 | `StencilCapability2D` | class | Directional count of contiguous wet neighbours for each 2-D grid cell. |
 | `StencilCapability3D` | class | Directional count of contiguous wet neighbours for each 3-D grid cell. |
@@ -628,7 +619,10 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `diffusion_2d` | function | Horizontal tracer diffusion tendency at T-points (flux form). |
 | `dilate_mask` | function | Binary dilation by 1 cell with an n-D *cross* structuring element. |
 | `divergence_2d` | function | Compute ∇·(u, v) at T-points on the 2-D Arakawa C-grid. |
+| `enforce_periodic` | function | Fill the ghost-cell ring with periodic boundary conditions. |
 | `enstrophy` | function | Enstrophy (pointwise). |
+| `fix_boundary_corners` | function | Average corner ghost cells from their two face-adjacent ghost neighbours. |
+| `free_slip_boundaries` | function | Fill ghost ring with symmetric reflection (free-slip wall). |
 | `h_from_pooled` | function | Inverse of `pool_bool` for binary inputs. |
 | `interior` | function | Create an array shaped like ``like``, zero everywhere except the interior. |
 | `kinetic_energy` | function | Kinetic energy at T-points (cell centers) on an Arakawa C-grid. |
@@ -645,7 +639,10 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `masked_std` | function | Standard deviation over ``axis``, excluding dry cells, floored at ``eps``. |
 | `mc` | function | Monotonized Central (MC) flux limiter. |
 | `minmod` | function | Minmod flux limiter. |
+| `no_flux_boundaries` | function | Fill ghost ring with zeros for normal-flux variables. |
+| `no_slip_boundaries` | function | Fill ghost ring with sign-flipped interior values (no-slip wall). |
 | `okubo_weiss` | function | Okubo-Weiss parameter (pointwise). |
+| `pad_interior` | function | Extract physical interior and re-pad to original size. |
 | `plusminus` | function | Split velocity into positive and negative parts. |
 | `pool_bool` | function | n-D average-pool of a binary mask with one-sided zero padding. |
 | `potential_enstrophy` | function | Potential enstrophy (pointwise). |
@@ -689,6 +686,7 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `volume_sum` | function | Volume-weighted sum over physical interior T-cells (3-D). |
 | `volume_weights` | function | Dispatch to Cartesian/spherical volume weights (``xp`` as in `area_weights`). |
 | `vorticity_flux_upwind` | function | Dissipative upwind vortex-force fluxes on a C-grid. |
+| `wall_boundaries` | function | Apply wall boundary conditions appropriate for a C-grid staggering. |
 | `weno_3pts` | function | 3-points non-linear left-biased stencil reconstruction: |
 | `weno_3pts_improved` | function | 3-points non-linear left-biased stencil reconstruction: |
 | `weno_3pts_improved_right` | function | 3-points non-linear right-biased WENO-Z stencil reconstruction at face q0+1/2: |
@@ -701,6 +699,8 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `weno_7pts_right` | function | 7-points non-linear right-biased stencil reconstruction at face q0+1/2: |
 | `weno_9pts` | function | 9-points non-linear left-biased stencil reconstruction |
 | `weno_9pts_right` | function | 9-points non-linear right-biased stencil reconstruction at face q0+1/2: |
+| `zero_boundaries` | function | Fill ghost ring with zeros (homogeneous Dirichlet). |
+| `zero_gradient_boundaries` | function | Fill ghost ring by copying nearest interior value (zero gradient / Neumann). |
 
 ### `gridax.analysis`
 

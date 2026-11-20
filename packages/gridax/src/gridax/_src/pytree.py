@@ -185,6 +185,17 @@ def pytree_dataclass[T: type](cls: T) -> T:
     Box(n=3, width=1.5)
     """
     custom_init = "__init__" in cls.__dict__
+    if (
+        not custom_init
+        and hasattr(cls, "__check_init__")
+        and "__post_init__" not in cls.__dict__
+    ):
+        # As on an eqx.Module, __check_init__ runs after construction (and
+        # never on unflattening, which bypasses __init__).
+        def __post_init__(self: Any) -> None:
+            self.__check_init__()
+
+        setattr(cls, "__post_init__", __post_init__)  # noqa: B010
     cls = dataclasses.dataclass(frozen=True, eq=False, init=not custom_init)(cls)
     if custom_init:
         _allow_assignment_in(cls)
@@ -219,6 +230,9 @@ def _allow_assignment_in(cls: type) -> None:
         ]
         if missing:
             raise TypeError(f"{type(self).__name__}.__init__ did not set {missing}")
+        check = getattr(self, "__check_init__", None)
+        if check is not None:
+            check()
 
     def __setattr__(self: Any, name: str, value: Any) -> None:
         if self.__dict__.get(_INITIALISING, False):
