@@ -7,13 +7,17 @@ new fields — only the constructor :meth:`from_interior` and (in 3-D)
 the :meth:`horizontal_grid` helper.
 """
 
+from __future__ import annotations
+
 from finitevolx._src.grid.base import (
     CurvilinearGrid1D,
     CurvilinearGrid2D,
     CurvilinearGrid3D,
 )
+from finitevolx._src.utils.pytree import pytree_dataclass
 
 
+@pytree_dataclass
 class CartesianGrid1D(CurvilinearGrid1D):
     """1-D Cartesian Arakawa C-grid (uniform spacing).
 
@@ -34,7 +38,7 @@ class CartesianGrid1D(CurvilinearGrid1D):
     """
 
     @classmethod
-    def from_interior(cls, nx_interior: int, Lx: float) -> "CartesianGrid1D":
+    def from_interior(cls, nx_interior: int, Lx: float) -> CartesianGrid1D:
         """Construct grid from interior cell count.
 
         Parameters
@@ -53,6 +57,7 @@ class CartesianGrid1D(CurvilinearGrid1D):
         return cls(Nx=Nx, Lx=Lx, dx=dx)
 
 
+@pytree_dataclass
 class CartesianGrid2D(CurvilinearGrid2D):
     """2-D Cartesian Arakawa C-grid (uniform spacing).
 
@@ -82,7 +87,7 @@ class CartesianGrid2D(CurvilinearGrid2D):
     @classmethod
     def from_interior(
         cls, nx_interior: int, ny_interior: int, Lx: float, Ly: float
-    ) -> "CartesianGrid2D":
+    ) -> CartesianGrid2D:
         """Construct grid from interior cell counts.
 
         Parameters
@@ -107,6 +112,7 @@ class CartesianGrid2D(CurvilinearGrid2D):
         return cls(Nx=Nx, Ny=Ny, Lx=Lx, Ly=Ly, dx=dx, dy=dy)
 
 
+@pytree_dataclass
 class CartesianGrid3D(CurvilinearGrid3D):
     """3-D Cartesian Arakawa C-grid (uniform spacing).
 
@@ -146,7 +152,7 @@ class CartesianGrid3D(CurvilinearGrid3D):
         Lx: float,
         Ly: float,
         Lz: float,
-    ) -> "CartesianGrid3D":
+    ) -> CartesianGrid3D:
         """Construct grid from interior cell counts.
 
         Parameters
@@ -176,7 +182,7 @@ class CartesianGrid3D(CurvilinearGrid3D):
         dz = Lz / nz_interior
         return cls(Nx=Nx, Ny=Ny, Nz=Nz, Lx=Lx, Ly=Ly, Lz=Lz, dx=dx, dy=dy, dz=dz)
 
-    def horizontal_grid(self) -> "CartesianGrid2D":
+    def horizontal_grid(self) -> CartesianGrid2D:
         """Extract the horizontal 2-D grid from this 3-D grid.
 
         Returns

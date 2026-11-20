@@ -21,7 +21,7 @@ from finitevolx._src.grid.spherical import (
 )
 from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
-from finitevolx._src.operators._utils import _safe_div_cos
+from finitevolx._src.operators._utils import _metric_like, _safe_div_cos
 from finitevolx._src.operators.interpolation import Interpolation2D
 from finitevolx._src.operators.stencils import (
     _neighbours,
@@ -73,11 +73,12 @@ class SphericalDivergence2D(eqx.Module):
         du_dlon = diff_x_bwd(u) / dlon
 
         # d(v·cosφ)/dφ at T: backward diff V → T
-        v_cos_N = v[1:-1, 1:-1] * self.grid.cos_lat_V[1:-1, 1:-1]
-        v_cos_S = v[:-2, 1:-1] * self.grid.cos_lat_V[:-2, 1:-1]
+        cos_V = _metric_like(self.grid.cos_lat_V, v)
+        v_cos_N = v[1:-1, 1:-1] * cos_V[1:-1, 1:-1]
+        v_cos_S = v[:-2, 1:-1] * cos_V[:-2, 1:-1]
         dvc_dlat = (v_cos_N - v_cos_S) / dlat
 
-        cos_T = self.grid.cos_lat_T[1:-1, 1:-1]
+        cos_T = _metric_like(self.grid.cos_lat_T, u)[1:-1, 1:-1]
         out = interior(_safe_div_cos(du_dlon + dvc_dlat, cos_T, R), u)
         if self.mask is not None:
             out = out * self.mask.h
@@ -147,11 +148,12 @@ class SphericalVorticity2D(eqx.Module):
         dv_dlon = diff_x_fwd(v) / dlon
 
         # d(u·cosφ)/dφ at X: forward diff U → X
-        u_cos_N = u[2:, 1:-1] * self.grid.cos_lat_U[2:, 1:-1]
-        u_cos_S = u[1:-1, 1:-1] * self.grid.cos_lat_U[1:-1, 1:-1]
+        cos_U = _metric_like(self.grid.cos_lat_U, u)
+        u_cos_N = u[2:, 1:-1] * cos_U[2:, 1:-1]
+        u_cos_S = u[1:-1, 1:-1] * cos_U[1:-1, 1:-1]
         duc_dlat = (u_cos_N - u_cos_S) / dlat
 
-        cos_X = self.grid.cos_lat_X[1:-1, 1:-1]
+        cos_X = _metric_like(self.grid.cos_lat_X, u)[1:-1, 1:-1]
         out = interior(_safe_div_cos(dv_dlon - duc_dlat, cos_X, R), u)
         if self.mask is not None:
             out = out * self.mask.xy_corner_strict
@@ -282,7 +284,7 @@ class SphericalLaplacian2D(eqx.Module):
         R = self.grid.R
         dlon = self.grid.dlon
         dlat = self.grid.dlat
-        cos_T = self.grid.cos_lat_T[1:-1, 1:-1]
+        cos_T = _metric_like(self.grid.cos_lat_T, h)[1:-1, 1:-1]
 
         # Each offset of h is sliced once (see `_Neighbours2D`); same
         # arithmetic as diff_x_fwd(h) - diff_x_bwd(h) and the original
@@ -297,8 +299,9 @@ class SphericalLaplacian2D(eqx.Module):
         dh_S = (nb.c - nb.s) / dlat  # (h[1:-1, 1:-1] - h[:-2, 1:-1]) / dlat
         # V-face cosines from the grid, as SphericalDivergence2D reads them:
         #   cos_V_N = cos_lat_V[j] (north face), cos_V_S = cos_lat_V[j-1]
-        cos_V_N = self.grid.cos_lat_V[1:-1, 1:-1]
-        cos_V_S = self.grid.cos_lat_V[:-2, 1:-1]
+        cos_V = _metric_like(self.grid.cos_lat_V, h)
+        cos_V_N = cos_V[1:-1, 1:-1]
+        cos_V_S = cos_V[:-2, 1:-1]
         d_coslat_dh = (cos_V_N * dh_N - cos_V_S * dh_S) / dlat
 
         lon_term = _safe_div_cos(d2h_dlon2, cos_T, R**2 * cos_T)
@@ -372,7 +375,7 @@ def _geostrophic_velocity_sphere(
     if wet_v is not None:
         # f_on_V[j+1/2, i] = f_on_V[j+1/2, i] if wet_v[j+1/2, i] else 1
         f_on_V = jnp.where(wet_v[1:-1, 1:-1], f_on_V, 1.0)
-    cos_on_V = grid.cos_lat_V[1:-1, 1:-1]  # cos(lat_T[j] + dlat/2)
+    cos_on_V = _metric_like(grid.cos_lat_V, h)[1:-1, 1:-1]  # cos(lat_T[j] + dlat/2)
     dh_dlon_V = (h[1:-1, 2:] + h[2:, 2:] - h[1:-1, :-2] - h[2:, :-2]) / (4.0 * dlon)
     v_g = interior(_safe_div_cos(gravity * dh_dlon_V, cos_on_V, f_on_V * R), h)
 

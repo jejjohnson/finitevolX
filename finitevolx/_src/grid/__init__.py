@@ -1,4 +1,4 @@
-"""finitevolX grid containers — abstract base, Cartesian, spherical, cylindrical."""
+"""finitevolX grid containers — abstract base, Cartesian, spherical."""
 
 from finitevolx._src.grid.base import (
     ArakawaCGrid1D,

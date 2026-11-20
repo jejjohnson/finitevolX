@@ -10,17 +10,34 @@ The Cartesian-equivalent metric lengths inherited from
 ``CurvilinearGrid*`` are populated as ``dx = R * dlon``,
 ``dy = R * dlat``, etc., so spherical grids are drop-in compatible
 with operators that consume ``grid.dx`` / ``grid.dy``.
+
+The coordinate arrays are built with NumPy in float64. The metric
+properties (``dx_T``, ``min_cell_width``, ...) compute with the namespace of
+the arrays they read, so they run on the NumPy grid and, inside a JAX
+transform, on the traced one.
 """
 
 from __future__ import annotations
 
-import jax.numpy as jnp
-from jaxtyping import Array, Float
+from typing import TYPE_CHECKING
+
+from jaxtyping import Float
+import numpy as np
 
 from finitevolx._src.grid.base import CurvilinearGrid2D, CurvilinearGrid3D
 from finitevolx._src.utils.constants import R_EARTH
+from finitevolx._src.utils.pytree import array_namespace, pytree_dataclass
+
+# The coordinate arrays are NumPy when a grid is built and JAX arrays (or
+# tracers) once a transform has flattened it. ``jaxtyping.Array`` imports JAX,
+# so it names the type for the type checker only.
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
+@pytree_dataclass
 class SphericalGrid2D(CurvilinearGrid2D):
     """2-D Arakawa C-grid on a sphere.
 
@@ -112,10 +129,10 @@ class SphericalGrid2D(CurvilinearGrid2D):
         -------
         SphericalGrid2D
         """
-        lon_min_rad = jnp.deg2rad(lon_range[0])
-        lon_max_rad = jnp.deg2rad(lon_range[1])
-        lat_min_rad = jnp.deg2rad(lat_range[0])
-        lat_max_rad = jnp.deg2rad(lat_range[1])
+        lon_min_rad = np.deg2rad(lon_range[0])
+        lon_max_rad = np.deg2rad(lon_range[1])
+        lat_min_rad = np.deg2rad(lat_range[0])
+        lat_max_rad = np.deg2rad(lat_range[1])
 
         dlon = float((lon_max_rad - lon_min_rad) / nx_interior)
         dlat = float((lat_max_rad - lat_min_rad) / ny_interior)
@@ -132,17 +149,17 @@ class SphericalGrid2D(CurvilinearGrid2D):
         # 1-D coordinate arrays with ghost cells
         # Ghost cell at j=0 is one cell south of the physical domain;
         # j=1 is the first interior cell at lat_min.
-        lat_1d = lat_min_rad + (jnp.arange(Ny) - 1) * dlat
-        lon_1d = lon_min_rad + (jnp.arange(Nx) - 1) * dlon
+        lat_1d = lat_min_rad + (np.arange(Ny) - 1) * dlat
+        lon_1d = lon_min_rad + (np.arange(Nx) - 1) * dlon
 
         # 2-D meshgrid (j, i) ordering
-        lon_2d, lat_2d = jnp.meshgrid(lon_1d, lat_1d)
+        lon_2d, lat_2d = np.meshgrid(lon_1d, lat_1d)
 
-        cos_lat_T = jnp.cos(lat_2d)
+        cos_lat_T = np.cos(lat_2d)
         cos_lat_U = cos_lat_T  # U sits at the same latitude as T
 
         lat_V = lat_2d + 0.5 * dlat
-        cos_lat_V = jnp.cos(lat_V)
+        cos_lat_V = np.cos(lat_V)
         cos_lat_X = cos_lat_V  # X sits at the same latitude as V
 
         return cls(
@@ -256,8 +273,9 @@ class SphericalGrid2D(CurvilinearGrid2D):
             reaches a pole, where the zonal width degenerates.
         """
         dx_i = self.dx_T[1:-1, 1:-1]
-        dx_i = jnp.where(_degenerate_width(dx_i, self.R * self.dlon), 0.0, dx_i)
-        return jnp.minimum(jnp.min(dx_i), self.dy_T)
+        xp = array_namespace(dx_i)
+        dx_i = xp.where(_degenerate_width(dx_i, self.R * self.dlon), 0.0, dx_i)
+        return xp.minimum(xp.min(dx_i), self.dy_T)
 
     @property
     def max_aspect(self) -> Float[Array, ""]:
@@ -286,10 +304,11 @@ class SphericalGrid2D(CurvilinearGrid2D):
             degenerate zonal width (interior reaching a pole).
         """
         dx_i = self.dx_T[1:-1, 1:-1]
+        xp = array_namespace(dx_i)
         degenerate = _degenerate_width(dx_i, self.R * self.dlon)
-        safe_dx = jnp.where(degenerate, 1.0, dx_i)
-        aspect = jnp.where(degenerate, jnp.inf, self.dy_T / safe_dx)
-        return jnp.max(aspect)
+        safe_dx = xp.where(degenerate, 1.0, dx_i)
+        aspect = xp.where(degenerate, np.inf, self.dy_T / safe_dx)
+        return xp.max(aspect)
 
 
 def _degenerate_width(dx: Float[Array, "..."], nominal: float) -> Float[Array, "..."]:
@@ -327,10 +346,11 @@ def _degenerate_width(dx: Float[Array, "..."], nominal: float) -> Float[Array, "
         True where the width is indistinguishable from zero, or is
         negative.
     """
-    tolerance = 8.0 * jnp.finfo(jnp.asarray(dx).dtype).eps * abs(nominal)
-    return (jnp.abs(dx) <= tolerance) | (dx < 0.0)
+    tolerance = 8.0 * np.finfo(dx.dtype).eps * abs(nominal)
+    return (abs(dx) <= tolerance) | (dx < 0.0)
 
 
+@pytree_dataclass
 class SphericalGrid3D(CurvilinearGrid3D):
     """3-D Arakawa C-grid on a sphere.
 

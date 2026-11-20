@@ -1,7 +1,7 @@
 """Abstract base classes for finitevolX grid containers.
 
 This module defines the layered abstraction shared by every concrete
-grid type (Cartesian, spherical, cylindrical, ...):
+grid type (Cartesian, spherical):
 
     ArakawaCGrid1D / 2D / 3D       — pure C-grid topology (Nx, Ny, Nz +
                                      ghost-cell convention).  No metric.
@@ -13,23 +13,31 @@ grid type (Cartesian, spherical, cylindrical, ...):
         ↓
     CartesianGrid* (cartesian.py)
     SphericalGrid* (spherical.py)
-    CylindricalGrid* (cylindrical.py)
 
 The split lets operators that only need topology (e.g. shape and
 ghost-cell handling) accept ``ArakawaCGrid*``, operators that need a
 generic uniform spacing accept ``CurvilinearGrid*``, and operators
 that require coordinate-system-specific metric (e.g. ``cos(lat)``)
 take the concrete subclass directly.
+
+Every class is a frozen dataclass built with NumPy, registered as a JAX
+pytree when JAX can be imported (:func:`pytree_dataclass`). The integer
+sizes ``Nx``, ``Ny``, ``Nz`` are static pytree metadata, so a grid can be
+passed to plain ``jax.jit`` and still give concrete shapes; every other
+field is a leaf.
 """
 
-import equinox as eqx
+from __future__ import annotations
+
+from finitevolx._src.utils.pytree import pytree_dataclass, static_field
 
 # ----------------------------------------------------------------------
 # Layer 1 — pure C-grid topology (no metric)
 # ----------------------------------------------------------------------
 
 
-class ArakawaCGrid1D(eqx.Module):
+@pytree_dataclass
+class ArakawaCGrid1D:
     """1-D Arakawa C-grid topology (no metric).
 
     Records only the integer dimension and the ghost-cell convention;
@@ -55,10 +63,11 @@ class ArakawaCGrid1D(eqx.Module):
     U-east-faces); see ``CartesianGrid1D`` for the colocation rule.
     """
 
-    Nx: int
+    Nx: int = static_field()
 
 
-class ArakawaCGrid2D(eqx.Module):
+@pytree_dataclass
+class ArakawaCGrid2D:
     """2-D Arakawa C-grid topology (no metric).
 
     Records only the integer dimensions and the ghost-cell convention;
@@ -92,11 +101,12 @@ class ArakawaCGrid2D(eqx.Module):
     neighbourhood.  See ``CartesianGrid2D`` for the colocation rule.
     """
 
-    Nx: int
-    Ny: int
+    Nx: int = static_field()
+    Ny: int = static_field()
 
 
-class ArakawaCGrid3D(eqx.Module):
+@pytree_dataclass
+class ArakawaCGrid3D:
     """3-D Arakawa C-grid topology (no metric).
 
     Records only the integer dimensions and the ghost-cell convention;
@@ -130,9 +140,9 @@ class ArakawaCGrid3D(eqx.Module):
     top face of ``T[k]`` (as ``Mask3D.w`` and ``vertical_velocity``).
     """
 
-    Nx: int
-    Ny: int
-    Nz: int
+    Nx: int = static_field()
+    Ny: int = static_field()
+    Nz: int = static_field()
 
 
 # ----------------------------------------------------------------------
@@ -140,12 +150,13 @@ class ArakawaCGrid3D(eqx.Module):
 # ----------------------------------------------------------------------
 
 
+@pytree_dataclass
 class CurvilinearGrid1D(ArakawaCGrid1D):
     """1-D curvilinear C-grid with a uniform metric.
 
     Adds physical extent (``Lx``) and uniform grid spacing (``dx``) to
-    :class:`ArakawaCGrid1D`.  Concrete subclasses (``CartesianGrid1D``,
-    cylindrical 1-D, ...) inherit from this layer and provide their
+    :class:`ArakawaCGrid1D`.  Concrete subclasses (``CartesianGrid1D``)
+    inherit from this layer and provide their
     coordinate-system-specific construction logic.
 
     Parameters
@@ -162,12 +173,13 @@ class CurvilinearGrid1D(ArakawaCGrid1D):
     dx: float
 
 
+@pytree_dataclass
 class CurvilinearGrid2D(ArakawaCGrid2D):
     """2-D curvilinear C-grid with a uniform metric.
 
     Adds physical extents (``Lx``, ``Ly``) and uniform grid spacings
     (``dx``, ``dy``) to :class:`ArakawaCGrid2D`.  Concrete subclasses
-    (``CartesianGrid2D``, ``SphericalGrid2D``, ``CylindricalGrid2D``)
+    (``CartesianGrid2D``, ``SphericalGrid2D``)
     inherit from this layer and provide their coordinate-system-specific
     construction logic.
 
@@ -193,13 +205,14 @@ class CurvilinearGrid2D(ArakawaCGrid2D):
     dy: float
 
 
+@pytree_dataclass
 class CurvilinearGrid3D(ArakawaCGrid3D):
     """3-D curvilinear C-grid with a uniform metric.
 
     Adds physical extents (``Lx``, ``Ly``, ``Lz``) and uniform grid
     spacings (``dx``, ``dy``, ``dz``) to :class:`ArakawaCGrid3D`.
-    Concrete subclasses (``CartesianGrid3D``, ``SphericalGrid3D``,
-    ``CylindricalGrid3D``) inherit from this layer and provide their
+    Concrete subclasses (``CartesianGrid3D``, ``SphericalGrid3D``)
+    inherit from this layer and provide their
     coordinate-system-specific construction logic.
 
     Parameters

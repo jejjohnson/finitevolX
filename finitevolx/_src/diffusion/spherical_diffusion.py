@@ -76,7 +76,7 @@ from finitevolx._src.diffusion.diffusion import _face_kappa
 from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
 from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
-from finitevolx._src.operators._utils import _safe_div_cos
+from finitevolx._src.operators._utils import _metric_like, _safe_div_cos
 
 
 def _spherical_diffusion_2d_impl(
@@ -93,6 +93,9 @@ def _spherical_diffusion_2d_impl(
     mv: Bool[Array, "Ny Nx"] | Float[Array, "Ny Nx"] | None,
 ) -> Float[Array, "Ny Nx"]:
     """Shared 2-D spherical diffusion kernel with explicit raw-array masks."""
+    cos_lat_T = _metric_like(cos_lat_T, h)
+    cos_lat_U = _metric_like(cos_lat_U, h)
+    cos_lat_V = _metric_like(cos_lat_V, h)
     # κ at the interior faces (arithmetic mean of the two T cells)
     kappa_x, kappa_y = _face_kappa(kappa)  # [Ny-2, Nx-3], [Ny-3, Nx-2]
 
@@ -150,6 +153,7 @@ def _spherical_diffusion_2d_fluxes_impl(
     mv: Bool[Array, "Ny Nx"] | Float[Array, "Ny Nx"] | None,
 ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
     """Shared diagnostic-flux kernel for :class:`SphericalDiffusion2D`."""
+    cos_lat_U = _metric_like(cos_lat_U, h)
     # κ at the interior faces (arithmetic mean of the two T cells)
     kappa_x, kappa_y = _face_kappa(kappa)  # [Ny-2, Nx-3], [Ny-3, Nx-2]
 

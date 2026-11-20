@@ -37,6 +37,7 @@ from finitevolx._src.grid.base import (
 from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
 from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
 from finitevolx._src.mask import Mask2D, Mask3D
+from finitevolx._src.operators._utils import _metric_like
 
 # ----------------------------------------------------------------------
 # Cell-area / cell-volume metrics
@@ -202,7 +203,7 @@ def area_sum(
         Scalar area-weighted sum.  Dtype follows the promoted dtype of
         ``field`` and the area weights.
     """
-    w = area_weights(grid)
+    w = _metric_like(area_weights(grid), field)
     f, w = _apply_mask_2d(field, w, mask)
     return jnp.sum(_interior_2d(w * f))
 
@@ -232,7 +233,7 @@ def area_mean(
     Float[Array, ""]
         Scalar area-weighted mean, or NaN if the total wet area is 0.
     """
-    w = area_weights(grid)
+    w = _metric_like(area_weights(grid), field)
     f, w = _apply_mask_2d(field, w, mask)
     wi = _interior_2d(w)
     num = jnp.sum(wi * _interior_2d(f))
@@ -293,7 +294,7 @@ def volume_sum(
     -------
     Float[Array, ""]
     """
-    w = volume_weights(grid)
+    w = _metric_like(volume_weights(grid), field)
     f, w = _apply_mask_3d(field, w, mask)
     return jnp.sum(_interior_3d(w * f))
 
@@ -308,7 +309,7 @@ def volume_mean(
     Returns ``(Σ V·field) / (Σ V)`` over wet T-cells.  NaN/Inf-safe
     under masking; NaN when the total wet volume is zero.
     """
-    w = volume_weights(grid)
+    w = _metric_like(volume_weights(grid), field)
     f, w = _apply_mask_3d(field, w, mask)
     wi = _interior_3d(w)
     num = jnp.sum(wi * _interior_3d(f))
