@@ -33,6 +33,8 @@ import numbers
 
 import equinox as eqx
 from gridax import Mask2D
+from gridax._src.boundary.bc_1d import Dirichlet1D, Neumann1D, Periodic1D
+from gridax._src.boundary.bc_set import BoundaryConditionSet
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
@@ -40,8 +42,6 @@ import numpy as np
 from scipy import ndimage
 from spectraldiffx import CapacitanceSolver
 
-from gridax_jax._src.boundary.bc_1d import Dirichlet1D, Neumann1D, Periodic1D
-from gridax_jax._src.boundary.bc_set import BoundaryConditionSet
 from gridax_jax._src.solvers.inhomogeneous import (
     SolveDomain,
     coast_ring,

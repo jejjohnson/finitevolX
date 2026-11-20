@@ -2,13 +2,22 @@
 
 from __future__ import annotations
 
-import equinox as eqx
-from jaxtyping import Array, Float
+from typing import TYPE_CHECKING
 
-from gridax_jax._src.boundary.bc_set import BoundaryConditionSet
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.boundary.bc_set import BoundaryConditionSet
+from gridax._src.pytree import pytree_dataclass
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
-class FieldBCSet(eqx.Module):
+@pytree_dataclass
+class FieldBCSet:
     """Dispatch per-face boundary conditions across multiple fields.
 
     Parameters

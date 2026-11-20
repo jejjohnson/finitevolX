@@ -40,9 +40,9 @@ MODULES = (
     "gridax._src.operators.coriolis",
     "gridax._src.operators.diagnostics",
     "gridax._src.operators.diagnostic_operators",
-    "gridax_jax._src.boundary.bc_1d",
-    "gridax_jax._src.boundary.bc_set",
-    "gridax_jax._src.boundary.boundary",
+    "gridax._src.boundary.bc_1d",
+    "gridax._src.boundary.bc_set",
+    "gridax._src.boundary.boundary",
 )
 
 

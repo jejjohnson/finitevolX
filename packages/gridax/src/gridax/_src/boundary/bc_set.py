@@ -2,20 +2,29 @@
 
 from __future__ import annotations
 
-import equinox as eqx
-from gridax import Mask2D
-from jaxtyping import Array, Float
+from typing import TYPE_CHECKING
 
-from gridax_jax._src.boundary.bc_1d import (
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.boundary.bc_1d import (
     BoundaryCondition1D,
     Dirichlet1D,
     Outflow1D,
     Periodic1D,
     Point,
 )
+from gridax._src.mask import Mask2D
+from gridax._src.pytree import pytree_dataclass
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
-class BoundaryConditionSet(eqx.Module):
+@pytree_dataclass
+class BoundaryConditionSet:
     """Apply a different boundary condition on each domain face.
 
     The application order is south, north, west, then east, so west/east
