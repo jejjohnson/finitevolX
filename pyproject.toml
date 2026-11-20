@@ -1,6 +1,6 @@
 [project]
 name = "finitevolx"
-version = "0.1.0"
+version = "0.2.0"
 description = "Deprecated: finitevolX is now gridax-jax (import gridax_jax) on gridax."
 authors = [
     { name = "Juan Emmanuel Johnson", email = "jemanjohnson34@gmail.com" },

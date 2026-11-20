@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.2.0](https://github.com/jejjohnson/finitevolX/compare/v0.1.0...v0.2.0) (2026-11-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* the package is gridax-jax and the import gridax_jax.
+* finitevolx is renamed gridax-jax (import gridax_jax), and its array-API code (grids, masks, stencils, the C-grid operators, advection, diffusion, boundary conditions, reductions) moves to gridax (#435); import finitevolx warns and will be removed after one 0.X release.
+* **mask:** Mask*.sponge, the sponge_width argument and the xy_corner_strict_irrbound_* fields are removed.
+
+### Features
+
+* **gridax:** analysis kernels on collocated grids — finite differences and axis remapping on any array backend ([#434](https://github.com/jejjohnson/finitevolX/issues/434)) ([95798a1](https://github.com/jejjohnson/finitevolX/commit/95798a1a7d7d4052bd4d6bea634f1e0322f39f64))
+* one dtype rule — the caller decides, and a silent downcast is an error ([#431](https://github.com/jejjohnson/finitevolX/issues/431)) ([fb9102f](https://github.com/jejjohnson/finitevolX/commit/fb9102f428240fc2a6c318de03f4474888e995de)), closes [#421](https://github.com/jejjohnson/finitevolX/issues/421)
+
+
+### Bug Fixes
+
+* **grid:** spherical T rows are cell centres, so whole-sphere area weights sum to 4πR² ([#433](https://github.com/jejjohnson/finitevolX/issues/433)) ([067d292](https://github.com/jejjohnson/finitevolX/commit/067d292cac70ff7eade615aaadc7d86be1039b5b)), closes [#322](https://github.com/jejjohnson/finitevolX/issues/322)
+
+
+### Code Refactoring
+
+* **mask:** Mask1D/2D/3D as frozen dataclasses on NumPy, without sponge and the irregular-boundary index fields ([#428](https://github.com/jejjohnson/finitevolX/issues/428)) ([44d80f4](https://github.com/jejjohnson/finitevolX/commit/44d80f404beaf28de755c197820d22835c3c5929)), closes [#419](https://github.com/jejjohnson/finitevolX/issues/419)
+* rename finitevolX to gridax-ops (import gridax_ops), with a finitevolx shim for one release ([#430](https://github.com/jejjohnson/finitevolX/issues/430)) ([dfb9b58](https://github.com/jejjohnson/finitevolX/commit/dfb9b58385d450dbbc19e03d1f28813ff4eb2715)), closes [#420](https://github.com/jejjohnson/finitevolX/issues/420)
+* rename gridax-ops to gridax-jax (import gridax_jax) ([#437](https://github.com/jejjohnson/finitevolX/issues/437)) ([aff7146](https://github.com/jejjohnson/finitevolX/commit/aff714687ebebc14fd1ad06a8d11f520124a6146)), closes [#435](https://github.com/jejjohnson/finitevolX/issues/435)
+
 ## [0.1.0](https://github.com/jejjohnson/finitevolX/compare/v0.0.48...v0.1.0) (2026-10-17)
 
 
