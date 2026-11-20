@@ -50,6 +50,7 @@ nav:
   - C-Grid Discretization:
       - Theory & Overview: cgrid_discretization.md
       - API Reference: api/grids.md
+      - Analysis Kernels (gridax): api/analysis.md
   - Masks:
       - Theory & Overview: masks.md
       - API Reference: api/masks.md

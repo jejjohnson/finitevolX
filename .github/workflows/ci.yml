@@ -52,11 +52,11 @@ jobs:
 
       - name: Run tests (fast + integration)
         if: github.event_name == 'push' || github.event_name == 'pull_request'
-        run: uv run pytest tests -m "not slow" -n 2 --durations=15
+        run: uv run pytest tests packages/gridax/tests -m "not slow" -n 2 --durations=15
 
       - name: Run tests (every tier)
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        run: uv run pytest tests -n 2 --durations=25
+        run: uv run pytest tests packages/gridax/tests -n 2 --durations=25
 
   gridax-numpy-only:
     # gridax must install and run with NumPy alone: this environment has
@@ -108,4 +108,4 @@ jobs:
         run: uv sync --extra test --extra pipekit
 
       - name: Run tests (slow)
-        run: uv run pytest tests -m slow -n 2 --durations=25
+        run: uv run pytest tests packages/gridax/tests -m slow -n 2 --durations=25

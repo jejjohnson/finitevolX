@@ -34,6 +34,12 @@ CHECKS = textwrap.dedent(
     gridax.Mask1D.from_dimensions(8).get_adaptive_masks()
     gridax.Mask3D.from_mask(np.broadcast_to(h, (4, 8, 8))).get_adaptive_masks("z")
 
+    from gridax import analysis
+
+    y, x = np.mgrid[0:6, 0:8].astype(float)
+    analysis.adaptive_laplacian_2d(x**2 + y**2, mask=h[:6])
+    analysis.remap_axis(x, axis=-1, source_coords=np.arange(8.0), target_coords=np.array([1.5]))
+
     import sys
 
     loaded = sorted(m for m in sys.modules if m.split(".")[0] in {"jax", "equinox"})
