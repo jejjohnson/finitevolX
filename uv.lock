@@ -461,8 +461,8 @@ dependencies = [
 
 [[package]]
 name = "geophysix"
-version = "0.0.2"
-source = { git = "https://github.com/jejjohnson/geophysix?tag=v0.0.2#b6b0ba2e73ce4533595b07f2877e6948e47c6f01" }
+version = "0.0.3"
+source = { git = "https://github.com/jejjohnson/geophysix?tag=v0.0.3#65b1faab906a4b2abfc743eacac4f21745c00d67" }
 dependencies = [
     { name = "numpy" },
 ]
@@ -510,7 +510,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "geophysix", git = "https://github.com/jejjohnson/geophysix?tag=v0.0.2" },
+    { name = "geophysix", git = "https://github.com/jejjohnson/geophysix?tag=v0.0.3" },
     { name = "jaxtyping", specifier = ">=0.3.0" },
     { name = "numpy", specifier = ">=2.0.0" },
     { name = "scipy", specifier = ">=1.14.0" },
@@ -548,7 +548,7 @@ requires-dist = [
     { name = "diffrax", specifier = ">=0.6.0" },
     { name = "equinox", specifier = ">=0.11.0" },
     { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?tag=v0.6.5" },
-    { name = "geophysix", git = "https://github.com/jejjohnson/geophysix?tag=v0.0.2" },
+    { name = "geophysix", git = "https://github.com/jejjohnson/geophysix?tag=v0.0.3" },
     { name = "gridax", editable = "packages/gridax" },
     { name = "integrix", git = "https://github.com/jejjohnson/integrix?tag=v0.0.3" },
     { name = "jax", specifier = ">=0.4.38" },
