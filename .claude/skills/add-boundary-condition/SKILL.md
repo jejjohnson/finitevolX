@@ -1,6 +1,6 @@
 ---
 name: add-boundary-condition
-description: Add a boundary condition to finitevolX — a per-face ghost-ring atom (like Dirichlet1D, Neumann1D, Robin1D, Slip1D, Sponge1D), a BoundaryConditionSet factory, or a functional ghost-ring filler (like wall_boundaries) — with its half-cell placement, the BoundaryCondition1D union, elliptic-solver compatibility, tests and docs. Use when asked to add, port or fix a boundary condition, ghost-cell fill, wall or open-boundary treatment in gridax_jax/_src/boundary.
+description: Add a boundary condition to finitevolX — a per-face ghost-ring atom (like Dirichlet1D, Neumann1D, Robin1D, Slip1D, Sponge1D), a BoundaryConditionSet factory, or a functional ghost-ring filler (like wall_boundaries) — with its half-cell placement, the BoundaryCondition1D union, elliptic-solver compatibility, tests and docs. Use when asked to add, port or fix a boundary condition, ghost-cell fill, wall or open-boundary treatment in gridax/_src/boundary.
 ---
 
 # Add a boundary condition
@@ -21,21 +21,23 @@ Search `docs/capabilities.md` (the `bc_1d`, `bc_set`, `bc_field` and
 `fix_boundary_corners`. Many "new" conditions are a `Robin1D` with
 particular coefficients, or a set of existing atoms.
 
-## 2. Write it (`gridax_jax/_src/boundary/`)
+## 2. Write it (`packages/gridax/src/gridax/_src/boundary/`)
 
-- **An atom** goes in `bc_1d.py`: an `eqx.Module` with
-  `face: Face = eqx.field(static=True)` and its parameters as fields;
+- **An atom** goes in `bc_1d.py`: a `@pytree_dataclass` with
+  `face: Face = static_field()` and its parameters as fields;
   validation in `__check_init__` (as `Sponge1D` checks `weight`);
   `__call__(self, field, dx, dy)` returns `field` with **one** ghost row /
   column replaced, using the private helpers there (`_adjacent_interior`,
-  `_opposite_interior`, `_normal_spacing`, `_set_face`).
+  `_opposite_interior`, `_normal_spacing`, `_set_face`). It runs on any
+  array backend: use `xp = array_namespace(field)` and `set_at`, never
+  `jnp` or `.at[]` (the AGENTS.md "Backends" rule).
 - Place the condition **at the face**, half a cell from the first interior
   value: Dirichlet sets `ghost = 2 * value - interior`, Neumann
   `ghost = interior + value * spacing` on every face (the ghost cell lies
   outward of the interior, so `(ghost - interior) / spacing` is already the
   outward-normal gradient). Write that formula in the docstring and in a
   comment.
-- Give the atom `point: Point = eqx.field(static=True, default="T")` and
+- Give the atom `point: Point = static_field(default="T")` and
   pass it to `_adjacent_interior` / `_set_face`: when `_on_wall(face,
   point)` is true (`U` / `X` on west / east, `V` / `X` on south / north)
   the field's node is on the wall itself, so impose the condition on that

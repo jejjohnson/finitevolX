@@ -1,6 +1,6 @@
 ---
 name: add-advection-scheme
-description: Add an advection scheme to finitevolX — a face-value reconstruction (upwind, linear, WENO / WENO-Z variant), a TVD flux limiter, or a face-flux function (Rusanov-style) — wired through Reconstruction1D/2D/3D, the Advection1D/2D/3D and SphericalAdvection method dispatch, the coastal stencil fallback, the scale-covariance method lists and the golden fixtures. Use when asked to add, port or implement a reconstruction, WENO stencil, limiter or numerical flux in gridax_jax/_src/advection.
+description: Add an advection scheme to finitevolX — a face-value reconstruction (upwind, linear, WENO / WENO-Z variant), a TVD flux limiter, or a face-flux function (Rusanov-style) — wired through Reconstruction1D/2D/3D, the Advection1D/2D/3D and SphericalAdvection method dispatch, the coastal stencil fallback, the scale-covariance method lists and the golden fixtures. Use when asked to add, port or implement a reconstruction, WENO stencil, limiter or numerical flux in gridax/_src/advection.
 ---
 
 # Add an advection scheme
@@ -19,7 +19,9 @@ functions, and the face fluxes `uv_center_flux`, `uv_node_flux`,
 `rusanov_flux`. A different limiter for TVD is a new limiter, not a new
 scheme.
 
-## 2. Where each piece goes (`gridax_jax/_src/advection/`)
+## 2. Where each piece goes (`packages/gridax/src/gridax/_src/advection/`)
+
+Everything here runs on any array backend: `xp = array_namespace(...)` and the hooks in `gridax/_src/backend.py`, never `jnp` or `.at[]`.
 
 | Piece | File | Wire it into |
 |---|---|---|
