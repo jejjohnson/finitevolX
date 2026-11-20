@@ -4,8 +4,8 @@
   "author": {
     "name": "jejjohnson"
   },
-  "homepage": "https://jejjohnson.github.io/finitevolX/agents/",
-  "repository": "https://github.com/jejjohnson/finitevolX",
+  "homepage": "https://jejjohnson.github.io/gridax/agents/",
+  "repository": "https://github.com/jejjohnson/gridax",
   "license": "Apache-2.0",
   "keywords": ["jax", "finite-volume", "arakawa-c-grid", "ocean-modelling", "equinox", "weno", "elliptic-solvers"]
 }

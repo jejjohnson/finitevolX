@@ -28,7 +28,7 @@ pip install finitevolx
 ### From source
 
 ```bash
-git clone https://github.com/jejjohnson/finitevolX
+git clone https://github.com/jejjohnson/gridax
 cd finitevolX
 pip install -e .
 ```
@@ -81,7 +81,7 @@ artifacts written by each script.
 
 ## Documentation
 
-For detailed API documentation, see the [API Reference](https://jejjohnson.github.io/finitevolX/reference/).
+For detailed API documentation, see the [API Reference](https://jejjohnson.github.io/gridax/reference/).
 
 ## Citation
 
@@ -92,7 +92,7 @@ If you use finitevolX in your research, please cite:
   author = {Johnson, Juan Emmanuel and Uchida, Takaya},
   title = {finitevolX: Finite volume operators for JAX},
   year = {2024},
-  url = {https://github.com/jejjohnson/finitevolX}
+  url = {https://github.com/jejjohnson/gridax}
 }
 ```
 

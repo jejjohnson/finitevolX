@@ -56,7 +56,7 @@ Masking
 -------
 Like the Cartesian :class:`Diffusion2D`, the spherical operator applies
 the three-step intermediate-flux masking pattern when a ``Mask2D`` /
-``Mask3D`` is provided (`#209 <https://github.com/jejjohnson/finitevolX/issues/209>`_):
+``Mask3D`` is provided (`#209 <https://github.com/jejjohnson/gridax/issues/209>`_):
 
 * ``F_λ *= mask.u``
 * ``F_φ *= mask.v``

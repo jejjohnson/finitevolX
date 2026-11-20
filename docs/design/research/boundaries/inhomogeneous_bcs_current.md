@@ -8,7 +8,7 @@ non-zero Dirichlet data.
 **Companion document:** [inhomogeneous_bcs_design.md](./inhomogeneous_bcs_design.md)
 proposes a future API that closes this gap.
 
-**GitHub issue:** [jejjohnson/finitevolX#186](https://github.com/jejjohnson/finitevolX/issues/186)
+**GitHub issue:** [jejjohnson/gridax#186](https://github.com/jejjohnson/gridax/issues/186)
 
 ---
 

@@ -71,7 +71,7 @@ A target that does not exist in the inventory fails `myst build --strict`, so br
 
 ## Never link to a file mystmd does not build
 
-mystmd builds only the pages in its `toc`. A relative prose link to any other Markdown file, such as an API page under `docs/api/` (`[Masks](api/masks.md)`), does not fail: mystmd publishes the file as a raw download, the link resolves, and the reader gets a Markdown file. A link to a folder (`[examples/](examples/)`) does not resolve at all. Link to an API object with `xref:api#<name>`, to a whole API page by its deployed URL (`https://jejjohnson.github.io/finitevolX/reference/masks/`), and to a prose page only once it is in the `toc`. `source_link_problems` in `scripts/build_docs.py` fails the build on any of these.
+mystmd builds only the pages in its `toc`. A relative prose link to any other Markdown file, such as an API page under `docs/api/` (`[Masks](api/masks.md)`), does not fail: mystmd publishes the file as a raw download, the link resolves, and the reader gets a Markdown file. A link to a folder (`[examples/](examples/)`) does not resolve at all. Link to an API object with `xref:api#<name>`, to a whole API page by its deployed URL (`https://jejjohnson.github.io/gridax/reference/masks/`), and to a prose page only once it is in the `toc`. `source_link_problems` in `scripts/build_docs.py` fails the build on any of these.
 
 ## Known upstream issue: the `$` anchor abbreviation
 

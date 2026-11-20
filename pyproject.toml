@@ -66,7 +66,7 @@ override-dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/jejjohnson/finitevolX"
+Repository = "https://github.com/jejjohnson/gridax"
 
 [project.optional-dependencies]
 test = [

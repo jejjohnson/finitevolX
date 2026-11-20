@@ -21,7 +21,7 @@ project:
   id: finitevolx-docs
   title: finitevolX
   description: Finite volume operators for JAX on Arakawa C-grids.
-  github: https://github.com/jejjohnson/finitevolX
+  github: https://github.com/jejjohnson/gridax
   authors:
     - name: Juan Emmanuel Johnson
     - name: Takaya Uchida
@@ -146,4 +146,4 @@ site:
     logo_text: finitevolX
   nav:
     - title: API reference
-      url: https://jejjohnson.github.io/finitevolX/reference/
+      url: https://jejjohnson.github.io/gridax/reference/
