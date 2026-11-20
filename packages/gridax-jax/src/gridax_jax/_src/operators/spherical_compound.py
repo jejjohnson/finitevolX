@@ -18,17 +18,17 @@ from gridax import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
+from gridax._src.operators._ghost import interior, zero_z_ghosts
+from gridax._src.operators._utils import _metric_like, _safe_div_cos
+from gridax._src.operators.stencils import (
+    _neighbours,
+    diff_x_bwd_2d,
+    diff_x_fwd_2d,
+)
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from gridax_jax._src.operators._ghost import interior, zero_z_ghosts
-from gridax_jax._src.operators._utils import _metric_like, _safe_div_cos
 from gridax_jax._src.operators.interpolation import Interpolation2D
-from gridax_jax._src.operators.stencils import (
-    _neighbours,
-    diff_x_bwd,
-    diff_x_fwd,
-)
 from gridax_jax._src.operators.vorticity import (
     _pv_flux_corner_product,
     _warn_arakawa_lamb,
@@ -71,7 +71,7 @@ class SphericalDivergence2D(eqx.Module):
         R = self.grid.R
 
         # du/dλ at T: backward diff U → T
-        du_dlon = diff_x_bwd(u) / dlon
+        du_dlon = diff_x_bwd_2d(u) / dlon
 
         # d(v·cosφ)/dφ at T: backward diff V → T
         cos_V = _metric_like(self.grid.cos_lat_V, v)
@@ -146,7 +146,7 @@ class SphericalVorticity2D(eqx.Module):
         R = self.grid.R
 
         # dv/dλ at X: forward diff V → X
-        dv_dlon = diff_x_fwd(v) / dlon
+        dv_dlon = diff_x_fwd_2d(v) / dlon
 
         # d(u·cosφ)/dφ at X: forward diff U → X
         cos_U = _metric_like(self.grid.cos_lat_U, u)
@@ -288,7 +288,7 @@ class SphericalLaplacian2D(eqx.Module):
         cos_T = _metric_like(self.grid.cos_lat_T, h)[1:-1, 1:-1]
 
         # Each offset of h is sliced once (see `_Neighbours2D`); same
-        # arithmetic as diff_x_fwd(h) - diff_x_bwd(h) and the original
+        # arithmetic as diff_x_fwd_2d(h) - diff_x_bwd_2d(h) and the original
         # dh_N / dh_S slices, but the VJP is one fused pass.
         nb = _neighbours(h)  # c, e, w, n, s views  [Ny-2, Nx-2]
 

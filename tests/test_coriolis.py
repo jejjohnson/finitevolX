@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
+from gridax._src.operators._ghost import interior
+from gridax._src.operators.stencils import diff_x_bwd_2d, diff_y_bwd_2d
 from gridax_jax import BoundaryConditionSet, Interpolation2D, enforce_periodic
-from gridax_jax._src.operators._ghost import interior
 from gridax_jax._src.operators.coriolis import Coriolis2D, Coriolis3D
-from gridax_jax._src.operators.stencils import diff_x_bwd, diff_y_bwd
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -398,8 +398,8 @@ class TestCoriolisEnergyConservation:
         g = self._grid()
         psi = enforce_periodic(jax.random.normal(jax.random.PRNGKey(0), (g.Ny, g.Nx)))
         # u[j, i+1/2] = -(psi[j+1/2] - psi[j-1/2]) / dy, v[j+1/2, i] = (psi[i+1/2] - psi[i-1/2]) / dx
-        u = enforce_periodic(interior(-diff_y_bwd(psi) / g.dy, psi))
-        v = enforce_periodic(interior(diff_x_bwd(psi) / g.dx, psi))
+        u = enforce_periodic(interior(-diff_y_bwd_2d(psi) / g.dy, psi))
+        v = enforce_periodic(interior(diff_x_bwd_2d(psi) / g.dx, psi))
         du, dv = Coriolis2D(grid=g)(u, v, enforce_periodic(self._beta_f(g)))
         assert self._rel_dE(u, v, du, dv) < 1e-13
 

@@ -22,6 +22,7 @@ References
 from __future__ import annotations
 
 from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
+from gridax._src.operators._ghost import interior
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
@@ -33,7 +34,6 @@ from gridax_jax._src.forcing._utils import (
     safe_denominator,
 )
 from gridax_jax._src.forcing.functional import wind_stress_tendency
-from gridax_jax._src.operators._ghost import interior
 from gridax_jax._src.operators.difference import _curl_2d
 from gridax_jax._src.operators.interpolation import Interpolation2D
 

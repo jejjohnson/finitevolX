@@ -1,3 +1,4 @@
+import gridax as _gridax
 from gridax import (
     ArakawaCGrid1D,
     ArakawaCGrid2D,
@@ -16,7 +17,36 @@ from gridax import (
     StencilCapability1D,
     StencilCapability2D,
     StencilCapability3D,
+    avg_x_bwd_1d,
+    avg_x_bwd_2d,
+    avg_x_bwd_3d,
+    avg_x_fwd_1d,
+    avg_x_fwd_2d,
+    avg_x_fwd_3d,
+    avg_xbwd_ybwd_2d,
+    avg_xbwd_yfwd_2d,
+    avg_xfwd_ybwd_2d,
+    avg_xfwd_yfwd_2d,
+    avg_y_bwd_2d,
+    avg_y_bwd_3d,
+    avg_y_fwd_2d,
+    avg_y_fwd_3d,
+    diff_x_bwd_1d,
+    diff_x_bwd_2d,
+    diff_x_bwd_3d,
+    diff_x_fwd_1d,
+    diff_x_fwd_2d,
+    diff_x_fwd_3d,
+    diff_y_bwd_2d,
+    diff_y_bwd_3d,
+    diff_y_fwd_2d,
+    diff_y_fwd_3d,
+    interior,
+    smooth_abs,
+    smooth_clamp,
+    smooth_max,
 )
+from gridax._src.operators.stencils import RENAMED as _RENAMED_STENCILS
 
 from gridax_jax._src.advection.advection import Advection1D, Advection2D, Advection3D
 from gridax_jax._src.advection.face_flux import (
@@ -127,7 +157,6 @@ from gridax_jax._src.forcing.functional import (
 )
 from gridax_jax._src.forcing.rayleigh import RayleighDamping2D, RayleighDamping3D
 from gridax_jax._src.forcing.wind import WindCurl2D, WindStress2D, WindStress3D
-from gridax_jax._src.operators._ghost import interior
 from gridax_jax._src.operators.barotropic import barotropic_filter
 from gridax_jax._src.operators.coriolis import Coriolis2D, Coriolis3D
 from gridax_jax._src.operators.diagnostic_operators import (
@@ -165,11 +194,6 @@ from gridax_jax._src.operators.difference import (
     Difference1D,
     Difference2D,
     Difference3D,
-)
-from gridax_jax._src.operators.differentiable import (
-    smooth_abs,
-    smooth_clamp,
-    smooth_max,
 )
 from gridax_jax._src.operators.divergence import Divergence2D, divergence_2d
 from gridax_jax._src.operators.eos import (
@@ -221,32 +245,6 @@ from gridax_jax._src.operators.spherical_compound import (
 from gridax_jax._src.operators.spherical_difference import (
     SphericalDifference2D,
     SphericalDifference3D,
-)
-from gridax_jax._src.operators.stencils import (
-    avg_x_bwd,
-    avg_x_bwd_1d,
-    avg_x_bwd_3d,
-    avg_x_fwd,
-    avg_x_fwd_1d,
-    avg_x_fwd_3d,
-    avg_xbwd_yfwd,
-    avg_xfwd_ybwd,
-    avg_xy_bwd,
-    avg_xy_fwd,
-    avg_y_bwd,
-    avg_y_bwd_3d,
-    avg_y_fwd,
-    avg_y_fwd_3d,
-    diff_x_bwd,
-    diff_x_bwd_1d,
-    diff_x_bwd_3d,
-    diff_x_fwd,
-    diff_x_fwd_1d,
-    diff_x_fwd_3d,
-    diff_y_bwd,
-    diff_y_bwd_3d,
-    diff_y_fwd,
-    diff_y_fwd_3d,
 )
 from gridax_jax._src.operators.vorticity import (
     Vorticity2D,
@@ -518,10 +516,10 @@ __all__ = [
     "SphericalDifference3D",
     # Raw stencils (Layer 1 — no metric scaling)
     # Difference stencils
-    "diff_x_fwd",
-    "diff_x_bwd",
-    "diff_y_fwd",
-    "diff_y_bwd",
+    "diff_x_fwd_2d",
+    "diff_x_bwd_2d",
+    "diff_y_fwd_2d",
+    "diff_y_bwd_2d",
     "diff_x_fwd_1d",
     "diff_x_bwd_1d",
     "diff_x_fwd_3d",
@@ -529,14 +527,14 @@ __all__ = [
     "diff_y_fwd_3d",
     "diff_y_bwd_3d",
     # Averaging stencils
-    "avg_x_fwd",
-    "avg_x_bwd",
-    "avg_y_fwd",
-    "avg_y_bwd",
-    "avg_xy_fwd",
-    "avg_xy_bwd",
-    "avg_xbwd_yfwd",
-    "avg_xfwd_ybwd",
+    "avg_x_fwd_2d",
+    "avg_x_bwd_2d",
+    "avg_y_fwd_2d",
+    "avg_y_bwd_2d",
+    "avg_xfwd_yfwd_2d",
+    "avg_xbwd_ybwd_2d",
+    "avg_xbwd_yfwd_2d",
+    "avg_xfwd_ybwd_2d",
     "avg_x_fwd_1d",
     "avg_x_bwd_1d",
     "avg_x_fwd_3d",
@@ -829,4 +827,18 @@ def __getattr__(name: str) -> object:
     # names stay for one release and warn on access.
     if name in _MOVED_STEPPERS or name in _ADAPTED_STEPPERS:
         return _deprecated_stepper(name)
+    # The raw stencils were renamed in gridax (#435): every name carries its
+    # rank and the corner averages use one scheme. The old names stay for
+    # one release and warn on access.
+    if name in _RENAMED_STENCILS:
+        import warnings
+
+        new_name = _RENAMED_STENCILS[name]
+        warnings.warn(
+            f"gridax_jax.{name} is deprecated and will be removed in the next"
+            f" release: it is gridax.{new_name}.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return getattr(_gridax, new_name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -22,25 +22,24 @@ from gridax import (
     Mask2D,
     Mask3D,
 )
-from jaxtyping import Array, Float
-
-from gridax_jax._src.operators._ghost import interior
-from gridax_jax._src.operators.stencils import (
-    avg_x_bwd,
+from gridax._src.operators._ghost import interior
+from gridax._src.operators.stencils import (
     avg_x_bwd_1d,
+    avg_x_bwd_2d,
     avg_x_bwd_3d,
-    avg_x_fwd,
     avg_x_fwd_1d,
+    avg_x_fwd_2d,
     avg_x_fwd_3d,
-    avg_xbwd_yfwd,
-    avg_xfwd_ybwd,
-    avg_xy_bwd,
-    avg_xy_fwd,
-    avg_y_bwd,
+    avg_xbwd_ybwd_2d,
+    avg_xbwd_yfwd_2d,
+    avg_xfwd_ybwd_2d,
+    avg_xfwd_yfwd_2d,
+    avg_y_bwd_2d,
     avg_y_bwd_3d,
-    avg_y_fwd,
+    avg_y_fwd_2d,
     avg_y_fwd_3d,
 )
+from jaxtyping import Array, Float
 
 
 class Interpolation1D(eqx.Module):
@@ -142,7 +141,7 @@ class Interpolation2D(eqx.Module):
 
         h_on_u[j, i+1/2] = 1/2 * (h[j, i] + h[j, i+1])
         """
-        out = interior(avg_x_fwd(h), h)
+        out = interior(avg_x_fwd_2d(h), h)
         if self.mask is not None:
             out = out * self.mask.u
         return out
@@ -152,7 +151,7 @@ class Interpolation2D(eqx.Module):
 
         h_on_v[j+1/2, i] = 1/2 * (h[j, i] + h[j+1, i])
         """
-        out = interior(avg_y_fwd(h), h)
+        out = interior(avg_y_fwd_2d(h), h)
         if self.mask is not None:
             out = out * self.mask.v
         return out
@@ -162,7 +161,7 @@ class Interpolation2D(eqx.Module):
 
         h_on_q[j+1/2, i+1/2] = 1/4 * (h[j,i] + h[j,i+1] + h[j+1,i] + h[j+1,i+1])
         """
-        out = interior(avg_xy_fwd(h), h)
+        out = interior(avg_xfwd_yfwd_2d(h), h)
         if self.mask is not None:
             out = out * self.mask.xy_corner_strict
         return out
@@ -176,7 +175,7 @@ class Interpolation2D(eqx.Module):
 
         q_on_u[j, i+1/2] = 1/2 * (q[j+1/2, i+1/2] + q[j-1/2, i+1/2])
         """
-        out = interior(avg_y_bwd(q), q)
+        out = interior(avg_y_bwd_2d(q), q)
         if self.mask is not None:
             out = out * self.mask.u
         return out
@@ -186,7 +185,7 @@ class Interpolation2D(eqx.Module):
 
         q_on_v[j+1/2, i] = 1/2 * (q[j+1/2, i+1/2] + q[j+1/2, i-1/2])
         """
-        out = interior(avg_x_bwd(q), q)
+        out = interior(avg_x_bwd_2d(q), q)
         if self.mask is not None:
             out = out * self.mask.v
         return out
@@ -200,7 +199,7 @@ class Interpolation2D(eqx.Module):
 
         u_on_h[j, i] = 1/2 * (u[j, i+1/2] + u[j, i-1/2])
         """
-        out = interior(avg_x_bwd(u), u)
+        out = interior(avg_x_bwd_2d(u), u)
         if self.mask is not None:
             out = out * self.mask.h
         return out
@@ -210,7 +209,7 @@ class Interpolation2D(eqx.Module):
 
         v_on_h[j, i] = 1/2 * (v[j+1/2, i] + v[j-1/2, i])
         """
-        out = interior(avg_y_bwd(v), v)
+        out = interior(avg_y_bwd_2d(v), v)
         if self.mask is not None:
             out = out * self.mask.h
         return out
@@ -221,7 +220,7 @@ class Interpolation2D(eqx.Module):
         q_on_h[j, i] = 1/4 * (q[j+1/2,i+1/2] + q[j-1/2,i+1/2]
                              + q[j+1/2,i-1/2] + q[j-1/2,i-1/2])
         """
-        out = interior(avg_xy_bwd(q), q)
+        out = interior(avg_xbwd_ybwd_2d(q), q)
         if self.mask is not None:
             out = out * self.mask.h
         return out
@@ -235,7 +234,7 @@ class Interpolation2D(eqx.Module):
 
         u_on_q[j+1/2, i+1/2] = 1/2 * (u[j, i+1/2] + u[j+1, i+1/2])
         """
-        out = interior(avg_y_fwd(u), u)
+        out = interior(avg_y_fwd_2d(u), u)
         if self.mask is not None:
             out = out * self.mask.xy_corner_strict
         return out
@@ -245,7 +244,7 @@ class Interpolation2D(eqx.Module):
 
         v_on_q[j+1/2, i+1/2] = 1/2 * (v[j+1/2, i] + v[j+1/2, i+1])
         """
-        out = interior(avg_x_fwd(v), v)
+        out = interior(avg_x_fwd_2d(v), v)
         if self.mask is not None:
             out = out * self.mask.xy_corner_strict
         return out
@@ -260,7 +259,7 @@ class Interpolation2D(eqx.Module):
         u_on_v[j+1/2, i] = 1/4 * (u[j,   i+1/2] + u[j+1, i+1/2]
                                  + u[j,   i-1/2] + u[j+1, i-1/2])
         """
-        out = interior(avg_xbwd_yfwd(u), u)
+        out = interior(avg_xbwd_yfwd_2d(u), u)
         if self.mask is not None:
             out = out * self.mask.v
         return out
@@ -271,7 +270,7 @@ class Interpolation2D(eqx.Module):
         v_on_u[j, i+1/2] = 1/4 * (v[j+1/2, i] + v[j-1/2, i]
                                  + v[j+1/2, i+1] + v[j-1/2, i+1])
         """
-        out = interior(avg_xfwd_ybwd(v), v)
+        out = interior(avg_xfwd_ybwd_2d(v), v)
         if self.mask is not None:
             out = out * self.mask.u
         return out

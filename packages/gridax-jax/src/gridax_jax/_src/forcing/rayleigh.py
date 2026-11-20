@@ -17,13 +17,13 @@ from __future__ import annotations
 
 import equinox as eqx
 from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
+from gridax._src.operators._ghost import interior, zero_z_ghosts
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from gridax_jax._src.forcing._base import AbstractForcing
 from gridax_jax._src.forcing._utils import interior_or_scalar, mask_where
 from gridax_jax._src.forcing.functional import rayleigh_tendency
-from gridax_jax._src.operators._ghost import interior, zero_z_ghosts
 
 
 class RayleighDamping2D(AbstractForcing):

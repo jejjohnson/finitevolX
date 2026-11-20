@@ -52,8 +52,8 @@ order); review what they cannot see.
   BC, spectral solve, eigenvalue formula, DCT / DST, tridiagonal solve, CG
   loop or preconditioner is a **High** finding, with the existing name to
   use.
-- Stencils use pure `jnp` slicing or the raw stencils (`diff_x_fwd`,
-  `avg_xy_fwd`, …) and `interior`; no `finitediffx` / `kernex`.
+- Stencils use pure `jnp` slicing or the raw stencils (`diff_x_fwd_2d`,
+  `avg_xfwd_yfwd_2d`, …) and `interior`; no `finitediffx` / `kernex`.
 - spectraldiffx and gaussx through their public APIs; NumPy / SciPy only at
   construction time, on concrete values.
 
@@ -160,7 +160,7 @@ order); review what they cannot see.
 dh_dx = jnp.zeros_like(h).at[1:-1, 1:-1].set((h[1:-1, 1:-1] - h[1:-1, :-2]) / dx)
 
 # ✅ dh_dx[j, i+1/2] = (h[j, i+1] - h[j, i]) / dx — equal to Difference2D.diff_x_T_to_U
-dh_dx = fvx.interior(fvx.diff_x_fwd(h) / dx, h)
+dh_dx = fvx.interior(fvx.diff_x_fwd_2d(h) / dx, h)
 ```
 
 ### NaN on land: sanitise the input, not only the output

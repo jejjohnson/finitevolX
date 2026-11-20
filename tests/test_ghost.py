@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from gridax_jax._src.operators._ghost import interior, zero_z_ghosts
+from gridax._src.operators._ghost import interior, zero_z_ghosts
 import jax
 import jax.numpy as jnp
 

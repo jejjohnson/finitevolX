@@ -7,13 +7,14 @@ reverse-mode pass that differentiable data-assimilation (4DVar, BFN) relies on.
 This module provides smooth, everywhere-differentiable surrogates:
 
 * :func:`smooth_abs` — ``sqrt(x**2 + eps**2)``, a rounded ``|x|`` used for
-  wave speeds (e.g. the Rusanov flux, :func:`finitevolx.rusanov_flux`) and
+  wave speeds (e.g. the Rusanov flux, ``rusanov_flux``) and
   reconstruction smoothness weights.
 * :func:`smooth_clamp` — a softplus-based ``max(x, x_min)`` with a nonzero
   gradient everywhere, used to keep layer thicknesses positive.
 * :func:`smooth_max` — the generic two-argument variant of the above.
 
-All three are pure ``jax.numpy`` and compose with ``jit`` / ``vmap`` / ``grad``.
+All three compute in their input's namespace (NumPy, JAX, ...); on JAX they
+compose with ``jit`` / ``vmap`` / ``grad``.
 The ``eps`` / ``sharpness`` knobs trade approximation error against gradient
 conditioning: smaller ``eps`` (larger ``sharpness``) is closer to the
 non-smooth function but has a stiffer gradient near the kink.
@@ -21,9 +22,22 @@ non-smooth function but has a stiffer gradient near the kink.
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
-from jaxtyping import Array, Float
+from typing import TYPE_CHECKING
+
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.pytree import array_namespace
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
+
+
+def _softplus(xp, z):
+    """``log(1 + e^z)``, as ``jax.nn.softplus`` defines it: ``logaddexp(z, 0)``."""
+    return xp.logaddexp(z, xp.zeros_like(z))
 
 
 def smooth_abs(
@@ -50,7 +64,7 @@ def smooth_abs(
     Float[Array, "..."]
         ``sqrt(x**2 + eps**2)``, same shape as ``x``.
     """
-    return jnp.sqrt(x * x + eps * eps)
+    return array_namespace(x).sqrt(x * x + eps * eps)
 
 
 def smooth_clamp(
@@ -83,7 +97,8 @@ def smooth_clamp(
     Float[Array, "..."]
         Smoothly lower-clamped ``x``.
     """
-    return x_min + jax.nn.softplus((x - x_min) * sharpness) / sharpness
+    xp = array_namespace(x, x_min)
+    return x_min + _softplus(xp, (x - x_min) * sharpness) / sharpness
 
 
 def smooth_max(
@@ -110,4 +125,5 @@ def smooth_max(
     Float[Array, "..."]
         Smooth elementwise maximum of ``x`` and ``y``.
     """
-    return y + jax.nn.softplus((x - y) * sharpness) / sharpness
+    xp = array_namespace(x, y)
+    return y + _softplus(xp, (x - y) * sharpness) / sharpness

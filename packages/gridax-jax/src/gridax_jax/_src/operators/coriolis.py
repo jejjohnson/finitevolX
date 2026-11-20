@@ -30,10 +30,9 @@ from __future__ import annotations
 
 import equinox as eqx
 from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
+from gridax._src.operators._ghost import interior, zero_z_ghosts
 import jax.numpy as jnp
 from jaxtyping import Array, Float
-
-from gridax_jax._src.operators._ghost import interior, zero_z_ghosts
 
 
 class Coriolis2D(eqx.Module):

@@ -32,6 +32,7 @@ from gridax import (
     Mask2D,
     Mask3D,
 )
+from gridax._src.operators._ghost import interior
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 
@@ -41,7 +42,6 @@ from gridax_jax._src.advection.reconstruction import (
     Reconstruction2D,
     Reconstruction3D,
 )
-from gridax_jax._src.operators._ghost import interior
 
 # TVD limiter names supported by the advection operators.
 _TVD_LIMITERS = frozenset({"minmod", "van_leer", "superbee", "mc"})

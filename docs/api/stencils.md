@@ -12,13 +12,13 @@ mathematical background.
 
 ## 2-D Difference Stencils
 
-::: gridax_jax.diff_x_fwd
+::: gridax_jax.diff_x_fwd_2d
 
-::: gridax_jax.diff_y_fwd
+::: gridax_jax.diff_y_fwd_2d
 
-::: gridax_jax.diff_x_bwd
+::: gridax_jax.diff_x_bwd_2d
 
-::: gridax_jax.diff_y_bwd
+::: gridax_jax.diff_y_bwd_2d
 
 ## 3-D Difference Stencils
 
@@ -38,23 +38,23 @@ mathematical background.
 
 ## 2-D Averaging Stencils (2-point)
 
-::: gridax_jax.avg_x_fwd
+::: gridax_jax.avg_x_fwd_2d
 
-::: gridax_jax.avg_y_fwd
+::: gridax_jax.avg_y_fwd_2d
 
-::: gridax_jax.avg_x_bwd
+::: gridax_jax.avg_x_bwd_2d
 
-::: gridax_jax.avg_y_bwd
+::: gridax_jax.avg_y_bwd_2d
 
 ## 2-D Averaging Stencils (4-point bilinear)
 
-::: gridax_jax.avg_xy_fwd
+::: gridax_jax.avg_xfwd_yfwd_2d
 
-::: gridax_jax.avg_xy_bwd
+::: gridax_jax.avg_xbwd_ybwd_2d
 
-::: gridax_jax.avg_xbwd_yfwd
+::: gridax_jax.avg_xbwd_yfwd_2d
 
-::: gridax_jax.avg_xfwd_ybwd
+::: gridax_jax.avg_xfwd_ybwd_2d
 
 ## 3-D Averaging Stencils
 

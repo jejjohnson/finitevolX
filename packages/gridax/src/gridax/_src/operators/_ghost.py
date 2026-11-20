@@ -2,8 +2,17 @@
 
 from __future__ import annotations
 
-import jax.numpy as jnp
-from jaxtyping import Array
+from typing import TYPE_CHECKING
+
+import numpy as np
+
+from gridax._src.backend import pad, set_at
+from gridax._src.pytree import array_namespace
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
 def interior(values: Array, like: Array, ghost: int = 1) -> Array:
@@ -51,8 +60,9 @@ def interior(values: Array, like: Array, ghost: int = 1) -> Array:
                 f"interior: values {values.shape} does not fit like {like.shape} "
                 f"with ghost={ghost} (each axis must match or be 2*ghost shorter)"
             )
-    out = jnp.zeros(like.shape, dtype=jnp.result_type(like, values))
-    return out.at[tuple(slices)].set(values)
+    xp = array_namespace(values, like)
+    out = xp.zeros(like.shape, dtype=xp.result_type(like, values))
+    return set_at(out, tuple(slices), values)
 
 
 def zero_z_ghosts(arr: Array) -> Array:
@@ -73,5 +83,5 @@ def zero_z_ghosts(arr: Array) -> Array:
     # one fusible pad, and XLA can skip computing the discarded ghost slabs
     # of ``arr`` (``Coriolis3D`` forward ~1.6x faster on CPU).
     if arr.shape[0] <= 2:
-        return jnp.zeros_like(arr)
-    return jnp.pad(arr[1:-1], ((1, 1),) + ((0, 0),) * (arr.ndim - 1))
+        return array_namespace(arr).zeros_like(arr)
+    return pad(arr[1:-1], ((1, 1),) + ((0, 0),) * (arr.ndim - 1))

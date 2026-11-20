@@ -2,7 +2,7 @@
 
 Pure, stateless functions that compute the core math of surface wind
 stress, bottom drag, and Rayleigh damping.  They mirror the
-:mod:`~gridax_jax._src.operators.stencils` pattern: no grid object, no
+:mod:`~gridax._src.operators.stencils` pattern: no grid object, no
 interpolation, no ghost ring, and no masking.  The caller supplies every
 field **already at the correct stagger** and is responsible for any
 ghost-ring padding and land/ocean masking afterwards.  The output has the

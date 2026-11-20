@@ -7,9 +7,9 @@ stand-in solvers.  One integration test runs the real multigrid solver.
 
 from __future__ import annotations
 
+from gridax._src.operators._ghost import interior
+from gridax._src.operators.stencils import diff_x_fwd_2d
 from gridax_jax import barotropic_filter, build_multigrid_solver, divergence_2d
-from gridax_jax._src.operators._ghost import interior
-from gridax_jax._src.operators.stencils import diff_x_fwd
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -91,7 +91,7 @@ class TestBarotropicFilterWiring:
             dt=1.0,
             helm_solve=lambda rhs: w,
         )
-        expected = interior(-g * tau * diff_x_fwd(w) / dx, w)
+        expected = interior(-g * tau * diff_x_fwd_2d(w) / dx, w)
         np.testing.assert_allclose(fu, expected, atol=1e-12)
 
 

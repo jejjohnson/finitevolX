@@ -2,30 +2,30 @@
 
 from __future__ import annotations
 
-from gridax_jax._src.operators.stencils import (
-    avg_x_bwd,
+from gridax._src.operators.stencils import (
     avg_x_bwd_1d,
+    avg_x_bwd_2d,
     avg_x_bwd_3d,
-    avg_x_fwd,
     avg_x_fwd_1d,
+    avg_x_fwd_2d,
     avg_x_fwd_3d,
-    avg_xbwd_yfwd,
-    avg_xfwd_ybwd,
-    avg_xy_bwd,
-    avg_xy_fwd,
-    avg_y_bwd,
+    avg_xbwd_ybwd_2d,
+    avg_xbwd_yfwd_2d,
+    avg_xfwd_ybwd_2d,
+    avg_xfwd_yfwd_2d,
+    avg_y_bwd_2d,
     avg_y_bwd_3d,
-    avg_y_fwd,
+    avg_y_fwd_2d,
     avg_y_fwd_3d,
-    diff_x_bwd,
     diff_x_bwd_1d,
+    diff_x_bwd_2d,
     diff_x_bwd_3d,
-    diff_x_fwd,
     diff_x_fwd_1d,
+    diff_x_fwd_2d,
     diff_x_fwd_3d,
-    diff_y_bwd,
+    diff_y_bwd_2d,
     diff_y_bwd_3d,
-    diff_y_fwd,
+    diff_y_fwd_2d,
     diff_y_fwd_3d,
 )
 import jax
@@ -63,7 +63,7 @@ class TestDiffStencils1D:
         assert jnp.allclose(out, 1.0)
 
     def test_fwd_bwd_second_derivative_1d(self):
-        """diff_x_fwd - diff_x_bwd should give the second derivative."""
+        """diff_x_fwd_2d - diff_x_bwd_2d should give the second derivative."""
         # Quadratic: h[i] = i^2
         x = jnp.arange(8, dtype=jnp.float32)
         h = x**2
@@ -98,22 +98,22 @@ class TestDiffStencils2D:
 
     def test_diff_x_fwd_shape(self, shape):
         h = jnp.zeros(shape)
-        out = diff_x_fwd(h)
+        out = diff_x_fwd_2d(h)
         assert out.shape == (shape[0] - 2, shape[1] - 2)
 
     def test_diff_y_fwd_shape(self, shape):
         h = jnp.zeros(shape)
-        out = diff_y_fwd(h)
+        out = diff_y_fwd_2d(h)
         assert out.shape == (shape[0] - 2, shape[1] - 2)
 
     def test_diff_x_bwd_shape(self, shape):
         h = jnp.zeros(shape)
-        out = diff_x_bwd(h)
+        out = diff_x_bwd_2d(h)
         assert out.shape == (shape[0] - 2, shape[1] - 2)
 
     def test_diff_y_bwd_shape(self, shape):
         h = jnp.zeros(shape)
-        out = diff_y_bwd(h)
+        out = diff_y_bwd_2d(h)
         assert out.shape == (shape[0] - 2, shape[1] - 2)
 
     def test_diff_x_fwd_linear_in_x(self, shape):
@@ -121,7 +121,7 @@ class TestDiffStencils2D:
         ny, nx = shape
         x = jnp.arange(nx, dtype=jnp.float32)
         h = jnp.broadcast_to(x, (ny, nx))
-        out = diff_x_fwd(h)
+        out = diff_x_fwd_2d(h)
         assert jnp.allclose(out, 1.0)
 
     def test_diff_y_fwd_linear_in_y(self, shape):
@@ -129,7 +129,7 @@ class TestDiffStencils2D:
         ny, nx = shape
         y = jnp.arange(ny, dtype=jnp.float32)[:, None]
         h = jnp.broadcast_to(y, (ny, nx))
-        out = diff_y_fwd(h)
+        out = diff_y_fwd_2d(h)
         assert jnp.allclose(out, 1.0)
 
     def test_diff_x_fwd_constant_in_y(self, shape):
@@ -137,7 +137,7 @@ class TestDiffStencils2D:
         ny, nx = shape
         y = jnp.arange(ny, dtype=jnp.float32)[:, None]
         h = jnp.broadcast_to(y, (ny, nx))
-        out = diff_x_fwd(h)
+        out = diff_x_fwd_2d(h)
         assert jnp.allclose(out, 0.0)
 
     def test_diff_y_fwd_constant_in_x(self, shape):
@@ -145,41 +145,41 @@ class TestDiffStencils2D:
         ny, nx = shape
         x = jnp.arange(nx, dtype=jnp.float32)
         h = jnp.broadcast_to(x, (ny, nx))
-        out = diff_y_fwd(h)
+        out = diff_y_fwd_2d(h)
         assert jnp.allclose(out, 0.0)
 
     def test_fwd_bwd_second_derivative_x(self, shape):
-        """diff_x_fwd - diff_x_bwd gives the second x-derivative."""
+        """diff_x_fwd_2d - diff_x_bwd_2d gives the second x-derivative."""
         ny, nx = shape
         x = jnp.arange(nx, dtype=jnp.float32)
         h = jnp.broadcast_to(x**2, (ny, nx))
-        d2h = diff_x_fwd(h) - diff_x_bwd(h)
+        d2h = diff_x_fwd_2d(h) - diff_x_bwd_2d(h)
         assert jnp.allclose(d2h, 2.0)
 
     def test_fwd_bwd_second_derivative_y(self, shape):
-        """diff_y_fwd - diff_y_bwd gives the second y-derivative."""
+        """diff_y_fwd_2d - diff_y_bwd_2d gives the second y-derivative."""
         ny, nx = shape
         y = jnp.arange(ny, dtype=jnp.float32)[:, None]
         h = jnp.broadcast_to(y**2, (ny, nx))
-        d2h = diff_y_fwd(h) - diff_y_bwd(h)
+        d2h = diff_y_fwd_2d(h) - diff_y_bwd_2d(h)
         assert jnp.allclose(d2h, 2.0)
 
     def test_symmetry_fwd_bwd_x(self, shape):
-        """diff_x_bwd(h) == -diff_x_fwd(h) reversed, for symmetric h."""
+        """diff_x_bwd_2d(h) == -diff_x_fwd_2d(h) reversed, for symmetric h."""
         h = jnp.ones(shape)
-        assert jnp.allclose(diff_x_fwd(h), 0.0)
-        assert jnp.allclose(diff_x_bwd(h), 0.0)
+        assert jnp.allclose(diff_x_fwd_2d(h), 0.0)
+        assert jnp.allclose(diff_x_bwd_2d(h), 0.0)
 
     def test_diff_x_fwd_jit(self, shape):
         h = jnp.arange(shape[0] * shape[1], dtype=jnp.float32).reshape(shape)
-        out_eager = diff_x_fwd(h)
-        out_jit = jax.jit(diff_x_fwd)(h)
+        out_eager = diff_x_fwd_2d(h)
+        out_jit = jax.jit(diff_x_fwd_2d)(h)
         assert jnp.allclose(out_eager, out_jit)
 
     def test_diff_y_fwd_jit(self, shape):
         h = jnp.arange(shape[0] * shape[1], dtype=jnp.float32).reshape(shape)
-        out_eager = diff_y_fwd(h)
-        out_jit = jax.jit(diff_y_fwd)(h)
+        out_eager = diff_y_fwd_2d(h)
+        out_jit = jax.jit(diff_y_fwd_2d)(h)
         assert jnp.allclose(out_eager, out_jit)
 
 
@@ -316,34 +316,34 @@ class TestAvgStencils2D:
 
     def test_avg_x_fwd_shape(self, shape):
         h = jnp.zeros(shape)
-        assert avg_x_fwd(h).shape == (shape[0] - 2, shape[1] - 2)
+        assert avg_x_fwd_2d(h).shape == (shape[0] - 2, shape[1] - 2)
 
     def test_avg_y_fwd_shape(self, shape):
         h = jnp.zeros(shape)
-        assert avg_y_fwd(h).shape == (shape[0] - 2, shape[1] - 2)
+        assert avg_y_fwd_2d(h).shape == (shape[0] - 2, shape[1] - 2)
 
     def test_avg_x_bwd_shape(self, shape):
         h = jnp.zeros(shape)
-        assert avg_x_bwd(h).shape == (shape[0] - 2, shape[1] - 2)
+        assert avg_x_bwd_2d(h).shape == (shape[0] - 2, shape[1] - 2)
 
     def test_avg_y_bwd_shape(self, shape):
         h = jnp.zeros(shape)
-        assert avg_y_bwd(h).shape == (shape[0] - 2, shape[1] - 2)
+        assert avg_y_bwd_2d(h).shape == (shape[0] - 2, shape[1] - 2)
 
     def test_avg_x_fwd_constant(self, shape):
         h = 5.0 * jnp.ones(shape)
-        assert jnp.allclose(avg_x_fwd(h), 5.0)
+        assert jnp.allclose(avg_x_fwd_2d(h), 5.0)
 
     def test_avg_y_fwd_constant(self, shape):
         h = 5.0 * jnp.ones(shape)
-        assert jnp.allclose(avg_y_fwd(h), 5.0)
+        assert jnp.allclose(avg_y_fwd_2d(h), 5.0)
 
     def test_avg_x_fwd_linear_in_x(self, shape):
         """Average of a field linear in x should give midpoint values."""
         ny, nx = shape
         x = jnp.arange(nx, dtype=jnp.float32)
         h = jnp.broadcast_to(x, (ny, nx))
-        out = avg_x_fwd(h)
+        out = avg_x_fwd_2d(h)
         # Each value should be x[i] + 0.5 for interior i
         expected = jnp.broadcast_to(
             jnp.arange(1, nx - 1, dtype=jnp.float32) + 0.5,
@@ -356,7 +356,7 @@ class TestAvgStencils2D:
         ny, nx = shape
         y = jnp.arange(ny, dtype=jnp.float32)[:, None]
         h = jnp.broadcast_to(y, (ny, nx))
-        out = avg_y_fwd(h)
+        out = avg_y_fwd_2d(h)
         expected = jnp.broadcast_to(
             (jnp.arange(1, ny - 1, dtype=jnp.float32) + 0.5)[:, None],
             (ny - 2, nx - 2),
@@ -366,12 +366,12 @@ class TestAvgStencils2D:
     def test_avg_preserves_constant_across_directions(self, shape):
         """All 2-point averages of a constant field give the same constant."""
         h = 7.0 * jnp.ones(shape)
-        for fn in [avg_x_fwd, avg_x_bwd, avg_y_fwd, avg_y_bwd]:
+        for fn in [avg_x_fwd_2d, avg_x_bwd_2d, avg_y_fwd_2d, avg_y_bwd_2d]:
             assert jnp.allclose(fn(h), 7.0)
 
     def test_avg_x_fwd_jit(self, shape):
         h = jnp.arange(shape[0] * shape[1], dtype=jnp.float32).reshape(shape)
-        assert jnp.allclose(jax.jit(avg_x_fwd)(h), avg_x_fwd(h))
+        assert jnp.allclose(jax.jit(avg_x_fwd_2d)(h), avg_x_fwd_2d(h))
 
 
 # =====================================================================
@@ -388,35 +388,35 @@ class TestAvgStencils2DBilinear:
 
     def test_avg_xy_fwd_shape(self, shape):
         h = jnp.zeros(shape)
-        assert avg_xy_fwd(h).shape == (shape[0] - 2, shape[1] - 2)
+        assert avg_xfwd_yfwd_2d(h).shape == (shape[0] - 2, shape[1] - 2)
 
     def test_avg_xy_bwd_shape(self, shape):
         h = jnp.zeros(shape)
-        assert avg_xy_bwd(h).shape == (shape[0] - 2, shape[1] - 2)
+        assert avg_xbwd_ybwd_2d(h).shape == (shape[0] - 2, shape[1] - 2)
 
     def test_avg_xbwd_yfwd_shape(self, shape):
         h = jnp.zeros(shape)
-        assert avg_xbwd_yfwd(h).shape == (shape[0] - 2, shape[1] - 2)
+        assert avg_xbwd_yfwd_2d(h).shape == (shape[0] - 2, shape[1] - 2)
 
     def test_avg_xfwd_ybwd_shape(self, shape):
         h = jnp.zeros(shape)
-        assert avg_xfwd_ybwd(h).shape == (shape[0] - 2, shape[1] - 2)
+        assert avg_xfwd_ybwd_2d(h).shape == (shape[0] - 2, shape[1] - 2)
 
     def test_avg_xy_fwd_constant(self, shape):
         h = 4.0 * jnp.ones(shape)
-        assert jnp.allclose(avg_xy_fwd(h), 4.0)
+        assert jnp.allclose(avg_xfwd_yfwd_2d(h), 4.0)
 
     def test_avg_xy_bwd_constant(self, shape):
         h = 4.0 * jnp.ones(shape)
-        assert jnp.allclose(avg_xy_bwd(h), 4.0)
+        assert jnp.allclose(avg_xbwd_ybwd_2d(h), 4.0)
 
     def test_avg_xbwd_yfwd_constant(self, shape):
         h = 4.0 * jnp.ones(shape)
-        assert jnp.allclose(avg_xbwd_yfwd(h), 4.0)
+        assert jnp.allclose(avg_xbwd_yfwd_2d(h), 4.0)
 
     def test_avg_xfwd_ybwd_constant(self, shape):
         h = 4.0 * jnp.ones(shape)
-        assert jnp.allclose(avg_xfwd_ybwd(h), 4.0)
+        assert jnp.allclose(avg_xfwd_ybwd_2d(h), 4.0)
 
     def test_avg_xy_fwd_bilinear_field(self, shape):
         """Bilinear average of h = x*y at (j+½, i+½) should be (j+½)*(i+½)."""
@@ -424,7 +424,7 @@ class TestAvgStencils2DBilinear:
         x = jnp.arange(nx, dtype=jnp.float32)
         y = jnp.arange(ny, dtype=jnp.float32)[:, None]
         h = x * y
-        out = avg_xy_fwd(h)
+        out = avg_xfwd_yfwd_2d(h)
         # Expected: (j+0.5)*(i+0.5) for interior j in [1,ny-2], i in [1,nx-2]
         xi = jnp.arange(1, nx - 1, dtype=jnp.float32) + 0.5
         yj = (jnp.arange(1, ny - 1, dtype=jnp.float32) + 0.5)[:, None]
@@ -433,7 +433,7 @@ class TestAvgStencils2DBilinear:
 
     def test_avg_xy_fwd_jit(self, shape):
         h = jnp.arange(shape[0] * shape[1], dtype=jnp.float32).reshape(shape)
-        assert jnp.allclose(jax.jit(avg_xy_fwd)(h), avg_xy_fwd(h))
+        assert jnp.allclose(jax.jit(avg_xfwd_yfwd_2d)(h), avg_xfwd_yfwd_2d(h))
 
 
 # =====================================================================

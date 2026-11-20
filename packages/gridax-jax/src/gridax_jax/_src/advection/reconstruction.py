@@ -18,6 +18,7 @@ from gridax import (
     ArakawaCGrid3D,
     Mask2D,
 )
+from gridax._src.operators._ghost import interior
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 import numpy as np
@@ -38,7 +39,6 @@ from gridax_jax._src.advection.weno import (
     weno_9pts as _weno9,
     weno_9pts_right as _weno9_right,
 )
-from gridax_jax._src.operators._ghost import interior
 
 # Relative TVD floor (#294): ``r = num / (den + copysign(eps, den))`` with
 # ``eps = eps_rel · |num| + tiny``, a floor relative to the stencil's own

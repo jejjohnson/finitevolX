@@ -18,11 +18,11 @@ from __future__ import annotations
 
 import equinox as eqx
 from gridax import CartesianGrid2D, Mask2D
+from gridax._src.operators.stencils import _neighbours
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from gridax_jax._src.operators.diagnostic_operators import _sanitize
-from gridax_jax._src.operators.stencils import _neighbours
 
 
 def arakawa_jacobian(

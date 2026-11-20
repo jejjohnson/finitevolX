@@ -2,8 +2,17 @@
 
 from __future__ import annotations
 
-import jax.numpy as jnp
-from jaxtyping import Array, Float
+from typing import TYPE_CHECKING
+
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.pytree import array_namespace
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 _COS_EPS = 1e-12  # guard against division by cos(lat) ≈ 0 near poles
 
@@ -13,12 +22,11 @@ def _metric_like(
 ) -> Float[Array, "..."]:
     """A grid metric array in the floating dtype of the field it acts on.
 
-    Grid coordinate arrays are float64 NumPy arrays, which JAX treats as
-    strongly typed: multiplying one into a float32 field would promote the
-    result to float64 under x64. The metric is a property of the grid, not
-    a precision request, so it takes the field's dtype instead (as the
-    weakly typed ``jnp`` arrays the grids used to hold did). A non-floating
-    ``like`` leaves the metric's dtype alone.
+    Grid coordinate arrays are float64 NumPy arrays: multiplying one into a
+    float32 field would promote the result to float64 (under x64 on JAX).
+    The metric is a property of the grid, not a precision request, so it
+    takes the field's dtype and namespace instead. A non-floating ``like``
+    leaves the metric's dtype alone.
 
     Parameters
     ----------
@@ -30,12 +38,13 @@ def _metric_like(
     Returns
     -------
     array
-        ``metric`` as a JAX array of ``like``'s floating dtype.
+        ``metric`` as an array of ``like``'s namespace and floating dtype.
     """
-    dtype = jnp.result_type(like)
-    if not jnp.issubdtype(dtype, jnp.floating):
-        return jnp.asarray(metric)
-    return jnp.asarray(metric, dtype=dtype)
+    xp = array_namespace(like)
+    dtype = xp.asarray(like).dtype
+    if not xp.isdtype(dtype, "real floating"):
+        return xp.asarray(metric)
+    return xp.asarray(metric, dtype=dtype)
 
 
 def _safe_div_cos(
@@ -61,7 +70,8 @@ def _safe_div_cos(
     array
         Result with NaN at pole-adjacent points.
     """
+    xp = array_namespace(numerator, cos_val)
     denom = scale * cos_val
-    safe_denom = jnp.where(jnp.abs(cos_val) < _COS_EPS, 1.0, denom)
+    safe_denom = xp.where(xp.abs(cos_val) < _COS_EPS, 1.0, denom)
     result = numerator / safe_denom
-    return jnp.where(jnp.abs(cos_val) < _COS_EPS, jnp.nan, result)
+    return xp.where(xp.abs(cos_val) < _COS_EPS, xp.nan, result)

@@ -23,6 +23,7 @@ Non-Oscillatory Schemes for Hyperbolic Conservation Laws.
 
 from __future__ import annotations
 
+from gridax._src.operators._ghost import interior
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
@@ -42,7 +43,6 @@ from gridax_jax._src.advection.weno import (
     weno_5pts_improved_right,
     weno_5pts_right,
 )
-from gridax_jax._src.operators._ghost import interior
 
 
 def plusminus(

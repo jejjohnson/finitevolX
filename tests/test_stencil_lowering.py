@@ -22,23 +22,23 @@ from __future__ import annotations
 
 import warnings
 
-import gridax_jax as fvx
-from gridax_jax._src.diffusion.diffusion import _diffusion_2d_fluxes_impl
-from gridax_jax._src.operators._ghost import interior, zero_z_ghosts
-from gridax_jax._src.operators.stencils import (
+from gridax._src.operators._ghost import interior, zero_z_ghosts
+from gridax._src.operators.stencils import (
     _materialize,
     _neighbours,
-    diff_x_bwd,
     diff_x_bwd_1d,
+    diff_x_bwd_2d,
     diff_x_bwd_3d,
-    diff_x_fwd,
     diff_x_fwd_1d,
+    diff_x_fwd_2d,
     diff_x_fwd_3d,
-    diff_y_bwd,
+    diff_y_bwd_2d,
     diff_y_bwd_3d,
-    diff_y_fwd,
+    diff_y_fwd_2d,
     diff_y_fwd_3d,
 )
+import gridax_jax as fvx
+from gridax_jax._src.diffusion.diffusion import _diffusion_2d_fluxes_impl
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -98,10 +98,10 @@ class TestNeighbours:
     def test_offsets_are_the_raw_stencil_offsets(self):
         h = _field(NY, NX)
         nb = _neighbours(h)
-        np.testing.assert_array_equal(nb.e - nb.c, diff_x_fwd(h))
-        np.testing.assert_array_equal(nb.c - nb.w, diff_x_bwd(h))
-        np.testing.assert_array_equal(nb.n - nb.c, diff_y_fwd(h))
-        np.testing.assert_array_equal(nb.c - nb.s, diff_y_bwd(h))
+        np.testing.assert_array_equal(nb.e - nb.c, diff_x_fwd_2d(h))
+        np.testing.assert_array_equal(nb.c - nb.w, diff_x_bwd_2d(h))
+        np.testing.assert_array_equal(nb.n - nb.c, diff_y_fwd_2d(h))
+        np.testing.assert_array_equal(nb.c - nb.s, diff_y_bwd_2d(h))
 
 
 class TestMaterialize:
@@ -150,8 +150,8 @@ class TestSameValues:
 
     def test_laplacian_2d(self):
         h = _field(NY, NX)
-        d2x = (diff_x_fwd(h) - diff_x_bwd(h)) / self.g2.dx**2
-        d2y = (diff_y_fwd(h) - diff_y_bwd(h)) / self.g2.dy**2
+        d2x = (diff_x_fwd_2d(h) - diff_x_bwd_2d(h)) / self.g2.dx**2
+        d2y = (diff_y_fwd_2d(h) - diff_y_bwd_2d(h)) / self.g2.dy**2
         ref = interior(d2x + d2y, h)
         np.testing.assert_array_equal(fvx.Difference2D(self.g2).laplacian(h), ref)
 
