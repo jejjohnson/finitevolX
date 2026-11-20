@@ -258,7 +258,7 @@ def reconstruct(
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import reconstruct
+    >>> from gridax import reconstruct
     >>> Ny, Nx = 10, 10
     >>> q = jnp.ones((Ny, Nx))
     >>> u = jnp.ones((Ny, Nx))

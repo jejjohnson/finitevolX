@@ -28,14 +28,25 @@ References
 
 from __future__ import annotations
 
-import equinox as eqx
-from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
+from typing import TYPE_CHECKING
+
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.backend import vmap
+from gridax._src.grid import CartesianGrid2D, CartesianGrid3D
+from gridax._src.mask import Mask2D, Mask3D
 from gridax._src.operators._ghost import interior, zero_z_ghosts
-import jax.numpy as jnp
-from jaxtyping import Array, Float
+from gridax._src.pytree import array_namespace, pytree_dataclass
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
-class Coriolis2D(eqx.Module):
+@pytree_dataclass
+class Coriolis2D:
     """Coriolis force operator for 2-D Arakawa C-grids.
 
     Computes the Coriolis tendency for both velocity components in the
@@ -78,7 +89,7 @@ class Coriolis2D(eqx.Module):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import CartesianGrid2D, Coriolis2D
+    >>> from gridax import CartesianGrid2D, Coriolis2D
     >>> grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> cor = Coriolis2D(grid=grid)
     >>> u = jnp.zeros((grid.Ny, grid.Nx))
@@ -117,10 +128,11 @@ class Coriolis2D(eqx.Module):
             V-points respectively, both zero in the ghost ring.  When
             ``self.mask`` is set, dry U / V faces are zero.
         """
+        xp = array_namespace(u, v, f)
         if self.mask is not None:
             # zero dry faces before any stencil reads them (NaN-filled land)
-            u = jnp.where(self.mask.u, u, 0.0)
-            v = jnp.where(self.mask.v, v, 0.0)
+            u = xp.where(self.mask.u, u, 0.0)
+            v = xp.where(self.mask.v, v, 0.0)
         # f_X[j+1/2, i+1/2] = 1/4 (f[j, i] + f[j+1, i] + f[j, i+1] + f[j+1, i+1])
         #   X rows / cols 0 .. N-2 (the south / west ghost corners included)
         f_x = 0.25 * (
@@ -139,13 +151,14 @@ class Coriolis2D(eqx.Module):
         dv_cor = interior(-0.5 * (q[..., 1:, 1:] + q[..., 1:, :-1]), v)
 
         if self.mask is not None:
-            du_cor = jnp.where(self.mask.u, du_cor, 0.0)
-            dv_cor = jnp.where(self.mask.v, dv_cor, 0.0)
+            du_cor = xp.where(self.mask.u, du_cor, 0.0)
+            dv_cor = xp.where(self.mask.v, dv_cor, 0.0)
 
         return du_cor, dv_cor
 
 
-class Coriolis3D(eqx.Module):
+@pytree_dataclass
+class Coriolis3D:
     """Coriolis force operator for 3-D Arakawa C-grids.
 
     Applies the same horizontal Coriolis stencil as :class:`Coriolis2D`
@@ -172,7 +185,7 @@ class Coriolis3D(eqx.Module):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import CartesianGrid3D, Coriolis3D
+    >>> from gridax import CartesianGrid3D, Coriolis3D
     >>> grid = CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
     >>> cor = Coriolis3D(grid=grid)
     >>> u = jnp.zeros((grid.Nz, grid.Ny, grid.Nx))
@@ -225,15 +238,14 @@ class Coriolis3D(eqx.Module):
             is set, ``du_cor`` is zeroed at dry U-faces via
             ``* mask.u`` and ``dv_cor`` at dry V-faces via ``* mask.v``.
         """
+        xp = array_namespace(u, v, f)
         if self.mask is not None:
             # zero dry faces before the stencil, as Coriolis2D does
-            u = jnp.where(self.mask.u, u, 0.0)
-            v = jnp.where(self.mask.v, v, 0.0)
+            u = xp.where(self.mask.u, u, 0.0)
+            v = xp.where(self.mask.v, v, 0.0)
         # Vmap the 2D Coriolis operator over z-levels.
         # f is 2D (depth-independent) and broadcast to each z-slice.
-        du_cor, dv_cor = eqx.filter_vmap(lambda u_k, v_k: self._cor2d(u_k, v_k, f))(
-            u, v
-        )
+        du_cor, dv_cor = vmap(lambda u_k, v_k: self._cor2d(u_k, v_k, f))(u, v)
 
         # Zero the z-ghost slices to match the 3D ghost-ring convention.
         du_cor = zero_z_ghosts(du_cor)

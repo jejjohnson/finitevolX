@@ -1,8 +1,5 @@
-import math
+"""Physical constants: defined once, in gridax."""
 
-from gridax import R_EARTH  # radius of the Earth (m); one value for both packages
+from gridax._src.constants import DEG2M, GRAVITY, OMEGA, R_EARTH, RHO
 
-GRAVITY = 9.80665  # gravitational acceleration (m/s^2)
-OMEGA = 2.0 * math.pi / 86_164.0  # angular speed of the Earth (7.292e-5) (rad/s)
-DEG2M = math.pi * R_EARTH / 180.0  # Degrees to Meters
-RHO = 1.0e3  # density of water (kg/m^3)
+__all__ = ["DEG2M", "GRAVITY", "OMEGA", "RHO", "R_EARTH"]

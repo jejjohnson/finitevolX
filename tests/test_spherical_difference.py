@@ -4,7 +4,7 @@ from gridax import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
-from gridax_jax._src.operators.spherical_difference import (
+from gridax._src.operators.spherical_difference import (
     SphericalDifference2D,
     SphericalDifference3D,
 )

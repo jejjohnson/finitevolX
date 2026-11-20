@@ -6,7 +6,7 @@ Covers: coriolis_param, beta_param, coriolis_fn,
 """
 
 from gridax import CartesianGrid2D
-from gridax_jax._src.operators.diagnostics import (
+from gridax._src.operators.diagnostics import (
     beta_param,
     coriolis_fn,
     coriolis_param,

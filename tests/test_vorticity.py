@@ -1,7 +1,7 @@
 """Tests for Vorticity2D and Vorticity3D."""
 
 from gridax import CartesianGrid2D, CartesianGrid3D
-from gridax_jax._src.operators.vorticity import Vorticity2D, Vorticity3D
+from gridax._src.operators.vorticity import Vorticity2D, Vorticity3D
 import jax.numpy as jnp
 import numpy as np
 import pytest

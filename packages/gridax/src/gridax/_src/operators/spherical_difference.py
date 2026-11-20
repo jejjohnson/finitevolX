@@ -19,28 +19,33 @@ Operators that divide by ``cos(lat)`` return NaN where
 
 from __future__ import annotations
 
-import equinox as eqx
-from gridax import (
-    Mask2D,
-    Mask3D,
-    SphericalGrid2D,
-    SphericalGrid3D,
-)
+from typing import TYPE_CHECKING
+
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.backend import vmap
+from gridax._src.grid import SphericalGrid2D, SphericalGrid3D
+from gridax._src.mask import Mask2D, Mask3D
 from gridax._src.operators._ghost import interior, zero_z_ghosts
 from gridax._src.operators._utils import _metric_like, _safe_div_cos
+from gridax._src.operators.spherical_compound import _geostrophic_velocity_sphere
 from gridax._src.operators.stencils import (
     diff_x_bwd_2d,
     diff_x_fwd_2d,
     diff_y_bwd_2d,
     diff_y_fwd_2d,
 )
-import jax.numpy as jnp
-from jaxtyping import Array, Float
+from gridax._src.pytree import array_namespace, pytree_dataclass
 
-from gridax_jax._src.operators.spherical_compound import _geostrophic_velocity_sphere
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
-class SphericalDifference2D(eqx.Module):
+@pytree_dataclass
+class SphericalDifference2D:
     """Spherical finite-difference operators on a 2-D Arakawa C-grid.
 
     Parameters
@@ -245,20 +250,22 @@ class SphericalDifference2D(eqx.Module):
         the 4-point stencils of wet coastal faces read ``h`` on the
         neighbouring land cells, so land ``h`` must be finite.
         """
+        xp = array_namespace(h, f)
         if self.mask is None:
             return _geostrophic_velocity_sphere(h, f, self.grid, gravity)
         u_g, v_g = _geostrophic_velocity_sphere(
             h, f, self.grid, gravity, wet_u=self.mask.u, wet_v=self.mask.v
         )
-        u_g = jnp.where(self.mask.u, u_g, 0.0)
-        v_g = jnp.where(self.mask.v, v_g, 0.0)
+        u_g = xp.where(self.mask.u, u_g, 0.0)
+        v_g = xp.where(self.mask.v, v_g, 0.0)
         return u_g, v_g
 
 
-class SphericalDifference3D(eqx.Module):
+@pytree_dataclass
+class SphericalDifference3D:
     """Spherical finite-difference operators on a 3-D Arakawa C-grid.
 
-    Applies 2-D spherical differences to each z-level via ``eqx.filter_vmap``.
+    Applies 2-D spherical differences to each z-level via ``vmap`` (``jax.vmap`` on JAX inputs).
 
     Parameters
     ----------
@@ -297,56 +304,56 @@ class SphericalDifference3D(eqx.Module):
 
     def diff_lon_T_to_U(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Zonal derivative T → U over all z-levels."""
-        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lon_T_to_U)(h))
+        out = zero_z_ghosts(vmap(self._diff2d.diff_lon_T_to_U)(h))
         if self.mask is not None:
             out = out * self.mask.u
         return out
 
     def diff_lat_T_to_V(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Meridional derivative T → V over all z-levels."""
-        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lat_T_to_V)(h))
+        out = zero_z_ghosts(vmap(self._diff2d.diff_lat_T_to_V)(h))
         if self.mask is not None:
             out = out * self.mask.v
         return out
 
     def diff_lon_V_to_X(self, v: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Zonal derivative V → X over all z-levels."""
-        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lon_V_to_X)(v))
+        out = zero_z_ghosts(vmap(self._diff2d.diff_lon_V_to_X)(v))
         if self.mask is not None:
             out = out * self.mask.xy_corner_strict
         return out
 
     def diff_lat_U_to_X(self, u: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Meridional derivative U → X over all z-levels."""
-        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lat_U_to_X)(u))
+        out = zero_z_ghosts(vmap(self._diff2d.diff_lat_U_to_X)(u))
         if self.mask is not None:
             out = out * self.mask.xy_corner_strict
         return out
 
     def diff_lon_U_to_T(self, u: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Backward zonal derivative U → T over all z-levels."""
-        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lon_U_to_T)(u))
+        out = zero_z_ghosts(vmap(self._diff2d.diff_lon_U_to_T)(u))
         if self.mask is not None:
             out = out * self.mask.h
         return out
 
     def diff_lat_V_to_T(self, v: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Backward meridional derivative V → T over all z-levels."""
-        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff_lat_V_to_T)(v))
+        out = zero_z_ghosts(vmap(self._diff2d.diff_lat_V_to_T)(v))
         if self.mask is not None:
             out = out * self.mask.h
         return out
 
     def diff2_lon(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Second zonal derivative at T-points over all z-levels."""
-        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.diff2_lon)(h))
+        out = zero_z_ghosts(vmap(self._diff2d.diff2_lon)(h))
         if self.mask is not None:
             out = out * self.mask.h
         return out
 
     def laplacian_merid(self, h: Float[Array, "Nz Ny Nx"]) -> Float[Array, "Nz Ny Nx"]:
         """Meridional Laplacian term at T-points over all z-levels."""
-        out = zero_z_ghosts(eqx.filter_vmap(self._diff2d.laplacian_merid)(h))
+        out = zero_z_ghosts(vmap(self._diff2d.laplacian_merid)(h))
         if self.mask is not None:
             out = out * self.mask.h
         return out

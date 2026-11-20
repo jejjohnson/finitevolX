@@ -1,6 +1,6 @@
 """Class forms of the diagnostic operators, with operator-attribute masks.
 
-The functional diagnostics in :mod:`gridax_jax._src.operators.diagnostics`
+The functional diagnostics in :mod:`gridax._src.operators.diagnostics`
 are mask-free Layer-2 helpers.  The classes here are their Layer-3
 counterparts: the mask is set once at construction and every method zeroes
 the dry cells of its output stagger, following the rule in ``docs/masks.md``
@@ -33,12 +33,16 @@ returns, except where a method's docstring says otherwise.
 
 from __future__ import annotations
 
-import equinox as eqx
-from gridax import CartesianGrid2D, Mask2D
-import jax.numpy as jnp
-from jaxtyping import Array, Float
+from typing import TYPE_CHECKING
 
-from gridax_jax._src.operators.diagnostics import (
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.backend import set_at
+from gridax._src.constants import GRAVITY
+from gridax._src.grid import CartesianGrid2D
+from gridax._src.mask import Mask2D
+from gridax._src.operators.diagnostics import (
     available_potential_energy,
     bernoulli_potential,
     kinetic_energy,
@@ -50,8 +54,13 @@ from gridax_jax._src.operators.diagnostics import (
     stretching_term,
     tensor_strain,
 )
-from gridax_jax._src.operators.interpolation import Interpolation2D
-from gridax_jax._src.utils.constants import GRAVITY
+from gridax._src.operators.interpolation import Interpolation2D
+from gridax._src.pytree import array_namespace, pytree_dataclass
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
 def _where(
@@ -61,9 +70,10 @@ def _where(
 
     field[..., j, i] = field[..., j, i] if wet[j, i] else 0
     """
+    xp = array_namespace(wet, field)
     if wet is None:
         return field
-    return jnp.where(wet, field, 0.0)
+    return xp.where(wet, field, 0.0)
 
 
 def _sanitize(
@@ -75,15 +85,19 @@ def _sanitize(
     field[..., j, i] = field[..., j, i] if wet[j, i] else 0
                                          for 1 <= j <= Ny-2, 1 <= i <= Nx-2
     """
+    xp = array_namespace(wet, field)
     if wet is None:
         return field
-    wet = jnp.asarray(wet, dtype=bool)
+    wet = xp.asarray(wet, dtype=bool)
     # keep[j, i] = True on the ghost ring, wet[j, i] in the interior
-    keep = jnp.ones_like(wet).at[..., 1:-1, 1:-1].set(wet[..., 1:-1, 1:-1])
-    return jnp.where(keep, field, 0.0)
+    keep = set_at(
+        xp.ones_like(wet), (..., slice(1, -1), slice(1, -1)), wet[..., 1:-1, 1:-1]
+    )
+    return xp.where(keep, field, 0.0)
 
 
-class Energetics2D(eqx.Module):
+@pytree_dataclass
+class Energetics2D:
     """Energy diagnostics at T-points on a 2-D Arakawa C-grid.
 
     Class form of :func:`~finitevolx.kinetic_energy`,
@@ -105,7 +119,7 @@ class Energetics2D(eqx.Module):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import CartesianGrid2D, Energetics2D
+    >>> from gridax import CartesianGrid2D, Energetics2D
     >>> grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> u = jnp.ones((grid.Ny, grid.Nx))
     >>> ke = Energetics2D(grid=grid).kinetic_energy(u, 0.0 * u)
@@ -218,6 +232,7 @@ class Energetics2D(eqx.Module):
             Available potential energy at T-points, zero in the ghost ring
             and, when ``self.mask`` is set, at dry T-cells.
         """
+        xp = array_namespace(h, H, g_prime)
         h, H = self._t(h), self._t(H)
         # Evaluate on the interior only, so ghost values never enter the
         # arithmetic (or its gradient):
@@ -226,11 +241,14 @@ class Energetics2D(eqx.Module):
         ape = available_potential_energy(
             h[..., 1:-1, 1:-1], H[..., 1:-1, 1:-1], g_prime
         )
-        out = jnp.zeros_like(h, dtype=ape.dtype).at[..., 1:-1, 1:-1].set(ape)
+        out = set_at(
+            xp.zeros_like(h, dtype=ape.dtype), (..., slice(1, -1), slice(1, -1)), ape
+        )
         return self._out(out)
 
 
-class Strain2D(eqx.Module):
+@pytree_dataclass
+class Strain2D:
     """Strain diagnostics on a 2-D Arakawa C-grid.
 
     Class form of :func:`~finitevolx.shear_strain`,
@@ -264,7 +282,7 @@ class Strain2D(eqx.Module):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import CartesianGrid2D, Strain2D
+    >>> from gridax import CartesianGrid2D, Strain2D
     >>> grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> u = jnp.ones((grid.Ny, grid.Nx))
     >>> ow = Strain2D(grid=grid).okubo_weiss(u, 0.0 * u)
@@ -315,13 +333,16 @@ class Strain2D(eqx.Module):
         west ghost corners are BC-owned and keep the values derived from
         the ghost velocities, even where a closed-basin mask marks them dry.
         """
+        xp = array_namespace(u, v)
         # dv_dx[j+1/2, i+1/2] = (v[j+1/2, i+1] - v[j+1/2, i]) / dx
         dv_dx = (v[..., :-1, 1:] - v[..., :-1, :-1]) / self.grid.dx
         # du_dy[j+1/2, i+1/2] = (u[j+1, i+1/2] - u[j, i+1/2]) / dy
         du_dy = (u[..., 1:, :-1] - u[..., :-1, :-1]) / self.grid.dy
         x = dv_dx + sign * du_dy
         # out[j, i] = x[j, i] for 0 <= j <= Ny-2, 0 <= i <= Nx-2
-        out = jnp.zeros_like(u, dtype=x.dtype).at[..., :-1, :-1].set(x)
+        out = set_at(
+            xp.zeros_like(u, dtype=x.dtype), (..., slice(None, -1), slice(None, -1)), x
+        )
         return _sanitize(None if self.mask is None else self.mask.xy_corner_strict, out)
 
     def shear(
@@ -454,7 +475,8 @@ class Strain2D(eqx.Module):
         return _where(None if self.mask is None else self.mask.h, out)
 
 
-class QGPotentialVorticity2D(eqx.Module):
+@pytree_dataclass
+class QGPotentialVorticity2D:
     """Quasi-geostrophic potential vorticity at T-points.
 
     Class form of :func:`~finitevolx.qg_potential_vorticity`,
@@ -483,7 +505,7 @@ class QGPotentialVorticity2D(eqx.Module):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import CartesianGrid2D, QGPotentialVorticity2D
+    >>> from gridax import CartesianGrid2D, QGPotentialVorticity2D
     >>> grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> psi = jnp.zeros((grid.Ny, grid.Nx))
     >>> y = jnp.zeros((grid.Ny, grid.Nx))

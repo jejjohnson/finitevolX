@@ -17,18 +17,18 @@ so a conservation check over a trajectory is a three-node graph::
 from __future__ import annotations
 
 import equinox as eqx
-from gridax._src.operators.reductions import area_mean, area_sum
-import jax
-import jax.numpy as jnp
-from jaxtyping import Array, Float
-
-from gridax_jax._src.operators.diagnostic_operators import (
+from gridax._src.operators.diagnostic_operators import (
     Energetics2D,
     QGPotentialVorticity2D,
     Strain2D,
 )
-from gridax_jax._src.operators.diagnostics import total_energy
-from gridax_jax._src.operators.vorticity import Vorticity2D
+from gridax._src.operators.diagnostics import total_energy
+from gridax._src.operators.reductions import area_mean, area_sum
+from gridax._src.operators.vorticity import Vorticity2D
+import jax
+import jax.numpy as jnp
+from jaxtyping import Array, Float
+
 from gridax_jax._src.pipekit.base import GridOperator, over_leading
 
 Field = Float[Array, "*batch Ny Nx"]

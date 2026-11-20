@@ -13,6 +13,9 @@ pins that), and uses a plain equivalent everywhere else.
   concatenation of zero blocks on a namespace without ``pad``).
 - :func:`optimization_barrier` and :func:`stop_gradient`: identities on
   values that steer XLA and JAX's autodiff; plain identities elsewhere.
+- :func:`vmap`: map a function over the leading axis of its arguments
+  (``jax.vmap`` on JAX, a loop and a stack elsewhere), for the 3-D operators
+  that apply a 2-D one per level.
 """
 
 from __future__ import annotations
@@ -98,3 +101,35 @@ def stop_gradient(x: Any) -> Any:
 
         return jax.lax.stop_gradient(x)
     return x
+
+
+def vmap(fn: Any) -> Any:
+    """``fn`` mapped over the leading axis of every argument.
+
+    On JAX inputs this is ``jax.vmap(fn)``. Elsewhere it calls ``fn`` once per
+    index of the leading axis and stacks the results (each element of a tuple
+    result separately).
+
+    Parameters
+    ----------
+    fn : callable
+        A function of arrays, returning an array or a tuple of arrays.
+
+    Returns
+    -------
+    callable
+        The mapped function.
+    """
+
+    def mapped(*args: Any) -> Any:
+        xp = array_namespace(*args)
+        if is_jax(xp):
+            import jax
+
+            return jax.vmap(fn)(*args)
+        outs = [fn(*(a[k] for a in args)) for k in range(args[0].shape[0])]
+        if isinstance(outs[0], tuple):
+            return tuple(xp.stack([o[i] for o in outs]) for i in range(len(outs[0])))
+        return xp.stack(outs)
+
+    return mapped

@@ -30,13 +30,13 @@ from __future__ import annotations
 
 import typing
 
-from gridax_jax._src.operators.divergence import Divergence2D
-from gridax_jax._src.operators.interpolation import (
+from gridax._src.operators.divergence import Divergence2D
+from gridax._src.operators.interpolation import (
     Interpolation1D,
     Interpolation2D,
     Interpolation3D,
 )
-from gridax_jax._src.operators.vorticity import Vorticity2D, Vorticity3D
+from gridax._src.operators.vorticity import Vorticity2D, Vorticity3D
 import numpy as np
 import pytest
 
