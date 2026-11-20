@@ -1,6 +1,6 @@
 """Energy-conserving momentum advection operators on spherical C-grids.
 
-Spherical counterpart of :mod:`gridax_jax._src.diffusion.momentum`.
+Spherical counterpart of :mod:`gridax._src.diffusion.momentum`.
 
 Uses the vector-invariant (vortex-force) form of the horizontal
 momentum equations:
@@ -29,18 +29,29 @@ the Cartesian :class:`~finitevolx.MomentumAdvection2D` with
 
 from __future__ import annotations
 
-import equinox as eqx
-from gridax import Mask2D, Mask3D, SphericalGrid2D, SphericalGrid3D
+from typing import TYPE_CHECKING
+
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.backend import vmap
+from gridax._src.diffusion.momentum import _resolve_scheme
+from gridax._src.grid import SphericalGrid2D, SphericalGrid3D
+from gridax._src.mask import Mask2D, Mask3D
 from gridax._src.operators._ghost import interior, zero_z_ghosts
 from gridax._src.operators.interpolation import Interpolation2D
 from gridax._src.operators.spherical_compound import SphericalVorticity2D
 from gridax._src.operators.spherical_difference import SphericalDifference2D
-from jaxtyping import Array, Float
+from gridax._src.pytree import pytree_dataclass
 
-from gridax_jax._src.diffusion.momentum import _resolve_scheme
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
-class SphericalMomentumAdvection2D(eqx.Module):
+@pytree_dataclass
+class SphericalMomentumAdvection2D:
     """Energy-conserving momentum advection on a 2-D spherical C-grid.
 
     Computes the vortex-force form on a sphere:
@@ -219,7 +230,8 @@ class SphericalMomentumAdvection2D(eqx.Module):
         return du_adv, dv_adv
 
 
-class SphericalMomentumAdvection3D(eqx.Module):
+@pytree_dataclass
+class SphericalMomentumAdvection3D:
     """Energy-conserving momentum advection on a 3-D spherical C-grid.
 
     Applies :class:`SphericalMomentumAdvection2D`-equivalent stencils
@@ -275,9 +287,9 @@ class SphericalMomentumAdvection3D(eqx.Module):
             slices and at outermost horizontal ring.
         """
         scheme = _resolve_scheme(scheme)
-        du_adv, dv_adv = eqx.filter_vmap(
-            lambda u_k, v_k: self._madv2d(u_k, v_k, scheme=scheme)
-        )(u, v)
+        du_adv, dv_adv = vmap(lambda u_k, v_k: self._madv2d(u_k, v_k, scheme=scheme))(
+            u, v
+        )
         du_adv = zero_z_ghosts(du_adv)
         dv_adv = zero_z_ghosts(dv_adv)
         if self.mask is not None:

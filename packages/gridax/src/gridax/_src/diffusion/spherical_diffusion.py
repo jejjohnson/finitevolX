@@ -44,7 +44,7 @@ flux-form Laplacian ``∇·(κ∇h)`` with ``dx = R·dlon`` and
 Boundary conditions
 -------------------
 Face fluxes at domain walls are zero by construction (west, east,
-south, north) — see :mod:`gridax_jax._src.diffusion.diffusion` for the
+south, north) — see :mod:`gridax._src.diffusion.diffusion` for the
 ghost-ring rationale.  This gives no-flux walls by default.
 
 Pole handling
@@ -68,14 +68,23 @@ pending a dedicated ``SphericalMask2D`` follow-up.
 
 from __future__ import annotations
 
-import equinox as eqx
-from gridax import Mask2D, Mask3D, SphericalGrid2D, SphericalGrid3D
+from typing import TYPE_CHECKING
+
+from jaxtyping import Bool, Float
+import numpy as np
+
+from gridax._src.backend import set_at, vmap
+from gridax._src.diffusion.diffusion import _face_kappa
+from gridax._src.grid import SphericalGrid2D, SphericalGrid3D
+from gridax._src.mask import Mask2D, Mask3D
 from gridax._src.operators._ghost import interior, zero_z_ghosts
 from gridax._src.operators._utils import _metric_like, _safe_div_cos
-import jax.numpy as jnp
-from jaxtyping import Array, Bool, Float
+from gridax._src.pytree import array_namespace, pytree_dataclass
 
-from gridax_jax._src.diffusion.diffusion import _face_kappa
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
 def _spherical_diffusion_2d_impl(
@@ -92,6 +101,7 @@ def _spherical_diffusion_2d_impl(
     mv: Bool[Array, "Ny Nx"] | Float[Array, "Ny Nx"] | None,
 ) -> Float[Array, "Ny Nx"]:
     """Shared 2-D spherical diffusion kernel with explicit raw-array masks."""
+    xp = array_namespace(h, kappa, cos_lat_T, cos_lat_U, cos_lat_V, mh, mu, mv)
     cos_lat_T = _metric_like(cos_lat_T, h)
     cos_lat_U = _metric_like(cos_lat_U, h)
     cos_lat_V = _metric_like(cos_lat_V, h)
@@ -127,10 +137,10 @@ def _spherical_diffusion_2d_impl(
     # but the zero closed-wall faces enter as a `pad` of the interior-face
     # fluxes, so the tendency and its VJP fuse into one pass (see
     # `diffusion._diffusion_2d_impl`).
-    fx_e = jnp.pad(flux_x_interior, ((0, 0), (0, 1)))  # east face   [Ny-2, Nx-2]
-    fx_w = jnp.pad(flux_x_interior, ((0, 0), (1, 0)))  # west face
-    fy_n = jnp.pad(flux_y_interior, ((0, 1), (0, 0)))  # north face  [Ny-2, Nx-2]
-    fy_s = jnp.pad(flux_y_interior, ((1, 0), (0, 0)))  # south face
+    fx_e = xp.pad(flux_x_interior, ((0, 0), (0, 1)))  # east face   [Ny-2, Nx-2]
+    fx_w = xp.pad(flux_x_interior, ((0, 0), (1, 0)))  # west face
+    fy_n = xp.pad(flux_y_interior, ((0, 1), (0, 0)))  # north face  [Ny-2, Nx-2]
+    fy_s = xp.pad(flux_y_interior, ((1, 0), (0, 0)))  # south face
     du = (fx_e - fx_w) / dlon
     dv = (cos_V_N * fy_n - cos_V_S * fy_s) / dlat
     out = interior(_safe_div_cos(du + dv, cos_T_c, R), h)
@@ -152,6 +162,7 @@ def _spherical_diffusion_2d_fluxes_impl(
     mv: Bool[Array, "Ny Nx"] | Float[Array, "Ny Nx"] | None,
 ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
     """Shared diagnostic-flux kernel for :class:`SphericalDiffusion2D`."""
+    xp = array_namespace(h, kappa, cos_lat_U, mu, mv)
     cos_lat_U = _metric_like(cos_lat_U, h)
     # κ at the interior faces (arithmetic mean of the two T cells)
     kappa_x, kappa_y = _face_kappa(kappa)  # [Ny-2, Nx-3], [Ny-3, Nx-2]
@@ -159,19 +170,20 @@ def _spherical_diffusion_2d_fluxes_impl(
     dh_dlon_raw = kappa_x * (h[1:-1, 2:-1] - h[1:-1, 1:-2])
     cos_U_face = cos_lat_U[1:-1, 1:-2]
     flux_x_interior = _safe_div_cos(dh_dlon_raw, cos_U_face, R * dlon)
-    flux_x = jnp.zeros_like(h).at[1:-1, 1:-2].set(flux_x_interior)
+    flux_x = set_at(xp.zeros_like(h), np.s_[1:-1, 1:-2], flux_x_interior)
     if mu is not None:
         flux_x = flux_x * mu
 
     flux_y_interior = kappa_y * (h[2:-1, 1:-1] - h[1:-2, 1:-1]) / (R * dlat)
-    flux_y = jnp.zeros_like(h).at[1:-2, 1:-1].set(flux_y_interior)
+    flux_y = set_at(xp.zeros_like(h), np.s_[1:-2, 1:-1], flux_y_interior)
     if mv is not None:
         flux_y = flux_y * mv
 
     return flux_x, flux_y
 
 
-class SphericalDiffusion2D(eqx.Module):
+@pytree_dataclass
+class SphericalDiffusion2D:
     """Horizontal tracer diffusion (flux form) on a 2-D spherical C-grid.
 
     Computes ``∂h/∂t = ∇·(κ ∇h)`` at T-points from staggered face
@@ -296,11 +308,12 @@ class SphericalDiffusion2D(eqx.Module):
         )
 
 
-class SphericalDiffusion3D(eqx.Module):
+@pytree_dataclass
+class SphericalDiffusion3D:
     """Horizontal tracer diffusion on a 3-D spherical Arakawa C-grid.
 
     Applies :class:`SphericalDiffusion2D` independently at each z-level
-    via ``eqx.filter_vmap``.  The 3-D field shape is ``[Nz, Ny, Nx]``.
+    via ``vmap`` (``jax.vmap`` on JAX inputs).  The 3-D field shape is ``[Nz, Ny, Nx]``.
 
     Parameters
     ----------
@@ -321,12 +334,13 @@ class SphericalDiffusion3D(eqx.Module):
         kappa: float | Float[Array, "Nz Ny Nx"],
     ) -> Float[Array, "Nz Ny Nx"]:
         """Diffusion tendency at T-points over all z-levels."""
+        xp = array_namespace(h, kappa)
         dlon, dlat, R = self.grid.dlon, self.grid.dlat, self.grid.R
         cos_T = self.grid.cos_lat_T
         cos_U = self.grid.cos_lat_U
         cos_V = self.grid.cos_lat_V
 
-        kappa_arr = jnp.asarray(kappa)
+        kappa_arr = xp.asarray(kappa)
         kappa_ax = 0 if kappa_arr.ndim >= 3 else None
 
         if self.mask is None:
@@ -346,7 +360,7 @@ class SphericalDiffusion3D(eqx.Module):
                     mv=None,
                 )
 
-            out = eqx.filter_vmap(_apply, in_axes=(0, kappa_ax))(h, kappa_arr)
+            out = vmap(_apply, in_axes=(0, kappa_ax))(h, kappa_arr)
             return zero_z_ghosts(out)
 
         mh = self.mask.h
@@ -368,7 +382,7 @@ class SphericalDiffusion3D(eqx.Module):
                 mv=mv_k,
             )
 
-        out = eqx.filter_vmap(_apply_masked, in_axes=(0, kappa_ax, 0, 0, 0))(
+        out = vmap(_apply_masked, in_axes=(0, kappa_ax, 0, 0, 0))(
             h, kappa_arr, mh, mu, mv
         )
         return zero_z_ghosts(out)
@@ -379,10 +393,11 @@ class SphericalDiffusion3D(eqx.Module):
         kappa: float | Float[Array, "Nz Ny Nx"],
     ) -> tuple[Float[Array, "Nz Ny Nx"], Float[Array, "Nz Ny Nx"]]:
         """Diagnostic diffusive face fluxes at U- and V-points, all z."""
+        xp = array_namespace(h, kappa)
         dlon, dlat, R = self.grid.dlon, self.grid.dlat, self.grid.R
         cos_U = self.grid.cos_lat_U
 
-        kappa_arr = jnp.asarray(kappa)
+        kappa_arr = xp.asarray(kappa)
         kappa_ax = 0 if kappa_arr.ndim >= 3 else None
 
         if self.mask is None:
@@ -392,7 +407,7 @@ class SphericalDiffusion3D(eqx.Module):
                     h_k, kap_k, dlon, dlat, R, cos_U, mu=None, mv=None
                 )
 
-            fx, fy = eqx.filter_vmap(_apply, in_axes=(0, kappa_ax))(h, kappa_arr)
+            fx, fy = vmap(_apply, in_axes=(0, kappa_ax))(h, kappa_arr)
             return zero_z_ghosts(fx), zero_z_ghosts(fy)
 
         mu = self.mask.u
@@ -403,13 +418,12 @@ class SphericalDiffusion3D(eqx.Module):
                 h_k, kap_k, dlon, dlat, R, cos_U, mu=mu_k, mv=mv_k
             )
 
-        fx, fy = eqx.filter_vmap(_apply_masked, in_axes=(0, kappa_ax, 0, 0))(
-            h, kappa_arr, mu, mv
-        )
+        fx, fy = vmap(_apply_masked, in_axes=(0, kappa_ax, 0, 0))(h, kappa_arr, mu, mv)
         return zero_z_ghosts(fx), zero_z_ghosts(fy)
 
 
-class SphericalBiharmonicDiffusion2D(eqx.Module):
+@pytree_dataclass
+class SphericalBiharmonicDiffusion2D:
     """Biharmonic (spherical ∇⁴) diffusion on a 2-D spherical C-grid.
 
     Computes the scale-selective biharmonic tendency
@@ -499,15 +513,17 @@ class SphericalBiharmonicDiffusion2D(eqx.Module):
             ``h``.  Ghost cells are zero.  When ``self.mask`` is set, it
             is ``−κ · Dm(Dm(h))`` and zero on dry cells.
         """
+        xp = array_namespace(h)
         if self.mask is not None:
             # zero land (NaN / 1e10) before any stencil reads it
-            h = jnp.where(self.mask.h, h, 0.0)
+            h = xp.where(self.mask.h, h, 0.0)
         lap1 = self._harm(h, kappa=1.0)
         lap2 = self._harm(lap1, kappa=1.0)
         return -kappa * lap2
 
 
-class SphericalBiharmonicDiffusion3D(eqx.Module):
+@pytree_dataclass
+class SphericalBiharmonicDiffusion3D:
     """Biharmonic spherical diffusion on a 3-D Arakawa C-grid.
 
     Applies the horizontal biharmonic spherical Laplacian independently
@@ -564,9 +580,10 @@ class SphericalBiharmonicDiffusion3D(eqx.Module):
             are zero.  When ``self.mask`` is set, it is ``−κ · Dm(Dm(h))``
             and zero on dry cells.
         """
+        xp = array_namespace(h)
         if self.mask is not None:
             # zero land (NaN / 1e10) before any stencil reads it
-            h = jnp.where(self.mask.h, h, 0.0)
+            h = xp.where(self.mask.h, h, 0.0)
         lap1 = self._harm(h, kappa=1.0)
         lap2 = self._harm(lap1, kappa=1.0)
         return -kappa * lap2

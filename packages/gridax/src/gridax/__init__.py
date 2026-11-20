@@ -73,6 +73,27 @@ from gridax._src.advection.weno import (
     weno_9pts_right,
 )
 from gridax._src.constants import R_EARTH
+from gridax._src.diffusion.diffusion import (
+    BiharmonicDiffusion2D,
+    BiharmonicDiffusion3D,
+    Diffusion2D,
+    Diffusion3D,
+    diffusion_2d,
+)
+from gridax._src.diffusion.momentum import (
+    MomentumAdvection2D,
+    MomentumAdvection3D,
+)
+from gridax._src.diffusion.spherical_diffusion import (
+    SphericalBiharmonicDiffusion2D,
+    SphericalBiharmonicDiffusion3D,
+    SphericalDiffusion2D,
+    SphericalDiffusion3D,
+)
+from gridax._src.diffusion.spherical_momentum import (
+    SphericalMomentumAdvection2D,
+    SphericalMomentumAdvection3D,
+)
 from gridax._src.grid import (
     ArakawaCGrid1D,
     ArakawaCGrid2D,
@@ -430,6 +451,23 @@ __all__ = [
     "rusanov_flux",
     "uv_center_flux",
     "uv_node_flux",
+    # Diffusion
+    "BiharmonicDiffusion2D",
+    "BiharmonicDiffusion3D",
+    "Diffusion2D",
+    "Diffusion3D",
+    "diffusion_2d",
+    # Momentum advection
+    "MomentumAdvection2D",
+    "MomentumAdvection3D",
+    # Spherical diffusion
+    "SphericalBiharmonicDiffusion2D",
+    "SphericalBiharmonicDiffusion3D",
+    "SphericalDiffusion2D",
+    "SphericalDiffusion3D",
+    # Spherical momentum advection
+    "SphericalMomentumAdvection2D",
+    "SphericalMomentumAdvection3D",
     # Constants
     "R_EARTH",
 ]

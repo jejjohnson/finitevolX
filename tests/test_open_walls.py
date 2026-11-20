@@ -27,7 +27,7 @@ from gridax._src.advection.advection import (
     Advection2D,
     Advection3D,
 )
-from gridax_jax._src.diffusion.diffusion import Diffusion2D, Diffusion3D
+from gridax._src.diffusion.diffusion import Diffusion2D, Diffusion3D
 import jax.numpy as jnp
 import numpy as np
 import pytest

@@ -103,17 +103,20 @@ def stop_gradient(x: Any) -> Any:
     return x
 
 
-def vmap(fn: Any) -> Any:
-    """``fn`` mapped over the leading axis of every argument.
+def vmap(fn: Any, in_axes: Any = 0) -> Any:
+    """``fn`` mapped over the leading axis of its arguments.
 
-    On JAX inputs this is ``jax.vmap(fn)``. Elsewhere it calls ``fn`` once per
-    index of the leading axis and stacks the results (each element of a tuple
-    result separately).
+    On JAX inputs this is ``jax.vmap(fn, in_axes=in_axes)``. Elsewhere it
+    calls ``fn`` once per index of the leading axis and stacks the results
+    (each element of a tuple result separately).
 
     Parameters
     ----------
     fn : callable
         A function of arrays, returning an array or a tuple of arrays.
+    in_axes : 0, None, or a tuple of them, optional
+        Per argument: ``0`` maps over its leading axis, ``None`` passes it
+        whole to every call. Default ``0`` for every argument.
 
     Returns
     -------
@@ -122,12 +125,17 @@ def vmap(fn: Any) -> Any:
     """
 
     def mapped(*args: Any) -> Any:
+        axes = in_axes if isinstance(in_axes, tuple) else (in_axes,) * len(args)
         xp = array_namespace(*args)
         if is_jax(xp):
             import jax
 
-            return jax.vmap(fn)(*args)
-        outs = [fn(*(a[k] for a in args)) for k in range(args[0].shape[0])]
+            return jax.vmap(fn, in_axes=axes)(*args)
+        n = next(a.shape[0] for a, ax in zip(args, axes, strict=True) if ax == 0)
+        outs = [
+            fn(*(a[k] if ax == 0 else a for a, ax in zip(args, axes, strict=True)))
+            for k in range(n)
+        ]
         if isinstance(outs[0], tuple):
             return tuple(xp.stack([o[i] for o in outs]) for i in range(len(outs[0])))
         return xp.stack(outs)

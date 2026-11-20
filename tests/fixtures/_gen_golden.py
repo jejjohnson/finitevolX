@@ -831,13 +831,13 @@ def _diffusion_entries(
 ) -> list[Entry]:
     """Register goldens for Diffusion2D/3D, BiharmonicDiffusion2D/3D,
     and MomentumAdvection2D/3D."""
-    from gridax_jax._src.diffusion.diffusion import (
+    from gridax._src.diffusion.diffusion import (
         BiharmonicDiffusion2D,
         BiharmonicDiffusion3D,
         Diffusion2D,
         Diffusion3D,
     )
-    from gridax_jax._src.diffusion.momentum import (
+    from gridax._src.diffusion.momentum import (
         MomentumAdvection2D,
         MomentumAdvection3D,
     )

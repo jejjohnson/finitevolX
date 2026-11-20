@@ -45,6 +45,18 @@ from gridax._src.advection.spherical_advection import (
     SphericalAdvection2D,
     SphericalAdvection3D,
 )
+from gridax._src.diffusion.diffusion import (
+    BiharmonicDiffusion2D,
+    BiharmonicDiffusion3D,
+    Diffusion2D,
+    Diffusion3D,
+)
+from gridax._src.diffusion.spherical_diffusion import (
+    SphericalBiharmonicDiffusion2D,
+    SphericalBiharmonicDiffusion3D,
+    SphericalDiffusion2D,
+    SphericalDiffusion3D,
+)
 from gridax._src.operators.diagnostic_operators import QGPotentialVorticity2D
 from gridax._src.operators.diagnostics import (
     potential_vorticity_multilayer,
@@ -75,18 +87,6 @@ from gridax._src.operators.spherical_difference import (
     SphericalDifference3D,
 )
 from gridax._src.operators.vorticity import Vorticity2D, Vorticity3D
-from gridax_jax._src.diffusion.diffusion import (
-    BiharmonicDiffusion2D,
-    BiharmonicDiffusion3D,
-    Diffusion2D,
-    Diffusion3D,
-)
-from gridax_jax._src.diffusion.spherical_diffusion import (
-    SphericalBiharmonicDiffusion2D,
-    SphericalBiharmonicDiffusion3D,
-    SphericalDiffusion2D,
-    SphericalDiffusion3D,
-)
 from gridax_jax._src.solvers.spectral import (
     solve_poisson_dst,
     solve_poisson_fft,

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from gridax import CartesianGrid2D, Mask2D, Mask3D, SphericalGrid2D, SphericalGrid3D
-from gridax_jax._src.diffusion.momentum import MomentumAdvection2D
-from gridax_jax._src.diffusion.spherical_momentum import (
+from gridax._src.diffusion.momentum import MomentumAdvection2D
+from gridax._src.diffusion.spherical_momentum import (
     SphericalMomentumAdvection2D,
     SphericalMomentumAdvection3D,
 )
