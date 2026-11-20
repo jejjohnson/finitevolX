@@ -82,8 +82,13 @@ class SphericalGrid2D(CurvilinearGrid2D):
         X[j, i]  NE corner    at  ( lon_{i+1/2}  ,  lat_{j+1/2}   )
 
     where ``lon_i = lon_min + (i-1) * dlon`` and
-    ``lat_j = lat_min + (j-1) * dlat`` (the ``-1`` shift accounts for
-    the south/west ghost cells at ``j=0``/``i=0``).  Because U-points
+    ``lat_j = lat_min + (j - 1/2) * dlat``: latitude is a bounded axis, so
+    the T rows are cell centres, the interior rows ``j = 1 .. Ny-2`` span
+    ``lat_min + dlat/2 .. lat_max - dlat/2`` symmetrically, and the V faces
+    ``lat_{j+1/2} = lat_min + j * dlat`` put ``V[0]`` on ``lat_min`` and
+    ``V[Ny-2]`` on ``lat_max``. No T row sits on a pole, and a ghost row
+    lies at most ``dlat/2`` past one. (Longitude is periodic: ``lon_i``
+    keeps the first interior column on ``lon_min``.) Because U-points
     share the latitude of T-points, ``cos_lat_U == cos_lat_T``;
     similarly ``cos_lat_X == cos_lat_V``.
 
@@ -147,9 +152,12 @@ class SphericalGrid2D(CurvilinearGrid2D):
         Ly = R * float(lat_max_rad - lat_min_rad)
 
         # 1-D coordinate arrays with ghost cells
-        # Ghost cell at j=0 is one cell south of the physical domain;
-        # j=1 is the first interior cell at lat_min.
-        lat_1d = lat_min_rad + (np.arange(Ny) - 1) * dlat
+        # Latitude is bounded: T rows are cell centres,
+        #   lat_T[j] = lat_min + (j - 1/2) * dlat,
+        # so j=1 is half a cell north of lat_min and j=Ny-2 half a cell south
+        # of lat_max; the ghost rows j=0, Ny-1 sit half a cell outside.
+        lat_1d = lat_min_rad + (np.arange(Ny) - 0.5) * dlat
+        # Longitude is periodic: the first interior column sits on lon_min.
         lon_1d = lon_min_rad + (np.arange(Nx) - 1) * dlon
 
         # 2-D meshgrid (j, i) ordering

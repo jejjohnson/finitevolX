@@ -68,13 +68,31 @@ class TestSphericalArakawaCGrid2D:
         np.testing.assert_allclose(grid2d.cos_lat_X, grid2d.cos_lat_V, atol=0)
 
     def test_lat_T_coordinates(self, grid2d):
-        lat_min = jnp.deg2rad(-80.0)
-        # j=1 is first interior cell at lat_min
-        np.testing.assert_allclose(grid2d.lat_T[1, 0], lat_min, atol=1e-12)
-        # j=0 is ghost cell one step south
+        lat_min = np.deg2rad(-80.0)
+        # j=1 is the first interior cell centre, half a cell north of lat_min
         np.testing.assert_allclose(
-            grid2d.lat_T[0, 0], lat_min - grid2d.dlat, atol=1e-12
+            grid2d.lat_T[1, 0], lat_min + 0.5 * grid2d.dlat, atol=1e-12
         )
+        # j=0 is the ghost cell centre, half a cell south of lat_min
+        np.testing.assert_allclose(
+            grid2d.lat_T[0, 0], lat_min - 0.5 * grid2d.dlat, atol=1e-12
+        )
+
+    def test_lat_T_is_symmetric_and_off_the_poles(self):
+        """#322: symmetric rows, no T row on a pole, ghosts at most dlat/2 past it."""
+        grid = SphericalGrid2D.from_interior(
+            nx_interior=12,
+            ny_interior=6,
+            lon_range=(0.0, 360.0),
+            lat_range=(-90.0, 90.0),
+        )
+        lat = np.asarray(grid.lat_T)[:, 0]
+        np.testing.assert_allclose(lat, -lat[::-1], atol=1e-14)
+        assert np.all(np.abs(lat[1:-1]) < np.pi / 2)
+        np.testing.assert_allclose(np.abs(lat[[0, -1]]), np.pi / 2 + grid.dlat / 2)
+        # V faces: V[0] on lat_min, V[Ny-2] on lat_max
+        lat_V = lat + grid.dlat / 2
+        np.testing.assert_allclose(lat_V[[0, -2]], [-np.pi / 2, np.pi / 2], atol=1e-14)
 
     def test_lon_T_coordinates(self, grid2d):
         lon_min = 0.0
