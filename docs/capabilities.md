@@ -675,6 +675,43 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `make_sponge` | function | n-D linear sponge ramp: 0 at every wall, 1 in the interior. |
 | `pool_bool` | function | n-D average-pool of a binary mask with one-sided zero padding. |
 
+### `gridax.analysis`
+
+| Name | Kind | What it does |
+|---|---|---|
+| `Extrapolate` | type alias | `typing.Literal['nan', 'nearest']` |
+| `METHODS` | constant | `('central', 'forward', 'backward')` |
+| `Method` | type alias | `typing.Literal['central', 'forward', 'backward']` |
+| `adaptive_curl_2d` | function | Mask-aware curl: `adaptive_difference` for each derivative. |
+| `adaptive_curl_3d` | function | Mask-aware 3-D curl: `adaptive_difference` for each derivative. |
+| `adaptive_difference` | function | Mask-aware finite difference: the widest stencil that fits on valid data. |
+| `adaptive_divergence_1d` | function | Mask-aware 1-D divergence: `adaptive_difference` of ``u``. |
+| `adaptive_divergence_2d` | function | Mask-aware divergence: `adaptive_difference` for each derivative. |
+| `adaptive_divergence_3d` | function | Mask-aware 3-D divergence: `adaptive_difference` for each term. |
+| `adaptive_gradient_1d` | function | Mask-aware ``∂f/∂s`` along one axis: `adaptive_difference`. |
+| `adaptive_gradient_2d` | function | Mask-aware ``(∂f/∂y, ∂f/∂x)``: `adaptive_difference` on both axes. |
+| `adaptive_gradient_3d` | function | Mask-aware ``(∂f/∂z, ∂f/∂y, ∂f/∂x)``: `adaptive_difference` per axis. |
+| `adaptive_laplacian_1d` | function | Mask-aware ``∂²f/∂s²`` along one axis: `adaptive_difference` of order 2. |
+| `adaptive_laplacian_2d` | function | Mask-aware Laplacian: `adaptive_difference` of second order on each axis. |
+| `adaptive_laplacian_3d` | function | Mask-aware 3-D Laplacian: `adaptive_difference` of order 2 per axis. |
+| `curl_2d` | function | Curl2D (relative vorticity) ``∂v/∂x − ∂u/∂y`` over the last two axes. |
+| `curl_3d` | function | Curl (vorticity vector) over the last three axes; a NaN propagates. |
+| `difference` | function | Finite-difference derivative along one axis; a NaN propagates. |
+| `difference_coeffs` | function | The coefficients of a stencil on ``offsets``, from the Taylor conditions. |
+| `difference_offsets` | function | The offsets of one stencil, finitediffx's rules. |
+| `divergence_1d` | function | The 1-D divergence ``∂u/∂s`` of a flux along one axis; a NaN propagates. |
+| `divergence_2d` | function | Divergence ``∂u/∂x + ∂v/∂y`` over the last two axes; a NaN propagates. |
+| `divergence_3d` | function | Divergence ``∂u/∂x + ∂v/∂y + ∂w/∂z`` over the last three axes. |
+| `gradient_1d` | function | ``∂f/∂s`` along one axis; a NaN propagates. |
+| `gradient_2d` | function | ``(∂f/∂y, ∂f/∂x)`` over the last two axes; a NaN propagates. |
+| `gradient_3d` | function | ``(∂f/∂z, ∂f/∂y, ∂f/∂x)`` over the last three axes; a NaN propagates. |
+| `laplacian_1d` | function | ``∂²f/∂s²`` along one axis, a second-derivative stencil; a NaN propagates. |
+| `laplacian_2d` | function | Laplacian ``∂²f/∂x² + ∂²f/∂y²`` over the last two axes; a NaN propagates. |
+| `laplacian_3d` | function | Laplacian ``∂²f/∂x² + ∂²f/∂y² + ∂²f/∂z²``, second-derivative stencils. |
+| `nonuniform_coeffs` | function | Stencil coefficients for points at arbitrary distances, on any backend. |
+| `remap_axis` | function | Interpolate ``values`` along ``axis`` from ``source_coords`` to ``target_coords``. |
+| `remap_axis_columns` | function | Interpolate every column of ``values`` onto ``target_coords``. |
+
 ## Upstream: `spectraldiffx`
 
 Spectral transforms (DCT / DST / FFT), the rectangular spectral Poisson / Helmholtz solvers and their eigenvalues, and the spectral capacitance solver. finitevolX re-exports most of the solver API (listed above); the rest — spectral derivatives, spherical-harmonic and Chebyshev machinery — is used from here, never re-implemented.

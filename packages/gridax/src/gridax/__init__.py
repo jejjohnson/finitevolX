@@ -7,8 +7,11 @@ wet / dry masks built from a T-point mask. Everything is built with NumPy
 grid a model ran on. When JAX is importable every class is also a JAX pytree,
 so grids and masks pass through ``jax.jit`` and ``jax.vmap``.
 
-Operations applied to a field (differences, advection, solvers) live in
-gridax-ops, which builds on this package.
+:mod:`gridax.analysis` adds the backend-agnostic analysis kernels on
+collocated grids: finite differences and axis remapping, written against the
+array API so they run on NumPy, JAX or any other backend. The staggered
+C-grid operations (differences on T / U / V / X points, advection, boundary
+conditions, solvers) live in gridax-ops, which builds on this package.
 """
 
 from gridax._src.constants import R_EARTH

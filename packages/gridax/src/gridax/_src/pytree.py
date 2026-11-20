@@ -41,24 +41,40 @@ def static_field(**kwargs: Any) -> Any:
 
 
 def array_namespace(*values: Any) -> Any:
-    """The array namespace of the first non-NumPy array among ``values``.
+    """The array namespace shared by ``values``, NumPy for plain values.
 
-    Lets a property written once run on the NumPy arrays a grid is built
-    with and on the JAX arrays or tracers that replace them under a
-    transform. Python scalars and NumPy arrays resolve to NumPy.
+    Lets a function written once run on the NumPy arrays a grid is built
+    with and on the JAX arrays, tracers, CuPy arrays (or anything else that
+    follows the array API) a caller passes instead. With
+    ``array-api-compat`` installed it decides, so backends without a native
+    ``__array_namespace__`` (PyTorch) work too; otherwise the first value
+    that reports a namespace other than NumPy's wins. Python scalars,
+    ``None`` and NumPy arrays resolve to NumPy.
 
     Parameters
     ----------
     *values
-        Arrays or scalars.
+        Arrays, scalars or ``None``.
 
     Returns
     -------
     module
-        ``numpy``, or the namespace a value reports through
-        ``__array_namespace__`` (``jax.numpy`` for JAX arrays and tracers).
+        ``numpy``, or the namespace of the arrays (``jax.numpy`` for JAX
+        arrays and tracers).
     """
-    for value in values:
+    arrays = [
+        v for v in values if v is not None and not isinstance(v, int | float | complex)
+    ]
+    try:
+        import array_api_compat
+    except ImportError:
+        array_api_compat = None
+    if array_api_compat is not None and arrays:
+        namespace = array_api_compat.array_namespace(*arrays)
+        if namespace.__name__.endswith("numpy") and "jax" not in namespace.__name__:
+            return np
+        return namespace
+    for value in arrays:
         if isinstance(value, np.ndarray | np.generic):
             continue
         get_namespace = getattr(value, "__array_namespace__", None)
