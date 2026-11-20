@@ -25,7 +25,8 @@ that (`gridax-numpy-only` in `ci.yml`). Everything under `finitevolx/_src/`
 and `gridax/_src/` is private; the public API is the flat
 `finitevolx.__all__`, re-exported from `finitevolx/__init__.py` (its order is
 a logical grouping, not alphabetical: ruff's `RUF022` is off), which includes
-every name of `gridax.__all__`.
+the grid and mask classes of `gridax` (the mask construction helpers stay
+`gridax`-only).
 
 | Area | Path (`finitevolx/_src/`, or `gridax/_src/`) | Owns |
 |---|---|---|
