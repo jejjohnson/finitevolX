@@ -22,16 +22,15 @@ from gridax import (
     CartesianGrid2D,
     CartesianGrid3D,
 )
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx._src.advection.advection import (
+from gridax_ops._src.advection.advection import (
     Advection1D,
     Advection2D,
     Advection3D,
 )
-from finitevolx._src.diffusion.diffusion import Diffusion2D, Diffusion3D
+from gridax_ops._src.diffusion.diffusion import Diffusion2D, Diffusion3D
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 
 # ── fixtures ────────────────────────────────────────────────────────────────

@@ -125,7 +125,7 @@ Re-export it flat in `finitevolx/__init__.py` (and add to `__all__`), exactly li
 ### Example
 
 ```python
-import finitevolx as fvx
+import gridax_ops as fvx
 import jax.numpy as jnp
 
 h  = jnp.array(...)                                   # (Ny, Nx) on h-grid
@@ -221,7 +221,7 @@ when `h` varies in space. The existing `potential_enstrophy(q, h)` (`diagnostics
 ### Example
 
 ```python
-import finitevolx as fvx
+import gridax_ops as fvx
 # conserving form via the existing class (works today):
 vort = fvx.Vorticity2D(grid=grid, mask=None)
 pv   = fvx.sw_potential_vorticity(u, v, h, f, dx, dy)        # existing diagnostic
@@ -381,7 +381,7 @@ layers, BC forcing, BFN nudging, and tracer restoring — define once, reuse eve
 ### Example
 
 ```python
-import finitevolx as fvx
+import gridax_ops as fvx
 du, dv = fvx.linear_drag(u, v, coef=r)
 dssh   = fvx.rayleigh_relaxation(ssh, ssh_bc, coef=gamma, weight=Wbc)
 ```

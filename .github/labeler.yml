@@ -22,4 +22,4 @@
 
 "source":
   - changed-files:
-    - any-glob-to-any-file: "finitevolx/**"
+    - any-glob-to-any-file: ["packages/**", "finitevolx/**"]

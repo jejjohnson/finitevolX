@@ -15,12 +15,12 @@ import inspect
 import itertools
 
 import equinox as eqx
+import gridax_ops as fvx
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
-import finitevolx as fvx
 from tests.fixtures.inputs import make_grid_2d, make_mask_2d
 
 BATCH = (2, 3)
@@ -32,17 +32,17 @@ SCALAR = 0.7  # value for every float argument (dx, dy, g_prime, f0, …)
 # public function and class method there that carries the annotation is
 # tested below, so the annotation and the behaviour cannot drift apart.
 MODULES = (
-    "finitevolx._src.operators.stencils",
-    "finitevolx._src.operators.difference",
-    "finitevolx._src.operators.interpolation",
-    "finitevolx._src.operators.divergence",
-    "finitevolx._src.operators.vorticity",
-    "finitevolx._src.operators.coriolis",
-    "finitevolx._src.operators.diagnostics",
-    "finitevolx._src.operators.diagnostic_operators",
-    "finitevolx._src.boundary.bc_1d",
-    "finitevolx._src.boundary.bc_set",
-    "finitevolx._src.boundary.boundary",
+    "gridax_ops._src.operators.stencils",
+    "gridax_ops._src.operators.difference",
+    "gridax_ops._src.operators.interpolation",
+    "gridax_ops._src.operators.divergence",
+    "gridax_ops._src.operators.vorticity",
+    "gridax_ops._src.operators.coriolis",
+    "gridax_ops._src.operators.diagnostics",
+    "gridax_ops._src.operators.diagnostic_operators",
+    "gridax_ops._src.boundary.bc_1d",
+    "gridax_ops._src.boundary.bc_set",
+    "gridax_ops._src.boundary.boundary",
 )
 
 

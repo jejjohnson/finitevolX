@@ -6,12 +6,7 @@ import itertools
 import math
 
 import diffrax as dfx
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx import (
+from gridax_ops import (
     IMEX_SSP2,
     RK3SSP,
     SSP_RK2,
@@ -26,6 +21,10 @@ from finitevolx import (
     SplitExplicitRKSolver,
     solve_ocean_pde,
 )
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 
 def _decay_rhs(t, y, args):
@@ -410,7 +409,7 @@ class TestSplitExplicitRKSolver:
 
     def test_matches_split_explicit_step(self):
         """The solver equals the functional step, slow forcing and coupling included."""
-        from finitevolx import split_explicit_step
+        from gridax_ops import split_explicit_step
 
         solver = SplitExplicitRKSolver(n_substeps=7)
         y3, y2 = jnp.array([1.0, -0.5]), jnp.array([0.3, 0.2])
@@ -676,7 +675,7 @@ class TestDiffeqsolveProtocol:
     @pytest.mark.slow
     def test_imex_stepto_matches_functional_step(self):
         """IMEX_SSP2 in diffeqsolve equals imex_ssp2_step (exact implicit solve)."""
-        from finitevolx import imex_ssp2_step
+        from gridax_ops import imex_ssp2_step
 
         dt, n = 0.01, 100
         sol = dfx.diffeqsolve(
@@ -717,7 +716,7 @@ class TestDiffeqsolveProtocol:
 
     def test_semi_lagrangian_in_diffeqsolve(self):
         """SemiLagrangianTerm + SaveAt(ts): integer shifts per step are exact."""
-        from finitevolx import SemiLagrangianTerm
+        from gridax_ops import SemiLagrangianTerm
 
         ny, nx = 8, 16
         y0 = jnp.sin(2 * jnp.pi * jnp.arange(nx) / nx)[None, :] * jnp.ones((ny, 1))
@@ -735,7 +734,7 @@ class TestDiffeqsolveProtocol:
 
     def test_solvers_pass_through_jax_jit(self):
         """Static int fields: the solver objects can be jax.jit arguments."""
-        from finitevolx import SemiLagrangianTerm
+        from gridax_ops import SemiLagrangianTerm
 
         @jax.jit
         def run_sl(solver, y0):
@@ -811,7 +810,7 @@ class TestAB3Solver:
         assert all(r >= 2.9 for r in rates), rates
 
     def test_matches_rk3_bootstrap_then_ab3_step(self):
-        from finitevolx import ab3_step, rk3_ssp_step
+        from gridax_ops import ab3_step, rk3_ssp_step
 
         f = lambda y: -1.5 * y
         dt = 0.1

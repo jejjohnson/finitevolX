@@ -2,19 +2,18 @@
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-import finitevolx as fvx
-from finitevolx import (
+import gridax_ops as fvx
+from gridax_ops import (
     BoundaryConditionSet,
     Dirichlet1D,
     Mask2D,
     Neumann1D,
     Periodic1D,
 )
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 NY, NX = 20, 24
 DX, DY = 0.05, 0.04

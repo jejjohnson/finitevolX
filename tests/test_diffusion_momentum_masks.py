@@ -20,19 +20,19 @@ API on ``Mask2D`` / ``Mask3D`` class fields:
 from __future__ import annotations
 
 import equinox as eqx
-import numpy as np
-import pytest
-
-from finitevolx._src.diffusion.diffusion import (
+from gridax_ops._src.diffusion.diffusion import (
     BiharmonicDiffusion2D,
     BiharmonicDiffusion3D,
     Diffusion2D,
     Diffusion3D,
 )
-from finitevolx._src.diffusion.momentum import (
+from gridax_ops._src.diffusion.momentum import (
     MomentumAdvection2D,
     MomentumAdvection3D,
 )
+import numpy as np
+import pytest
+
 from tests.fixtures._helpers import assert_matches_golden
 from tests.fixtures.inputs import (
     make_grid_2d,
@@ -320,7 +320,7 @@ def _basin_mask_2d(n: int = 12) -> np.ndarray:
 
 def _biharmonic_cases():
     """(name, op, area weight [Ny, Nx], wet [Ny, Nx]) for the 2-D operators."""
-    from finitevolx import (
+    from gridax_ops import (
         CartesianGrid2D,
         Mask2D,
         SphericalBiharmonicDiffusion2D,
@@ -415,14 +415,13 @@ class TestMaskedBiharmonicNoFlux:
 
 def test_masked_biharmonic_3d_constant_and_conservation():
     """The 3-D operators apply the same masked ``Dm(Dm(h))`` per level."""
-    import jax.numpy as jnp
-
-    from finitevolx import (
+    from gridax_ops import (
         CartesianGrid3D,
         Mask3D,
         SphericalBiharmonicDiffusion3D,
         SphericalGrid3D,
     )
+    import jax.numpy as jnp
 
     m2 = _basin_mask_2d()
     m3 = np.stack([np.zeros_like(m2), m2, m2, m2, np.zeros_like(m2)])  # [Nz, Ny, Nx]

@@ -59,8 +59,8 @@ import matplotlib.pyplot as plt
 from pipekit_ops import Graph, Input, Operator
 from pipekit_jax import Rollout
 
-import finitevolx as fvx
-from finitevolx import pipekit as fp
+import gridax_ops as fvx
+from gridax_ops import pipekit as fp
 
 jax.config.update("jax_enable_x64", True)
 

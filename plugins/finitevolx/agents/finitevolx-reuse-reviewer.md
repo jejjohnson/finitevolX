@@ -22,7 +22,7 @@ can import:
 python - <<'PY'
 import inspect
 try:
-    import finitevolx
+    import gridax_ops
 except ImportError:
     print("# finitevolx: not installed")
 else:

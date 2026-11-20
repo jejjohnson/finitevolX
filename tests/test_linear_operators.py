@@ -9,12 +9,7 @@ applies; gaussx's structured primitives then hold exactly.
 from __future__ import annotations
 
 import gaussx
-import jax.numpy as jnp
-import lineax as lx
-import numpy as np
-import pytest
-
-from finitevolx import (
+from gridax_ops import (
     Mask2D,
     dctn,
     helmholtz_operator,
@@ -24,6 +19,10 @@ from finitevolx import (
     solve_helmholtz_dst,
     solve_helmholtz_fft,
 )
+import jax.numpy as jnp
+import lineax as lx
+import numpy as np
+import pytest
 
 NY, NX = 12, 16
 DX, DY = 0.1, 0.25  # anisotropic on purpose

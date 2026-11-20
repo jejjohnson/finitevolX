@@ -54,7 +54,7 @@ The factory method derives everything else:
 
 ```python
 import numpy as np
-from finitevolx import Mask2D
+from gridax_ops import Mask2D
 
 # Rectangular basin with land boundaries
 n = 10
@@ -175,7 +175,7 @@ operator; once constructed, method calls don't need to pass the mask
 through per call.
 
 ```python
-import finitevolx as fvx
+import gridax_ops as fvx
 
 grid = fvx.CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 mask = fvx.Mask2D.from_mask(h_mask)

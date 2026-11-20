@@ -1,11 +1,11 @@
 ---
 name: add-time-integrator
-description: Add a time-integration scheme to finitevolX — a pure functional step (explicit RK, multistep, IMEX, split-explicit, semi-Lagrangian) and its diffrax solver form (a Butcher-tableau AbstractERK, an AbstractSolver, or an eqx.Module with init / step for schemes that do not fit diffeqsolve) — with convergence-order tests and docs. Use when asked to add, port or implement a time stepper, Runge–Kutta scheme, multistep / leapfrog scheme, IMEX or split-explicit integrator in finitevolx/_src/timestepping.
+description: Add a time-integration scheme to finitevolX — a pure functional step (explicit RK, multistep, IMEX, split-explicit, semi-Lagrangian) and its diffrax solver form (a Butcher-tableau AbstractERK, an AbstractSolver, or an eqx.Module with init / step for schemes that do not fit diffeqsolve) — with convergence-order tests and docs. Use when asked to add, port or implement a time stepper, Runge–Kutta scheme, multistep / leapfrog scheme, IMEX or split-explicit integrator in gridax_ops/_src/timestepping.
 ---
 
 # Add a time integrator
 
-The generic time steppers (explicit RK, multistep, IMEX, split-explicit, their diffrax solvers and the `AbstractStepper`s) now live in integrix (`integrix.march`), and their `finitevolx.*` names are deprecated aliases for one release. Add a generic scheme to integrix, not here; this recipe applies only to schemes tied to the C-grid, such as the semi-Lagrangian step and solver in `finitevolx/_src/timestepping/semi_lagrangian.py`.
+The generic time steppers (explicit RK, multistep, IMEX, split-explicit, their diffrax solvers and the `AbstractStepper`s) now live in integrix (`integrix.march`), and their `finitevolx.*` names are deprecated aliases for one release. Add a generic scheme to integrix, not here; this recipe applies only to schemes tied to the C-grid, such as the semi-Lagrangian step and solver in `gridax_ops/_src/timestepping/semi_lagrangian.py`.
 
 Read contract 6 (time integration) in `AGENTS.md`, then
 `docs/time_integration.md` and `docs/time_integration_usage.md`.
@@ -23,7 +23,7 @@ more (`dfx.Tsit5`, `dfx.Dopri5`, `dfx.Kvaerno5`, …): a generic ODE scheme
 belongs there, not here. finitevolX adds the schemes ocean models need
 (SSP, multistep with filters, IMEX, split-explicit).
 
-## 2. Write it (`finitevolx/_src/timestepping/`)
+## 2. Write it (`gridax_ops/_src/timestepping/`)
 
 - **The pure step** in the matching module (`explicit_rk.py`,
   `multistep.py`, `imex.py`, `split_explicit.py`, `semi_lagrangian.py`):
@@ -48,7 +48,7 @@ belongs there, not here. finitevolX adds the schemes ocean models need
 
 ## 3. Export and document
 
-`finitevolx/__init__.py` (import + `__all__` under `# Time integration —
+`packages/gridax-ops/src/gridax_ops/__init__.py` (import + `__all__` under `# Time integration —
 pure functional` or `# Time integration — diffrax solvers`),
 `::: finitevolx.NewScheme` on `docs/api/time_integration.md`, the scheme on
 `docs/time_integration.md` and a usage snippet on

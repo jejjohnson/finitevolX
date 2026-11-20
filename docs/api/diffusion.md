@@ -2,12 +2,12 @@
 
 Harmonic (∇²) and biharmonic (∇⁴) diffusion operators for C-grid staggered models.
 
-::: finitevolx.Diffusion2D
+::: gridax_ops.Diffusion2D
 
-::: finitevolx.Diffusion3D
+::: gridax_ops.Diffusion3D
 
-::: finitevolx.BiharmonicDiffusion2D
+::: gridax_ops.BiharmonicDiffusion2D
 
-::: finitevolx.BiharmonicDiffusion3D
+::: gridax_ops.BiharmonicDiffusion3D
 
-::: finitevolx.diffusion_2d
+::: gridax_ops.diffusion_2d

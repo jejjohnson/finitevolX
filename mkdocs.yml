@@ -31,7 +31,7 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          paths: [., packages/gridax/src]
+          paths: [packages/gridax-ops/src, packages/gridax/src]
           options:
             docstring_style: numpy
             show_source: true

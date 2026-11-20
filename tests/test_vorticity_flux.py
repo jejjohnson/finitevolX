@@ -6,12 +6,7 @@ Covers the public ``pv_flux_blend`` free function (parity with the
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx import (
+from gridax_ops import (
     CartesianGrid2D,
     SphericalGrid2D,
     SphericalVorticity2D,
@@ -20,8 +15,12 @@ from finitevolx import (
     pv_flux_blend,
     vorticity_flux_upwind,
 )
-from finitevolx._src.operators._ghost import interior
-from finitevolx._src.operators.stencils import avg_xfwd_ybwd, avg_y_bwd
+from gridax_ops._src.operators._ghost import interior
+from gridax_ops._src.operators.stencils import avg_xfwd_ybwd, avg_y_bwd
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 
 @pytest.fixture()
@@ -154,7 +153,7 @@ class TestPVFluxForms:
         Before #284 the first interior row / column read a zero ghost corner
         and came out exactly halved.
         """
-        from finitevolx import Interpolation2D
+        from gridax_ops import Interpolation2D
 
         g, q, u, v = fields
         interp = Interpolation2D(g)
@@ -165,7 +164,7 @@ class TestPVFluxForms:
         np.testing.assert_allclose(qv, ref_qv, rtol=0, atol=1e-14)
 
     def test_enstrophy_is_average_then_multiply(self, fields):
-        from finitevolx import Interpolation2D
+        from gridax_ops import Interpolation2D
 
         g, q, u, v = fields
         interp = Interpolation2D(g)
@@ -180,7 +179,7 @@ class TestPVFluxForms:
         the south / west ghost corners are zero, which is what the old
         interior()-intermediate assumed: the result equals that composition.
         """
-        from finitevolx import Interpolation2D
+        from gridax_ops import Interpolation2D
 
         g, q, u, v = fields
         q0 = interior(q[1:-1, 1:-1], q)

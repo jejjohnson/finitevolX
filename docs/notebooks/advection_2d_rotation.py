@@ -104,7 +104,7 @@ import numpy as np
 
 jax.config.update("jax_enable_x64", True)
 
-import finitevolx as fvx
+import gridax_ops as fvx
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "advection_2d_rotation"
 IMG_DIR.mkdir(parents=True, exist_ok=True)

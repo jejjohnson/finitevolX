@@ -1,6 +1,6 @@
 ---
 name: add-stencil-operator
-description: Add a spatial operator to finitevolX — a raw stencil (Layer 1), a metric-scaled functional helper (Layer 2) or a mask-aware class operator (Layer 3) such as a difference, interpolation, divergence / vorticity, diffusion, Coriolis or diagnostic, in 1-D / 2-D / 3-D and on the sphere — with its golden mask fixtures, scale-covariance case, docs and capability index. Use when asked to add, port or implement a finite-difference / finite-volume operator, stencil, diagnostic or spherical operator in finitevolx/_src/operators or finitevolx/_src/diffusion.
+description: Add a spatial operator to finitevolX — a raw stencil (Layer 1), a metric-scaled functional helper (Layer 2) or a mask-aware class operator (Layer 3) such as a difference, interpolation, divergence / vorticity, diffusion, Coriolis or diagnostic, in 1-D / 2-D / 3-D and on the sphere — with its golden mask fixtures, scale-covariance case, docs and capability index. Use when asked to add, port or implement a finite-difference / finite-volume operator, stencil, diagnostic or spherical operator in gridax_ops/_src/operators or gridax_ops/_src/diffusion.
 ---
 
 # Add a stencil operator
@@ -26,7 +26,7 @@ step-by-step.
 
 | Layer | Where | Rules |
 |---|---|---|
-| 1 — raw stencil | `finitevolx/_src/operators/stencils.py` (`diff_*` / `avg_*`, `_1d` / `_3d` variants) | Pure slicing of the full array, interior-sized result (`[Ny-2, Nx-2]`), no metric, no padding; docstring with the `Δx h[i+½] = …` formula and the source → target stagger |
+| 1 — raw stencil | `gridax_ops/_src/operators/stencils.py` (`diff_*` / `avg_*`, `_1d` / `_3d` variants) | Pure slicing of the full array, interior-sized result (`[Ny-2, Nx-2]`), no metric, no padding; docstring with the `Δx h[i+½] = …` formula and the source → target stagger |
 | 2 — functional | the family module (`operators/diagnostics.py`, `operators/jacobian.py`, `diffusion/diffusion.py`, …) | Raw stencils ÷ metric, padded with `interior(values, like)` from `operators/_ghost.py`; never takes a mask; no physical constant inside an expression (default parameters only) |
 | 3 — class | `operators/<family>.py`, `diffusion/…`, spherical forms in `operators/spherical_difference.py` / `spherical_compound.py` | `eqx.Module` with `grid` and `mask: Mask2D \| None = None`; precompute in `__init__`; mask the output on the dry points of its stagger (`mask.h` / `u` / `v` / `xy_corner_strict`) behind `if self.mask is not None:` |
 
@@ -48,7 +48,7 @@ step-by-step.
 
 ## 3. Export and document
 
-- `finitevolx/__init__.py`: import, and add the name to `__all__` in its
+- `packages/gridax-ops/src/gridax_ops/__init__.py`: import, and add the name to `__all__` in its
   logical group (e.g. under `# Difference stencils`, `# Diagnostics`).
 - `::: finitevolx.NewName` on the matching `docs/api/*.md` page; a
   paragraph (formula, stagger, ghost cells read) on the theory page.

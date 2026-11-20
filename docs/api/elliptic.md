@@ -6,15 +6,15 @@ depending on the ``method`` argument.
 
 ## Streamfunction from Vorticity
 
-::: finitevolx.streamfunction_from_vorticity
+::: gridax_ops.streamfunction_from_vorticity
 
 ## Pressure from Divergence
 
-::: finitevolx.pressure_from_divergence
+::: gridax_ops.pressure_from_divergence
 
 ## PV Inversion
 
-::: finitevolx.pv_inversion
+::: gridax_ops.pv_inversion
 
 ## Known Values (Inhomogeneous Dirichlet)
 
@@ -22,10 +22,10 @@ Building blocks behind the wrappers' ``known_values`` / ``known_mask``
 arguments, for use with your own solver.  The known values sit on the coast
 ring (the dry cells adjacent to the wet mask: the C-grid wall nodes for ψ).
 
-::: finitevolx.coast_ring
+::: gridax_ops.coast_ring
 
-::: finitevolx.boundary_ring
+::: gridax_ops.boundary_ring
 
-::: finitevolx.SolveDomain
+::: gridax_ops.SolveDomain
 
-::: finitevolx.KnownValueLifting
+::: gridax_ops.KnownValueLifting

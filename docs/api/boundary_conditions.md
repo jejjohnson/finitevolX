@@ -4,28 +4,28 @@ Boundary condition primitives and helpers for staggered C-grid fields.
 
 ## BC Atoms (1-D)
 
-::: finitevolx.Dirichlet1D
+::: gridax_ops.Dirichlet1D
 
-::: finitevolx.Neumann1D
+::: gridax_ops.Neumann1D
 
-::: finitevolx.Periodic1D
+::: gridax_ops.Periodic1D
 
-::: finitevolx.Reflective1D
+::: gridax_ops.Reflective1D
 
-::: finitevolx.Slip1D
+::: gridax_ops.Slip1D
 
-::: finitevolx.Outflow1D
+::: gridax_ops.Outflow1D
 
-::: finitevolx.Sponge1D
+::: gridax_ops.Sponge1D
 
 ## BC Composition
 
-::: finitevolx.BoundaryConditionSet
+::: gridax_ops.BoundaryConditionSet
 
-::: finitevolx.FieldBCSet
+::: gridax_ops.FieldBCSet
 
 ## Helpers
 
-::: finitevolx.enforce_periodic
+::: gridax_ops.enforce_periodic
 
-::: finitevolx.pad_interior
+::: gridax_ops.pad_interior

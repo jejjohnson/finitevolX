@@ -31,6 +31,14 @@ PACKAGES: dict[str, tuple[str, tuple[str, ...]]] = {
         "pyproject.toml",
         ("finitevolx",),
     ),
+    "gridax-ops": (
+        "packages/gridax-ops/pyproject.toml",
+        ("packages/gridax-ops/src/gridax_ops",),
+    ),
+    "gridax": (
+        "packages/gridax/pyproject.toml",
+        ("packages/gridax/src/gridax",),
+    ),
 }
 
 #: stack libraries finitevolX may not use: import name -> distribution
@@ -54,6 +62,8 @@ FORBIDDEN: dict[str, str] = {
 #: stack libraries finitevolX may use: import name -> distribution
 ALLOWED: dict[str, str] = {
     "finitevolx": "finitevolx",
+    "gridax": "gridax",
+    "gridax_ops": "gridax-ops",
     "gaussx": "gaussx",
     "geocatalog": "geotoolz-catalog",
     "geocloud": "geotoolz-cloud",

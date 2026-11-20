@@ -11,19 +11,18 @@ import pytest
 pytest.importorskip("pipekit_jax")
 
 import equinox as eqx
-import jax
-import jax.numpy as jnp
-import numpy as np
-from pipekit_ops import Operator
-
-import finitevolx as fvx
-from finitevolx.pipekit import (
+import gridax_ops as fvx
+from gridax_ops.pipekit import (
     GridOperator,
     as_grid_spec,
     build_grid,
     over_leading,
 )
-from finitevolx.pipekit.testing import check_operator, compiled_hlo
+from gridax_ops.pipekit.testing import check_operator, compiled_hlo
+import jax
+import jax.numpy as jnp
+import numpy as np
+from pipekit_ops import Operator
 
 SPEC = (8, 6, 2.0, 1.5)
 
@@ -135,7 +134,7 @@ def test_import_finitevolx_does_not_import_pipekit():
 
 def test_missing_extra_names_it():
     res = _run(
-        "import sys; sys.modules['pipekit_jax'] = None; import finitevolx.pipekit"
+        "import sys; sys.modules['pipekit_jax'] = None; import gridax_ops.pipekit"
     )
     assert res.returncode != 0
-    assert "finitevolx[pipekit]" in res.stderr
+    assert "gridax-ops[pipekit]" in res.stderr

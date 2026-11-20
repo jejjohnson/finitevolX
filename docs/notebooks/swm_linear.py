@@ -66,7 +66,7 @@ import numpy as np
 
 jax.config.update("jax_enable_x64", True)
 
-import finitevolx as fvx
+import gridax_ops as fvx
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "swm_linear"
 IMG_DIR.mkdir(parents=True, exist_ok=True)

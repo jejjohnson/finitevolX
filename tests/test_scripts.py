@@ -4,11 +4,10 @@ import importlib.util
 from pathlib import Path
 import sys
 
+from gridax_ops import CartesianGrid2D, Difference2D, Interpolation2D
 import jax.numpy as jnp
 import numpy as np
 import pytest
-
-from finitevolx import CartesianGrid2D, Difference2D, Interpolation2D
 
 xr = pytest.importorskip("xarray")
 pytest.importorskip("zarr")

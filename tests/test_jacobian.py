@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
+from gridax_ops import arakawa_jacobian
 import jax.numpy as jnp
 import numpy as np
 import pytest
-
-from finitevolx import arakawa_jacobian
 
 # ---------------------------------------------------------------------------
 # Helper

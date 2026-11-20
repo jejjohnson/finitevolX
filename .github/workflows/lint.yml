@@ -37,4 +37,4 @@ jobs:
         run: uv run ruff format --check .
 
       - name: Run ty
-        run: uv run ty check finitevolx packages/gridax/src
+        run: uv run ty check packages/gridax-ops/src packages/gridax/src finitevolx

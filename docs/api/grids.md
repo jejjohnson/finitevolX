@@ -4,15 +4,15 @@ Arakawa C-grid spatial discretization containers for 1-D, 2-D, and 3-D domains.
 
 ## 1-D Grid
 
-::: finitevolx.ArakawaCGrid1D
+::: gridax_ops.ArakawaCGrid1D
 
 ## 2-D Grid
 
-::: finitevolx.ArakawaCGrid2D
+::: gridax_ops.ArakawaCGrid2D
 
 ## 3-D Grid
 
-::: finitevolx.ArakawaCGrid3D
+::: gridax_ops.ArakawaCGrid3D
 
 ## Spherical Grids
 
@@ -38,6 +38,6 @@ equatorial width `R * dlon`, so a genuinely narrow cell is kept. Prefer the redu
 or resolution guard. Both exclude the ghost ring, and both return 0-d
 arrays so they can be used inside `jax.jit`.
 
-::: finitevolx.SphericalGrid2D
+::: gridax_ops.SphericalGrid2D
 
-::: finitevolx.SphericalGrid3D
+::: gridax_ops.SphericalGrid3D

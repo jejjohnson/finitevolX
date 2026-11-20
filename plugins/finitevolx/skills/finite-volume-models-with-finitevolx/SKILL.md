@@ -21,7 +21,7 @@ Poisson solver or an RK loop, look it up:
    ```python
    import inspect
 
-   import finitevolx
+   import gridax_ops
 
    for name in finitevolx.__all__:
        doc = (inspect.getdoc(getattr(finitevolx, name)) or "").split("\n")[0]
@@ -96,7 +96,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-import finitevolx as fvx
+import gridax_ops as fvx
 
 jax.config.update("jax_enable_x64", True)
 

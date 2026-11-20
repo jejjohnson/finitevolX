@@ -148,7 +148,7 @@ the one whose stencil size the mask hierarchy assigns to the upwind cell:
 
 ```python
 import jax.numpy as jnp
-from finitevolx import CartesianGrid2D, Mask2D, Reconstruction2D, upwind_flux
+from gridax_ops import CartesianGrid2D, Mask2D, Reconstruction2D, upwind_flux
 
 grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
 recon = Reconstruction2D(grid=grid)
@@ -366,7 +366,7 @@ reuses it.
 ```python
 import jax.numpy as jnp
 import numpy as np
-from finitevolx import Advection2D, CartesianGrid2D, Mask2D
+from gridax_ops import Advection2D, CartesianGrid2D, Mask2D
 
 grid = CartesianGrid2D.from_interior(16, 16, 1.0, 1.0)
 wet = np.ones((grid.Ny, grid.Nx), dtype=bool)
@@ -472,7 +472,7 @@ the same axis:
 
 ```python
 import jax.numpy as jnp
-from finitevolx import (
+from gridax_ops import (
     Advection2D,
     CartesianGrid2D,
     Interpolation2D,
@@ -515,7 +515,7 @@ dhq = adv(q, U, V, method="weno5")  # -div(q U): tendency of h q
 ```python
 import jax.numpy as jnp
 import numpy as np
-from finitevolx import CartesianGrid2D, Advection2D, Mask2D
+from gridax_ops import CartesianGrid2D, Advection2D, Mask2D
 
 grid = CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 

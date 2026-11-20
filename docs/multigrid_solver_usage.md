@@ -12,7 +12,7 @@ differentiable solves.
 import jax
 import jax.numpy as jnp
 import numpy as np
-import finitevolx as fvx
+import gridax_ops as fvx
 
 jax.config.update("jax_enable_x64", True)
 
@@ -170,7 +170,7 @@ def A(x):
     """Variable-coefficient Helmholtz operator."""
     # For constant coeff, use masked_laplacian directly.
     # For variable coeff, use the multigrid's internal operator.
-    from finitevolx._src.solvers.multigrid import _apply_operator
+    from gridax_ops._src.solvers.multigrid import _apply_operator
     return _apply_operator(x, mg_solver.levels[0])
 
 # Solve with multigrid-preconditioned CG
@@ -286,7 +286,7 @@ u_batch = batch_solve(solver, rhs_batch)  # (3, Ny, Nx)
 !!! tip "Quick convergence check"
     ```python
     u = solver(rhs)
-    from finitevolx._src.solvers.multigrid import _apply_operator
+    from gridax_ops._src.solvers.multigrid import _apply_operator
     residual = jnp.linalg.norm(rhs - _apply_operator(u, solver.levels[0]))
     print(f"Residual norm: {residual:.2e}")
     ```

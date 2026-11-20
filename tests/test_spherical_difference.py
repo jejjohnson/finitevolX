@@ -4,15 +4,14 @@ from gridax import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
+from gridax_ops._src.operators.spherical_difference import (
+    SphericalDifference2D,
+    SphericalDifference3D,
+)
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-
-from finitevolx._src.operators.spherical_difference import (
-    SphericalDifference2D,
-    SphericalDifference3D,
-)
 
 R = 1.0
 NX_INT, NY_INT = 10, 8

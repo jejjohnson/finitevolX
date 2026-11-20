@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
-import numpy as np
-
-from finitevolx._src.operators.eos import (
+from gridax_ops._src.operators.eos import (
     buoyancy,
     linear_density,
     linear_density_anomaly,
@@ -14,6 +10,9 @@ from finitevolx._src.operators.eos import (
     linear_drho_dT,
     reduced_gravity,
 )
+import jax
+import jax.numpy as jnp
+import numpy as np
 
 RHO_0 = 1025.0
 ALPHA = 2e-4

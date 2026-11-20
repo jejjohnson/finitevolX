@@ -1,6 +1,6 @@
 ---
 name: add-boundary-condition
-description: Add a boundary condition to finitevolX — a per-face ghost-ring atom (like Dirichlet1D, Neumann1D, Robin1D, Slip1D, Sponge1D), a BoundaryConditionSet factory, or a functional ghost-ring filler (like wall_boundaries) — with its half-cell placement, the BoundaryCondition1D union, elliptic-solver compatibility, tests and docs. Use when asked to add, port or fix a boundary condition, ghost-cell fill, wall or open-boundary treatment in finitevolx/_src/boundary.
+description: Add a boundary condition to finitevolX — a per-face ghost-ring atom (like Dirichlet1D, Neumann1D, Robin1D, Slip1D, Sponge1D), a BoundaryConditionSet factory, or a functional ghost-ring filler (like wall_boundaries) — with its half-cell placement, the BoundaryCondition1D union, elliptic-solver compatibility, tests and docs. Use when asked to add, port or fix a boundary condition, ghost-cell fill, wall or open-boundary treatment in gridax_ops/_src/boundary.
 ---
 
 # Add a boundary condition
@@ -21,7 +21,7 @@ Search `docs/capabilities.md` (the `bc_1d`, `bc_set`, `bc_field` and
 `fix_boundary_corners`. Many "new" conditions are a `Robin1D` with
 particular coefficients, or a set of existing atoms.
 
-## 2. Write it (`finitevolx/_src/boundary/`)
+## 2. Write it (`gridax_ops/_src/boundary/`)
 
 - **An atom** goes in `bc_1d.py`: an `eqx.Module` with
   `face: Face = eqx.field(static=True)` and its parameters as fields;
@@ -57,7 +57,7 @@ particular coefficients, or a set of existing atoms.
 
 ## 3. Export and document
 
-`finitevolx/__init__.py` (import + `__all__` under `# Boundary condition
+`packages/gridax-ops/src/gridax_ops/__init__.py` (import + `__all__` under `# Boundary condition
 sets and 1D BCs` or `# Boundary helpers`), `::: finitevolx.NewBC` on
 `docs/api/boundary_conditions.md`, the formula on
 `docs/boundary_conditions.md`, `make capabilities`.

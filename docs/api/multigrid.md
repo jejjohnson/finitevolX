@@ -5,14 +5,14 @@ on masked Arakawa C-grids.
 
 ## Solver
 
-::: finitevolx.MultigridSolver
+::: gridax_ops.MultigridSolver
 
 ## Factory
 
-::: finitevolx.build_multigrid_solver
+::: gridax_ops.build_multigrid_solver
 
 ## Preconditioner
 
-::: finitevolx.make_multigrid_preconditioner
+::: gridax_ops.make_multigrid_preconditioner
 
-::: finitevolx.make_gaussx_multigrid_preconditioner
+::: gridax_ops.make_gaussx_multigrid_preconditioner

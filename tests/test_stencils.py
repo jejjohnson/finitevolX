@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
-import pytest
-
-from finitevolx._src.operators.stencils import (
+from gridax_ops._src.operators.stencils import (
     avg_x_bwd,
     avg_x_bwd_1d,
     avg_x_bwd_3d,
@@ -32,6 +28,9 @@ from finitevolx._src.operators.stencils import (
     diff_y_fwd,
     diff_y_fwd_3d,
 )
+import jax
+import jax.numpy as jnp
+import pytest
 
 # =====================================================================
 # 1-D stencils

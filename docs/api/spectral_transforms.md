@@ -5,20 +5,20 @@ JAX-compatible DCT and DST transforms (types I–IV), re-exported from
 
 ## Discrete Cosine Transform
 
-::: finitevolx.dct
+::: gridax_ops.dct
 
-::: finitevolx.dctn
+::: gridax_ops.dctn
 
-::: finitevolx.idct
+::: gridax_ops.idct
 
-::: finitevolx.idctn
+::: gridax_ops.idctn
 
 ## Discrete Sine Transform
 
-::: finitevolx.dst
+::: gridax_ops.dst
 
-::: finitevolx.dstn
+::: gridax_ops.dstn
 
-::: finitevolx.idst
+::: gridax_ops.idst
 
-::: finitevolx.idstn
+::: gridax_ops.idstn

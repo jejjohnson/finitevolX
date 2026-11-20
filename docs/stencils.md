@@ -412,7 +412,7 @@ $$
 $$
 
 ```python
-from finitevolx import diff_x_fwd, interior
+from gridax_ops import diff_x_fwd, interior
 
 # Pure index arithmetic — same for any coordinate system
 raw = diff_x_fwd(h)
@@ -427,7 +427,7 @@ result = interior(scaled, h)
 ### Example: Strain from raw stencils
 
 ```python
-from finitevolx import diff_x_fwd, diff_y_fwd, diff_x_bwd, diff_y_bwd, interior
+from gridax_ops import diff_x_fwd, diff_y_fwd, diff_x_bwd, diff_y_bwd, interior
 
 # Shear strain at X-points: dv/dx + du/dy
 shear = interior(

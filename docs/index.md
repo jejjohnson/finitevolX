@@ -43,7 +43,7 @@ uv sync --all-extras
 
 ```python
 import jax.numpy as jnp
-from finitevolx import Advection2D, CartesianGrid2D
+from gridax_ops import Advection2D, CartesianGrid2D
 
 # Create a 2D Arakawa C-grid
 grid = CartesianGrid2D.from_interior(64, 64, 1.0, 1.0)

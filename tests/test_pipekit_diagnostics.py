@@ -7,15 +7,15 @@ import pytest
 pytest.importorskip("pipekit_jax")
 
 import equinox as eqx
+import gridax_ops as fvx
+from gridax_ops import pipekit as fp
+from gridax_ops.pipekit.testing import check_operator
 import jax
 import jax.numpy as jnp
 import numpy as np
 from pipekit_jax import Rollout
 from pipekit_ops import Graph, Input
 
-import finitevolx as fvx
-from finitevolx import pipekit as fp
-from finitevolx.pipekit.testing import check_operator
 from tests.fixtures.inputs import make_grid_2d
 
 GRID = make_grid_2d()

@@ -1,10 +1,9 @@
-"""Tests for flux limiter functions in finitevolx._src.advection.limiters."""
+"""Tests for flux limiter functions in gridax_ops._src.advection.limiters."""
 
+from gridax_ops._src.advection.limiters import mc, minmod, superbee, van_leer
 import jax.numpy as jnp
 import numpy as np
 import pytest
-
-from finitevolx._src.advection.limiters import mc, minmod, superbee, van_leer
 
 
 class TestMinmod:
@@ -112,7 +111,7 @@ class TestLimitersPublicAPI:
     """Verify the limiters are exported from the top-level package."""
 
     def test_import_from_package(self):
-        from finitevolx import (
+        from gridax_ops import (
             mc as _mc,
             minmod as _minmod,
             superbee as _superbee,

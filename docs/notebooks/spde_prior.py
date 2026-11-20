@@ -61,7 +61,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-import finitevolx as fvx
+import gridax_ops as fvx
 
 jax.config.update("jax_enable_x64", True)
 

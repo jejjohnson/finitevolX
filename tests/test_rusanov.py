@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+from gridax_ops import rusanov_flux
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-
-from finitevolx import rusanov_flux
 
 
 class TestRusanovFlux:

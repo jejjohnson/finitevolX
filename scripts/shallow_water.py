@@ -44,11 +44,7 @@ import jax.numpy as jnp
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import numpy as np
-import xarray as xr
-
-from finitevolx import (
+from gridax_ops import (
     Advection2D,
     CartesianGrid2D,
     Difference2D,
@@ -57,6 +53,9 @@ from finitevolx import (
     heun_step,
     pad_interior,
 )
+import matplotlib.pyplot as plt
+import numpy as np
+import xarray as xr
 
 jax.config.update("jax_enable_x64", True)
 

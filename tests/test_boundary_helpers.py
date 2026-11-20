@@ -10,12 +10,7 @@ Covers:
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx import (
+from gridax_ops import (
     fix_boundary_corners,
     free_slip_boundaries,
     no_flux_boundaries,
@@ -24,6 +19,10 @@ from finitevolx import (
     zero_boundaries,
     zero_gradient_boundaries,
 )
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 # ---------------------------------------------------------------------------
 # Helpers

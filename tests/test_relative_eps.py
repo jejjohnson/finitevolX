@@ -11,13 +11,12 @@ tiny downwind slope, and ``van_leer(inf)``.
 
 from __future__ import annotations
 
+import gridax_ops as fvx
+from gridax_ops._src.advection import limiters, reconstruction, weno
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-
-import finitevolx as fvx
-from finitevolx._src.advection import limiters, reconstruction, weno
 
 N = 8  # interior cells
 WENO = ("weno3", "weno5", "wenoz5", "weno7", "weno9")

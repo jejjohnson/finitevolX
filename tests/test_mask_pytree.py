@@ -13,12 +13,7 @@ import dataclasses
 from pathlib import Path
 
 import equinox as eqx
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx import (
+from gridax_ops import (
     Advection1D,
     Advection2D,
     Advection3D,
@@ -28,6 +23,11 @@ from finitevolx import (
     Mask1D,
     Mask2D,
 )
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
+
 from tests.fixtures import inputs
 
 ROOT = Path(__file__).resolve().parents[1]

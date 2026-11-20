@@ -51,7 +51,7 @@ The generic time steppers live in [integrix](https://github.com/jejjohnson/integ
 
 ## Semi-Lagrangian (Pure Functional)
 
-::: finitevolx.semi_lagrangian_step
+::: gridax_ops.semi_lagrangian_step
 
 ## Diffrax Solvers
 
@@ -115,20 +115,20 @@ The generic time steppers live in [integrix](https://github.com/jejjohnson/integ
 
 ## Semi-Lagrangian Solver
 
-::: finitevolx.SemiLagrangianSolver
+::: gridax_ops.SemiLagrangianSolver
 
-::: finitevolx.SemiLagrangianTerm
+::: gridax_ops.SemiLagrangianTerm
 
 ## Deprecated Adapters
 
 The objects behind `finitevolx.AB2Solver`, `finitevolx.LeapfrogRAFSolver` and `finitevolx.SplitExplicitRKSolver` for one release.
 
-::: finitevolx._src.timestepping._deprecated.AB2Solver
+::: gridax_ops._src.timestepping._deprecated.AB2Solver
 
-::: finitevolx._src.timestepping._deprecated.LeapfrogRAFSolver
+::: gridax_ops._src.timestepping._deprecated.LeapfrogRAFSolver
 
-::: finitevolx._src.timestepping._deprecated.SplitExplicitRKSolver
+::: gridax_ops._src.timestepping._deprecated.SplitExplicitRKSolver
 
 ## Convenience Wrapper
 
-::: finitevolx.solve_ocean_pde
+::: gridax_ops.solve_ocean_pde

@@ -1,4 +1,5 @@
 {
   ".": "0.1.0",
-  "packages/gridax": "0.0.0"
+  "packages/gridax": "0.0.0",
+  "packages/gridax-ops": "0.1.0"
 }
