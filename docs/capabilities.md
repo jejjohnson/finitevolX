@@ -340,7 +340,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `masked_std` | function | Standard deviation over ``axis``, excluding dry cells, floored at ``eps``. |
 | `spherical_area_mean` | function | Spherical area-weighted mean. |
 | `spherical_area_sum` | function | Spherical area-weighted sum. |
-| `spherical_area_weights` | function | T-cell areas on a spherical grid. |
+| `spherical_area_weights` | function | T-cell areas on a spherical grid, exact for a lat-lon cell. |
 | `spherical_volume_mean` | function | Spherical volume-weighted mean. |
 | `spherical_volume_sum` | function | Spherical volume-weighted sum. |
 | `spherical_volume_weights` | function | T-cell volumes on a spherical 3-D grid. |

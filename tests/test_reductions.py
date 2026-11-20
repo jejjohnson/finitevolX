@@ -57,8 +57,37 @@ class TestWeights:
             R=R,
         )
         w = area_weights(grid)
-        expected = grid.R**2 * grid.dlon * grid.dlat * grid.cos_lat_T
-        np.testing.assert_allclose(w, expected, rtol=1e-12)
+        # exact cell area R² dlon (sin lat_N - sin lat_S) = 2 R² dlon sin(dlat/2) cos(lat_T)
+        expected = 2.0 * grid.R**2 * grid.dlon * np.sin(grid.dlat / 2) * grid.cos_lat_T
+        np.testing.assert_allclose(w[1:-1], expected[1:-1], rtol=1e-12)
+        # dlat = 20° puts the ghost rows' centres on the poles: zero weight
+        np.testing.assert_array_equal(np.asarray(w)[[0, -1]], 0.0)
+
+    @pytest.mark.parametrize("ny", [6, 24, 45])
+    def test_spherical_area_sums_to_the_sphere(self, ny):
+        """#322: the interior weights of a whole-sphere grid sum to 4πR² exactly."""
+        grid = SphericalGrid2D.from_interior(
+            nx_interior=2 * ny,
+            ny_interior=ny,
+            lon_range=(0.0, 360.0),
+            lat_range=(-90.0, 90.0),
+            R=R,
+        )
+        total = float(np.sum(np.asarray(area_weights(grid))[1:-1, 1:-1]))
+        np.testing.assert_allclose(total, 4.0 * np.pi * R**2, rtol=1e-12)
+
+    def test_spherical_area_weights_are_never_negative(self):
+        """Ghost rows past a pole get zero weight, in float32 and float64."""
+        grid = SphericalGrid2D.from_interior(
+            nx_interior=8,
+            ny_interior=6,
+            lon_range=(0.0, 360.0),
+            lat_range=(-90.0, 90.0),
+            R=R,
+        )
+        w = np.asarray(area_weights(grid))
+        assert (w >= 0.0).all()
+        assert (w[0] == 0.0).all() and (w[-1] == 0.0).all()
 
     def test_volume_weights_cartesian(self):
         grid = CartesianGrid3D.from_interior(

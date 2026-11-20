@@ -17,7 +17,7 @@ import pytest
 
 @pytest.fixture
 def grid2d():
-    """Unit-radius grid, symmetric about the equator with an equator row."""
+    """Unit-radius grid, symmetric about the equator (rows mirror in pairs)."""
     return SphericalGrid2D.from_interior(
         nx_interior=10,
         ny_interior=8,
@@ -97,13 +97,14 @@ class TestCellWidths2D:
         """Where cos(lat) == 1 the true width collapses to the uniform ``dx``."""
         grid = SphericalGrid2D.from_interior(
             nx_interior=8,
-            ny_interior=4,
+            ny_interior=5,
             lon_range=(0.0, 80.0),
             lat_range=(-20.0, 20.0),
             R=R_EARTH,
         )
         lat = np.asarray(grid.lat_T)
-        # The equator is a grid row for a symmetric range with even ny.
+        # Rows are cell centres: the equator is a row for a symmetric range
+        # with an odd number of interior rows.
         j_eq = int(np.argmin(np.abs(lat[:, 0])))
         assert np.isclose(lat[j_eq, 0], 0.0, atol=1e-6)
         np.testing.assert_allclose(np.asarray(grid.dx_T)[j_eq, :], grid.dx, rtol=1e-6)

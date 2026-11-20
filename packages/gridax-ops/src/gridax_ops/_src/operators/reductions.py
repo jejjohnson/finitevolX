@@ -65,13 +65,20 @@ def cartesian_area_weights(grid: CartesianGrid2D) -> Float[Array, "Ny Nx"]:
 
 
 def spherical_area_weights(grid: SphericalGrid2D) -> Float[Array, "Ny Nx"]:
-    """T-cell areas on a spherical grid.
+    """T-cell areas on a spherical grid, exact for a lat-lon cell.
 
-    ``A[j, i] = R² · cos(lat_T[j, i]) · dlon · dlat``.
+    ``A[j, i] = R² · dlon · (sin lat_{j+1/2} − sin lat_{j−1/2})
+    = 2 R² · dlon · sin(dlat / 2) · cos(lat_T[j, i])``.
 
-    Near the poles (``|cos(lat_T)| < 1e-12``) the weight is taken as
-    zero rather than a tiny positive number to avoid near-singular
-    denominators in ``*_mean``.
+    The two forms are the same identity; the second needs only
+    ``cos_lat_T``. Summed over the interior of a grid that spans
+    ``[lat_min, lat_max]`` it gives ``R² · Lλ · (sin lat_max − sin lat_min)``
+    exactly (``4πR²`` for the whole sphere), where the midpoint rule
+    ``R² cos(lat_T) dlon dlat`` overestimates by ``dlat / (2 sin(dlat/2))``.
+
+    A cell whose ``cos(lat_T)`` is negative (a ghost row past a pole) or
+    indistinguishable from zero (within ``8 eps`` of the dtype) gets weight
+    zero, so the weights are never negative in float32 or float64.
 
     Parameters
     ----------
@@ -82,10 +89,10 @@ def spherical_area_weights(grid: SphericalGrid2D) -> Float[Array, "Ny Nx"]:
     Float[Array, "Ny Nx"]
         Per-T-cell area.
     """
-    cos_T = grid.cos_lat_T
-    base = grid.R**2 * grid.dlon * grid.dlat
-    weights = base * cos_T
-    return jnp.where(jnp.abs(cos_T) < 1e-12, 0.0, weights)
+    cos_T = jnp.asarray(grid.cos_lat_T)
+    base = 2.0 * grid.R**2 * grid.dlon * jnp.sin(0.5 * grid.dlat)
+    degenerate = cos_T <= 8.0 * jnp.finfo(cos_T.dtype).eps
+    return jnp.where(degenerate, 0.0, base * cos_T)
 
 
 def area_weights(grid: ArakawaCGrid2D) -> Float[Array, "Ny Nx"]:
