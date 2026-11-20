@@ -6,8 +6,7 @@
 ### ⚠ BREAKING CHANGES
 
 * the package is gridax-jax and the import gridax_jax.
-* the package is gridax-jax and the import gridax_jax.
-* the package is gridax_ops; import finitevolx warns and will be removed after one 0.X release.
+* finitevolx is renamed gridax-jax (import gridax_jax), and its array-API code (grids, masks, stencils, the C-grid operators, advection, diffusion, boundary conditions, reductions) moves to gridax (#435); import finitevolx warns and will be removed after one 0.X release.
 * **mask:** Mask*.sponge, the sponge_width argument and the xy_corner_strict_irrbound_* fields are removed.
 
 ### Features
@@ -25,7 +24,6 @@
 
 * **mask:** Mask1D/2D/3D as frozen dataclasses on NumPy, without sponge and the irregular-boundary index fields ([#428](https://github.com/jejjohnson/finitevolX/issues/428)) ([44d80f4](https://github.com/jejjohnson/finitevolX/commit/44d80f404beaf28de755c197820d22835c3c5929)), closes [#419](https://github.com/jejjohnson/finitevolX/issues/419)
 * rename finitevolX to gridax-ops (import gridax_ops), with a finitevolx shim for one release ([#430](https://github.com/jejjohnson/finitevolX/issues/430)) ([dfb9b58](https://github.com/jejjohnson/finitevolX/commit/dfb9b58385d450dbbc19e03d1f28813ff4eb2715)), closes [#420](https://github.com/jejjohnson/finitevolX/issues/420)
-* rename gridax-ops to gridax-jax (import gridax_jax) ([10d71bd](https://github.com/jejjohnson/finitevolX/commit/10d71bd888517576e681fcd085ba8f4339565dd9)), closes [#435](https://github.com/jejjohnson/finitevolX/issues/435)
 * rename gridax-ops to gridax-jax (import gridax_jax) ([#437](https://github.com/jejjohnson/finitevolX/issues/437)) ([aff7146](https://github.com/jejjohnson/finitevolX/commit/aff714687ebebc14fd1ad06a8d11f520124a6146)), closes [#435](https://github.com/jejjohnson/finitevolX/issues/435)
 
 ## [0.1.0](https://github.com/jejjohnson/finitevolX/compare/v0.0.48...v0.1.0) (2026-10-17)

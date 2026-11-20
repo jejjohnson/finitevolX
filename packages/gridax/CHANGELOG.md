@@ -3,13 +3,9 @@
 ## 0.1.0 (2026-11-20)
 
 
-### ⚠ BREAKING CHANGES
-
-* the package is gridax-jax and the import gridax_jax.
-* the package is gridax-jax and the import gridax_jax.
-
 ### Features
 
+* first release: grids, masks, the raw stencils, the C-grid operators, advection, diffusion, boundary conditions, reductions and gridax.analysis, on NumPy, JAX or any array-API backend ([#435](https://github.com/jejjohnson/finitevolX/issues/435))
 * **gridax:** analysis kernels on collocated grids — finite differences and axis remapping on any array backend ([#434](https://github.com/jejjohnson/finitevolX/issues/434)) ([95798a1](https://github.com/jejjohnson/finitevolX/commit/95798a1a7d7d4052bd4d6bea634f1e0322f39f64))
 
 
@@ -20,5 +16,4 @@
 
 ### Code Refactoring
 
-* rename gridax-ops to gridax-jax (import gridax_jax) ([10d71bd](https://github.com/jejjohnson/finitevolX/commit/10d71bd888517576e681fcd085ba8f4339565dd9)), closes [#435](https://github.com/jejjohnson/finitevolX/issues/435)
 * rename gridax-ops to gridax-jax (import gridax_jax) ([#437](https://github.com/jejjohnson/finitevolX/issues/437)) ([aff7146](https://github.com/jejjohnson/finitevolX/commit/aff714687ebebc14fd1ad06a8d11f520124a6146)), closes [#435](https://github.com/jejjohnson/finitevolX/issues/435)
