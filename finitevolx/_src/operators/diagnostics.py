@@ -10,13 +10,13 @@ from __future__ import annotations
 import warnings
 
 import equinox as eqx
+from gridax import Mask3D
 import jax.numpy as jnp
 from jaxtyping import (
     Array,
     Float,
 )
 
-from finitevolx._src.mask import Mask3D
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.difference import _curl_2d
 from finitevolx._src.operators.stencils import (

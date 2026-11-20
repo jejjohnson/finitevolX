@@ -12,6 +12,7 @@ PYTHON = python
 ROOT = ./
 SHELL = bash
 PKGROOT = finitevolx
+TYROOTS = finitevolx packages/gridax/src
 
 help:## Display this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -38,7 +39,7 @@ uv-lint: ## Run ruff check, format check, and ty (mirrors CI)
 	@printf "$(YELLOW)>>> Executing static analysis and type checking...$(RESET)\n"
 	@uv run ruff check .
 	@uv run ruff format --check .
-	@uv run ty check $(PKGROOT)
+	@uv run ty check $(TYROOTS)
 	@printf "$(GREEN)>>> Linting checks passed.$(RESET)\n"
 
 ##@ Pre-commit
@@ -79,7 +80,7 @@ test-cov: ## Run tests with coverage
 .PHONY: typecheck
 typecheck: ## Type check code with ty
 	@printf "$(YELLOW)>>> Type checking code...$(RESET)\n"
-	@uv run ty check $(PKGROOT)
+	@uv run ty check $(TYROOTS)
 	@printf "$(GREEN)>>> Type checks passed.$(RESET)\n"
 
 ##@ CI
@@ -91,7 +92,7 @@ ci: ## Run all CI checks locally (lint + format + typecheck + tests)
 	@printf "$(BLUE)>>> [2/4] Ruff format check...$(RESET)\n"
 	@uv run ruff format --check .
 	@printf "$(BLUE)>>> [3/4] Type check...$(RESET)\n"
-	@uv run ty check $(PKGROOT)
+	@uv run ty check $(TYROOTS)
 	@printf "$(BLUE)>>> [4/4] Tests...$(RESET)\n"
 	@uv run pytest tests -n 2
 	@printf "$(GREEN)>>> All CI checks passed.$(RESET)\n"

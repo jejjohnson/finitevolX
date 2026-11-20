@@ -5,12 +5,12 @@ Covers: coriolis_param, beta_param, coriolis_fn,
         potential_vorticity_multilayer.
 """
 
+from gridax import CartesianGrid2D
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.grid.cartesian import CartesianGrid2D
 from finitevolx._src.operators.diagnostics import (
     beta_param,
     coriolis_fn,

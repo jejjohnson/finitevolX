@@ -20,14 +20,15 @@ Operators that divide by ``cos(lat)`` return NaN where
 from __future__ import annotations
 
 import equinox as eqx
-import jax.numpy as jnp
-from jaxtyping import Array, Float
-
-from finitevolx._src.grid.spherical import (
+from gridax import (
+    Mask2D,
+    Mask3D,
     SphericalGrid2D,
     SphericalGrid3D,
 )
-from finitevolx._src.mask import Mask2D, Mask3D
+import jax.numpy as jnp
+from jaxtyping import Array, Float
+
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators._utils import _metric_like, _safe_div_cos
 from finitevolx._src.operators.spherical_compound import _geostrophic_velocity_sphere

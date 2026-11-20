@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
+from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
 from finitevolx import BoundaryConditionSet, Interpolation2D, enforce_periodic
-from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
-from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.coriolis import Coriolis2D, Coriolis3D
 from finitevolx._src.operators.stencils import diff_x_bwd, diff_y_bwd

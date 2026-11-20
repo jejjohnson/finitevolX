@@ -36,12 +36,12 @@ from __future__ import annotations
 import numbers
 
 import gaussx
+from gridax import Mask2D
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 import lineax as lx
 import numpy as np
 
-from finitevolx._src.mask import Mask2D
 from finitevolx._src.solvers.spectral import (
     dct2_eigenvalues,
     dst1_eigenvalues,

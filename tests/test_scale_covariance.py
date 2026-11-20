@@ -26,6 +26,16 @@ gradient or flux divergence, 2 for a Laplacian, 4 for a biharmonic, and
 import ast
 import pathlib
 
+from gridax import (
+    CartesianGrid1D,
+    CartesianGrid2D,
+    CartesianGrid3D,
+    Mask1D,
+    Mask2D,
+    Mask3D,
+    SphericalGrid2D,
+    SphericalGrid3D,
+)
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -51,13 +61,6 @@ from finitevolx._src.diffusion.spherical_diffusion import (
     SphericalDiffusion2D,
     SphericalDiffusion3D,
 )
-from finitevolx._src.grid.cartesian import (
-    CartesianGrid1D,
-    CartesianGrid2D,
-    CartesianGrid3D,
-)
-from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
-from finitevolx._src.mask.cartesian import Mask1D, Mask2D, Mask3D
 from finitevolx._src.operators.diagnostic_operators import QGPotentialVorticity2D
 from finitevolx._src.operators.diagnostics import (
     potential_vorticity_multilayer,

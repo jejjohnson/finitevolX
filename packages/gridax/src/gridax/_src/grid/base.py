@@ -1,4 +1,4 @@
-"""Abstract base classes for finitevolX grid containers.
+"""Abstract base classes for gridax grid containers.
 
 This module defines the layered abstraction shared by every concrete
 grid type (Cartesian, spherical):
@@ -29,7 +29,7 @@ field is a leaf.
 
 from __future__ import annotations
 
-from finitevolx._src.utils.pytree import pytree_dataclass, static_field
+from gridax._src.pytree import pytree_dataclass, static_field
 
 # ----------------------------------------------------------------------
 # Layer 1 — pure C-grid topology (no metric)

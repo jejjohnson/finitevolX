@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import equinox as eqx
+from gridax import Mask2D
 from jaxtyping import Array, Float
 
 from finitevolx._src.boundary.bc_1d import (
@@ -12,7 +13,6 @@ from finitevolx._src.boundary.bc_1d import (
     Periodic1D,
     Point,
 )
-from finitevolx._src.mask import Mask2D
 
 
 class BoundaryConditionSet(eqx.Module):

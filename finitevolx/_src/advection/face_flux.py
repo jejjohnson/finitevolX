@@ -20,6 +20,7 @@ See Also
 
 from __future__ import annotations
 
+from gridax import CartesianGrid2D, Mask2D
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
@@ -30,8 +31,6 @@ from finitevolx._src.advection.advection import (
 )
 from finitevolx._src.advection.flux import upwind_flux
 from finitevolx._src.advection.reconstruction import Reconstruction2D
-from finitevolx._src.grid.cartesian import CartesianGrid2D
-from finitevolx._src.mask import Mask2D
 from finitevolx._src.operators.differentiable import smooth_abs
 
 

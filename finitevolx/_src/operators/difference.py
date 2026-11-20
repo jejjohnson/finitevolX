@@ -16,15 +16,17 @@ Storage index [j, i] encodes:
 """
 
 import equinox as eqx
-import jax.numpy as jnp
-from jaxtyping import Array, Float
-
-from finitevolx._src.grid.cartesian import (
+from gridax import (
     CartesianGrid1D,
     CartesianGrid2D,
     CartesianGrid3D,
+    Mask1D,
+    Mask2D,
+    Mask3D,
 )
-from finitevolx._src.mask import Mask1D, Mask2D, Mask3D
+import jax.numpy as jnp
+from jaxtyping import Array, Float
+
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.stencils import (
     _neighbours,

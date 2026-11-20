@@ -4,9 +4,10 @@
 
 Every public name in finitevolX (346 of them), each listed once,
 grouped by the module that defines it (names re-exported from
-spectraldiffx, gaussx and integrix are grouped by library), with the
-first sentence of its docstring; then the public API of spectraldiffx,
-gaussx and integrix.march, which finitevolX builds on. Search this
+gridax, spectraldiffx, gaussx and integrix are grouped by library),
+with the first sentence of its docstring; then the public API of
+gridax, spectraldiffx, gaussx and integrix.march, which finitevolX
+builds on. Search this
 page before writing a helper: if what you need is here, compose it;
 if it is almost here, extend it where it lives. Regenerate with
 `make capabilities` after changing a public API
@@ -215,48 +216,6 @@ if it is almost here, extend it where it lives. Regenerate with
 | `WindCurl2D` | class | Wind-stress curl forcing of the vorticity / QG potential vorticity. |
 | `WindStress2D` | class | Surface wind-stress forcing on a 2-D Arakawa C-grid. |
 | `WindStress3D` | class | Surface wind-stress forcing on a 3-D Arakawa C-grid. |
-
-#### Abstract base classes for finitevolX grid containers (`finitevolx._src.grid.base`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `ArakawaCGrid1D` | class | 1-D Arakawa C-grid topology (no metric). |
-| `ArakawaCGrid2D` | class | 2-D Arakawa C-grid topology (no metric). |
-| `ArakawaCGrid3D` | class | 3-D Arakawa C-grid topology (no metric). |
-| `CurvilinearGrid1D` | class | 1-D curvilinear C-grid with a uniform metric. |
-| `CurvilinearGrid2D` | class | 2-D curvilinear C-grid with a uniform metric. |
-| `CurvilinearGrid3D` | class | 3-D curvilinear C-grid with a uniform metric. |
-
-#### Cartesian Arakawa C-grid containers (1-D, 2-D, 3-D) (`finitevolx._src.grid.cartesian`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `CartesianGrid1D` | class | 1-D Cartesian Arakawa C-grid (uniform spacing). |
-| `CartesianGrid2D` | class | 2-D Cartesian Arakawa C-grid (uniform spacing). |
-| `CartesianGrid3D` | class | 3-D Cartesian Arakawa C-grid (uniform spacing). |
-
-#### Spherical Arakawa C-grid containers (2-D, 3-D) (`finitevolx._src.grid.spherical`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `SphericalGrid2D` | class | 2-D Arakawa C-grid on a sphere. |
-| `SphericalGrid3D` | class | 3-D Arakawa C-grid on a sphere. |
-
-#### Shared mask infrastructure: StencilCapability1D / 2D / 3D classes (`finitevolx._src.mask.base`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `StencilCapability1D` | class | Directional count of contiguous wet neighbours for each 1-D grid cell. |
-| `StencilCapability2D` | class | Directional count of contiguous wet neighbours for each 2-D grid cell. |
-| `StencilCapability3D` | class | Directional count of contiguous wet neighbours for each 3-D grid cell. |
-
-#### Cartesian Arakawa C-grid masks (1-D / 2-D / 3-D) (`finitevolx._src.mask.cartesian`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `Mask1D` | class | Unified Arakawa C-grid mask for a 1-D Cartesian domain. |
-| `Mask2D` | class | Unified Arakawa C-grid mask for a 2-D Cartesian domain. |
-| `Mask3D` | class | Unified Arakawa C-grid mask for a 3-D Cartesian domain. |
 
 #### Ghost-ring zeroing utilities for Arakawa C-grid operators (`finitevolx._src.operators._ghost`)
 
@@ -540,6 +499,28 @@ if it is almost here, extend it where it lives. Regenerate with
 | `layer_to_mode` | function | Transform a field from layer space to mode space. |
 | `mode_to_layer` | function | Transform a field from mode space to layer space. |
 
+#### Re-exported from `gridax`
+
+| Name | Kind | What it does |
+|---|---|---|
+| `ArakawaCGrid1D` | class | 1-D Arakawa C-grid topology (no metric). |
+| `ArakawaCGrid2D` | class | 2-D Arakawa C-grid topology (no metric). |
+| `ArakawaCGrid3D` | class | 3-D Arakawa C-grid topology (no metric). |
+| `CartesianGrid1D` | class | 1-D Cartesian Arakawa C-grid (uniform spacing). |
+| `CartesianGrid2D` | class | 2-D Cartesian Arakawa C-grid (uniform spacing). |
+| `CartesianGrid3D` | class | 3-D Cartesian Arakawa C-grid (uniform spacing). |
+| `CurvilinearGrid1D` | class | 1-D curvilinear C-grid with a uniform metric. |
+| `CurvilinearGrid2D` | class | 2-D curvilinear C-grid with a uniform metric. |
+| `CurvilinearGrid3D` | class | 3-D curvilinear C-grid with a uniform metric. |
+| `Mask1D` | class | Unified Arakawa C-grid mask for a 1-D Cartesian domain. |
+| `Mask2D` | class | Unified Arakawa C-grid mask for a 2-D Cartesian domain. |
+| `Mask3D` | class | Unified Arakawa C-grid mask for a 3-D Cartesian domain. |
+| `SphericalGrid2D` | class | 2-D Arakawa C-grid on a sphere. |
+| `SphericalGrid3D` | class | 3-D Arakawa C-grid on a sphere. |
+| `StencilCapability1D` | class | Directional count of contiguous wet neighbours for each 1-D grid cell. |
+| `StencilCapability2D` | class | Directional count of contiguous wet neighbours for each 2-D grid cell. |
+| `StencilCapability3D` | class | Directional count of contiguous wet neighbours for each 3-D grid cell. |
+
 #### Re-exported from `spectraldiffx`
 
 | Name | Kind | What it does |
@@ -654,7 +635,39 @@ if it is almost here, extend it where it lives. Regenerate with
 
 <!-- upstream -->
 
-Listed at spectraldiffx 0.1.1, gaussx 0.6.5, integrix 0.0.3.
+Listed at gridax 0.0.0, spectraldiffx 0.1.1, gaussx 0.6.5, integrix 0.0.3.
+
+## Upstream: `gridax`
+
+Grids and land / ocean masks as NumPy data (packages/gridax in this repository): the Arakawa C-grid containers, the staggered masks, the stencil capability and the mask construction helpers. finitevolX re-exports all of them (listed above); build a grid or a mask here, not by hand.
+
+### `gridax`
+
+| Name | Kind | What it does |
+|---|---|---|
+| `ArakawaCGrid1D` | class | 1-D Arakawa C-grid topology (no metric). |
+| `ArakawaCGrid2D` | class | 2-D Arakawa C-grid topology (no metric). |
+| `ArakawaCGrid3D` | class | 3-D Arakawa C-grid topology (no metric). |
+| `CartesianGrid1D` | class | 1-D Cartesian Arakawa C-grid (uniform spacing). |
+| `CartesianGrid2D` | class | 2-D Cartesian Arakawa C-grid (uniform spacing). |
+| `CartesianGrid3D` | class | 3-D Cartesian Arakawa C-grid (uniform spacing). |
+| `CurvilinearGrid1D` | class | 1-D curvilinear C-grid with a uniform metric. |
+| `CurvilinearGrid2D` | class | 2-D curvilinear C-grid with a uniform metric. |
+| `CurvilinearGrid3D` | class | 3-D curvilinear C-grid with a uniform metric. |
+| `Mask1D` | class | Unified Arakawa C-grid mask for a 1-D Cartesian domain. |
+| `Mask2D` | class | Unified Arakawa C-grid mask for a 2-D Cartesian domain. |
+| `Mask3D` | class | Unified Arakawa C-grid mask for a 3-D Cartesian domain. |
+| `R_EARTH` | constant | `6371200.0` |
+| `SphericalGrid2D` | class | 2-D Arakawa C-grid on a sphere. |
+| `SphericalGrid3D` | class | 3-D Arakawa C-grid on a sphere. |
+| `StencilCapability1D` | class | Directional count of contiguous wet neighbours for each 1-D grid cell. |
+| `StencilCapability2D` | class | Directional count of contiguous wet neighbours for each 2-D grid cell. |
+| `StencilCapability3D` | class | Directional count of contiguous wet neighbours for each 3-D grid cell. |
+| `count_contiguous` | function | Count contiguous wet cells from each point along one axis (n-D). |
+| `dilate_mask` | function | Binary dilation by 1 cell with an n-D *cross* structuring element. |
+| `h_from_pooled` | function | Inverse of `pool_bool` for binary inputs. |
+| `make_sponge` | function | n-D linear sponge ramp: 0 at every wall, 1 in the interior. |
+| `pool_bool` | function | n-D average-pool of a binary mask with one-sided zero padding. |
 
 ## Upstream: `spectraldiffx`
 

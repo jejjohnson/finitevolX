@@ -14,14 +14,16 @@ Half-index notation
 """
 
 import equinox as eqx
-from jaxtyping import Array, Float
-
-from finitevolx._src.grid.base import (
+from gridax import (
     CurvilinearGrid1D,
     CurvilinearGrid2D,
     CurvilinearGrid3D,
+    Mask1D,
+    Mask2D,
+    Mask3D,
 )
-from finitevolx._src.mask import Mask1D, Mask2D, Mask3D
+from jaxtyping import Array, Float
+
 from finitevolx._src.operators._ghost import interior
 from finitevolx._src.operators.stencils import (
     avg_x_bwd,

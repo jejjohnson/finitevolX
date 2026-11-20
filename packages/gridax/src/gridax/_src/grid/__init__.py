@@ -1,6 +1,6 @@
-"""finitevolX grid containers — abstract base, Cartesian, spherical."""
+"""gridax grid containers — abstract base, Cartesian, spherical."""
 
-from finitevolx._src.grid.base import (
+from gridax._src.grid.base import (
     ArakawaCGrid1D,
     ArakawaCGrid2D,
     ArakawaCGrid3D,
@@ -8,12 +8,12 @@ from finitevolx._src.grid.base import (
     CurvilinearGrid2D,
     CurvilinearGrid3D,
 )
-from finitevolx._src.grid.cartesian import (
+from gridax._src.grid.cartesian import (
     CartesianGrid1D,
     CartesianGrid2D,
     CartesianGrid3D,
 )
-from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
+from gridax._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
 
 __all__ = [
     # Abstract topology

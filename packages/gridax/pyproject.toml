@@ -1,0 +1,41 @@
+[project]
+name = "gridax"
+version = "0.0.0"
+description = "Structured grids and land / ocean masks as data, on NumPy (JAX pytrees when JAX is installed)."
+authors = [
+    { name = "Juan Emmanuel Johnson", email = "jemanjohnson34@gmail.com" },
+]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+keywords = ["arakawa", "c-grid", "staggered-grid", "numpy", "jax"]
+classifiers = [
+    "Topic :: Scientific/Engineering",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Science/Research",
+    "Development Status :: 2 - Pre-Alpha",
+]
+# No jax and no equinox: the classes register as JAX pytrees only when JAX is
+# importable. jaxtyping is pure Python and imports JAX lazily.
+dependencies = [
+    "numpy>=2.0.0",
+    "scipy>=1.14.0",
+    "jaxtyping>=0.3.0",
+]
+
+[project.urls]
+Repository = "https://github.com/jejjohnson/finitevolX"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gridax"]
+
+[tool.pytest.ini_options]
+filterwarnings = ["error"]
+testpaths = ["tests"]
+addopts = "--strict-markers"

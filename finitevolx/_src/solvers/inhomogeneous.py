@@ -31,10 +31,10 @@ trick.  Sandwiches any solver with RHS correction and reconstruction.
 from __future__ import annotations
 
 import equinox as eqx
+from gridax import Mask2D
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 
-from finitevolx._src.mask import Mask2D
 from finitevolx._src.solvers.iterative import masked_laplacian
 
 # ---------------------------------------------------------------------------

@@ -1,15 +1,15 @@
 """Tests for spherical compound operators."""
 
+from gridax import (
+    Mask2D,
+    SphericalGrid2D,
+    SphericalGrid3D,
+)
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.grid.spherical import (
-    SphericalGrid2D,
-    SphericalGrid3D,
-)
-from finitevolx._src.mask.cartesian import Mask2D
 from finitevolx._src.operators.reductions import spherical_area_weights
 from finitevolx._src.operators.spherical_compound import (
     SphericalDivergence2D,

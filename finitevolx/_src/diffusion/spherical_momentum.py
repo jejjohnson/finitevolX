@@ -30,11 +30,10 @@ the Cartesian :class:`~finitevolx.MomentumAdvection2D` with
 from __future__ import annotations
 
 import equinox as eqx
+from gridax import Mask2D, Mask3D, SphericalGrid2D, SphericalGrid3D
 from jaxtyping import Array, Float
 
 from finitevolx._src.diffusion.momentum import _resolve_scheme
-from finitevolx._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
-from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators.interpolation import Interpolation2D
 from finitevolx._src.operators.spherical_compound import SphericalVorticity2D

@@ -1,12 +1,12 @@
-"""finitevolX masks — base and Cartesian (used by spherical operators too)."""
+"""gridax masks — base and Cartesian (used by spherical operators too)."""
 
-from finitevolx._src.mask.base import (
+from gridax._src.mask.base import (
     StencilCapability1D,
     StencilCapability2D,
     StencilCapability3D,
 )
-from finitevolx._src.mask.cartesian import Mask1D, Mask2D, Mask3D
-from finitevolx._src.mask.utils import (
+from gridax._src.mask.cartesian import Mask1D, Mask2D, Mask3D
+from gridax._src.mask.utils import (
     count_contiguous,
     dilate_mask,
     h_from_pooled,

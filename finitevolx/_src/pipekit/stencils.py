@@ -23,6 +23,7 @@ import re
 from typing import Any, ClassVar
 
 import equinox as eqx
+from gridax import Mask2D
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
@@ -36,7 +37,6 @@ from finitevolx._src.boundary.boundary import (
     zero_boundaries,
     zero_gradient_boundaries,
 )
-from finitevolx._src.mask.cartesian import Mask2D
 from finitevolx._src.operators.coriolis import Coriolis2D
 from finitevolx._src.operators.diagnostics import coriolis_fn
 from finitevolx._src.operators.difference import Difference2D

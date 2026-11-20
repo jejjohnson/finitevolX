@@ -1,14 +1,14 @@
 """Tests for SphericalDifference2D and SphericalDifference3D."""
 
+from gridax import (
+    SphericalGrid2D,
+    SphericalGrid3D,
+)
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.grid.spherical import (
-    SphericalGrid2D,
-    SphericalGrid3D,
-)
 from finitevolx._src.operators.spherical_difference import (
     SphericalDifference2D,
     SphericalDifference3D,

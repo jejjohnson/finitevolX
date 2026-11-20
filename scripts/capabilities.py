@@ -2,8 +2,8 @@
 
 ``docs/capabilities.md`` lists each name in ``finitevolx.__all__`` once,
 grouped by the private module that defines it, with the first sentence of
-its docstring; names finitevolX re-exports from spectraldiffx, gaussx or
-integrix are grouped by the library they come from. It then lists the public
+its docstring; names finitevolX re-exports from gridax, spectraldiffx, gaussx
+or integrix are grouped by the library they come from. It then lists the public
 API of those libraries, which finitevolX builds on. Agents and people search it before
 writing a helper ("Reuse before you write" in ``AGENTS.md``).
 
@@ -43,11 +43,19 @@ PACKAGES: dict[str, list[str]] = {
 
 # GeoML-stack libraries finitevolX builds on.
 UPSTREAM: dict[str, list[str]] = {
+    "gridax": ["gridax"],
     "spectraldiffx": ["spectraldiffx"],
     "gaussx": ["gaussx"],
     "integrix": ["integrix.march"],
 }
 UPSTREAM_BLURB = {
+    "gridax": (
+        "Grids and land / ocean masks as NumPy data (packages/gridax in this"
+        " repository): the Arakawa C-grid containers, the staggered masks, the"
+        " stencil capability and the mask construction helpers. finitevolX"
+        " re-exports all of them (listed above); build a grid or a mask here,"
+        " not by hand."
+    ),
     "spectraldiffx": (
         "Spectral transforms (DCT / DST / FFT), the rectangular spectral"
         " Poisson / Helmholtz solvers and their eigenvalues, and the spectral"
@@ -302,9 +310,10 @@ def render() -> str:
         "",
         f"Every public name in finitevolX ({total} of them), each listed once,",
         "grouped by the module that defines it (names re-exported from",
-        "spectraldiffx, gaussx and integrix are grouped by library), with the",
-        "first sentence of its docstring; then the public API of spectraldiffx,",
-        "gaussx and integrix.march, which finitevolX builds on. Search this",
+        "gridax, spectraldiffx, gaussx and integrix are grouped by library),",
+        "with the first sentence of its docstring; then the public API of",
+        "gridax, spectraldiffx, gaussx and integrix.march, which finitevolX",
+        "builds on. Search this",
         "page before writing a helper: if what you need is here, compose it;",
         "if it is almost here, extend it where it lives. Regenerate with",
         "`make capabilities` after changing a public API",

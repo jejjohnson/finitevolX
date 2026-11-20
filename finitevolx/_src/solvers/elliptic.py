@@ -32,6 +32,7 @@ from collections.abc import Callable
 import numbers
 
 import equinox as eqx
+from gridax import Mask2D
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
@@ -41,7 +42,6 @@ from spectraldiffx import CapacitanceSolver
 
 from finitevolx._src.boundary.bc_1d import Dirichlet1D, Neumann1D, Periodic1D
 from finitevolx._src.boundary.bc_set import BoundaryConditionSet
-from finitevolx._src.mask import Mask2D
 from finitevolx._src.solvers.inhomogeneous import (
     SolveDomain,
     coast_ring,

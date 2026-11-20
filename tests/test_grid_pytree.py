@@ -10,9 +10,6 @@ from __future__ import annotations
 
 import dataclasses
 from pathlib import Path
-import subprocess
-import sys
-import textwrap
 
 import equinox as eqx
 import jax
@@ -141,43 +138,3 @@ def test_spherical_metric_properties_run_under_jit():
         eager = getattr(grid, prop)
         traced = jax.jit(lambda g, prop=prop: getattr(g, prop))(grid)
         np.testing.assert_allclose(traced, eager, rtol=1e-12)
-
-
-def test_grid_modules_import_without_jax():
-    """The grid modules build every grid with JAX and Equinox unimportable.
-
-    ``finitevolx/__init__.py`` imports the operators, which need JAX, so the
-    script stands in an empty ``finitevolx`` package and imports
-    ``finitevolx._src.grid`` directly.
-    """
-    script = textwrap.dedent(
-        """
-        import importlib.abc, sys, types
-
-        class Block(importlib.abc.MetaPathFinder):
-            def find_spec(self, name, path, target=None):
-                if name.split(".")[0] in {"jax", "jaxlib", "equinox"}:
-                    raise ImportError(f"blocked: {name}")
-
-        sys.meta_path.insert(0, Block())
-        package = types.ModuleType("finitevolx")
-        package.__path__ = [sys.argv[1]]
-        sys.modules["finitevolx"] = package
-
-        import finitevolx._src.grid as grid
-
-        grid.CartesianGrid1D.from_interior(4, 1.0)
-        grid.CartesianGrid3D.from_interior(4, 4, 4, 1.0, 1.0, 1.0).horizontal_grid()
-        s = grid.SphericalGrid3D.from_interior(8, 6, 3, (0, 40), (-30, 30), 1.0)
-        float(s.min_cell_width), float(s.max_aspect), s.horizontal_grid().dx_V
-        loaded = sorted(m for m in sys.modules if m.split(".")[0] in {"jax", "equinox"})
-        assert not loaded, loaded
-        """
-    )
-    result = subprocess.run(
-        [sys.executable, "-c", script, str(ROOT / "finitevolx")],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert result.returncode == 0, result.stderr

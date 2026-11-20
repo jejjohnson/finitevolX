@@ -20,8 +20,8 @@ from typing import TYPE_CHECKING, Any
 from jaxtyping import Bool, Int
 import numpy as np
 
-from finitevolx._src.mask.utils import count_contiguous
-from finitevolx._src.utils.pytree import pytree_dataclass
+from gridax._src.mask.utils import count_contiguous
+from gridax._src.pytree import pytree_dataclass
 
 if TYPE_CHECKING:
     from jaxtyping import Array

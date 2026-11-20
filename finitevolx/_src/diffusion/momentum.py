@@ -25,10 +25,9 @@ from __future__ import annotations
 import warnings
 
 import equinox as eqx
+from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
 from jaxtyping import Array, Float
 
-from finitevolx._src.grid.cartesian import CartesianGrid2D, CartesianGrid3D
-from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 from finitevolx._src.operators.difference import Difference2D
 from finitevolx._src.operators.interpolation import Interpolation2D

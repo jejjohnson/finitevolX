@@ -24,9 +24,9 @@ from typing import TYPE_CHECKING
 from jaxtyping import Float
 import numpy as np
 
-from finitevolx._src.grid.base import CurvilinearGrid2D, CurvilinearGrid3D
-from finitevolx._src.utils.constants import R_EARTH
-from finitevolx._src.utils.pytree import array_namespace, pytree_dataclass
+from gridax._src.constants import R_EARTH
+from gridax._src.grid.base import CurvilinearGrid2D, CurvilinearGrid3D
+from gridax._src.pytree import array_namespace, pytree_dataclass
 
 # The coordinate arrays are NumPy when a grid is built and JAX arrays (or
 # tracers) once a transform has flattened it. ``jaxtyping.Array`` imports JAX,
@@ -205,7 +205,7 @@ class SphericalGrid2D(CurvilinearGrid2D):
         Notes
         -----
         This is the raw metric, matching
-        :func:`~finitevolx._src.operators.reductions.spherical_area_weights`:
+        ``spherical_area_weights`` in finitevolX:
         it is **not** clamped, so a row at or past a pole carries a
         degenerate width that can be zero or slightly negative (in
         float32 ``cos(pi/2)`` evaluates to ``-4.4e-08``).  The

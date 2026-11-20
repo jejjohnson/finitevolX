@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx._src.grid.cartesian import (
+from gridax import (
     CartesianGrid1D,
     CartesianGrid2D,
     CartesianGrid3D,
 )
+import jax.numpy as jnp
+import numpy as np
+import pytest
+
 from finitevolx._src.operators.interpolation import (
     Interpolation1D,
     Interpolation2D,

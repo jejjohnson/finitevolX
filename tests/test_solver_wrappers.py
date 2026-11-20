@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+from gridax import CartesianGrid2D, Mask2D
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from finitevolx._src.grid import CartesianGrid2D
-from finitevolx._src.mask import Mask2D
 from finitevolx._src.solvers.elliptic import (
     build_capacitance_solver,
     dst1_eigenvalues,

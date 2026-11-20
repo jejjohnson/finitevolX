@@ -1,5 +1,11 @@
 """Tests for Reconstruction1D, Reconstruction2D, Reconstruction3D."""
 
+from gridax import (
+    CartesianGrid1D,
+    CartesianGrid2D,
+    CartesianGrid3D,
+    Mask2D,
+)
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -9,12 +15,6 @@ from finitevolx._src.advection.reconstruction import (
     Reconstruction2D,
     Reconstruction3D,
 )
-from finitevolx._src.grid.cartesian import (
-    CartesianGrid1D,
-    CartesianGrid2D,
-    CartesianGrid3D,
-)
-from finitevolx._src.mask import Mask2D
 
 
 @pytest.fixture

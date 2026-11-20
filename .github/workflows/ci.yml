@@ -58,6 +58,36 @@ jobs:
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: uv run pytest tests -n 2 --durations=25
 
+  gridax-numpy-only:
+    # gridax must install and run with NumPy alone: this environment has
+    # gridax, its declared dependencies and pytest, and no JAX or Equinox.
+    name: gridax without JAX (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    defaults:
+      run:
+        working-directory: packages/gridax
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Check that JAX is absent
+        run: >-
+          uv run --isolated --no-project --python ${{ matrix.python-version }}
+          --with . python -c "import importlib.util as u;
+          assert u.find_spec('jax') is None and u.find_spec('equinox') is None"
+
+      - name: Run the gridax tests
+        run: >-
+          uv run --isolated --no-project --python ${{ matrix.python-version }}
+          --with . --with pytest python -m pytest tests -p no:cacheprovider
+
   slow:
     name: Run Tests (slow tier)
     if: github.event_name == 'push' || github.event_name == 'pull_request'

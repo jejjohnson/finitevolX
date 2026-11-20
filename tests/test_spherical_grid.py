@@ -1,15 +1,15 @@
 """Tests for SphericalGrid2D and SphericalGrid3D."""
 
+from gridax import (
+    CurvilinearGrid2D,
+    CurvilinearGrid3D,
+    SphericalGrid2D,
+    SphericalGrid3D,
+)
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-
-from finitevolx._src.grid.base import CurvilinearGrid2D, CurvilinearGrid3D
-from finitevolx._src.grid.spherical import (
-    SphericalGrid2D,
-    SphericalGrid3D,
-)
 
 
 @pytest.fixture
