@@ -1,4 +1,4 @@
-"""finitevolX masks — base, Cartesian, spherical, cylindrical."""
+"""finitevolX masks — base and Cartesian (used by spherical operators too)."""
 
 from finitevolx._src.mask.base import (
     StencilCapability1D,

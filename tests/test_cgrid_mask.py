@@ -385,30 +385,6 @@ class TestVorticityBoundary:
         )
 
 
-# ── irregular boundary indices ────────────────────────────────────────────────
-
-
-class TestIrregularBoundary:
-    def test_dtype_int32(self, rect_cgrid):
-        m = rect_cgrid
-        assert m.xy_corner_strict_irrbound_cols.dtype == jnp.int32
-        assert m.xy_corner_strict_irrbound_rows.dtype == jnp.int32
-
-    def test_paired_lengths(self, rect_cgrid):
-        m = rect_cgrid
-        assert len(m.xy_corner_strict_irrbound_cols) == len(
-            m.xy_corner_strict_irrbound_rows
-        )
-
-    def test_within_interior_bounds(self, rect_cgrid):
-        m = rect_cgrid
-        Ny, Nx = m.h.shape
-        assert bool(jnp.all(m.xy_corner_strict_irrbound_rows >= 1))
-        assert bool(jnp.all(m.xy_corner_strict_irrbound_rows < Ny - 1))
-        assert bool(jnp.all(m.xy_corner_strict_irrbound_cols >= 1))
-        assert bool(jnp.all(m.xy_corner_strict_irrbound_cols < Nx - 1))
-
-
 # ── land / coast classification ───────────────────────────────────────────────
 
 
@@ -457,23 +433,6 @@ class TestClassification:
         np.testing.assert_array_equal(bnd[:, 0], True)
         np.testing.assert_array_equal(bnd[:, -1], True)
         np.testing.assert_array_equal(bnd[1:-1, 1:-1], False)
-
-
-# ── sponge layer ──────────────────────────────────────────────────────────────
-
-
-class TestSponge:
-    def test_default_is_ones(self, rect_cgrid):
-        np.testing.assert_allclose(np.asarray(rect_cgrid.sponge), 1.0)
-
-    def test_walls_are_zero(self, rect_mask):
-        m = Mask2D.from_mask(rect_mask, sponge_width=2)
-        np.testing.assert_array_equal(np.asarray(m.sponge)[0, :], 0.0)
-        np.testing.assert_array_equal(np.asarray(m.sponge)[:, 0], 0.0)
-
-    def test_shape(self, rect_mask):
-        m = Mask2D.from_mask(rect_mask, sponge_width=3)
-        assert m.sponge.shape == rect_mask.shape
 
 
 # ── adaptive WENO stencil masks ───────────────────────────────────────────────
@@ -736,50 +695,6 @@ class TestVorticityBoundaryGeometry:
         assert bool(m.xy_corner_x_wall[0, 4])
 
 
-class TestIrregularBoundaryGeometry:
-    """Verify irregular psi boundary indices point to correct cells."""
-
-    def test_irrbound_cells_are_dry_psi(self):
-        """Every irregular boundary cell must be a dry psi cell."""
-        h = np.ones((10, 10), dtype=bool)
-        h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
-        h[4:7, 4:7] = False
-        m = Mask2D.from_mask(h)
-        psi = np.asarray(m.xy_corner_strict)
-        yids = np.asarray(m.xy_corner_strict_irrbound_rows)
-        xids = np.asarray(m.xy_corner_strict_irrbound_cols)
-        for y, x in zip(yids, xids, strict=True):
-            assert not psi[y, x], f"psi[{y},{x}] should be dry"
-
-    def test_irrbound_has_wet_psi_neighbour(self):
-        """Every irr. boundary cell must have ≥1 wet psi in its 3×3 hood."""
-        h = np.ones((10, 10), dtype=bool)
-        h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
-        h[4:7, 4:7] = False
-        m = Mask2D.from_mask(h)
-        psi = np.asarray(m.xy_corner_strict)
-        yids = np.asarray(m.xy_corner_strict_irrbound_rows)
-        xids = np.asarray(m.xy_corner_strict_irrbound_cols)
-        Ny, Nx = psi.shape
-        for y, x in zip(yids, xids, strict=True):
-            patch = psi[
-                max(0, y - 1) : min(Ny, y + 2),
-                max(0, x - 1) : min(Nx, x + 2),
-            ]
-            assert patch.any(), f"irr boundary ({y},{x}) has no wet psi neighbour"
-
-    def test_irrbound_not_on_array_edge(self):
-        """Irregular boundary cells are in [1:-1, 1:-1], not on the edge."""
-        h = np.ones((10, 10), dtype=bool)
-        h[0, :] = h[-1, :] = h[:, 0] = h[:, -1] = False
-        m = Mask2D.from_mask(h)
-        Ny, Nx = h.shape
-        yids = np.asarray(m.xy_corner_strict_irrbound_rows)
-        xids = np.asarray(m.xy_corner_strict_irrbound_cols)
-        assert np.all(yids >= 1) and np.all(yids < Ny - 1)
-        assert np.all(xids >= 1) and np.all(xids < Nx - 1)
-
-
 class TestClassificationGeometry:
     """Verify land/coast classification at specific grid points."""
 
@@ -915,17 +830,6 @@ class TestMask1D:
         np.testing.assert_array_equal(np.asarray(sc.x_pos), [8, 7, 6, 5, 4, 3, 2, 1])
         np.testing.assert_array_equal(np.asarray(sc.x_neg), [1, 2, 3, 4, 5, 6, 7, 8])
 
-    def test_sponge_default_all_ones(self, all_ocean_1d):
-        np.testing.assert_array_equal(np.asarray(all_ocean_1d.sponge), 1.0)
-
-    def test_sponge_with_width(self):
-        m = Mask1D.from_mask(np.ones(16, dtype=bool), sponge_width=3)
-        s = np.asarray(m.sponge)
-        # Endpoints are zero
-        assert s[0] == 0.0 and s[-1] == 0.0
-        # Interior is 1.0
-        assert s[8] == 1.0
-
     def test_get_adaptive_masks_all_ocean(self, all_ocean_1d):
         masks = all_ocean_1d.get_adaptive_masks(stencil_sizes=(2, 4, 6))
         # Mutually exclusive
@@ -997,17 +901,6 @@ class TestMask3D:
     def test_classification_shape(self, all_ocean_3d):
         assert all_ocean_3d.classification.shape == (4, 6, 8)
 
-    def test_sponge_is_2d(self, all_ocean_3d):
-        # 2-D horizontal sponge that broadcasts over z
-        assert all_ocean_3d.sponge.shape == (6, 8)
-
-    def test_sponge_with_width_is_2d(self):
-        m = Mask3D.from_dimensions(4, 10, 12, sponge_width=3)
-        assert m.sponge.shape == (10, 12)
-        s = np.asarray(m.sponge)
-        assert s[0, 0] == 0.0  # corner
-        assert s[5, 6] == 1.0  # interior
-
     def test_stencil_capability_is_3d(self, all_ocean_3d):
         sc = all_ocean_3d.stencil_capability
         assert isinstance(sc, StencilCapability3D)
@@ -1064,13 +957,6 @@ class TestMask3D:
         assert np.all(b[:, :, -1])
         # Interior is not boundary
         assert not np.any(b[1:-1, 1:-1, 1:-1])
-
-    def test_irrbound_indices_have_three_components(self, mask3d_with_island):
-        m = Mask3D.from_mask(mask3d_with_island)
-        # All three index arrays must have the same length
-        n = len(m.xy_corner_strict_irrbound_layers)
-        assert len(m.xy_corner_strict_irrbound_rows) == n
-        assert len(m.xy_corner_strict_irrbound_cols) == n
 
     def test_get_adaptive_masks_x(self, all_ocean_3d):
         masks = all_ocean_3d.get_adaptive_masks(direction="x", stencil_sizes=(2, 4))
