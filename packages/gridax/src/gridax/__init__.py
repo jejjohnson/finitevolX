@@ -140,7 +140,7 @@ from gridax._src.operators.stencils import (
     diff_z_fwd_3d,
 )
 
-__version__ = "0.0.0"  # x-release-please-version
+__version__ = "0.1.0"  # x-release-please-version
 
 __all__ = [
     # Grids: topology, uniform metric, concrete coordinate systems

@@ -1,6 +1,6 @@
 [project]
 name = "gridax"
-version = "0.0.0"
+version = "0.1.0"
 description = "Structured grids and land / ocean masks as data, on NumPy (JAX pytrees when JAX is installed)."
 authors = [
     { name = "Juan Emmanuel Johnson", email = "jemanjohnson34@gmail.com" },
