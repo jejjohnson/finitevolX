@@ -80,6 +80,8 @@ from __future__ import annotations
 
 import equinox as eqx
 from gridax import Mask2D, Mask3D, SphericalGrid2D, SphericalGrid3D
+from gridax._src.operators._ghost import interior
+from gridax._src.operators._utils import _metric_like, _safe_div_cos
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 
@@ -97,8 +99,6 @@ from gridax_jax._src.advection.reconstruction import (
     Reconstruction2D,
     Reconstruction3D,
 )
-from gridax_jax._src.operators._ghost import interior
-from gridax_jax._src.operators._utils import _metric_like, _safe_div_cos
 
 
 def _open_wall_fluxes(

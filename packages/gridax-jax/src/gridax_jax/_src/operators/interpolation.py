@@ -22,10 +22,8 @@ from gridax import (
     Mask2D,
     Mask3D,
 )
-from jaxtyping import Array, Float
-
-from gridax_jax._src.operators._ghost import interior
-from gridax_jax._src.operators.stencils import (
+from gridax._src.operators._ghost import interior
+from gridax._src.operators.stencils import (
     avg_x_bwd,
     avg_x_bwd_1d,
     avg_x_bwd_3d,
@@ -41,6 +39,7 @@ from gridax_jax._src.operators.stencils import (
     avg_y_fwd,
     avg_y_fwd_3d,
 )
+from jaxtyping import Array, Float
 
 
 class Interpolation1D(eqx.Module):

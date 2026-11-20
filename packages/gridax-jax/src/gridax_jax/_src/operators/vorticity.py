@@ -10,20 +10,20 @@ import warnings
 
 import equinox as eqx
 from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
-import jax.numpy as jnp
-from jaxtyping import Array, Float
-
-from gridax_jax._src.operators._ghost import interior, zero_z_ghosts
-from gridax_jax._src.operators.diagnostic_operators import _sanitize
-from gridax_jax._src.operators.diagnostics import enstrophy, potential_enstrophy
-from gridax_jax._src.operators.difference import Difference2D, _curl_2d
-from gridax_jax._src.operators.interpolation import Interpolation2D
-from gridax_jax._src.operators.stencils import (
+from gridax._src.operators._ghost import interior, zero_z_ghosts
+from gridax._src.operators.stencils import (
     avg_x_bwd,
     avg_xbwd_yfwd,
     avg_xfwd_ybwd,
     avg_y_bwd,
 )
+import jax.numpy as jnp
+from jaxtyping import Array, Float
+
+from gridax_jax._src.operators.diagnostic_operators import _sanitize
+from gridax_jax._src.operators.diagnostics import enstrophy, potential_enstrophy
+from gridax_jax._src.operators.difference import Difference2D, _curl_2d
+from gridax_jax._src.operators.interpolation import Interpolation2D
 
 
 class Vorticity2D(eqx.Module):

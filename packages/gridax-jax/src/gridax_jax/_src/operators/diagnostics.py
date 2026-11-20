@@ -11,15 +11,8 @@ import warnings
 
 import equinox as eqx
 from gridax import Mask3D
-import jax.numpy as jnp
-from jaxtyping import (
-    Array,
-    Float,
-)
-
-from gridax_jax._src.operators._ghost import interior
-from gridax_jax._src.operators.difference import _curl_2d
-from gridax_jax._src.operators.stencils import (
+from gridax._src.operators._ghost import interior
+from gridax._src.operators.stencils import (
     avg_x_bwd,
     avg_xy_fwd,
     avg_y_bwd,
@@ -30,6 +23,13 @@ from gridax_jax._src.operators.stencils import (
     diff_y_bwd_3d,
     diff_y_fwd,
 )
+import jax.numpy as jnp
+from jaxtyping import (
+    Array,
+    Float,
+)
+
+from gridax_jax._src.operators.difference import _curl_2d
 from gridax_jax._src.utils.constants import GRAVITY, OMEGA, R_EARTH
 
 # ======================================================================

@@ -11,6 +11,7 @@ Covers:
 
 from __future__ import annotations
 
+from gridax._src.operators._ghost import interior
 from gridax_jax import (
     Advection2D,
     CartesianGrid2D,
@@ -18,7 +19,6 @@ from gridax_jax import (
     uv_center_flux,
     uv_node_flux,
 )
-from gridax_jax._src.operators._ghost import interior
 import jax
 import jax.numpy as jnp
 import numpy as np

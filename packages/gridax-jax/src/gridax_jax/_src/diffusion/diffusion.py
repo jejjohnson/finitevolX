@@ -86,11 +86,10 @@ from __future__ import annotations
 
 import equinox as eqx
 from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
+from gridax._src.operators._ghost import interior, zero_z_ghosts
+from gridax._src.operators.stencils import _materialize, avg_x_fwd, avg_y_fwd
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
-
-from gridax_jax._src.operators._ghost import interior, zero_z_ghosts
-from gridax_jax._src.operators.stencils import _materialize, avg_x_fwd, avg_y_fwd
 
 
 def _check_diffusion_wall(wall: str, mask: object) -> None:

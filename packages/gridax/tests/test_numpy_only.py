@@ -34,6 +34,10 @@ CHECKS = textwrap.dedent(
     gridax.Mask1D.from_dimensions(8).get_adaptive_masks()
     gridax.Mask3D.from_mask(np.broadcast_to(h, (4, 8, 8))).get_adaptive_masks("z")
 
+    h2 = np.arange(30.0).reshape(5, 6)
+    gridax.interior(gridax.diff_x_fwd(h2) + gridax.avg_y_bwd(h2), h2)
+    gridax.smooth_clamp(h2, 3.0)
+
     from gridax import analysis
 
     y, x = np.mgrid[0:6, 0:8].astype(float)

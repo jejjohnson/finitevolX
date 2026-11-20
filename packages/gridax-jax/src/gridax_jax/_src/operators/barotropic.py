@@ -29,12 +29,12 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from gridax._src.operators._ghost import interior
+from gridax._src.operators.stencils import diff_x_fwd, diff_y_fwd
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
-from gridax_jax._src.operators._ghost import interior
 from gridax_jax._src.operators.divergence import divergence_2d
-from gridax_jax._src.operators.stencils import diff_x_fwd, diff_y_fwd
 
 
 def barotropic_filter(

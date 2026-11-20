@@ -32,7 +32,7 @@ SCALAR = 0.7  # value for every float argument (dx, dy, g_prime, f0, …)
 # public function and class method there that carries the annotation is
 # tested below, so the annotation and the behaviour cannot drift apart.
 MODULES = (
-    "gridax_jax._src.operators.stencils",
+    "gridax._src.operators.stencils",
     "gridax_jax._src.operators.difference",
     "gridax_jax._src.operators.interpolation",
     "gridax_jax._src.operators.divergence",

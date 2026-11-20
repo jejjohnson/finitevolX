@@ -1,7 +1,7 @@
 """Spherical finite-difference operators on Arakawa C-grids.
 
 These operators apply spherical metric scaling (Layer 2) to the raw
-stencils from :mod:`gridax_jax._src.operators.stencils` (Layer 1).
+stencils from :mod:`gridax._src.operators.stencils` (Layer 1).
 
 Half-index notation
 -------------------
@@ -26,18 +26,18 @@ from gridax import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
-import jax.numpy as jnp
-from jaxtyping import Array, Float
-
-from gridax_jax._src.operators._ghost import interior, zero_z_ghosts
-from gridax_jax._src.operators._utils import _metric_like, _safe_div_cos
-from gridax_jax._src.operators.spherical_compound import _geostrophic_velocity_sphere
-from gridax_jax._src.operators.stencils import (
+from gridax._src.operators._ghost import interior, zero_z_ghosts
+from gridax._src.operators._utils import _metric_like, _safe_div_cos
+from gridax._src.operators.stencils import (
     diff_x_bwd,
     diff_x_fwd,
     diff_y_bwd,
     diff_y_fwd,
 )
+import jax.numpy as jnp
+from jaxtyping import Array, Float
+
+from gridax_jax._src.operators.spherical_compound import _geostrophic_velocity_sphere
 
 
 class SphericalDifference2D(eqx.Module):

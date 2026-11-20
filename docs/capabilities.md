@@ -217,12 +217,6 @@ if it is almost here, extend it where it lives. Regenerate with
 | `WindStress2D` | class | Surface wind-stress forcing on a 2-D Arakawa C-grid. |
 | `WindStress3D` | class | Surface wind-stress forcing on a 3-D Arakawa C-grid. |
 
-#### Ghost-ring zeroing utilities for Arakawa C-grid operators (`gridax_jax._src.operators._ghost`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `interior` | function | Create an array shaped like ``like``, zero everywhere except the interior. |
-
 #### Implicit barotropic-mode (external gravity wave) filter for multi-layer shallow water (`gridax_jax._src.operators.barotropic`)
 
 | Name | Kind | What it does |
@@ -280,14 +274,6 @@ if it is almost here, extend it where it lives. Regenerate with
 | `Difference1D` | class | Finite-difference operators on a 1-D Arakawa C-grid. |
 | `Difference2D` | class | Finite-difference operators on a 2-D Arakawa C-grid. |
 | `Difference3D` | class | Finite-difference operators on a 3-D Arakawa C-grid. |
-
-#### Differentiable surrogates for non-smooth operations (`gridax_jax._src.operators.differentiable`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `smooth_abs` | function | Smooth approximation of ``\|x\|`` with a nonzero gradient at the origin. |
-| `smooth_clamp` | function | Smooth approximation of ``max(x, x_min)`` (a soft lower clamp). |
-| `smooth_max` | function | Smooth approximation of the elementwise ``max(x, y)``. |
 
 #### Standalone divergence operator on 2-D Arakawa C-grids (`gridax_jax._src.operators.divergence`)
 
@@ -372,35 +358,6 @@ if it is almost here, extend it where it lives. Regenerate with
 |---|---|---|
 | `SphericalDifference2D` | class | Spherical finite-difference operators on a 2-D Arakawa C-grid. |
 | `SphericalDifference3D` | class | Spherical finite-difference operators on a 3-D Arakawa C-grid. |
-
-#### Raw finite-difference and averaging stencils for Arakawa C-grids (`gridax_jax._src.operators.stencils`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `avg_x_bwd` | function | Backward average in x (east face → centre). |
-| `avg_x_bwd_1d` | function | Backward average in x (east face → centre), 1-D. |
-| `avg_x_bwd_3d` | function | Backward average in x over all z-levels (east face → centre). |
-| `avg_x_fwd` | function | Forward average in x (centre → east face). |
-| `avg_x_fwd_1d` | function | Forward average in x (centre → east face), 1-D. |
-| `avg_x_fwd_3d` | function | Forward average in x over all z-levels (centre → east face). |
-| `avg_xbwd_yfwd` | function | Bilinear average: U-points → V-points (backward-x, forward-y). |
-| `avg_xfwd_ybwd` | function | Bilinear average: V-points → U-points (forward-x, backward-y). |
-| `avg_xy_bwd` | function | Bilinear average from corners to centre (backward in both x and y). |
-| `avg_xy_fwd` | function | Bilinear average to NE corner (forward in both x and y). |
-| `avg_y_bwd` | function | Backward average in y (north face → centre). |
-| `avg_y_bwd_3d` | function | Backward average in y over all z-levels (north face → centre). |
-| `avg_y_fwd` | function | Forward average in y (centre → north face). |
-| `avg_y_fwd_3d` | function | Forward average in y over all z-levels (centre → north face). |
-| `diff_x_bwd` | function | Backward difference in x (east face → centre). |
-| `diff_x_bwd_1d` | function | Backward difference in x (east face → centre), 1-D. |
-| `diff_x_bwd_3d` | function | Backward difference in x over all z-levels (east face → centre). |
-| `diff_x_fwd` | function | Forward difference in x (centre → east face). |
-| `diff_x_fwd_1d` | function | Forward difference in x (centre → east face), 1-D. |
-| `diff_x_fwd_3d` | function | Forward difference in x over all z-levels (centre → east face). |
-| `diff_y_bwd` | function | Backward difference in y (north face → centre). |
-| `diff_y_bwd_3d` | function | Backward difference in y over all z-levels (north face → centre). |
-| `diff_y_fwd` | function | Forward difference in y (centre → north face). |
-| `diff_y_fwd_3d` | function | Forward difference in y over all z-levels (centre → north face). |
 
 #### Vorticity and potential-vorticity flux operators on Arakawa C-grids (`gridax_jax._src.operators.vorticity`)
 
@@ -526,6 +483,34 @@ if it is almost here, extend it where it lives. Regenerate with
 | `StencilCapability1D` | class | Directional count of contiguous wet neighbours for each 1-D grid cell. |
 | `StencilCapability2D` | class | Directional count of contiguous wet neighbours for each 2-D grid cell. |
 | `StencilCapability3D` | class | Directional count of contiguous wet neighbours for each 3-D grid cell. |
+| `avg_x_bwd` | function | Backward average in x (east face → centre). |
+| `avg_x_bwd_1d` | function | Backward average in x (east face → centre), 1-D. |
+| `avg_x_bwd_3d` | function | Backward average in x over all z-levels (east face → centre). |
+| `avg_x_fwd` | function | Forward average in x (centre → east face). |
+| `avg_x_fwd_1d` | function | Forward average in x (centre → east face), 1-D. |
+| `avg_x_fwd_3d` | function | Forward average in x over all z-levels (centre → east face). |
+| `avg_xbwd_yfwd` | function | Bilinear average: U-points → V-points (backward-x, forward-y). |
+| `avg_xfwd_ybwd` | function | Bilinear average: V-points → U-points (forward-x, backward-y). |
+| `avg_xy_bwd` | function | Bilinear average from corners to centre (backward in both x and y). |
+| `avg_xy_fwd` | function | Bilinear average to NE corner (forward in both x and y). |
+| `avg_y_bwd` | function | Backward average in y (north face → centre). |
+| `avg_y_bwd_3d` | function | Backward average in y over all z-levels (north face → centre). |
+| `avg_y_fwd` | function | Forward average in y (centre → north face). |
+| `avg_y_fwd_3d` | function | Forward average in y over all z-levels (centre → north face). |
+| `diff_x_bwd` | function | Backward difference in x (east face → centre). |
+| `diff_x_bwd_1d` | function | Backward difference in x (east face → centre), 1-D. |
+| `diff_x_bwd_3d` | function | Backward difference in x over all z-levels (east face → centre). |
+| `diff_x_fwd` | function | Forward difference in x (centre → east face). |
+| `diff_x_fwd_1d` | function | Forward difference in x (centre → east face), 1-D. |
+| `diff_x_fwd_3d` | function | Forward difference in x over all z-levels (centre → east face). |
+| `diff_y_bwd` | function | Backward difference in y (north face → centre). |
+| `diff_y_bwd_3d` | function | Backward difference in y over all z-levels (north face → centre). |
+| `diff_y_fwd` | function | Forward difference in y (centre → north face). |
+| `diff_y_fwd_3d` | function | Forward difference in y over all z-levels (centre → north face). |
+| `interior` | function | Create an array shaped like ``like``, zero everywhere except the interior. |
+| `smooth_abs` | function | Smooth approximation of ``\|x\|`` with a nonzero gradient at the origin. |
+| `smooth_clamp` | function | Smooth approximation of ``max(x, x_min)`` (a soft lower clamp). |
+| `smooth_max` | function | Smooth approximation of the elementwise ``max(x, y)``. |
 
 #### Re-exported from `spectraldiffx`
 
@@ -669,11 +654,39 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `StencilCapability1D` | class | Directional count of contiguous wet neighbours for each 1-D grid cell. |
 | `StencilCapability2D` | class | Directional count of contiguous wet neighbours for each 2-D grid cell. |
 | `StencilCapability3D` | class | Directional count of contiguous wet neighbours for each 3-D grid cell. |
+| `avg_x_bwd` | function | Backward average in x (east face → centre). |
+| `avg_x_bwd_1d` | function | Backward average in x (east face → centre), 1-D. |
+| `avg_x_bwd_3d` | function | Backward average in x over all z-levels (east face → centre). |
+| `avg_x_fwd` | function | Forward average in x (centre → east face). |
+| `avg_x_fwd_1d` | function | Forward average in x (centre → east face), 1-D. |
+| `avg_x_fwd_3d` | function | Forward average in x over all z-levels (centre → east face). |
+| `avg_xbwd_yfwd` | function | Bilinear average: U-points → V-points (backward-x, forward-y). |
+| `avg_xfwd_ybwd` | function | Bilinear average: V-points → U-points (forward-x, backward-y). |
+| `avg_xy_bwd` | function | Bilinear average from corners to centre (backward in both x and y). |
+| `avg_xy_fwd` | function | Bilinear average to NE corner (forward in both x and y). |
+| `avg_y_bwd` | function | Backward average in y (north face → centre). |
+| `avg_y_bwd_3d` | function | Backward average in y over all z-levels (north face → centre). |
+| `avg_y_fwd` | function | Forward average in y (centre → north face). |
+| `avg_y_fwd_3d` | function | Forward average in y over all z-levels (centre → north face). |
 | `count_contiguous` | function | Count contiguous wet cells from each point along one axis (n-D). |
+| `diff_x_bwd` | function | Backward difference in x (east face → centre). |
+| `diff_x_bwd_1d` | function | Backward difference in x (east face → centre), 1-D. |
+| `diff_x_bwd_3d` | function | Backward difference in x over all z-levels (east face → centre). |
+| `diff_x_fwd` | function | Forward difference in x (centre → east face). |
+| `diff_x_fwd_1d` | function | Forward difference in x (centre → east face), 1-D. |
+| `diff_x_fwd_3d` | function | Forward difference in x over all z-levels (centre → east face). |
+| `diff_y_bwd` | function | Backward difference in y (north face → centre). |
+| `diff_y_bwd_3d` | function | Backward difference in y over all z-levels (north face → centre). |
+| `diff_y_fwd` | function | Forward difference in y (centre → north face). |
+| `diff_y_fwd_3d` | function | Forward difference in y over all z-levels (centre → north face). |
 | `dilate_mask` | function | Binary dilation by 1 cell with an n-D *cross* structuring element. |
 | `h_from_pooled` | function | Inverse of `pool_bool` for binary inputs. |
+| `interior` | function | Create an array shaped like ``like``, zero everywhere except the interior. |
 | `make_sponge` | function | n-D linear sponge ramp: 0 at every wall, 1 in the interior. |
 | `pool_bool` | function | n-D average-pool of a binary mask with one-sided zero padding. |
+| `smooth_abs` | function | Smooth approximation of ``\|x\|`` with a nonzero gradient at the origin. |
+| `smooth_clamp` | function | Smooth approximation of ``max(x, x_min)`` (a soft lower clamp). |
+| `smooth_max` | function | Smooth approximation of the elementwise ``max(x, y)``. |
 
 ### `gridax.analysis`
 

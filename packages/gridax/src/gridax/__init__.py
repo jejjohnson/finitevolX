@@ -41,6 +41,34 @@ from gridax._src.mask import (
     make_sponge,
     pool_bool,
 )
+from gridax._src.operators._ghost import interior
+from gridax._src.operators.differentiable import smooth_abs, smooth_clamp, smooth_max
+from gridax._src.operators.stencils import (
+    avg_x_bwd,
+    avg_x_bwd_1d,
+    avg_x_bwd_3d,
+    avg_x_fwd,
+    avg_x_fwd_1d,
+    avg_x_fwd_3d,
+    avg_xbwd_yfwd,
+    avg_xfwd_ybwd,
+    avg_xy_bwd,
+    avg_xy_fwd,
+    avg_y_bwd,
+    avg_y_bwd_3d,
+    avg_y_fwd,
+    avg_y_fwd_3d,
+    diff_x_bwd,
+    diff_x_bwd_1d,
+    diff_x_bwd_3d,
+    diff_x_fwd,
+    diff_x_fwd_1d,
+    diff_x_fwd_3d,
+    diff_y_bwd,
+    diff_y_bwd_3d,
+    diff_y_fwd,
+    diff_y_fwd_3d,
+)
 
 __version__ = "0.0.0"  # x-release-please-version
 
@@ -70,6 +98,36 @@ __all__ = [
     "h_from_pooled",
     "make_sponge",
     "pool_bool",
+    # Raw C-grid stencils (index arithmetic, no metric)
+    "avg_x_bwd",
+    "avg_x_bwd_1d",
+    "avg_x_bwd_3d",
+    "avg_x_fwd",
+    "avg_x_fwd_1d",
+    "avg_x_fwd_3d",
+    "avg_xbwd_yfwd",
+    "avg_xfwd_ybwd",
+    "avg_xy_bwd",
+    "avg_xy_fwd",
+    "avg_y_bwd",
+    "avg_y_bwd_3d",
+    "avg_y_fwd",
+    "avg_y_fwd_3d",
+    "diff_x_bwd",
+    "diff_x_bwd_1d",
+    "diff_x_bwd_3d",
+    "diff_x_fwd",
+    "diff_x_fwd_1d",
+    "diff_x_fwd_3d",
+    "diff_y_bwd",
+    "diff_y_bwd_3d",
+    "diff_y_fwd",
+    "diff_y_fwd_3d",
+    "interior",
+    # Differentiable surrogates
+    "smooth_abs",
+    "smooth_clamp",
+    "smooth_max",
     # Constants
     "R_EARTH",
 ]

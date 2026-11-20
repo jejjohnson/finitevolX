@@ -6,6 +6,8 @@ Covers the public ``pv_flux_blend`` free function (parity with the
 
 from __future__ import annotations
 
+from gridax._src.operators._ghost import interior
+from gridax._src.operators.stencils import avg_xfwd_ybwd, avg_y_bwd
 from gridax_jax import (
     CartesianGrid2D,
     SphericalGrid2D,
@@ -15,8 +17,6 @@ from gridax_jax import (
     pv_flux_blend,
     vorticity_flux_upwind,
 )
-from gridax_jax._src.operators._ghost import interior
-from gridax_jax._src.operators.stencils import avg_xfwd_ybwd, avg_y_bwd
 import jax
 import jax.numpy as jnp
 import numpy as np

@@ -70,12 +70,12 @@ from __future__ import annotations
 
 import equinox as eqx
 from gridax import Mask2D, Mask3D, SphericalGrid2D, SphericalGrid3D
+from gridax._src.operators._ghost import interior, zero_z_ghosts
+from gridax._src.operators._utils import _metric_like, _safe_div_cos
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 
 from gridax_jax._src.diffusion.diffusion import _face_kappa
-from gridax_jax._src.operators._ghost import interior, zero_z_ghosts
-from gridax_jax._src.operators._utils import _metric_like, _safe_div_cos
 
 
 def _spherical_diffusion_2d_impl(

@@ -26,9 +26,9 @@ import warnings
 
 import equinox as eqx
 from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
+from gridax._src.operators._ghost import interior, zero_z_ghosts
 from jaxtyping import Array, Float
 
-from gridax_jax._src.operators._ghost import interior, zero_z_ghosts
 from gridax_jax._src.operators.difference import Difference2D
 from gridax_jax._src.operators.interpolation import Interpolation2D
 

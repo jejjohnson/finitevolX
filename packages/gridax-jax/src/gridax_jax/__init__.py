@@ -16,6 +16,34 @@ from gridax import (
     StencilCapability1D,
     StencilCapability2D,
     StencilCapability3D,
+    avg_x_bwd,
+    avg_x_bwd_1d,
+    avg_x_bwd_3d,
+    avg_x_fwd,
+    avg_x_fwd_1d,
+    avg_x_fwd_3d,
+    avg_xbwd_yfwd,
+    avg_xfwd_ybwd,
+    avg_xy_bwd,
+    avg_xy_fwd,
+    avg_y_bwd,
+    avg_y_bwd_3d,
+    avg_y_fwd,
+    avg_y_fwd_3d,
+    diff_x_bwd,
+    diff_x_bwd_1d,
+    diff_x_bwd_3d,
+    diff_x_fwd,
+    diff_x_fwd_1d,
+    diff_x_fwd_3d,
+    diff_y_bwd,
+    diff_y_bwd_3d,
+    diff_y_fwd,
+    diff_y_fwd_3d,
+    interior,
+    smooth_abs,
+    smooth_clamp,
+    smooth_max,
 )
 
 from gridax_jax._src.advection.advection import Advection1D, Advection2D, Advection3D
@@ -127,7 +155,6 @@ from gridax_jax._src.forcing.functional import (
 )
 from gridax_jax._src.forcing.rayleigh import RayleighDamping2D, RayleighDamping3D
 from gridax_jax._src.forcing.wind import WindCurl2D, WindStress2D, WindStress3D
-from gridax_jax._src.operators._ghost import interior
 from gridax_jax._src.operators.barotropic import barotropic_filter
 from gridax_jax._src.operators.coriolis import Coriolis2D, Coriolis3D
 from gridax_jax._src.operators.diagnostic_operators import (
@@ -165,11 +192,6 @@ from gridax_jax._src.operators.difference import (
     Difference1D,
     Difference2D,
     Difference3D,
-)
-from gridax_jax._src.operators.differentiable import (
-    smooth_abs,
-    smooth_clamp,
-    smooth_max,
 )
 from gridax_jax._src.operators.divergence import Divergence2D, divergence_2d
 from gridax_jax._src.operators.eos import (
@@ -221,32 +243,6 @@ from gridax_jax._src.operators.spherical_compound import (
 from gridax_jax._src.operators.spherical_difference import (
     SphericalDifference2D,
     SphericalDifference3D,
-)
-from gridax_jax._src.operators.stencils import (
-    avg_x_bwd,
-    avg_x_bwd_1d,
-    avg_x_bwd_3d,
-    avg_x_fwd,
-    avg_x_fwd_1d,
-    avg_x_fwd_3d,
-    avg_xbwd_yfwd,
-    avg_xfwd_ybwd,
-    avg_xy_bwd,
-    avg_xy_fwd,
-    avg_y_bwd,
-    avg_y_bwd_3d,
-    avg_y_fwd,
-    avg_y_fwd_3d,
-    diff_x_bwd,
-    diff_x_bwd_1d,
-    diff_x_bwd_3d,
-    diff_x_fwd,
-    diff_x_fwd_1d,
-    diff_x_fwd_3d,
-    diff_y_bwd,
-    diff_y_bwd_3d,
-    diff_y_fwd,
-    diff_y_fwd_3d,
 )
 from gridax_jax._src.operators.vorticity import (
     Vorticity2D,

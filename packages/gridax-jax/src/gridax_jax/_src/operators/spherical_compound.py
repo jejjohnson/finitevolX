@@ -18,17 +18,17 @@ from gridax import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
-import jax.numpy as jnp
-from jaxtyping import Array, Float
-
-from gridax_jax._src.operators._ghost import interior, zero_z_ghosts
-from gridax_jax._src.operators._utils import _metric_like, _safe_div_cos
-from gridax_jax._src.operators.interpolation import Interpolation2D
-from gridax_jax._src.operators.stencils import (
+from gridax._src.operators._ghost import interior, zero_z_ghosts
+from gridax._src.operators._utils import _metric_like, _safe_div_cos
+from gridax._src.operators.stencils import (
     _neighbours,
     diff_x_bwd,
     diff_x_fwd,
 )
+import jax.numpy as jnp
+from jaxtyping import Array, Float
+
+from gridax_jax._src.operators.interpolation import Interpolation2D
 from gridax_jax._src.operators.vorticity import (
     _pv_flux_corner_product,
     _warn_arakawa_lamb,

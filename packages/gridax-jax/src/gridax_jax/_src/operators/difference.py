@@ -24,11 +24,8 @@ from gridax import (
     Mask2D,
     Mask3D,
 )
-import jax.numpy as jnp
-from jaxtyping import Array, Float
-
-from gridax_jax._src.operators._ghost import interior
-from gridax_jax._src.operators.stencils import (
+from gridax._src.operators._ghost import interior
+from gridax._src.operators.stencils import (
     _neighbours,
     diff_x_bwd,
     diff_x_bwd_1d,
@@ -41,6 +38,8 @@ from gridax_jax._src.operators.stencils import (
     diff_y_fwd,
     diff_y_fwd_3d,
 )
+import jax.numpy as jnp
+from jaxtyping import Array, Float
 
 # ======================================================================
 # Shared primitive implementations (used by both class and functional APIs)

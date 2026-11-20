@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
+from gridax._src.operators._ghost import interior
+from gridax._src.operators.stencils import diff_x_bwd, diff_y_bwd
 from gridax_jax import BoundaryConditionSet, Interpolation2D, enforce_periodic
-from gridax_jax._src.operators._ghost import interior
 from gridax_jax._src.operators.coriolis import Coriolis2D, Coriolis3D
-from gridax_jax._src.operators.stencils import diff_x_bwd, diff_y_bwd
 import jax
 import jax.numpy as jnp
 import numpy as np

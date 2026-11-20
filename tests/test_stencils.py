@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from gridax_jax._src.operators.stencils import (
+from gridax._src.operators.stencils import (
     avg_x_bwd,
     avg_x_bwd_1d,
     avg_x_bwd_3d,

@@ -37,10 +37,9 @@ from gridax import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
+from gridax._src.operators._utils import _metric_like
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
-
-from gridax_jax._src.operators._utils import _metric_like
 
 # ----------------------------------------------------------------------
 # Cell-area / cell-volume metrics

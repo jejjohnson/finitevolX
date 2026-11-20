@@ -8,21 +8,31 @@ Use these as building blocks for custom operators on any coordinate system —
 Cartesian, spherical, cylindrical, or curvilinear — by applying the
 appropriate metric scale factors to the result.
 
-All functions are pure, stateless, and compatible with ``jax.jit``,
-``jax.vmap``, and ``jax.grad``.
+All functions are pure and stateless, and are plain slicing and arithmetic,
+so they run on any array backend (NumPy, JAX, CuPy, ...); on JAX they are
+compatible with ``jax.jit``, ``jax.vmap`` and ``jax.grad``.
 
 Example
 -------
->>> from gridax_jax import diff_x_fwd, interior
+>>> from gridax import diff_x_fwd, interior
 >>> raw = diff_x_fwd(h)  # pure index arithmetic
 >>> scaled = raw / my_custom_metric  # user applies their own scaling
 >>> result = interior(scaled, h)  # pad back to full grid shape
 """
 
-from typing import NamedTuple
+from __future__ import annotations
 
-import jax
-from jaxtyping import Array, Float
+from typing import TYPE_CHECKING, NamedTuple
+
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.backend import optimization_barrier
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 # =====================================================================
 # 1-D difference stencils
@@ -676,10 +686,11 @@ def _neighbours(h: Float[Array, "... Ny Nx"]) -> _Neighbours2D:
 def _materialize(x: Float[Array, "..."]) -> Float[Array, "..."]:
     """Keep ``x`` as its own buffer instead of fusing it into its consumers.
 
-    Identity on values and derivatives (``jax.lax.optimization_barrier``).
+    Identity on values and derivatives (``jax.lax.optimization_barrier`` on
+    JAX inputs, a plain identity on other backends).
     Use it on an intermediate field that the *next* stencil reads at several
     offsets, e.g. the first Laplacian of a biharmonic operator: without it
     XLA may fuse the producer into each shifted read and recompute it once
     per offset (measured ~1.5x slower forward on CPU for the biharmonic).
     """
-    return jax.lax.optimization_barrier(x)
+    return optimization_barrier(x)
