@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
-import numpy as np
-
-from finitevolx import (
+from gridax_ops import (
     interior,
     linear_drag_tendency,
     quadratic_drag_tendency,
     rayleigh_tendency,
     wind_stress_tendency,
 )
+import jax
+import jax.numpy as jnp
+import numpy as np
 
 
 class TestWindStressTendency:

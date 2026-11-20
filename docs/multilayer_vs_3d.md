@@ -39,7 +39,7 @@ any overhead.  `finitevolX` exposes this pattern through the
 
 ```python
 import jax.numpy as jnp
-import finitevolx as fvx
+import gridax_ops as fvx
 
 grid = fvx.CartesianGrid2D.from_interior(64, 64, 1e4, 1e4)
 diff2d = fvx.Difference2D(grid=grid)
@@ -117,7 +117,7 @@ z-levels:
 ```python
 import jax.numpy as jnp
 import numpy as np
-import finitevolx as fvx
+import gridax_ops as fvx
 
 grid2d = fvx.CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
 grid3d = fvx.CartesianGrid3D.from_interior(8, 8, 4, 1.0, 1.0, 1.0)

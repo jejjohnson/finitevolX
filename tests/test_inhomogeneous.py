@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-import finitevolx as fvx
-from finitevolx._src.solvers.inhomogeneous import (
+import gridax_ops as fvx
+from gridax_ops._src.solvers.inhomogeneous import (
     KnownValueLifting,
     SolveDomain,
     boundary_ring,
     coast_ring,
 )
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -126,7 +125,7 @@ class TestCoastRing:
 
     def test_x_basin_is_the_cgrid_wall(self):
         """For psi on a from_interior rectangle: X rows / columns 0 and N-2."""
-        from finitevolx import Mask2D
+        from gridax_ops import Mask2D
 
         m = np.zeros((7, 9), dtype=bool)
         m[1:-1, 1:-1] = True

@@ -10,12 +10,7 @@ from gridax import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx._src.operators.reductions import (
+from gridax_ops._src.operators.reductions import (
     area_mean,
     area_sum,
     area_weights,
@@ -32,6 +27,10 @@ from finitevolx._src.operators.reductions import (
     volume_sum,
     volume_weights,
 )
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 R = 6.371e6
 

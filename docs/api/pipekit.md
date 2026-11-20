@@ -1,11 +1,11 @@
 # pipekit Operators
 
-`finitevolx.pipekit` wraps the 2-D Cartesian operators as
+`gridax_ops.pipekit` wraps the 2-D Cartesian operators as
 [pipekit](https://github.com/jejjohnson/pipekit) operators: JSON
 configuration, `Sequential` / `Graph` composition, and Equinox pytree leaves
 so `jit`, `grad` and `vmap` see through them. Each operator is one Tier-A
 call on `[*batch, Ny, Nx]` fields. Requires the `pipekit` extra:
-`pip install "finitevolx[pipekit]"`. Walkthrough:
+`pip install "gridax-ops[pipekit]"`. Walkthrough:
 [Composing finitevolX with pipekit](../notebooks/pipekit_composition.py).
 
 | Tier-B operator | Tier-A counterpart | in → out |
@@ -34,66 +34,66 @@ call on `[*batch, Ny, Nx]` fields. Requires the `pipekit` extra:
 
 ## Base classes and helpers
 
-::: finitevolx.pipekit.FVXOperator
+::: gridax_ops.pipekit.FVXOperator
 
-::: finitevolx.pipekit.GridOperator
+::: gridax_ops.pipekit.GridOperator
 
-::: finitevolx.pipekit.as_grid_spec
+::: gridax_ops.pipekit.as_grid_spec
 
-::: finitevolx.pipekit.build_grid
+::: gridax_ops.pipekit.build_grid
 
-::: finitevolx.pipekit.over_leading
+::: gridax_ops.pipekit.over_leading
 
-::: finitevolx.pipekit.testing.check_operator
+::: gridax_ops.pipekit.testing.check_operator
 
 ## Stencils, interpolation, boundaries and masks
 
-::: finitevolx.pipekit.Difference
+::: gridax_ops.pipekit.Difference
 
-::: finitevolx.pipekit.Divergence
+::: gridax_ops.pipekit.Divergence
 
-::: finitevolx.pipekit.Curl
+::: gridax_ops.pipekit.Curl
 
-::: finitevolx.pipekit.Laplacian
+::: gridax_ops.pipekit.Laplacian
 
-::: finitevolx.pipekit.GradPerp
+::: gridax_ops.pipekit.GradPerp
 
-::: finitevolx.pipekit.Interp
+::: gridax_ops.pipekit.Interp
 
-::: finitevolx.pipekit.Coriolis
+::: gridax_ops.pipekit.Coriolis
 
-::: finitevolx.pipekit.FillGhosts
+::: gridax_ops.pipekit.FillGhosts
 
-::: finitevolx.pipekit.ApplyMask
+::: gridax_ops.pipekit.ApplyMask
 
 ## Diagnostics and reductions
 
-::: finitevolx.pipekit.RelativeVorticity
+::: gridax_ops.pipekit.RelativeVorticity
 
-::: finitevolx.pipekit.PotentialVorticity
+::: gridax_ops.pipekit.PotentialVorticity
 
-::: finitevolx.pipekit.Enstrophy
+::: gridax_ops.pipekit.Enstrophy
 
-::: finitevolx.pipekit.QGPotentialVorticity
+::: gridax_ops.pipekit.QGPotentialVorticity
 
-::: finitevolx.pipekit.KineticEnergy
+::: gridax_ops.pipekit.KineticEnergy
 
-::: finitevolx.pipekit.AvailablePE
+::: gridax_ops.pipekit.AvailablePE
 
-::: finitevolx.pipekit.Strain
+::: gridax_ops.pipekit.Strain
 
-::: finitevolx.pipekit.OkuboWeiss
+::: gridax_ops.pipekit.OkuboWeiss
 
-::: finitevolx.pipekit.TotalEnergy
+::: gridax_ops.pipekit.TotalEnergy
 
-::: finitevolx.pipekit.DomainIntegral
+::: gridax_ops.pipekit.DomainIntegral
 
-::: finitevolx.pipekit.DomainMean
+::: gridax_ops.pipekit.DomainMean
 
 ## Time stepping and graph plumbing
 
-::: finitevolx.pipekit.ExplicitStep
+::: gridax_ops.pipekit.ExplicitStep
 
-::: finitevolx.pipekit.Pick
+::: gridax_ops.pipekit.Pick
 
-::: finitevolx.pipekit.LinComb
+::: gridax_ops.pipekit.LinComb

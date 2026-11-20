@@ -11,19 +11,18 @@ Covers:
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx import (
+from gridax_ops import (
     Advection2D,
     CartesianGrid2D,
     Mask2D,
     uv_center_flux,
     uv_node_flux,
 )
-from finitevolx._src.operators._ghost import interior
+from gridax_ops._src.operators._ghost import interior
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 # ---------------------------------------------------------------------------
 # Fixtures

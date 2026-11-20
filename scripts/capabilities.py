@@ -38,7 +38,7 @@ INDEX = ROOT / "docs" / "capabilities.md"
 
 # Public homes, in order: (distribution, [public modules]).
 PACKAGES: dict[str, list[str]] = {
-    "finitevolx": ["finitevolx"],
+    "gridax_ops": ["gridax_ops"],
 }
 
 # GeoML-stack libraries finitevolX builds on.

@@ -11,12 +11,7 @@ functional form (or documented composition) when ``mask=None``.
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx import (
+from gridax_ops import (
     Energetics2D,
     Interpolation2D,
     Mask2D,
@@ -35,6 +30,11 @@ from finitevolx import (
     stretching_term,
     tensor_strain,
 )
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
+
 from tests.fixtures._helpers import assert_matches_golden
 from tests.fixtures.inputs import (
     make_f_field_2d,

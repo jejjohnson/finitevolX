@@ -2,17 +2,16 @@ from __future__ import annotations
 
 """Tests for vertical coupling matrix and layer/mode transforms."""
 
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx._src.vertical.vertical_modes import (
+from gridax_ops._src.vertical.vertical_modes import (
     build_coupling_matrix,
     decompose_vertical_modes,
     layer_to_mode,
     mode_to_layer,
 )
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 # ---------------------------------------------------------------------------
 # build_coupling_matrix

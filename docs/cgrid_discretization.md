@@ -255,7 +255,7 @@ slabs.)
 ## Creating a Grid
 
 ```python
-from finitevolx import CartesianGrid2D
+from gridax_ops import CartesianGrid2D
 
 # 64 physical cells in each direction; 66×66 total array shape
 grid = CartesianGrid2D.from_interior(nx_interior=64, ny_interior=64,
@@ -471,7 +471,7 @@ apply boundary conditions to intermediate fields before chaining operators.
 A typical shallow-water advection step uses all four co-location points:
 
 ```python
-from finitevolx import (
+from gridax_ops import (
     CartesianGrid2D, Difference2D, Interpolation2D, Vorticity2D,
     enforce_periodic,
 )
@@ -492,7 +492,7 @@ q     = vort.potential_vorticity(u, v, h, f)   # X-points
 qu, qv = vort.pv_flux_energy_conserving(q, u, v)   # U- and V-points
 
 # 3. Kinetic energy and Bernoulli potential
-from finitevolx._src.operators.diagnostics import bernoulli_potential
+from gridax_ops._src.operators.diagnostics import bernoulli_potential
 p = bernoulli_potential(h=h, u=u, v=v)         # T-points
 
 # 4. Tendencies

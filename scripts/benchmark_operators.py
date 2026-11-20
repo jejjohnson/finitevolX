@@ -40,11 +40,10 @@ import statistics
 import sys
 import time
 
+import gridax_ops as fvx
 import jax
 import jax.numpy as jnp
 import numpy as np
-
-import finitevolx as fvx
 
 
 @dataclass

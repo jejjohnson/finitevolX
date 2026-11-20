@@ -2,6 +2,6 @@
 
 Flux-form divergence operators on staggered Arakawa C-grids.
 
-::: finitevolx.Divergence2D
+::: gridax_ops.Divergence2D
 
-::: finitevolx.divergence_2d
+::: gridax_ops.divergence_2d

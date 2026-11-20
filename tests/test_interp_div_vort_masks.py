@@ -30,16 +30,16 @@ from __future__ import annotations
 
 import typing
 
-import numpy as np
-import pytest
-
-from finitevolx._src.operators.divergence import Divergence2D
-from finitevolx._src.operators.interpolation import (
+from gridax_ops._src.operators.divergence import Divergence2D
+from gridax_ops._src.operators.interpolation import (
     Interpolation1D,
     Interpolation2D,
     Interpolation3D,
 )
-from finitevolx._src.operators.vorticity import Vorticity2D, Vorticity3D
+from gridax_ops._src.operators.vorticity import Vorticity2D, Vorticity3D
+import numpy as np
+import pytest
+
 from tests.fixtures._helpers import assert_matches_golden
 from tests.fixtures.inputs import (
     make_f_field_2d,

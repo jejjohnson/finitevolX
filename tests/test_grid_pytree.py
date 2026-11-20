@@ -12,12 +12,7 @@ import dataclasses
 from pathlib import Path
 
 import equinox as eqx
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx import (
+from gridax_ops import (
     CartesianGrid1D,
     CartesianGrid2D,
     CartesianGrid3D,
@@ -29,6 +24,10 @@ from finitevolx import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 

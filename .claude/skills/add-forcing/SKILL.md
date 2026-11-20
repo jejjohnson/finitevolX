@@ -1,12 +1,12 @@
 ---
 name: add-forcing
-description: Add a forcing term to finitevolX — a functional primitive in forcing/functional.py plus an AbstractForcing operator (2-D and 3-D) such as wind stress, bottom drag, Rayleigh damping, a sponge or a relaxation, with face interpolation, NaN-safe masking, composition through ForcingSum / ForcingProduct / TimeVaryingForcing, tests and docs. Use when asked to add, port or implement a forcing, drag, damping, relaxation or surface-flux term in finitevolx/_src/forcing.
+description: Add a forcing term to finitevolX — a functional primitive in forcing/functional.py plus an AbstractForcing operator (2-D and 3-D) such as wind stress, bottom drag, Rayleigh damping, a sponge or a relaxation, with face interpolation, NaN-safe masking, composition through ForcingSum / ForcingProduct / TimeVaryingForcing, tests and docs. Use when asked to add, port or implement a forcing, drag, damping, relaxation or surface-flux term in gridax_ops/_src/forcing.
 ---
 
 # Add a forcing term
 
 Read contracts 3 (masks) and 6 (forcing and units) in `AGENTS.md` and the
-module docstrings of `finitevolx/_src/forcing/_base.py` and
+module docstrings of `gridax_ops/_src/forcing/_base.py` and
 `forcing/functional.py` first.
 
 ## 1. Make sure it does not exist yet
@@ -20,7 +20,7 @@ Search `docs/capabilities.md`: `wind_stress_tendency`,
 `TimeVaryingForcing`; a sum of processes is a `ForcingSum`. None needs a
 new class.
 
-## 2. Write it (`finitevolx/_src/forcing/`)
+## 2. Write it (`gridax_ops/_src/forcing/`)
 
 1. **The primitive** in `functional.py`: pure math on arrays already at the
    right stagger, no grid, no ghost ring, no mask, one velocity component
@@ -45,7 +45,7 @@ new class.
 
 ## 3. Export and document
 
-`finitevolx/__init__.py` (import + `__all__` under `# Forcing — Layer 0
+`packages/gridax-ops/src/gridax_ops/__init__.py` (import + `__all__` under `# Forcing — Layer 0
 functional primitives` and `# Forcing — 2D operators` / `3D operators`),
 `::: finitevolx.NewForcing` on `docs/api/forcing.md`, the formula in the
 forcing section of `docs/spatial_operators.md`, `make capabilities`.

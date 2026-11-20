@@ -122,7 +122,7 @@ order); review what they cannot see.
 
 ### 7. Public API and documentation
 
-- New names: imported and listed in `finitevolx.__all__` in their logical
+- New names: imported and listed in `gridax_ops.__all__` in their logical
   group, a `::: finitevolx.<Name>` entry on the `docs/api/` page,
   `docs/capabilities.md` regenerated.
 - NumPy-style docstrings with the formula, shapes and an `Examples` section

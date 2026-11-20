@@ -20,7 +20,7 @@ in `AGENTS.md`.
    file:line, and say in a few words what it computes (the formula, the
    stagger it maps from and to, or the algorithm — not the name).
 2. For each, search for an existing equivalent:
-   - `docs/capabilities.md` — every name in `finitevolx.__all__` grouped by
+   - `docs/capabilities.md` — every name in `gridax_ops.__all__` grouped by
      defining module, then the spectraldiffx and gaussx sections;
    - the shared private helpers: `operators/_ghost.py` (`interior`,
      `zero_z_ghosts`); `operators/_utils._safe_div_cos`; `forcing/_utils.py`
@@ -35,7 +35,7 @@ in `AGENTS.md`.
      (`_resolve_mask_arr`, `_resolve_bc`); `solvers/inhomogeneous.py`
      (`lift_rhs`, `reconstruct_from_lift`); and, in tests,
      `tests/fixtures/inputs.py` and `tests/fixtures/_helpers.py`;
-   - a grep of `finitevolx/_src` for the key slice pattern or operation.
+   - a grep of `packages/gridax-ops/src/gridax_ops/_src` for the key slice pattern or operation.
 3. Also flag, wherever they appear in the diff:
    - a shifted-slice difference or average (`h[1:-1, 2:] - h[1:-1, 1:-1]`,
      `0.25 * (h[1:-1, 1:-1] + h[2:, 1:-1] + ...)`) → the raw stencils

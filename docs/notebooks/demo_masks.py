@@ -63,7 +63,7 @@ import numpy as np
 
 jax.config.update("jax_enable_x64", True)
 
-from finitevolx import CartesianGrid2D, Mask2D
+from gridax_ops import CartesianGrid2D, Mask2D
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "demo_masks"
 IMG_DIR.mkdir(parents=True, exist_ok=True)

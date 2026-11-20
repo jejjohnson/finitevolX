@@ -2,8 +2,8 @@
 
 Operators for interpolating fields between staggered grid points (T, U, V, X).
 
-::: finitevolx.Interpolation1D
+::: gridax_ops.Interpolation1D
 
-::: finitevolx.Interpolation2D
+::: gridax_ops.Interpolation2D
 
-::: finitevolx.Interpolation3D
+::: gridax_ops.Interpolation3D

@@ -2,18 +2,18 @@
 
 High-order flux reconstruction methods (upwind, WENO) for advection terms.
 
-::: finitevolx.Reconstruction1D
+::: gridax_ops.Reconstruction1D
 
-::: finitevolx.Reconstruction2D
+::: gridax_ops.Reconstruction2D
 
-::: finitevolx.Reconstruction3D
+::: gridax_ops.Reconstruction3D
 
 ## Flux Limiters
 
-::: finitevolx.minmod
+::: gridax_ops.minmod
 
-::: finitevolx.mc
+::: gridax_ops.mc
 
-::: finitevolx.superbee
+::: gridax_ops.superbee
 
-::: finitevolx.van_leer
+::: gridax_ops.van_leer

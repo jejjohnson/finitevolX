@@ -5,13 +5,8 @@ from gridax import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx._src.operators.reductions import spherical_area_weights
-from finitevolx._src.operators.spherical_compound import (
+from gridax_ops._src.operators.reductions import spherical_area_weights
+from gridax_ops._src.operators.spherical_compound import (
     SphericalDivergence2D,
     SphericalDivergence3D,
     SphericalLaplacian2D,
@@ -20,8 +15,12 @@ from finitevolx._src.operators.spherical_compound import (
     SphericalVorticity3D,
     geostrophic_velocity_sphere,
 )
-from finitevolx._src.operators.spherical_difference import SphericalDifference2D
-from finitevolx._src.operators.vorticity import Vorticity2D
+from gridax_ops._src.operators.spherical_difference import SphericalDifference2D
+from gridax_ops._src.operators.vorticity import Vorticity2D
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 R = 1.0
 NX_INT, NY_INT = 10, 8

@@ -1,7 +1,6 @@
-"""Contract check for finitevolX pipekit operators (``check_operator``)."""
+"""Deprecated: ``finitevolx.pipekit.testing`` is now :mod:`gridax_ops.pipekit.testing`."""
 
 from __future__ import annotations
 
-from finitevolx._src.pipekit.testing import FORBIDDEN_HLO, check_operator, compiled_hlo
-
-__all__ = ["FORBIDDEN_HLO", "check_operator", "compiled_hlo"]
+from gridax_ops.pipekit.testing import *  # noqa: F403
+from gridax_ops.pipekit.testing import __all__  # noqa: F401

@@ -57,7 +57,7 @@ exactly zero for any velocity field derived from a streamfunction via
 ### Usage
 
 ```python
-from finitevolx import CartesianGrid2D, Divergence2D, divergence_2d
+from gridax_ops import CartesianGrid2D, Divergence2D, divergence_2d
 
 grid = CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 
@@ -135,7 +135,7 @@ ghost-filled $q$, $u$, $v$: fill them (periodic, free-slip, …) before calling.
 ### Usage
 
 ```python
-from finitevolx import CartesianGrid2D, Vorticity2D
+from gridax_ops import CartesianGrid2D, Vorticity2D
 
 grid = CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 vort = Vorticity2D(grid=grid)
@@ -225,8 +225,8 @@ never enter the wet tendency, and the operator conserves $\sum_\text{wet} h$.
 ### Usage
 
 ```python
-from finitevolx import Diffusion2D, BiharmonicDiffusion2D, diffusion_2d
-from finitevolx import CartesianGrid2D
+from gridax_ops import Diffusion2D, BiharmonicDiffusion2D, diffusion_2d
+from gridax_ops import CartesianGrid2D
 
 grid = CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 
@@ -283,7 +283,7 @@ energy only for uniform $f$.
 ### Usage
 
 ```python
-from finitevolx import CartesianGrid2D, Coriolis2D
+from gridax_ops import CartesianGrid2D, Coriolis2D
 
 grid = CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 cor = Coriolis2D(grid=grid)
@@ -339,7 +339,7 @@ the vorticity-flux product is evaluated.  Three schemes are available:
 ### Usage
 
 ```python
-from finitevolx import CartesianGrid2D, MomentumAdvection2D
+from gridax_ops import CartesianGrid2D, MomentumAdvection2D
 
 grid = CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 
@@ -392,7 +392,7 @@ The three terms are:
 ### Usage
 
 ```python
-from finitevolx import ArakawaJacobian2D, CartesianGrid2D, arakawa_jacobian
+from gridax_ops import ArakawaJacobian2D, CartesianGrid2D, arakawa_jacobian
 
 grid = CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 

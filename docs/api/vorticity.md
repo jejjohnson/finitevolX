@@ -2,9 +2,9 @@
 
 Relative vorticity and Jacobian operators on Arakawa C-grids.
 
-::: finitevolx.Vorticity2D
+::: gridax_ops.Vorticity2D
 
-::: finitevolx.Vorticity3D
+::: gridax_ops.Vorticity3D
 
 ## PV flux (functional)
 
@@ -12,7 +12,7 @@ Relative vorticity and Jacobian operators on Arakawa C-grids.
 `pv_flux_arakawa_lamb` is its deprecated alias: the blend is not the
 Arakawa–Lamb (1981) scheme.
 
-::: finitevolx.pv_flux_blend
+::: gridax_ops.pv_flux_blend
 
 ## Jacobian
 
@@ -23,6 +23,6 @@ stencil) and dry output cells are exactly zero.  The functional
 `arakawa_jacobian` returns only the interior `[..., Ny-2, Nx-2]`, takes no
 mask, and reads land values as given.
 
-::: finitevolx.ArakawaJacobian2D
+::: gridax_ops.ArakawaJacobian2D
 
-::: finitevolx.arakawa_jacobian
+::: gridax_ops.arakawa_jacobian

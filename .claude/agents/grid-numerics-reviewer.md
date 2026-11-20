@@ -1,6 +1,6 @@
 ---
 name: grid-numerics-reviewer
-description: Read-only reviewer that checks a finitevolX diff for C-grid and numerical defects — slices that do not match their half-index staggering, ghost cells read before any boundary condition fills them, widened write regions, masks that leak NaN or change the unmasked result, broken flux-form conservation, SI constants and absolute epsilons that break unit covariance, pole singularities on the sphere, time-step / CFL and solver-sign mistakes, traced control flow, dtype promotion, and test tolerances without provenance. Use proactively on any change to finitevolx/_src or its tests, before committing or during code review.
+description: Read-only reviewer that checks a finitevolX diff for C-grid and numerical defects — slices that do not match their half-index staggering, ghost cells read before any boundary condition fills them, widened write regions, masks that leak NaN or change the unmasked result, broken flux-form conservation, SI constants and absolute epsilons that break unit covariance, pole singularities on the sphere, time-step / CFL and solver-sign mistakes, traced control flow, dtype promotion, and test tolerances without provenance. Use proactively on any change to packages/gridax-ops/src/gridax_ops/_src (or packages/gridax) or its tests, before committing or during code review.
 tools: Read, Grep, Glob, Bash
 ---
 

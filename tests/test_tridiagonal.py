@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
+from gridax_ops._src.solvers.tridiagonal import (
+    solve_tridiagonal,
+    solve_tridiagonal_batched,
+)
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-
-from finitevolx._src.solvers.tridiagonal import (
-    solve_tridiagonal,
-    solve_tridiagonal_batched,
-)
 
 # ---------------------------------------------------------------------------
 # solve_tridiagonal (single system)

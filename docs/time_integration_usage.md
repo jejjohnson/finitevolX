@@ -15,7 +15,7 @@ inside a loop.
 ```python
 import jax
 import jax.numpy as jnp
-import finitevolx as fvx
+import gridax_ops as fvx
 from integrix.march import rk3_ssp_step
 
 jax.config.update("jax_enable_x64", True)
@@ -210,7 +210,7 @@ over the cycle, and the returned `state_2d` is the end-of-cycle state.
 Advects a 2D field by backtracking along characteristic curves.
 
 ```python
-from finitevolx import semi_lagrangian_step
+from gridax_ops import semi_lagrangian_step
 
 # field: [Ny, Nx], u/v: velocity in m/s, dx/dy: grid spacing in m
 new_field = semi_lagrangian_step(
@@ -301,7 +301,7 @@ conditions to the tendency at each stage evaluation.
 ```python
 from integrix.march import RK3SSP
 
-from finitevolx import solve_ocean_pde
+from gridax_ops import solve_ocean_pde
 
 def rhs(t, y, args):
     return compute_tendency(y)

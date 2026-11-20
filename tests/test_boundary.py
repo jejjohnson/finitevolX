@@ -2,12 +2,7 @@
 
 from typing import ClassVar
 
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx import (
+from gridax_ops import (
     BoundaryConditionSet,
     CartesianGrid2D,
     Difference2D,
@@ -19,8 +14,12 @@ from finitevolx import (
     Slip1D,
     Sponge1D,
 )
-from finitevolx._src.boundary.bc_1d import Outflow1D, Periodic1D, Reflective1D
-from finitevolx._src.boundary.boundary import enforce_periodic, pad_interior
+from gridax_ops._src.boundary.bc_1d import Outflow1D, Periodic1D, Reflective1D
+from gridax_ops._src.boundary.boundary import enforce_periodic, pad_interior
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 
 class TestPadInterior:

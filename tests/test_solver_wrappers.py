@@ -3,11 +3,7 @@
 from __future__ import annotations
 
 from gridax import CartesianGrid2D, Mask2D
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx._src.solvers.elliptic import (
+from gridax_ops._src.solvers.elliptic import (
     build_capacitance_solver,
     dst1_eigenvalues,
     make_spectral_preconditioner,
@@ -19,6 +15,9 @@ from finitevolx._src.solvers.elliptic import (
     solve_poisson_dct,
     streamfunction_from_vorticity,
 )
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -536,7 +535,7 @@ class TestMaskDtypeFollowsRhs:
 
     @pytest.mark.slow
     def test_weak_float64_rhs_with_mask2d_stays_float64(self):
-        from finitevolx._src.solvers.elliptic import _resolve_mask_arr, solve_cg
+        from gridax_ops._src.solvers.elliptic import _resolve_mask_arr, solve_cg
 
         rhs, mask, dx = self._problem()
         assert rhs.dtype == jnp.float64 and rhs.weak_type
@@ -575,7 +574,7 @@ class TestMaskDtypeFollowsRhs:
         assert psi.dtype == jnp.float64
 
     def test_solve_domain_masks_are_boolean(self):
-        from finitevolx._src.solvers.inhomogeneous import SolveDomain
+        from gridax_ops._src.solvers.inhomogeneous import SolveDomain
 
         _, mask, _ = self._problem()
         domain = SolveDomain(mask)

@@ -13,26 +13,26 @@ staggering.  On the C-grid, `streamfunction_from_vorticity`,
 
 ## DST-I (Dirichlet BCs)
 
-::: finitevolx.solve_poisson_dst
+::: gridax_ops.solve_poisson_dst
 
-::: finitevolx.solve_helmholtz_dst
+::: gridax_ops.solve_helmholtz_dst
 
 ## DCT-II (Neumann BCs)
 
-::: finitevolx.solve_poisson_dct
+::: gridax_ops.solve_poisson_dct
 
-::: finitevolx.solve_helmholtz_dct
+::: gridax_ops.solve_helmholtz_dct
 
 ## FFT (Periodic BCs)
 
-::: finitevolx.solve_poisson_fft
+::: gridax_ops.solve_poisson_fft
 
-::: finitevolx.solve_helmholtz_fft
+::: gridax_ops.solve_helmholtz_fft
 
 ## Eigenvalue Helpers
 
-::: finitevolx.dst1_eigenvalues
+::: gridax_ops.dst1_eigenvalues
 
-::: finitevolx.dct2_eigenvalues
+::: gridax_ops.dct2_eigenvalues
 
-::: finitevolx.fft_eigenvalues
+::: gridax_ops.fft_eigenvalues

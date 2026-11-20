@@ -1,6 +1,6 @@
 ---
 name: add-advection-scheme
-description: Add an advection scheme to finitevolX — a face-value reconstruction (upwind, linear, WENO / WENO-Z variant), a TVD flux limiter, or a face-flux function (Rusanov-style) — wired through Reconstruction1D/2D/3D, the Advection1D/2D/3D and SphericalAdvection method dispatch, the coastal stencil fallback, the scale-covariance method lists and the golden fixtures. Use when asked to add, port or implement a reconstruction, WENO stencil, limiter or numerical flux in finitevolx/_src/advection.
+description: Add an advection scheme to finitevolX — a face-value reconstruction (upwind, linear, WENO / WENO-Z variant), a TVD flux limiter, or a face-flux function (Rusanov-style) — wired through Reconstruction1D/2D/3D, the Advection1D/2D/3D and SphericalAdvection method dispatch, the coastal stencil fallback, the scale-covariance method lists and the golden fixtures. Use when asked to add, port or implement a reconstruction, WENO stencil, limiter or numerical flux in gridax_ops/_src/advection.
 ---
 
 # Add an advection scheme
@@ -19,7 +19,7 @@ functions, and the face fluxes `uv_center_flux`, `uv_node_flux`,
 `rusanov_flux`. A different limiter for TVD is a new limiter, not a new
 scheme.
 
-## 2. Where each piece goes (`finitevolx/_src/advection/`)
+## 2. Where each piece goes (`gridax_ops/_src/advection/`)
 
 | Piece | File | Wire it into |
 |---|---|---|
@@ -48,7 +48,7 @@ Rules:
 
 ## 3. Export and document
 
-`finitevolx/__init__.py` (import + `__all__` group, e.g. `# WENO stencil
+`packages/gridax-ops/src/gridax_ops/__init__.py` (import + `__all__` group, e.g. `# WENO stencil
 functions`, `# Flux limiters`), the `docs/api/advection.md` /
 `docs/api/reconstruction.md` page, the method list in the `Advection*`
 docstrings and in `docs/advection.md`, then `make capabilities`.

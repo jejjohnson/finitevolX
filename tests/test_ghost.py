@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
+from gridax_ops._src.operators._ghost import interior, zero_z_ghosts
 import jax
 import jax.numpy as jnp
-
-from finitevolx._src.operators._ghost import interior, zero_z_ghosts
 
 # ---------------------------------------------------------------------------
 # interior

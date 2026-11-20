@@ -4,15 +4,9 @@ from __future__ import annotations
 
 import equinox as eqx
 import gaussx
-import jax
-import jax.numpy as jnp
-import lineax as lx
-import numpy as np
-import pytest
-
-from finitevolx import Mask2D, masked_laplacian, solve_cg
-from finitevolx._src.solvers.iterative import _masked_neumann_laplacian
-from finitevolx._src.solvers.multigrid import (
+from gridax_ops import Mask2D, masked_laplacian, solve_cg
+from gridax_ops._src.solvers.iterative import _masked_neumann_laplacian
+from gridax_ops._src.solvers.multigrid import (
     MultigridSolver,
     _apply_operator,
     _compute_n_levels,
@@ -22,10 +16,15 @@ from finitevolx._src.solvers.multigrid import (
     _weighted_jacobi,
     build_multigrid_solver,
 )
-from finitevolx._src.solvers.preconditioners import (
+from gridax_ops._src.solvers.preconditioners import (
     make_gaussx_multigrid_preconditioner,
     make_multigrid_preconditioner,
 )
+import jax
+import jax.numpy as jnp
+import lineax as lx
+import numpy as np
+import pytest
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -712,7 +711,7 @@ class TestMultigridPreconditioner:
     @pytest.mark.slow
     def test_preconditioner_with_cg(self, mg_grid_16):
         """Multigrid-preconditioned CG converges for Helmholtz (lambda > 0)."""
-        from finitevolx._src.solvers.iterative import solve_cg
+        from gridax_ops._src.solvers.iterative import solve_cg
 
         ny, nx, dx, dy = mg_grid_16
         lam = 10.0
@@ -788,7 +787,7 @@ class TestMultigridPreconditioner:
         """gaussx.CGSolver with the multigrid preconditioner solves the
         positive system (−A) x = −b on a masked basin to the same answer as
         finitevolX's solve_cg."""
-        from finitevolx._src.solvers.iterative import solve_cg
+        from gridax_ops._src.solvers.iterative import solve_cg
 
         ny, nx = 32, 32
         dx, dy = 1.0 / nx, 1.0 / ny

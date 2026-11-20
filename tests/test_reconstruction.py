@@ -6,15 +6,14 @@ from gridax import (
     CartesianGrid3D,
     Mask2D,
 )
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx._src.advection.reconstruction import (
+from gridax_ops._src.advection.reconstruction import (
     Reconstruction1D,
     Reconstruction2D,
     Reconstruction3D,
 )
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 
 @pytest.fixture

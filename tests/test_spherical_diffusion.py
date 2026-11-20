@@ -3,18 +3,17 @@
 from __future__ import annotations
 
 from gridax import CartesianGrid2D, Mask2D, Mask3D, SphericalGrid2D, SphericalGrid3D
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx._src.diffusion.diffusion import BiharmonicDiffusion2D, Diffusion2D
-from finitevolx._src.diffusion.spherical_diffusion import (
+from gridax_ops._src.diffusion.diffusion import BiharmonicDiffusion2D, Diffusion2D
+from gridax_ops._src.diffusion.spherical_diffusion import (
     SphericalBiharmonicDiffusion2D,
     SphericalBiharmonicDiffusion3D,
     SphericalDiffusion2D,
     SphericalDiffusion3D,
 )
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 R = 6.371e6
 NX_INT, NY_INT = 16, 10

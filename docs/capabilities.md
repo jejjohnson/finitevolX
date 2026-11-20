@@ -13,11 +13,11 @@ if it is almost here, extend it where it lives. Regenerate with
 `make capabilities` after changing a public API
 (`tests/test_capabilities.py` checks it is current).
 
-## `finitevolx`
+## `gridax_ops`
 
-### `finitevolx`
+### `gridax_ops`
 
-#### Advection operators for Arakawa C-grids (`finitevolx._src.advection.advection`)
+#### Advection operators for Arakawa C-grids (`gridax_ops._src.advection.advection`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -25,7 +25,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `Advection2D` | class | 2-D advection operator. |
 | `Advection3D` | class | 3-D advection operator (horizontal plane per z-level). |
 
-#### Public functional API for raw face fluxes on Arakawa C-grids (`finitevolx._src.advection.face_flux`)
+#### Public functional API for raw face fluxes on Arakawa C-grids (`gridax_ops._src.advection.face_flux`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -33,13 +33,13 @@ if it is almost here, extend it where it lives. Regenerate with
 | `uv_center_flux` | function | Compute raw face fluxes for a cell-centred scalar on a C-grid. |
 | `uv_node_flux` | function | Compute raw face fluxes for a node-centred tracer on a C-grid. |
 
-#### Upwind flux with mask-aware stencil-width dispatch for non-rectangular domains (`finitevolx._src.advection.flux`)
+#### Upwind flux with mask-aware stencil-width dispatch for non-rectangular domains (`gridax_ops._src.advection.flux`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `upwind_flux` | function | Compute upwind flux with automatic stencil fallback near boundaries. |
 
-#### Flux limiter functions for TVD (Total Variation Diminishing) reconstruction (`finitevolx._src.advection.limiters`)
+#### Flux limiter functions for TVD (Total Variation Diminishing) reconstruction (`gridax_ops._src.advection.limiters`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -48,7 +48,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `superbee` | function | Superbee flux limiter. |
 | `van_leer` | function | Van Leer flux limiter. |
 
-#### Linear (polynomial) face-value reconstruction stencils (`finitevolx._src.advection.linear`)
+#### Linear (polynomial) face-value reconstruction stencils (`gridax_ops._src.advection.linear`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -60,7 +60,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `linear_5pts_right` | function | 5-point right-biased reconstruction at face i+1/2. |
 | `linear_6pts` | function | 6-point centred reconstruction at face i+1/2. |
 
-#### Functional reconstruction dispatcher for upwind face-value computation (`finitevolx._src.advection.reconstruct_fn`)
+#### Functional reconstruction dispatcher for upwind face-value computation (`gridax_ops._src.advection.reconstruct_fn`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -70,7 +70,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `upwind_3pt` | function | 3-point upwind face value at i+1/2 along the last axis. |
 | `upwind_5pt` | function | 5-point upwind face value at i+1/2 along the last axis. |
 
-#### Face-value reconstruction operators for advective fluxes on Arakawa C-grids (`finitevolx._src.advection.reconstruction`)
+#### Face-value reconstruction operators for advective fluxes on Arakawa C-grids (`gridax_ops._src.advection.reconstruction`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -78,14 +78,14 @@ if it is almost here, extend it where it lives. Regenerate with
 | `Reconstruction2D` | class | 2-D face-value reconstruction for advective fluxes. |
 | `Reconstruction3D` | class | 3-D face-value reconstruction. |
 
-#### Spherical-coordinate advection operators for Arakawa C-grids (`finitevolx._src.advection.spherical_advection`)
+#### Spherical-coordinate advection operators for Arakawa C-grids (`gridax_ops._src.advection.spherical_advection`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `SphericalAdvection2D` | class | 2-D tracer advection on a spherical Arakawa C-grid. |
 | `SphericalAdvection3D` | class | 3-D tracer advection on a spherical Arakawa C-grid. |
 
-#### weno (`finitevolx._src.advection.weno`)
+#### weno (`gridax_ops._src.advection.weno`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -102,7 +102,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `weno_9pts` | function | 9-points non-linear left-biased stencil reconstruction |
 | `weno_9pts_right` | function | 9-points non-linear right-biased stencil reconstruction at face q0+1/2: |
 
-#### Single-face boundary condition atoms for 2-D ghost-ring arrays (`finitevolx._src.boundary.bc_1d`)
+#### Single-face boundary condition atoms for 2-D ghost-ring arrays (`gridax_ops._src.boundary.bc_1d`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -116,19 +116,19 @@ if it is almost here, extend it where it lives. Regenerate with
 | `Slip1D` | class | Slip boundary condition for tangential velocity at a solid wall. |
 | `Sponge1D` | class | Relax one ghost face toward a background value. |
 
-#### Boundary-condition dispatchers for state dictionaries (`finitevolx._src.boundary.bc_field`)
+#### Boundary-condition dispatchers for state dictionaries (`gridax_ops._src.boundary.bc_field`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `FieldBCSet` | class | Dispatch per-face boundary conditions across multiple fields. |
 
-#### Per-face boundary condition containers for 2-D ghost-ring arrays (`finitevolx._src.boundary.bc_set`)
+#### Per-face boundary condition containers for 2-D ghost-ring arrays (`gridax_ops._src.boundary.bc_set`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `BoundaryConditionSet` | class | Apply a different boundary condition on each domain face. |
 
-#### Boundary condition helpers for finitevolX (`finitevolx._src.boundary.boundary`)
+#### Boundary condition helpers for finitevolX (`gridax_ops._src.boundary.boundary`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -142,7 +142,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `zero_boundaries` | function | Fill ghost ring with zeros (homogeneous Dirichlet). |
 | `zero_gradient_boundaries` | function | Fill ghost ring by copying nearest interior value (zero gradient / Neumann). |
 
-#### Harmonic and biharmonic diffusion operators (flux form) on Arakawa C-grids (`finitevolx._src.diffusion.diffusion`)
+#### Harmonic and biharmonic diffusion operators (flux form) on Arakawa C-grids (`gridax_ops._src.diffusion.diffusion`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -152,14 +152,14 @@ if it is almost here, extend it where it lives. Regenerate with
 | `Diffusion3D` | class | Horizontal diffusion operator (flux form) on a 3-D Arakawa C-grid. |
 | `diffusion_2d` | function | Horizontal tracer diffusion tendency at T-points (flux form). |
 
-#### Energy-conserving momentum advection operators for Arakawa C-grids (`finitevolx._src.diffusion.momentum`)
+#### Energy-conserving momentum advection operators for Arakawa C-grids (`gridax_ops._src.diffusion.momentum`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `MomentumAdvection2D` | class | Energy-conserving momentum advection on a 2-D Arakawa C-grid. |
 | `MomentumAdvection3D` | class | Energy-conserving momentum advection on a 3-D Arakawa C-grid. |
 
-#### Spherical-coordinate harmonic diffusion operators (flux form) (`finitevolx._src.diffusion.spherical_diffusion`)
+#### Spherical-coordinate harmonic diffusion operators (flux form) (`gridax_ops._src.diffusion.spherical_diffusion`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -168,14 +168,14 @@ if it is almost here, extend it where it lives. Regenerate with
 | `SphericalDiffusion2D` | class | Horizontal tracer diffusion (flux form) on a 2-D spherical C-grid. |
 | `SphericalDiffusion3D` | class | Horizontal tracer diffusion on a 3-D spherical Arakawa C-grid. |
 
-#### Energy-conserving momentum advection operators on spherical C-grids (`finitevolx._src.diffusion.spherical_momentum`)
+#### Energy-conserving momentum advection operators on spherical C-grids (`gridax_ops._src.diffusion.spherical_momentum`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `SphericalMomentumAdvection2D` | class | Energy-conserving momentum advection on a 2-D spherical C-grid. |
 | `SphericalMomentumAdvection3D` | class | Energy-conserving momentum advection on a 3-D spherical C-grid. |
 
-#### Forcing base class (Layer 1) and composition wrappers (Layer 3) (`finitevolx._src.forcing._base`)
+#### Forcing base class (Layer 1) and composition wrappers (Layer 3) (`gridax_ops._src.forcing._base`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -184,7 +184,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `ForcingSum` | class | Additive composition of forcings: ``F = F_1 + F_2 + ... + F_n``. |
 | `TimeVaryingForcing` | class | Bundle a time-agnostic forcing with time-dependent input fields. |
 
-#### Linear and quadratic bottom-drag operators for Arakawa C-grids (`finitevolx._src.forcing.drag`)
+#### Linear and quadratic bottom-drag operators for Arakawa C-grids (`gridax_ops._src.forcing.drag`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -193,7 +193,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `QuadraticDrag2D` | class | Quadratic bottom drag on a 2-D Arakawa C-grid. |
 | `QuadraticDrag3D` | class | Quadratic bottom drag on a 3-D Arakawa C-grid. |
 
-#### Raw functional forcing primitives (Layer 0) (`finitevolx._src.forcing.functional`)
+#### Raw functional forcing primitives (Layer 0) (`gridax_ops._src.forcing.functional`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -202,14 +202,14 @@ if it is almost here, extend it where it lives. Regenerate with
 | `rayleigh_tendency` | function | Rayleigh damping tendency toward a reference state. |
 | `wind_stress_tendency` | function | Momentum tendency from a surface wind stress. |
 
-#### Rayleigh damping operator for Arakawa C-grids (`finitevolx._src.forcing.rayleigh`)
+#### Rayleigh damping operator for Arakawa C-grids (`gridax_ops._src.forcing.rayleigh`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `RayleighDamping2D` | class | Rayleigh damping of a T-point field on a 2-D Arakawa C-grid. |
 | `RayleighDamping3D` | class | Rayleigh damping of a T-point field on a 3-D Arakawa C-grid. |
 
-#### Surface wind-stress forcing operators for Arakawa C-grids (`finitevolx._src.forcing.wind`)
+#### Surface wind-stress forcing operators for Arakawa C-grids (`gridax_ops._src.forcing.wind`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -217,26 +217,26 @@ if it is almost here, extend it where it lives. Regenerate with
 | `WindStress2D` | class | Surface wind-stress forcing on a 2-D Arakawa C-grid. |
 | `WindStress3D` | class | Surface wind-stress forcing on a 3-D Arakawa C-grid. |
 
-#### Ghost-ring zeroing utilities for Arakawa C-grid operators (`finitevolx._src.operators._ghost`)
+#### Ghost-ring zeroing utilities for Arakawa C-grid operators (`gridax_ops._src.operators._ghost`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `interior` | function | Create an array shaped like ``like``, zero everywhere except the interior. |
 
-#### Implicit barotropic-mode (external gravity wave) filter for multi-layer shallow water (`finitevolx._src.operators.barotropic`)
+#### Implicit barotropic-mode (external gravity wave) filter for multi-layer shallow water (`gridax_ops._src.operators.barotropic`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `barotropic_filter` | function | Implicit external-gravity-wave (barotropic) mode filter. |
 
-#### Coriolis force operator for Arakawa C-grids (`finitevolx._src.operators.coriolis`)
+#### Coriolis force operator for Arakawa C-grids (`gridax_ops._src.operators.coriolis`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `Coriolis2D` | class | Coriolis force operator for 2-D Arakawa C-grids. |
 | `Coriolis3D` | class | Coriolis force operator for 3-D Arakawa C-grids. |
 
-#### Class forms of the diagnostic operators, with operator-attribute masks (`finitevolx._src.operators.diagnostic_operators`)
+#### Class forms of the diagnostic operators, with operator-attribute masks (`gridax_ops._src.operators.diagnostic_operators`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -244,7 +244,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `QGPotentialVorticity2D` | class | Quasi-geostrophic potential vorticity at T-points. |
 | `Strain2D` | class | Strain diagnostics on a 2-D Arakawa C-grid. |
 
-#### Diagnostic quantities on Arakawa C-grids (`finitevolx._src.operators.diagnostics`)
+#### Diagnostic quantities on Arakawa C-grids (`gridax_ops._src.operators.diagnostics`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -273,7 +273,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `total_enstrophy` | function | Domain-integrated enstrophy. |
 | `vertical_velocity` | function | Vertical velocity from the continuity equation. |
 
-#### Finite-difference operators on Arakawa C-grids (`finitevolx._src.operators.difference`)
+#### Finite-difference operators on Arakawa C-grids (`gridax_ops._src.operators.difference`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -281,7 +281,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `Difference2D` | class | Finite-difference operators on a 2-D Arakawa C-grid. |
 | `Difference3D` | class | Finite-difference operators on a 3-D Arakawa C-grid. |
 
-#### Differentiable surrogates for non-smooth operations (`finitevolx._src.operators.differentiable`)
+#### Differentiable surrogates for non-smooth operations (`gridax_ops._src.operators.differentiable`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -289,14 +289,14 @@ if it is almost here, extend it where it lives. Regenerate with
 | `smooth_clamp` | function | Smooth approximation of ``max(x, x_min)`` (a soft lower clamp). |
 | `smooth_max` | function | Smooth approximation of the elementwise ``max(x, y)``. |
 
-#### Standalone divergence operator on 2-D Arakawa C-grids (`finitevolx._src.operators.divergence`)
+#### Standalone divergence operator on 2-D Arakawa C-grids (`gridax_ops._src.operators.divergence`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `Divergence2D` | class | Divergence operator on a 2-D Arakawa C-grid. |
 | `divergence_2d` | function | Compute ∇·(u, v) at T-points on the 2-D Arakawa C-grid. |
 
-#### Equation of state operators for ocean density from temperature and salinity (`finitevolx._src.operators.eos`)
+#### Equation of state operators for ocean density from temperature and salinity (`gridax_ops._src.operators.eos`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -307,7 +307,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `linear_drho_dT` | function | Partial derivative ∂ρ/∂T for the linear EOS (constant). |
 | `reduced_gravity` | function | Compute reduced gravity between two layers. |
 
-#### Interpolation (averaging) operators on Arakawa C-grids (`finitevolx._src.operators.interpolation`)
+#### Interpolation (averaging) operators on Arakawa C-grids (`gridax_ops._src.operators.interpolation`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -315,14 +315,14 @@ if it is almost here, extend it where it lives. Regenerate with
 | `Interpolation2D` | class | 2-D averaging operators on an Arakawa C-grid. |
 | `Interpolation3D` | class | 3-D averaging operators on an Arakawa C-grid. |
 
-#### Arakawa (1966) Jacobian operator for energy- and enstrophy-conserving advection (`finitevolx._src.operators.jacobian`)
+#### Arakawa (1966) Jacobian operator for energy- and enstrophy-conserving advection (`gridax_ops._src.operators.jacobian`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `ArakawaJacobian2D` | class | Arakawa (1966) Jacobian J(f, g) at T-points, on the full grid. |
 | `arakawa_jacobian` | function | Arakawa (1966) discretization of J(f, g). |
 
-#### Area- and volume-weighted reduction helpers for Arakawa C-grids (`finitevolx._src.operators.reductions`)
+#### Area- and volume-weighted reduction helpers for Arakawa C-grids (`gridax_ops._src.operators.reductions`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -348,14 +348,14 @@ if it is almost here, extend it where it lives. Regenerate with
 | `volume_sum` | function | Volume-weighted sum over physical interior T-cells (3-D). |
 | `volume_weights` | function | Dispatch to Cartesian/spherical volume weights based on grid type. |
 
-#### Linear drag and Rayleigh-sponge relaxation tendency operators (`finitevolx._src.operators.relaxation`)
+#### Linear drag and Rayleigh-sponge relaxation tendency operators (`gridax_ops._src.operators.relaxation`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `linear_drag` | function | Rayleigh (linear) bottom-drag tendency `-\text{coef}\cdot u`. |
 | `rayleigh_relaxation` | function | Sponge / relaxation tendency `-\text{coef}\cdot W\cdot(x - x_\text{ref})`. |
 
-#### Compound spherical operators on Arakawa C-grids (`finitevolx._src.operators.spherical_compound`)
+#### Compound spherical operators on Arakawa C-grids (`gridax_ops._src.operators.spherical_compound`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -366,14 +366,14 @@ if it is almost here, extend it where it lives. Regenerate with
 | `SphericalVorticity2D` | class | Vorticity and PV-flux operators on a 2-D spherical Arakawa C-grid. |
 | `SphericalVorticity3D` | class | 3-D spherical vorticity (vmap over z-levels). |
 
-#### Spherical finite-difference operators on Arakawa C-grids (`finitevolx._src.operators.spherical_difference`)
+#### Spherical finite-difference operators on Arakawa C-grids (`gridax_ops._src.operators.spherical_difference`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `SphericalDifference2D` | class | Spherical finite-difference operators on a 2-D Arakawa C-grid. |
 | `SphericalDifference3D` | class | Spherical finite-difference operators on a 3-D Arakawa C-grid. |
 
-#### Raw finite-difference and averaging stencils for Arakawa C-grids (`finitevolx._src.operators.stencils`)
+#### Raw finite-difference and averaging stencils for Arakawa C-grids (`gridax_ops._src.operators.stencils`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -402,7 +402,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `diff_y_fwd` | function | Forward difference in y (centre → north face). |
 | `diff_y_fwd_3d` | function | Forward difference in y over all z-levels (centre → north face). |
 
-#### Vorticity and potential-vorticity flux operators on Arakawa C-grids (`finitevolx._src.operators.vorticity`)
+#### Vorticity and potential-vorticity flux operators on Arakawa C-grids (`gridax_ops._src.operators.vorticity`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -412,7 +412,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `pv_flux_blend` | function | Blend of the energy- and enstrophy-conserving PV fluxes (grid-free). |
 | `vorticity_flux_upwind` | function | Dissipative upwind vortex-force fluxes on a C-grid. |
 
-#### Capacitance matrix solver and convenience wrappers for 2-D elliptic PDEs (`finitevolx._src.solvers.elliptic`)
+#### Capacitance matrix solver and convenience wrappers for 2-D elliptic PDEs (`gridax_ops._src.solvers.elliptic`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -421,7 +421,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `pv_inversion` | function | QG potential-vorticity inversion: solve (∇² − λ)ψ = q. |
 | `streamfunction_from_vorticity` | function | Invert the vorticity–streamfunction relation ∇²ψ − λψ = ζ. |
 
-#### Known-value lifting for inhomogeneous Dirichlet boundary conditions (`finitevolx._src.solvers.inhomogeneous`)
+#### Known-value lifting for inhomogeneous Dirichlet boundary conditions (`gridax_ops._src.solvers.inhomogeneous`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -430,7 +430,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `boundary_ring` | function | Wet cells adjacent to at least one dry cell (the inner ring). |
 | `coast_ring` | function | Dry cells adjacent to at least one wet cell (the coast ring). |
 
-#### Iterative solvers for 2-D elliptic PDEs (`finitevolx._src.solvers.iterative`)
+#### Iterative solvers for 2-D elliptic PDEs (`gridax_ops._src.solvers.iterative`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -438,21 +438,21 @@ if it is almost here, extend it where it lives. Regenerate with
 | `masked_laplacian` | function | Apply the masked discrete Helmholtz operator (∇² − λ)·ψ. |
 | `solve_cg` | function | Preconditioned Conjugate Gradient solver for symmetric linear operators. |
 
-#### The C-grid Helmholtz operator as a structured gaussx linear operator (`finitevolx._src.solvers.linear_operators`)
+#### The C-grid Helmholtz operator as a structured gaussx linear operator (`gridax_ops._src.solvers.linear_operators`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `helmholtz_operator` | function | The rectangular Helmholtz operator ``(∇² − λ)`` as a gaussx operator. |
 | `masked_helmholtz_operator` | function | The masked Helmholtz operator of `masked_laplacian` as a gaussx operator. |
 
-#### Geometric multigrid solver for variable-coefficient Helmholtz equations (`finitevolx._src.solvers.multigrid`)
+#### Geometric multigrid solver for variable-coefficient Helmholtz equations (`gridax_ops._src.solvers.multigrid`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `MultigridSolver` | class | Geometric multigrid V-cycle solver for the variable-coefficient Helmholtz equation:: |
 | `build_multigrid_solver` | function | Build a multigrid solver with precomputed level hierarchies. |
 
-#### Preconditioners for iterative elliptic solvers (`finitevolx._src.solvers.preconditioners`)
+#### Preconditioners for iterative elliptic solvers (`gridax_ops._src.solvers.preconditioners`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -462,7 +462,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `make_preconditioner` | function | Convenience factory that builds a preconditioner by name. |
 | `make_spectral_preconditioner` | function | Return a spectral-solve preconditioner for PCG. |
 
-#### Deprecated time steppers, kept for one release after the move to integrix (`finitevolx._src.timestepping._deprecated`)
+#### Deprecated time steppers, kept for one release after the move to integrix (`gridax_ops._src.timestepping._deprecated`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -470,13 +470,13 @@ if it is almost here, extend it where it lives. Regenerate with
 | `LeapfrogRAFSolver` | class | Deprecated: use ``integrix.march.LeapfrogRAFSolver`` with ``integrix.march.run``. |
 | `SplitExplicitRKSolver` | class | Deprecated: use ``integrix.march.SplitExplicitRKSolver`` with ``integrix.march.run``. |
 
-#### Convenience wrapper around `diffeqsolve` for ocean PDEs (`finitevolx._src.timestepping._solve`)
+#### Convenience wrapper around `diffeqsolve` for ocean PDEs (`gridax_ops._src.timestepping._solve`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `solve_ocean_pde` | function | Integrate an ocean PDE using diffrax. |
 
-#### Semi-Lagrangian advection: a pure step and its diffrax solver (`finitevolx._src.timestepping.semi_lagrangian`)
+#### Semi-Lagrangian advection: a pure step and its diffrax solver (`gridax_ops._src.timestepping.semi_lagrangian`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -484,13 +484,13 @@ if it is almost here, extend it where it lives. Regenerate with
 | `SemiLagrangianTerm` | class | Velocity term for `SemiLagrangianSolver` in ``diffeqsolve``. |
 | `semi_lagrangian_step` | function | Advect a 2D scalar field using semi-Lagrangian backtracking. |
 
-#### Convenience wrapper to lift 2D horizontal operators to multilayer fields (`finitevolx._src.vertical.multilayer`)
+#### Convenience wrapper to lift 2D horizontal operators to multilayer fields (`gridax_ops._src.vertical.multilayer`)
 
 | Name | Kind | What it does |
 |---|---|---|
 | `multilayer` | function | Lift a 2D horizontal operator to multilayer/multimode fields. |
 
-#### Vertical coupling matrix and layer/mode transforms for multi-layer ocean models (`finitevolx._src.vertical.vertical_modes`)
+#### Vertical coupling matrix and layer/mode transforms for multi-layer ocean models (`gridax_ops._src.vertical.vertical_modes`)
 
 | Name | Kind | What it does |
 |---|---|---|

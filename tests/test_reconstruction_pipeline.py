@@ -9,12 +9,7 @@ Covers:
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx import (
+from gridax_ops import (
     Advection2D,
     CartesianGrid2D,
     Mask2D,
@@ -33,6 +28,10 @@ from finitevolx import (
     upwind_5pt,
     upwind_flux,
 )
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -218,7 +217,7 @@ class TestLinearWENOConsistency:
 
     def test_weno3_smooth_approaches_linear3(self):
         """On smooth data, WENO3 output should match linear_3pts_left closely."""
-        from finitevolx._src.advection.weno import weno_3pts
+        from gridax_ops._src.advection.weno import weno_3pts
 
         # Smooth data with large offset to ensure smoothness ratios are good
         N = 100
@@ -233,7 +232,7 @@ class TestLinearWENOConsistency:
 
     def test_weno5_smooth_approaches_linear5(self):
         """On smooth data, WENO5 output should match linear_5pts_left closely."""
-        from finitevolx._src.advection.weno import weno_5pts
+        from gridax_ops._src.advection.weno import weno_5pts
 
         N = 100
         x = jnp.linspace(0, 2 * jnp.pi, N)

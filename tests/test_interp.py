@@ -7,15 +7,14 @@ from gridax import (
     CartesianGrid2D,
     CartesianGrid3D,
 )
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx._src.operators.interpolation import (
+from gridax_ops._src.operators.interpolation import (
     Interpolation1D,
     Interpolation2D,
     Interpolation3D,
 )
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 
 @pytest.fixture

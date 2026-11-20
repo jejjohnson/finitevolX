@@ -10,16 +10,15 @@ which fails on a tracer.
 
 from __future__ import annotations
 
+import gridax_ops as fvx
+from gridax_ops._src.solvers.iterative import (
+    _masked_face_dirichlet_laplacian,
+    _masked_neumann_laplacian,
+)
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-
-import finitevolx as fvx
-from finitevolx._src.solvers.iterative import (
-    _masked_face_dirichlet_laplacian,
-    _masked_neumann_laplacian,
-)
 
 N = 34
 

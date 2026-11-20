@@ -1,12 +1,7 @@
 """Tests for diagnostic operators: strain, enstrophy, energy, Okubo-Weiss, QG PV, vertical velocity."""
 
 from gridax import CartesianGrid2D, CartesianGrid3D, Mask3D
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx._src.operators.diagnostics import (
+from gridax_ops._src.operators.diagnostics import (
     available_potential_energy,
     bernoulli_potential,
     enstrophy,
@@ -24,8 +19,12 @@ from finitevolx._src.operators.diagnostics import (
     total_enstrophy,
     vertical_velocity,
 )
-from finitevolx._src.operators.jacobian import arakawa_jacobian
-from finitevolx._src.vertical.multilayer import multilayer
+from gridax_ops._src.operators.jacobian import arakawa_jacobian
+from gridax_ops._src.vertical.multilayer import multilayer
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 
 @pytest.fixture

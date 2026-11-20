@@ -44,12 +44,11 @@ import jax.numpy as jnp
 import matplotlib
 
 matplotlib.use("Agg")
+import gridax_ops as fvx
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
-
-import finitevolx as fvx
 
 jax.config.update("jax_enable_x64", True)
 

@@ -14,6 +14,7 @@ resolution-markers = [
 members = [
     "finitevolx",
     "gridax",
+    "gridax-ops",
 ]
 overrides = [{ name = "gaussx", git = "https://github.com/jejjohnson/gaussx?tag=v0.6.5" }]
 
@@ -513,18 +514,8 @@ name = "finitevolx"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "beartype" },
-    { name = "diffrax" },
-    { name = "equinox" },
-    { name = "gaussx" },
     { name = "gridax" },
-    { name = "integrix" },
-    { name = "jax" },
-    { name = "jaxlib" },
-    { name = "jaxtyping" },
-    { name = "lineax" },
-    { name = "scipy" },
-    { name = "spectraldiffx" },
+    { name = "gridax-ops" },
 ]
 
 [package.optional-dependencies]
@@ -551,8 +542,7 @@ examples = [
     { name = "zarr" },
 ]
 pipekit = [
-    { name = "pipekit-jax" },
-    { name = "pipekit-ops" },
+    { name = "gridax-ops", extra = ["pipekit"] },
 ]
 test = [
     { name = "coverage" },
@@ -574,18 +564,11 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "beartype", specifier = ">=0.20.0" },
     { name = "coverage", marker = "extra == 'test'", specifier = ">=7.6.0" },
     { name = "cyclopts", marker = "extra == 'examples'", specifier = ">=2.0.0" },
-    { name = "diffrax", specifier = ">=0.6.0" },
-    { name = "equinox", specifier = ">=0.11.0" },
-    { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?tag=v0.6.5" },
     { name = "gridax", editable = "packages/gridax" },
-    { name = "integrix", git = "https://github.com/jejjohnson/integrix?tag=v0.0.3" },
-    { name = "jax", specifier = ">=0.4.38" },
-    { name = "jaxlib", specifier = ">=0.4.38" },
-    { name = "jaxtyping", specifier = ">=0.3.0" },
-    { name = "lineax", specifier = ">=0.1.0" },
+    { name = "gridax-ops", editable = "packages/gridax-ops" },
+    { name = "gridax-ops", extras = ["pipekit"], marker = "extra == 'pipekit'", editable = "packages/gridax-ops" },
     { name = "loguru", marker = "extra == 'examples'", specifier = ">=0.7.2" },
     { name = "matplotlib", marker = "extra == 'examples'", specifier = ">=3.9.0" },
     { name = "matplotlib", marker = "extra == 'test'", specifier = ">=3.9.0" },
@@ -598,16 +581,12 @@ requires-dist = [
     { name = "numpy", marker = "extra == 'examples'", specifier = ">=2.0.0" },
     { name = "pillow", marker = "extra == 'examples'", specifier = ">=11.0.0" },
     { name = "pillow", marker = "extra == 'test'", specifier = ">=11.0.0" },
-    { name = "pipekit-jax", marker = "extra == 'pipekit'", git = "https://github.com/jejjohnson/pipekit?subdirectory=packages%2Fpipekit-jax&tag=pipekit-ops-v0.2.1" },
-    { name = "pipekit-ops", marker = "extra == 'pipekit'", git = "https://github.com/jejjohnson/pipekit?subdirectory=packages%2Fpipekit-ops&tag=pipekit-ops-v0.2.1" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3.0" },
     { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=5.0.0" },
     { name = "pytest-pretty", marker = "extra == 'test'", specifier = ">=1.2.0" },
     { name = "pytest-xdist", marker = "extra == 'test'", specifier = ">=3.5.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.0" },
-    { name = "scipy", specifier = ">=1.14.0" },
-    { name = "spectraldiffx", git = "https://github.com/jejjohnson/spectraldiffx.git?tag=0.1.1" },
     { name = "tqdm", marker = "extra == 'examples'", specifier = ">=4.66.0" },
     { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.23" },
     { name = "xarray", marker = "extra == 'examples'", specifier = ">=2025.1.0" },
@@ -732,6 +711,50 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.0.0" },
     { name = "scipy", specifier = ">=1.14.0" },
 ]
+
+[[package]]
+name = "gridax-ops"
+version = "0.1.0"
+source = { editable = "packages/gridax-ops" }
+dependencies = [
+    { name = "beartype" },
+    { name = "diffrax" },
+    { name = "equinox" },
+    { name = "gaussx" },
+    { name = "gridax" },
+    { name = "integrix" },
+    { name = "jax" },
+    { name = "jaxlib" },
+    { name = "jaxtyping" },
+    { name = "lineax" },
+    { name = "scipy" },
+    { name = "spectraldiffx" },
+]
+
+[package.optional-dependencies]
+pipekit = [
+    { name = "pipekit-jax" },
+    { name = "pipekit-ops" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "beartype", specifier = ">=0.20.0" },
+    { name = "diffrax", specifier = ">=0.6.0" },
+    { name = "equinox", specifier = ">=0.11.0" },
+    { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?tag=v0.6.5" },
+    { name = "gridax", editable = "packages/gridax" },
+    { name = "integrix", git = "https://github.com/jejjohnson/integrix?tag=v0.0.3" },
+    { name = "jax", specifier = ">=0.4.38" },
+    { name = "jaxlib", specifier = ">=0.4.38" },
+    { name = "jaxtyping", specifier = ">=0.3.0" },
+    { name = "lineax", specifier = ">=0.1.0" },
+    { name = "pipekit-jax", marker = "extra == 'pipekit'", git = "https://github.com/jejjohnson/pipekit?subdirectory=packages%2Fpipekit-jax&tag=pipekit-ops-v0.2.1" },
+    { name = "pipekit-ops", marker = "extra == 'pipekit'", git = "https://github.com/jejjohnson/pipekit?subdirectory=packages%2Fpipekit-ops&tag=pipekit-ops-v0.2.1" },
+    { name = "scipy", specifier = ">=1.14.0" },
+    { name = "spectraldiffx", git = "https://github.com/jejjohnson/spectraldiffx.git?tag=0.1.1" },
+]
+provides-extras = ["pipekit"]
 
 [[package]]
 name = "griffelib"

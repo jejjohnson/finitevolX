@@ -7,16 +7,15 @@ always safe to divide by.
 """
 
 from gridax import Mask2D, Mask3D
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx._src.operators.reductions import (
+from gridax_ops._src.operators.reductions import (
     masked_mean,
     masked_moments,
     masked_std,
 )
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 NY, NX = 6, 7
 NSAMPLE = 9

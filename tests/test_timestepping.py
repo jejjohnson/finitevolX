@@ -4,12 +4,7 @@ from __future__ import annotations
 
 import itertools
 
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx import (
+from gridax_ops import (
     ab2_step,
     ab3_step,
     euler_step,
@@ -18,6 +13,10 @@ from finitevolx import (
     rk3_ssp_step,
     rk4_step,
 )
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -234,8 +233,7 @@ class TestPureFunctionalVsDiffrax:
     def test_heun_matches_rk2heun(self):
         """Pure heun_step should agree with RK2Heun diffrax solver."""
         import diffrax as dfx
-
-        from finitevolx import RK2Heun
+        from gridax_ops import RK2Heun
 
         y0 = jnp.array(1.0)
         dt = 0.1
@@ -260,8 +258,7 @@ class TestPureFunctionalVsDiffrax:
     def test_rk4_matches_rk4classic(self):
         """Pure rk4_step should agree with RK4Classic diffrax solver."""
         import diffrax as dfx
-
-        from finitevolx import RK4Classic
+        from gridax_ops import RK4Classic
 
         y0 = jnp.array(1.0)
         dt = 0.1

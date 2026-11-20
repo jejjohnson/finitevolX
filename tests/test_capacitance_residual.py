@@ -17,11 +17,10 @@ one cell inside the coast where CG puts the wall.
 
 from __future__ import annotations
 
+import gridax_ops as fvx
 import jax.numpy as jnp
 import numpy as np
 import pytest
-
-import finitevolx as fvx
 
 NY, NX = 34, 40
 DX, DY = 1.0 / (NX - 2), 1.0 / (NY - 2)

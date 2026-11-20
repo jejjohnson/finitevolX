@@ -6,62 +6,62 @@ mathematical background.
 
 ## 1-D Difference Stencils
 
-::: finitevolx.diff_x_fwd_1d
+::: gridax_ops.diff_x_fwd_1d
 
-::: finitevolx.diff_x_bwd_1d
+::: gridax_ops.diff_x_bwd_1d
 
 ## 2-D Difference Stencils
 
-::: finitevolx.diff_x_fwd
+::: gridax_ops.diff_x_fwd
 
-::: finitevolx.diff_y_fwd
+::: gridax_ops.diff_y_fwd
 
-::: finitevolx.diff_x_bwd
+::: gridax_ops.diff_x_bwd
 
-::: finitevolx.diff_y_bwd
+::: gridax_ops.diff_y_bwd
 
 ## 3-D Difference Stencils
 
-::: finitevolx.diff_x_fwd_3d
+::: gridax_ops.diff_x_fwd_3d
 
-::: finitevolx.diff_y_fwd_3d
+::: gridax_ops.diff_y_fwd_3d
 
-::: finitevolx.diff_x_bwd_3d
+::: gridax_ops.diff_x_bwd_3d
 
-::: finitevolx.diff_y_bwd_3d
+::: gridax_ops.diff_y_bwd_3d
 
 ## 1-D Averaging Stencils
 
-::: finitevolx.avg_x_fwd_1d
+::: gridax_ops.avg_x_fwd_1d
 
-::: finitevolx.avg_x_bwd_1d
+::: gridax_ops.avg_x_bwd_1d
 
 ## 2-D Averaging Stencils (2-point)
 
-::: finitevolx.avg_x_fwd
+::: gridax_ops.avg_x_fwd
 
-::: finitevolx.avg_y_fwd
+::: gridax_ops.avg_y_fwd
 
-::: finitevolx.avg_x_bwd
+::: gridax_ops.avg_x_bwd
 
-::: finitevolx.avg_y_bwd
+::: gridax_ops.avg_y_bwd
 
 ## 2-D Averaging Stencils (4-point bilinear)
 
-::: finitevolx.avg_xy_fwd
+::: gridax_ops.avg_xy_fwd
 
-::: finitevolx.avg_xy_bwd
+::: gridax_ops.avg_xy_bwd
 
-::: finitevolx.avg_xbwd_yfwd
+::: gridax_ops.avg_xbwd_yfwd
 
-::: finitevolx.avg_xfwd_ybwd
+::: gridax_ops.avg_xfwd_ybwd
 
 ## 3-D Averaging Stencils
 
-::: finitevolx.avg_x_fwd_3d
+::: gridax_ops.avg_x_fwd_3d
 
-::: finitevolx.avg_y_fwd_3d
+::: gridax_ops.avg_y_fwd_3d
 
-::: finitevolx.avg_x_bwd_3d
+::: gridax_ops.avg_x_bwd_3d
 
-::: finitevolx.avg_y_bwd_3d
+::: gridax_ops.avg_y_bwd_3d

@@ -4,11 +4,11 @@ Land/ocean masks with automatic stencil dispatch for Arakawa C-grids.
 
 ## Grid Mask
 
-::: finitevolx.Mask2D
+::: gridax_ops.Mask2D
 
 ## Stencil Capability
 
-::: finitevolx.StencilCapability2D
+::: gridax_ops.StencilCapability2D
 
 ## Masked Sample Statistics
 
@@ -17,7 +17,7 @@ member) that exclude dry cells. These are what a per-gridpoint
 standardising transform needs as its `loc` and `scale`:
 
 ```python
-from finitevolx import masked_moments
+from gridax_ops import masked_moments
 
 # samples: [N, Ny, Nx] stacked snapshots; mask: Mask2D
 loc, scale = masked_moments(samples, mask)          # per gridpoint
@@ -43,8 +43,8 @@ Pick the staggering location with `location=` (`"h"`, `"u"`, `"v"`,
 `"xy_corner"`, or `"w"` on `Mask3D`) so U- and V-point fields use their
 own C-grid mask.
 
-::: finitevolx.masked_mean
+::: gridax_ops.masked_mean
 
-::: finitevolx.masked_std
+::: gridax_ops.masked_std
 
-::: finitevolx.masked_moments
+::: gridax_ops.masked_moments

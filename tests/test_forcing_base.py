@@ -4,17 +4,16 @@ from __future__ import annotations
 
 import diffrax as dfx
 import equinox as eqx
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx import (
+from gridax_ops import (
     AbstractForcing,
     ForcingProduct,
     ForcingSum,
     TimeVaryingForcing,
 )
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 
 class Damp(AbstractForcing):

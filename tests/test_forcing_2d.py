@@ -3,12 +3,7 @@
 from __future__ import annotations
 
 import equinox as eqx
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx import (
+from gridax_ops import (
     AbstractForcing,
     CartesianGrid2D,
     Difference2D,
@@ -21,6 +16,11 @@ from finitevolx import (
     WindStress2D,
     multilayer,
 )
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
+
 from tests.fixtures.inputs import (
     make_grid_2d,
     make_h_field_2d,

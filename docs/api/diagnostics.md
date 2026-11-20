@@ -47,11 +47,11 @@ averages `h` to X-points.
 
 ## Class operators
 
-::: finitevolx.Energetics2D
+::: gridax_ops.Energetics2D
 
-::: finitevolx.Strain2D
+::: gridax_ops.Strain2D
 
-::: finitevolx.QGPotentialVorticity2D
+::: gridax_ops.QGPotentialVorticity2D
 
 Enstrophy and potential enstrophy are methods of
 [`Vorticity2D`](vorticity.md) (`enstrophy`, `potential_enstrophy`), next to
@@ -61,15 +61,15 @@ the vorticity they are built from.
 
 ### Kinetic Energy
 
-::: finitevolx.kinetic_energy
+::: gridax_ops.kinetic_energy
 
 ### Bernoulli Potential
 
-::: finitevolx.bernoulli_potential
+::: gridax_ops.bernoulli_potential
 
 ### Relative Vorticity
 
-::: finitevolx.relative_vorticity_cgrid
+::: gridax_ops.relative_vorticity_cgrid
 
 ### Potential Vorticity
 
@@ -78,46 +78,46 @@ the vorticity they are built from.
 included); `potential_vorticity` is the pointwise `(omega + f) / h` for
 inputs that already share a grid point.
 
-::: finitevolx.sw_potential_vorticity
+::: gridax_ops.sw_potential_vorticity
 
-::: finitevolx.potential_vorticity
+::: gridax_ops.potential_vorticity
 
 ### QG Potential Vorticity
 
-::: finitevolx.qg_potential_vorticity
+::: gridax_ops.qg_potential_vorticity
 
 ### Stretching Term (Multi-Layer QG)
 
-::: finitevolx.stretching_term
+::: gridax_ops.stretching_term
 
 ### Strain
 
-::: finitevolx.shear_strain
+::: gridax_ops.shear_strain
 
-::: finitevolx.tensor_strain
+::: gridax_ops.tensor_strain
 
-::: finitevolx.strain_magnitude_squared
+::: gridax_ops.strain_magnitude_squared
 
 ### Okubo-Weiss Parameter
 
-::: finitevolx.okubo_weiss
+::: gridax_ops.okubo_weiss
 
 ### Enstrophy
 
-::: finitevolx.enstrophy
+::: gridax_ops.enstrophy
 
-::: finitevolx.potential_enstrophy
+::: gridax_ops.potential_enstrophy
 
 ### Available Potential Energy
 
-::: finitevolx.available_potential_energy
+::: gridax_ops.available_potential_energy
 
 ### Domain-Integrated Quantities
 
-::: finitevolx.total_energy
+::: gridax_ops.total_energy
 
-::: finitevolx.total_enstrophy
+::: gridax_ops.total_enstrophy
 
 ### Vertical Velocity
 
-::: finitevolx.vertical_velocity
+::: gridax_ops.vertical_velocity

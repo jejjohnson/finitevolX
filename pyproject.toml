@@ -1,7 +1,7 @@
 [project]
 name = "finitevolx"
 version = "0.1.0"
-description = "Arakawa C-grid finite volume operators in JAX."
+description = "Deprecated: finitevolX is now gridax-ops (import gridax_ops) on gridax."
 authors = [
     { name = "Juan Emmanuel Johnson", email = "jemanjohnson34@gmail.com" },
     { name = "Takaya Uchida", email = "roxyboy.guppy@gmail.com" },
@@ -22,19 +22,11 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Development Status :: 2 - Pre-Alpha",
 ]
+# The finitevolx distribution is a deprecated shim for one 0.X release: the
+# code is gridax-ops (packages/gridax-ops, import gridax_ops) on gridax
+# (packages/gridax, import gridax). `import finitevolx` warns and re-exports.
 dependencies = [
-    "jax>=0.4.38",
-    "jaxlib>=0.4.38",
-    "jaxtyping>=0.3.0",
-    "beartype>=0.20.0",
-    "equinox>=0.11.0",
-    "scipy>=1.14.0",
-    "lineax>=0.1.0",
-    "diffrax>=0.6.0",
-    "spectraldiffx>=0.1.1",
-    "gaussx>=0.6.5",
-    "integrix>=0.0.3",
-    # Grids and masks as NumPy data (packages/gridax in this workspace).
+    "gridax-ops>=0.1.0",
     "gridax>=0.0.0",
 ]
 
@@ -43,10 +35,11 @@ dependencies = [
 # This repository is a uv workspace: the root project (finitevolx) and
 # packages/gridax, the NumPy-only grid and mask package it builds on.
 [tool.uv.workspace]
-members = ["packages/gridax"]
+members = ["packages/gridax", "packages/gridax-ops"]
 
 [tool.uv.sources]
 gridax = { workspace = true }
+gridax-ops = { workspace = true }
 spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "0.1.1" }
 gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.6.5" }
 # integrix owns the generic time steppers. Its own gaussx pin (v0.6.12) is
@@ -105,10 +98,9 @@ examples = [
     "zarr>=3.1.5",
 ]
 pipekit = [
-    # Tier-B operator layer, `finitevolx.pipekit` (pipekit Operators over
-    # the C-grid primitives). `import finitevolx` never imports these.
-    "pipekit-ops",
-    "pipekit-jax",
+    # Tier-B operator layer, `gridax_ops.pipekit` (pipekit Operators over
+    # the C-grid primitives). `import gridax_ops` never imports these.
+    "gridax-ops[pipekit]",
 ]
 docs = [
     "mkdocs>=1.6.0",
@@ -128,7 +120,7 @@ dev = [
 
 [tool.pytest.ini_options]
 filterwarnings = ["error", "ignore::DeprecationWarning"]
-testpaths = ["finitevolx", "tests", "packages/gridax/tests"]
+testpaths = ["tests", "packages/gridax/tests"]
 xfail_strict = true
 addopts = "--strict-markers"
 # Tiers (see tests/conftest.py).  Unmarked tests are the fast tier.
@@ -209,7 +201,7 @@ skip_covered = true
 branch = true
 command_line = "--module pytest"
 data_file = "reports/.coverage"
-source = ["finitevolx", "gridax"]
+source = ["gridax_ops", "gridax", "finitevolx"]
 
 [tool.coverage.xml]
 output = "reports/coverage.xml"

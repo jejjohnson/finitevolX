@@ -11,12 +11,7 @@ Tests cover:
 
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx._src.advection.weno import (
+from gridax_ops._src.advection.weno import (
     weno_3pts,
     weno_3pts_improved,
     weno_3pts_improved_right,
@@ -30,6 +25,10 @@ from finitevolx._src.advection.weno import (
     weno_9pts,
     weno_9pts_right,
 )
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 # ---------------------------------------------------------------------------
 # Helpers

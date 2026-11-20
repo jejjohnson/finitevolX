@@ -22,15 +22,10 @@ from __future__ import annotations
 
 import warnings
 
-import jax
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-import finitevolx as fvx
-from finitevolx._src.diffusion.diffusion import _diffusion_2d_fluxes_impl
-from finitevolx._src.operators._ghost import interior, zero_z_ghosts
-from finitevolx._src.operators.stencils import (
+import gridax_ops as fvx
+from gridax_ops._src.diffusion.diffusion import _diffusion_2d_fluxes_impl
+from gridax_ops._src.operators._ghost import interior, zero_z_ghosts
+from gridax_ops._src.operators.stencils import (
     _materialize,
     _neighbours,
     diff_x_bwd,
@@ -44,6 +39,10 @@ from finitevolx._src.operators.stencils import (
     diff_y_fwd,
     diff_y_fwd_3d,
 )
+import jax
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 NY, NX = 9, 12  # total shape incl. ghost ring; deliberately non-square
 
@@ -328,7 +327,7 @@ class TestUnrolledSmoothnessIndicator:
         ],
     )
     def test_matches_einsum_form(self, name, npts, monkeypatch):
-        from finitevolx._src.advection import weno
+        from gridax_ops._src.advection import weno
 
         qs = [_field(NY, NX, seed=k) * (1 + k) for k in range(npts)]
         fn = getattr(weno, name)
@@ -339,7 +338,7 @@ class TestUnrolledSmoothnessIndicator:
         np.testing.assert_allclose(out, ref, rtol=1e-13, atol=1e-13)
 
     def test_keeps_float32(self):
-        from finitevolx._src.advection.weno import weno_7pts
+        from gridax_ops._src.advection.weno import weno_7pts
 
         qs = [jnp.ones((NY, NX), dtype=jnp.float32) * k for k in range(7)]
         assert weno_7pts(*qs).dtype == jnp.float32

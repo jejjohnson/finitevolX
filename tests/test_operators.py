@@ -8,15 +8,14 @@ side.  U-points live at east faces (j, i+1/2), V-points at north faces
 from __future__ import annotations
 
 from gridax import CartesianGrid2D
-import jax.numpy as jnp
-import numpy as np
-import pytest
-
-from finitevolx._src.operators.diagnostics import (
+from gridax_ops._src.operators.diagnostics import (
     bernoulli_potential,
     kinetic_energy,
 )
-from finitevolx._src.utils.constants import GRAVITY
+from gridax_ops._src.utils.constants import GRAVITY
+import jax.numpy as jnp
+import numpy as np
+import pytest
 
 
 @pytest.fixture()
@@ -222,7 +221,7 @@ class TestOperatorIdentities:
         v =  ∂ψ/∂x  (from X-point via diff_x_X_to_V)
         div(u, v) = ∂u/∂x + ∂v/∂y = -∂²ψ/∂x∂y + ∂²ψ/∂x∂y = 0
         """
-        from finitevolx._src.operators.difference import Difference2D
+        from gridax_ops._src.operators.difference import Difference2D
 
         diff = Difference2D(grid=grid2d)
         x = jnp.arange(grid2d.Nx, dtype=float)
@@ -248,7 +247,7 @@ class TestOperatorIdentities:
         [1:-1, 1:-1], so reading their ghost ring gives 0 instead of the
         physical value).
         """
-        from finitevolx._src.operators.difference import Difference2D
+        from gridax_ops._src.operators.difference import Difference2D
 
         diff = Difference2D(grid=grid2d)
         x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
@@ -269,7 +268,7 @@ class TestOperatorIdentities:
         laplacian = diff_x_U_to_T(diff_x_T_to_U(h)) + diff_y_V_to_T(diff_y_T_to_V(h))
         This must match calling diff.laplacian(h) directly at the deep interior.
         """
-        from finitevolx._src.operators.difference import Difference2D
+        from gridax_ops._src.operators.difference import Difference2D
 
         diff = Difference2D(grid=grid2d)
         x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx

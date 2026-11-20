@@ -8,12 +8,11 @@ tightens) and the gradient behaviour at the kink.
 
 from __future__ import annotations
 
+from gridax_ops import smooth_abs, smooth_clamp, smooth_max
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-
-from finitevolx import smooth_abs, smooth_clamp, smooth_max
 
 
 class TestSmoothAbs:

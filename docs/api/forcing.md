@@ -11,13 +11,13 @@ padding, or masking.  The output has the shape of the inputs, so to get a
 full `[Ny, Nx]` field slice every array input to the interior `[1:-1, 1:-1]`
 first, then pad the result back with `interior()` and apply any mask.
 
-::: finitevolx.wind_stress_tendency
+::: gridax_ops.wind_stress_tendency
 
-::: finitevolx.linear_drag_tendency
+::: gridax_ops.linear_drag_tendency
 
-::: finitevolx.quadratic_drag_tendency
+::: gridax_ops.quadratic_drag_tendency
 
-::: finitevolx.rayleigh_tendency
+::: gridax_ops.rayleigh_tendency
 
 ## Base class and composition
 
@@ -29,13 +29,13 @@ by a fixed or callable factor (sponges, seasonal cycles), and
 interpolated with `diffrax.LinearInterpolation` — before calling a
 time-agnostic forcing.
 
-::: finitevolx.AbstractForcing
+::: gridax_ops.AbstractForcing
 
-::: finitevolx.ForcingSum
+::: gridax_ops.ForcingSum
 
-::: finitevolx.ForcingProduct
+::: gridax_ops.ForcingProduct
 
-::: finitevolx.TimeVaryingForcing
+::: gridax_ops.TimeVaryingForcing
 
 ## 2D operators
 
@@ -45,18 +45,18 @@ the zero ghost ring, and apply an optional `Mask2D` given at construction.
 Multilayer models (`[nl, Ny, Nx]`) reuse them through `multilayer()` or by
 calling them on a single layer, e.g. bottom drag on `u[-1], v[-1]`.
 
-::: finitevolx.WindStress2D
+::: gridax_ops.WindStress2D
 
 `WindCurl2D` is the vorticity / QG-PV form of the same forcing: the C-grid
 curl of the face-interpolated stress divided by `rho0 * H`, at X-points.
 
-::: finitevolx.WindCurl2D
+::: gridax_ops.WindCurl2D
 
-::: finitevolx.LinearDrag2D
+::: gridax_ops.LinearDrag2D
 
-::: finitevolx.QuadraticDrag2D
+::: gridax_ops.QuadraticDrag2D
 
-::: finitevolx.RayleighDamping2D
+::: gridax_ops.RayleighDamping2D
 
 ## 3D operators
 
@@ -71,10 +71,10 @@ patterns:
 | Bottom injection | `LinearDrag3D`, `QuadraticDrag3D` | bottom interior level `k = 1` only |
 | Uniform vmap | `RayleighDamping3D` | every interior level (z-ghosts zeroed) |
 
-::: finitevolx.WindStress3D
+::: gridax_ops.WindStress3D
 
-::: finitevolx.LinearDrag3D
+::: gridax_ops.LinearDrag3D
 
-::: finitevolx.QuadraticDrag3D
+::: gridax_ops.QuadraticDrag3D
 
-::: finitevolx.RayleighDamping3D
+::: gridax_ops.RayleighDamping3D
