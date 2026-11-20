@@ -240,7 +240,7 @@ def _difference_entries(
     v3d,
 ) -> list[Entry]:
     """Register goldens for Difference1D / Difference2D / Difference3D."""
-    from gridax_ops._src.operators.difference import (
+    from gridax_jax._src.operators.difference import (
         Difference1D,
         Difference2D,
         Difference3D,
@@ -372,7 +372,7 @@ def _interpolation_entries(
     v3d,
 ) -> list[Entry]:
     """Register goldens for Interpolation1D / 2D / 3D."""
-    from gridax_ops._src.operators.interpolation import (
+    from gridax_jax._src.operators.interpolation import (
         Interpolation1D,
         Interpolation2D,
         Interpolation3D,
@@ -463,7 +463,7 @@ def _interpolation_entries(
 
 def _divergence_entries(grid2d, mask2d, u2d, v2d) -> list[Entry]:
     """Register goldens for Divergence2D (call + noflux)."""
-    from gridax_ops._src.operators.divergence import Divergence2D
+    from gridax_jax._src.operators.divergence import Divergence2D
 
     div = Divergence2D(grid=grid2d)
     divm = Divergence2D(grid=grid2d, mask=mask2d)
@@ -480,7 +480,7 @@ def _vorticity_entries(
     grid2d, grid3d, mask2d, mask3d, h2d, u2d, v2d, q2d, u3d, v3d
 ) -> list[Entry]:
     """Register goldens for Vorticity2D and Vorticity3D."""
-    from gridax_ops._src.operators.vorticity import Vorticity2D, Vorticity3D
+    from gridax_jax._src.operators.vorticity import Vorticity2D, Vorticity3D
 
     from tests.fixtures.inputs import make_f_field_2d
 
@@ -602,7 +602,7 @@ def _spherical_entries(
     sgrid2d, sgrid3d, mask2d, mask3d, h2d, u2d, v2d, q2d, h3d, u3d, v3d
 ) -> list[Entry]:
     """Register goldens for the full Spherical operator family."""
-    from gridax_ops._src.operators.spherical_compound import (
+    from gridax_jax._src.operators.spherical_compound import (
         SphericalDivergence2D,
         SphericalDivergence3D,
         SphericalLaplacian2D,
@@ -610,7 +610,7 @@ def _spherical_entries(
         SphericalVorticity2D,
         SphericalVorticity3D,
     )
-    from gridax_ops._src.operators.spherical_difference import (
+    from gridax_jax._src.operators.spherical_difference import (
         SphericalDifference2D,
         SphericalDifference3D,
     )
@@ -831,13 +831,13 @@ def _diffusion_entries(
 ) -> list[Entry]:
     """Register goldens for Diffusion2D/3D, BiharmonicDiffusion2D/3D,
     and MomentumAdvection2D/3D."""
-    from gridax_ops._src.diffusion.diffusion import (
+    from gridax_jax._src.diffusion.diffusion import (
         BiharmonicDiffusion2D,
         BiharmonicDiffusion3D,
         Diffusion2D,
         Diffusion3D,
     )
-    from gridax_ops._src.diffusion.momentum import (
+    from gridax_jax._src.diffusion.momentum import (
         MomentumAdvection2D,
         MomentumAdvection3D,
     )
@@ -938,7 +938,7 @@ def _advection_entries(
     * ``weno5`` — the mask-dispatchable path (adaptive tier selection +
       post-compute mask.h).
     """
-    from gridax_ops._src.advection.advection import (
+    from gridax_jax._src.advection.advection import (
         Advection1D,
         Advection2D,
         Advection3D,
@@ -1016,7 +1016,7 @@ def _coriolis_entries(
     grid2d, grid3d, mask2d, mask3d, u2d, v2d, u3d, v3d
 ) -> list[Entry]:
     """Register goldens for Coriolis2D / Coriolis3D."""
-    from gridax_ops._src.operators.coriolis import Coriolis2D, Coriolis3D
+    from gridax_jax._src.operators.coriolis import Coriolis2D, Coriolis3D
 
     from tests.fixtures.inputs import make_f_field_2d
 
@@ -1037,12 +1037,12 @@ def _coriolis_entries(
 
 def _diagnostic_entries(grid2d, mask2d, h2d, u2d, v2d) -> list[Entry]:
     """Register goldens for the diagnostic classes and ArakawaJacobian2D."""
-    from gridax_ops._src.operators.diagnostic_operators import (
+    from gridax_jax._src.operators.diagnostic_operators import (
         Energetics2D,
         QGPotentialVorticity2D,
         Strain2D,
     )
-    from gridax_ops._src.operators.jacobian import ArakawaJacobian2D
+    from gridax_jax._src.operators.jacobian import ArakawaJacobian2D
 
     from tests.fixtures.inputs import (
         make_psi_field_2layer,

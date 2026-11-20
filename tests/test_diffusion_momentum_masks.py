@@ -20,13 +20,13 @@ API on ``Mask2D`` / ``Mask3D`` class fields:
 from __future__ import annotations
 
 import equinox as eqx
-from gridax_ops._src.diffusion.diffusion import (
+from gridax_jax._src.diffusion.diffusion import (
     BiharmonicDiffusion2D,
     BiharmonicDiffusion3D,
     Diffusion2D,
     Diffusion3D,
 )
-from gridax_ops._src.diffusion.momentum import (
+from gridax_jax._src.diffusion.momentum import (
     MomentumAdvection2D,
     MomentumAdvection3D,
 )
@@ -320,7 +320,7 @@ def _basin_mask_2d(n: int = 12) -> np.ndarray:
 
 def _biharmonic_cases():
     """(name, op, area weight [Ny, Nx], wet [Ny, Nx]) for the 2-D operators."""
-    from gridax_ops import (
+    from gridax_jax import (
         CartesianGrid2D,
         Mask2D,
         SphericalBiharmonicDiffusion2D,
@@ -415,7 +415,7 @@ class TestMaskedBiharmonicNoFlux:
 
 def test_masked_biharmonic_3d_constant_and_conservation():
     """The 3-D operators apply the same masked ``Dm(Dm(h))`` per level."""
-    from gridax_ops import (
+    from gridax_jax import (
         CartesianGrid3D,
         Mask3D,
         SphericalBiharmonicDiffusion3D,

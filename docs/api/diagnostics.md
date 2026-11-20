@@ -47,11 +47,11 @@ averages `h` to X-points.
 
 ## Class operators
 
-::: gridax_ops.Energetics2D
+::: gridax_jax.Energetics2D
 
-::: gridax_ops.Strain2D
+::: gridax_jax.Strain2D
 
-::: gridax_ops.QGPotentialVorticity2D
+::: gridax_jax.QGPotentialVorticity2D
 
 Enstrophy and potential enstrophy are methods of
 [`Vorticity2D`](vorticity.md) (`enstrophy`, `potential_enstrophy`), next to
@@ -61,15 +61,15 @@ the vorticity they are built from.
 
 ### Kinetic Energy
 
-::: gridax_ops.kinetic_energy
+::: gridax_jax.kinetic_energy
 
 ### Bernoulli Potential
 
-::: gridax_ops.bernoulli_potential
+::: gridax_jax.bernoulli_potential
 
 ### Relative Vorticity
 
-::: gridax_ops.relative_vorticity_cgrid
+::: gridax_jax.relative_vorticity_cgrid
 
 ### Potential Vorticity
 
@@ -78,46 +78,46 @@ the vorticity they are built from.
 included); `potential_vorticity` is the pointwise `(omega + f) / h` for
 inputs that already share a grid point.
 
-::: gridax_ops.sw_potential_vorticity
+::: gridax_jax.sw_potential_vorticity
 
-::: gridax_ops.potential_vorticity
+::: gridax_jax.potential_vorticity
 
 ### QG Potential Vorticity
 
-::: gridax_ops.qg_potential_vorticity
+::: gridax_jax.qg_potential_vorticity
 
 ### Stretching Term (Multi-Layer QG)
 
-::: gridax_ops.stretching_term
+::: gridax_jax.stretching_term
 
 ### Strain
 
-::: gridax_ops.shear_strain
+::: gridax_jax.shear_strain
 
-::: gridax_ops.tensor_strain
+::: gridax_jax.tensor_strain
 
-::: gridax_ops.strain_magnitude_squared
+::: gridax_jax.strain_magnitude_squared
 
 ### Okubo-Weiss Parameter
 
-::: gridax_ops.okubo_weiss
+::: gridax_jax.okubo_weiss
 
 ### Enstrophy
 
-::: gridax_ops.enstrophy
+::: gridax_jax.enstrophy
 
-::: gridax_ops.potential_enstrophy
+::: gridax_jax.potential_enstrophy
 
 ### Available Potential Energy
 
-::: gridax_ops.available_potential_energy
+::: gridax_jax.available_potential_energy
 
 ### Domain-Integrated Quantities
 
-::: gridax_ops.total_energy
+::: gridax_jax.total_energy
 
-::: gridax_ops.total_enstrophy
+::: gridax_jax.total_enstrophy
 
 ### Vertical Velocity
 
-::: gridax_ops.vertical_velocity
+::: gridax_jax.vertical_velocity

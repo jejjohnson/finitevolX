@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import gridax_ops as fvx
-from gridax_ops._src.solvers.inhomogeneous import (
+import gridax_jax as fvx
+from gridax_jax._src.solvers.inhomogeneous import (
     KnownValueLifting,
     SolveDomain,
     boundary_ring,
@@ -125,7 +125,7 @@ class TestCoastRing:
 
     def test_x_basin_is_the_cgrid_wall(self):
         """For psi on a from_interior rectangle: X rows / columns 0 and N-2."""
-        from gridax_ops import Mask2D
+        from gridax_jax import Mask2D
 
         m = np.zeros((7, 9), dtype=bool)
         m[1:-1, 1:-1] = True

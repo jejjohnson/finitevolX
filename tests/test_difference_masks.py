@@ -21,7 +21,7 @@ See ``tests/fixtures/`` for the shared inputs and golden helpers.
 
 from __future__ import annotations
 
-from gridax_ops._src.operators.difference import (
+from gridax_jax._src.operators.difference import (
     Difference1D,
     Difference2D,
     Difference3D,

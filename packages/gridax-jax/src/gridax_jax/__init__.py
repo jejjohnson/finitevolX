@@ -1,0 +1,832 @@
+from gridax import (
+    ArakawaCGrid1D,
+    ArakawaCGrid2D,
+    ArakawaCGrid3D,
+    CartesianGrid1D,
+    CartesianGrid2D,
+    CartesianGrid3D,
+    CurvilinearGrid1D,
+    CurvilinearGrid2D,
+    CurvilinearGrid3D,
+    Mask1D,
+    Mask2D,
+    Mask3D,
+    SphericalGrid2D,
+    SphericalGrid3D,
+    StencilCapability1D,
+    StencilCapability2D,
+    StencilCapability3D,
+)
+
+from gridax_jax._src.advection.advection import Advection1D, Advection2D, Advection3D
+from gridax_jax._src.advection.face_flux import (
+    rusanov_flux,
+    uv_center_flux,
+    uv_node_flux,
+)
+from gridax_jax._src.advection.flux import upwind_flux
+from gridax_jax._src.advection.limiters import mc, minmod, superbee, van_leer
+from gridax_jax._src.advection.linear import (
+    linear_2pts,
+    linear_3pts_left,
+    linear_3pts_right,
+    linear_4pts,
+    linear_5pts_left,
+    linear_5pts_right,
+    linear_6pts,
+)
+from gridax_jax._src.advection.reconstruct_fn import (
+    plusminus,
+    reconstruct,
+    upwind_1pt,
+    upwind_3pt,
+    upwind_5pt,
+)
+from gridax_jax._src.advection.reconstruction import (
+    Reconstruction1D,
+    Reconstruction2D,
+    Reconstruction3D,
+)
+from gridax_jax._src.advection.spherical_advection import (
+    SphericalAdvection2D,
+    SphericalAdvection3D,
+)
+from gridax_jax._src.advection.weno import (
+    weno_3pts,
+    weno_3pts_improved,
+    weno_3pts_improved_right,
+    weno_3pts_right,
+    weno_5pts,
+    weno_5pts_improved,
+    weno_5pts_improved_right,
+    weno_5pts_right,
+    weno_7pts,
+    weno_7pts_right,
+    weno_9pts,
+    weno_9pts_right,
+)
+from gridax_jax._src.boundary.bc_1d import (
+    Dirichlet1D,
+    Extrapolation1D,
+    Neumann1D,
+    Outflow1D,
+    Periodic1D,
+    Reflective1D,
+    Robin1D,
+    Slip1D,
+    Sponge1D,
+)
+from gridax_jax._src.boundary.bc_field import FieldBCSet
+from gridax_jax._src.boundary.bc_set import BoundaryConditionSet
+from gridax_jax._src.boundary.boundary import (
+    enforce_periodic,
+    fix_boundary_corners,
+    free_slip_boundaries,
+    no_flux_boundaries,
+    no_slip_boundaries,
+    pad_interior,
+    wall_boundaries,
+    zero_boundaries,
+    zero_gradient_boundaries,
+)
+from gridax_jax._src.diffusion.diffusion import (
+    BiharmonicDiffusion2D,
+    BiharmonicDiffusion3D,
+    Diffusion2D,
+    Diffusion3D,
+    diffusion_2d,
+)
+from gridax_jax._src.diffusion.momentum import MomentumAdvection2D, MomentumAdvection3D
+from gridax_jax._src.diffusion.spherical_diffusion import (
+    SphericalBiharmonicDiffusion2D,
+    SphericalBiharmonicDiffusion3D,
+    SphericalDiffusion2D,
+    SphericalDiffusion3D,
+)
+from gridax_jax._src.diffusion.spherical_momentum import (
+    SphericalMomentumAdvection2D,
+    SphericalMomentumAdvection3D,
+)
+from gridax_jax._src.forcing._base import (
+    AbstractForcing,
+    ForcingProduct,
+    ForcingSum,
+    TimeVaryingForcing,
+)
+from gridax_jax._src.forcing.drag import (
+    LinearDrag2D,
+    LinearDrag3D,
+    QuadraticDrag2D,
+    QuadraticDrag3D,
+)
+from gridax_jax._src.forcing.functional import (
+    linear_drag_tendency,
+    quadratic_drag_tendency,
+    rayleigh_tendency,
+    wind_stress_tendency,
+)
+from gridax_jax._src.forcing.rayleigh import RayleighDamping2D, RayleighDamping3D
+from gridax_jax._src.forcing.wind import WindCurl2D, WindStress2D, WindStress3D
+from gridax_jax._src.operators._ghost import interior
+from gridax_jax._src.operators.barotropic import barotropic_filter
+from gridax_jax._src.operators.coriolis import Coriolis2D, Coriolis3D
+from gridax_jax._src.operators.diagnostic_operators import (
+    Energetics2D,
+    QGPotentialVorticity2D,
+    Strain2D,
+)
+from gridax_jax._src.operators.diagnostics import (
+    available_potential_energy,
+    bernoulli_potential,
+    beta_param,
+    coriolis_fn,
+    coriolis_param,
+    enstrophy,
+    kinetic_energy,
+    okubo_weiss,
+    potential_enstrophy,
+    potential_vorticity,
+    potential_vorticity_multilayer,
+    qg_potential_vorticity,
+    relative_vorticity_cgrid,
+    shear_strain,
+    ssh_to_streamfn,
+    strain_magnitude_squared,
+    streamfn_to_ssh,
+    stretching_term,
+    sw_potential_vorticity,
+    sw_potential_vorticity_multilayer,
+    tensor_strain,
+    total_energy,
+    total_enstrophy,
+    vertical_velocity,
+)
+from gridax_jax._src.operators.difference import (
+    Difference1D,
+    Difference2D,
+    Difference3D,
+)
+from gridax_jax._src.operators.differentiable import (
+    smooth_abs,
+    smooth_clamp,
+    smooth_max,
+)
+from gridax_jax._src.operators.divergence import Divergence2D, divergence_2d
+from gridax_jax._src.operators.eos import (
+    buoyancy,
+    linear_density,
+    linear_density_anomaly,
+    linear_drho_dS,
+    linear_drho_dT,
+    reduced_gravity,
+)
+from gridax_jax._src.operators.interpolation import (
+    Interpolation1D,
+    Interpolation2D,
+    Interpolation3D,
+)
+from gridax_jax._src.operators.jacobian import ArakawaJacobian2D, arakawa_jacobian
+from gridax_jax._src.operators.reductions import (
+    area_mean,
+    area_sum,
+    area_weights,
+    cartesian_area_mean,
+    cartesian_area_sum,
+    cartesian_area_weights,
+    cartesian_volume_mean,
+    cartesian_volume_sum,
+    cartesian_volume_weights,
+    masked_mean,
+    masked_moments,
+    masked_std,
+    spherical_area_mean,
+    spherical_area_sum,
+    spherical_area_weights,
+    spherical_volume_mean,
+    spherical_volume_sum,
+    spherical_volume_weights,
+    volume_mean,
+    volume_sum,
+    volume_weights,
+)
+from gridax_jax._src.operators.relaxation import linear_drag, rayleigh_relaxation
+from gridax_jax._src.operators.spherical_compound import (
+    SphericalDivergence2D,
+    SphericalDivergence3D,
+    SphericalLaplacian2D,
+    SphericalLaplacian3D,
+    SphericalVorticity2D,
+    SphericalVorticity3D,
+)
+from gridax_jax._src.operators.spherical_difference import (
+    SphericalDifference2D,
+    SphericalDifference3D,
+)
+from gridax_jax._src.operators.stencils import (
+    avg_x_bwd,
+    avg_x_bwd_1d,
+    avg_x_bwd_3d,
+    avg_x_fwd,
+    avg_x_fwd_1d,
+    avg_x_fwd_3d,
+    avg_xbwd_yfwd,
+    avg_xfwd_ybwd,
+    avg_xy_bwd,
+    avg_xy_fwd,
+    avg_y_bwd,
+    avg_y_bwd_3d,
+    avg_y_fwd,
+    avg_y_fwd_3d,
+    diff_x_bwd,
+    diff_x_bwd_1d,
+    diff_x_bwd_3d,
+    diff_x_fwd,
+    diff_x_fwd_1d,
+    diff_x_fwd_3d,
+    diff_y_bwd,
+    diff_y_bwd_3d,
+    diff_y_fwd,
+    diff_y_fwd_3d,
+)
+from gridax_jax._src.operators.vorticity import (
+    Vorticity2D,
+    Vorticity3D,
+    pv_flux_arakawa_lamb,
+    pv_flux_blend,
+    vorticity_flux_upwind,
+)
+from gridax_jax._src.solvers.elliptic import (
+    # Types
+    BoundaryCondition,
+    # Capacitance
+    CapacitanceSolver,
+    CGInfo,
+    # Solver classes
+    DirichletHelmholtzSolver2D,
+    MixedBCHelmholtzSolver2D,
+    MixedBCHelmholtzSolver3D,
+    # Preconditioners
+    NeumannHelmholtzSolver2D,
+    RegularNeumannHelmholtzSolver2D,
+    SpectralHelmholtzSolver1D,
+    SpectralHelmholtzSolver2D,
+    SpectralHelmholtzSolver3D,
+    StaggeredDirichletHelmholtzSolver2D,
+    build_capacitance_solver,
+    # Eigenvalue functions (FD2)
+    dct1_eigenvalues,
+    # Eigenvalue functions (pseudo-spectral)
+    dct1_eigenvalues_ps,
+    dct2_eigenvalues,
+    dct2_eigenvalues_ps,
+    dct3_eigenvalues,
+    dct3_eigenvalues_ps,
+    dct4_eigenvalues,
+    dct4_eigenvalues_ps,
+    dst1_eigenvalues,
+    dst1_eigenvalues_ps,
+    dst2_eigenvalues,
+    dst2_eigenvalues_ps,
+    dst3_eigenvalues,
+    dst3_eigenvalues_ps,
+    dst4_eigenvalues,
+    dst4_eigenvalues_ps,
+    fft_eigenvalues,
+    fft_eigenvalues_ps,
+    make_gaussx_multigrid_preconditioner,
+    make_multigrid_preconditioner,
+    make_nystrom_preconditioner,
+    make_preconditioner,
+    make_spectral_preconditioner,
+    # CG solver
+    masked_laplacian,
+    # RHS modification
+    modify_rhs_1d,
+    modify_rhs_2d,
+    modify_rhs_3d,
+    # Convenience wrappers
+    pressure_from_divergence,
+    pv_inversion,
+    solve_cg,
+    # Generic per-axis BC solvers
+    solve_helmholtz_2d,
+    solve_helmholtz_3d,
+    # Helmholtz solvers — 2D
+    solve_helmholtz_dct,
+    solve_helmholtz_dct1,
+    # Helmholtz solvers — 1D
+    solve_helmholtz_dct1_1d,
+    # Helmholtz solvers — 3D
+    solve_helmholtz_dct1_3d,
+    solve_helmholtz_dct2,
+    solve_helmholtz_dct2_1d,
+    solve_helmholtz_dct2_3d,
+    solve_helmholtz_dst,
+    solve_helmholtz_dst1,
+    solve_helmholtz_dst1_1d,
+    solve_helmholtz_dst1_3d,
+    solve_helmholtz_dst2,
+    solve_helmholtz_dst2_1d,
+    solve_helmholtz_dst2_3d,
+    solve_helmholtz_fft,
+    solve_helmholtz_fft_1d,
+    solve_helmholtz_fft_3d,
+    solve_poisson_2d,
+    solve_poisson_3d,
+    # Poisson solvers — 2D
+    solve_poisson_dct,
+    solve_poisson_dct1,
+    # Poisson solvers — 1D
+    solve_poisson_dct1_1d,
+    # Poisson solvers — 3D
+    solve_poisson_dct1_3d,
+    solve_poisson_dct2,
+    solve_poisson_dct2_1d,
+    solve_poisson_dct2_3d,
+    solve_poisson_dst,
+    solve_poisson_dst1,
+    solve_poisson_dst1_1d,
+    solve_poisson_dst1_3d,
+    solve_poisson_dst2,
+    solve_poisson_dst2_1d,
+    solve_poisson_dst2_3d,
+    solve_poisson_fft,
+    solve_poisson_fft_1d,
+    solve_poisson_fft_3d,
+    streamfunction_from_vorticity,
+)
+from gridax_jax._src.solvers.inhomogeneous import (
+    KnownValueLifting,
+    SolveDomain,
+    boundary_ring,
+    coast_ring,
+)
+from gridax_jax._src.solvers.linear_operators import (
+    helmholtz_operator,
+    masked_helmholtz_operator,
+)
+from gridax_jax._src.solvers.multigrid import (
+    MultigridSolver,
+    build_multigrid_solver,
+)
+from gridax_jax._src.solvers.spectral_transforms import (
+    dct,
+    dctn,
+    dst,
+    dstn,
+    idct,
+    idctn,
+    idst,
+    idstn,
+)
+from gridax_jax._src.solvers.tridiagonal import (
+    solve_tridiagonal,
+    solve_tridiagonal_batched,
+)
+from gridax_jax._src.timestepping._deprecated import (
+    ADAPTED as _ADAPTED_STEPPERS,
+    MOVED as _MOVED_STEPPERS,
+    deprecated_stepper as _deprecated_stepper,
+)
+from gridax_jax._src.timestepping._solve import solve_ocean_pde
+from gridax_jax._src.timestepping.semi_lagrangian import (
+    SemiLagrangianSolver,
+    SemiLagrangianTerm,
+    semi_lagrangian_step,
+)
+from gridax_jax._src.utils.dtype import check_dtype
+from gridax_jax._src.vertical.multilayer import multilayer
+from gridax_jax._src.vertical.vertical_modes import (
+    build_coupling_matrix,
+    decompose_vertical_modes,
+    layer_to_mode,
+    mode_to_layer,
+)
+
+__all__ = [
+    # Upwind flux dispatch
+    "upwind_flux",
+    # Raw face fluxes
+    "uv_center_flux",
+    "uv_node_flux",
+    "rusanov_flux",
+    # Advection
+    "Advection1D",
+    "Advection2D",
+    "Advection3D",
+    "SphericalAdvection2D",
+    "SphericalAdvection3D",
+    # WENO stencil functions
+    "weno_3pts",
+    "weno_3pts_improved",
+    "weno_3pts_improved_right",
+    "weno_3pts_right",
+    "weno_5pts",
+    "weno_5pts_improved",
+    "weno_5pts_improved_right",
+    "weno_5pts_right",
+    "weno_7pts",
+    "weno_7pts_right",
+    "weno_9pts",
+    "weno_9pts_right",
+    # Linear stencil functions
+    "linear_2pts",
+    "linear_3pts_left",
+    "linear_3pts_right",
+    "linear_4pts",
+    "linear_5pts_left",
+    "linear_5pts_right",
+    "linear_6pts",
+    # Functional reconstruction dispatcher
+    "reconstruct",
+    "plusminus",
+    "upwind_1pt",
+    "upwind_3pt",
+    "upwind_5pt",
+    # Coriolis
+    "Coriolis2D",
+    "Coriolis3D",
+    # Momentum advection
+    "MomentumAdvection2D",
+    "MomentumAdvection3D",
+    "SphericalMomentumAdvection2D",
+    "SphericalMomentumAdvection3D",
+    # Jacobian
+    "ArakawaJacobian2D",
+    "arakawa_jacobian",
+    # Area- and volume-weighted reductions (grid-polymorphic + explicit)
+    "area_weights",
+    "area_sum",
+    "area_mean",
+    "masked_mean",
+    "masked_std",
+    "masked_moments",
+    "volume_weights",
+    "volume_sum",
+    "volume_mean",
+    "cartesian_area_weights",
+    "cartesian_area_sum",
+    "cartesian_area_mean",
+    "cartesian_volume_weights",
+    "cartesian_volume_sum",
+    "cartesian_volume_mean",
+    "spherical_area_weights",
+    "spherical_area_sum",
+    "spherical_area_mean",
+    "spherical_volume_weights",
+    "spherical_volume_sum",
+    "spherical_volume_mean",
+    # Multilayer vmap helper
+    "multilayer",
+    # Grid — abstract topology
+    "ArakawaCGrid1D",
+    "ArakawaCGrid2D",
+    "ArakawaCGrid3D",
+    # Grid — curvilinear (uniform metric)
+    "CurvilinearGrid1D",
+    "CurvilinearGrid2D",
+    "CurvilinearGrid3D",
+    # Grid — Cartesian concrete
+    "CartesianGrid1D",
+    "CartesianGrid2D",
+    "CartesianGrid3D",
+    # Grid — Spherical concrete
+    "SphericalGrid2D",
+    "SphericalGrid3D",
+    # Mask
+    "Mask1D",
+    "Mask2D",
+    "Mask3D",
+    # Boundary condition sets and 1D BCs
+    "BoundaryConditionSet",
+    "Dirichlet1D",
+    "Extrapolation1D",
+    "FieldBCSet",
+    "Neumann1D",
+    "Outflow1D",
+    "Periodic1D",
+    "Reflective1D",
+    "Robin1D",
+    "Slip1D",
+    "Sponge1D",
+    # Finite difference
+    "Difference1D",
+    "Difference2D",
+    "Difference3D",
+    # Spherical finite difference
+    "SphericalDifference2D",
+    "SphericalDifference3D",
+    # Raw stencils (Layer 1 — no metric scaling)
+    # Difference stencils
+    "diff_x_fwd",
+    "diff_x_bwd",
+    "diff_y_fwd",
+    "diff_y_bwd",
+    "diff_x_fwd_1d",
+    "diff_x_bwd_1d",
+    "diff_x_fwd_3d",
+    "diff_x_bwd_3d",
+    "diff_y_fwd_3d",
+    "diff_y_bwd_3d",
+    # Averaging stencils
+    "avg_x_fwd",
+    "avg_x_bwd",
+    "avg_y_fwd",
+    "avg_y_bwd",
+    "avg_xy_fwd",
+    "avg_xy_bwd",
+    "avg_xbwd_yfwd",
+    "avg_xfwd_ybwd",
+    "avg_x_fwd_1d",
+    "avg_x_bwd_1d",
+    "avg_x_fwd_3d",
+    "avg_x_bwd_3d",
+    "avg_y_fwd_3d",
+    "avg_y_bwd_3d",
+    # Diffusion
+    "BiharmonicDiffusion2D",
+    "BiharmonicDiffusion3D",
+    "Diffusion2D",
+    "Diffusion3D",
+    "SphericalBiharmonicDiffusion2D",
+    "SphericalBiharmonicDiffusion3D",
+    "SphericalDiffusion2D",
+    "SphericalDiffusion3D",
+    "diffusion_2d",
+    # Divergence
+    "Divergence2D",
+    "divergence_2d",
+    # Boundary helpers
+    "enforce_periodic",
+    "fix_boundary_corners",
+    "free_slip_boundaries",
+    "interior",
+    "no_flux_boundaries",
+    "no_slip_boundaries",
+    "pad_interior",
+    "wall_boundaries",
+    "zero_boundaries",
+    "zero_gradient_boundaries",
+    # Interpolation
+    "Interpolation1D",
+    "Interpolation2D",
+    "Interpolation3D",
+    # Reconstruction
+    "Reconstruction1D",
+    "Reconstruction2D",
+    "Reconstruction3D",
+    # Flux limiters
+    "mc",
+    "minmod",
+    "superbee",
+    "van_leer",
+    # Masks
+    "StencilCapability1D",
+    "StencilCapability2D",
+    "StencilCapability3D",
+    # Equation of state
+    "linear_density",
+    "linear_density_anomaly",
+    "linear_drho_dT",
+    "linear_drho_dS",
+    "buoyancy",
+    "reduced_gravity",
+    # Diagnostics
+    "Energetics2D",
+    "QGPotentialVorticity2D",
+    "Strain2D",
+    "available_potential_energy",
+    "bernoulli_potential",
+    "enstrophy",
+    "kinetic_energy",
+    "okubo_weiss",
+    "potential_enstrophy",
+    "potential_vorticity",
+    "potential_vorticity_multilayer",
+    "qg_potential_vorticity",
+    "relative_vorticity_cgrid",
+    "shear_strain",
+    "strain_magnitude_squared",
+    "stretching_term",
+    "tensor_strain",
+    "total_energy",
+    "total_enstrophy",
+    "vertical_velocity",
+    # Shallow-water PV
+    "sw_potential_vorticity",
+    "sw_potential_vorticity_multilayer",
+    # Coriolis / beta-plane constructors
+    "coriolis_fn",
+    "coriolis_param",
+    "beta_param",
+    # Streamfunction / SSH conversion
+    "streamfn_to_ssh",
+    "ssh_to_streamfn",
+    # Spherical compound operators
+    "SphericalDivergence2D",
+    "SphericalDivergence3D",
+    "SphericalLaplacian2D",
+    "SphericalLaplacian3D",
+    "SphericalVorticity2D",
+    "SphericalVorticity3D",
+    # Vorticity
+    "Vorticity2D",
+    "Vorticity3D",
+    "pv_flux_arakawa_lamb",
+    "pv_flux_blend",
+    "vorticity_flux_upwind",
+    # Barotropic-mode filter
+    "barotropic_filter",
+    # Linear drag / Rayleigh relaxation
+    "linear_drag",
+    "rayleigh_relaxation",
+    # Forcing — Layer 0 functional primitives
+    "wind_stress_tendency",
+    "linear_drag_tendency",
+    "quadratic_drag_tendency",
+    "rayleigh_tendency",
+    # Forcing — base class and composition
+    "AbstractForcing",
+    "ForcingSum",
+    "ForcingProduct",
+    "TimeVaryingForcing",
+    # Forcing — 2D operators
+    "WindStress2D",
+    "WindCurl2D",
+    "LinearDrag2D",
+    "QuadraticDrag2D",
+    "RayleighDamping2D",
+    # Forcing — 3D operators
+    "WindStress3D",
+    "LinearDrag3D",
+    "QuadraticDrag3D",
+    "RayleighDamping3D",
+    # Differentiable surrogates
+    "smooth_abs",
+    "smooth_clamp",
+    "smooth_max",
+    # The dtype rule: the caller decides, a silent downcast is an error
+    "check_dtype",
+    # Vertical coupling and mode transforms
+    "build_coupling_matrix",
+    "decompose_vertical_modes",
+    "layer_to_mode",
+    "mode_to_layer",
+    # Spectral transforms
+    "dct",
+    "dctn",
+    "dst",
+    "dstn",
+    "idct",
+    "idctn",
+    "idst",
+    "idstn",
+    # Spectral BC type
+    "BoundaryCondition",
+    # Spectral solver classes
+    "DirichletHelmholtzSolver2D",
+    "MixedBCHelmholtzSolver2D",
+    "MixedBCHelmholtzSolver3D",
+    "NeumannHelmholtzSolver2D",
+    "RegularNeumannHelmholtzSolver2D",
+    "SpectralHelmholtzSolver1D",
+    "SpectralHelmholtzSolver2D",
+    "SpectralHelmholtzSolver3D",
+    "StaggeredDirichletHelmholtzSolver2D",
+    # Elliptic eigenvalue helpers (FD2)
+    "dct1_eigenvalues",
+    "dct2_eigenvalues",
+    "dct3_eigenvalues",
+    "dct4_eigenvalues",
+    "dst1_eigenvalues",
+    "dst2_eigenvalues",
+    "dst3_eigenvalues",
+    "dst4_eigenvalues",
+    "fft_eigenvalues",
+    # Elliptic eigenvalue helpers (pseudo-spectral)
+    "dct1_eigenvalues_ps",
+    "dct2_eigenvalues_ps",
+    "dct3_eigenvalues_ps",
+    "dct4_eigenvalues_ps",
+    "dst1_eigenvalues_ps",
+    "dst2_eigenvalues_ps",
+    "dst3_eigenvalues_ps",
+    "dst4_eigenvalues_ps",
+    "fft_eigenvalues_ps",
+    # RHS modification for inhomogeneous BCs
+    "modify_rhs_1d",
+    "modify_rhs_2d",
+    "modify_rhs_3d",
+    # Generic per-axis BC solvers
+    "solve_helmholtz_2d",
+    "solve_helmholtz_3d",
+    "solve_poisson_2d",
+    "solve_poisson_3d",
+    # Spectral Helmholtz solvers — 2D
+    "solve_helmholtz_dct",
+    "solve_helmholtz_dct1",
+    "solve_helmholtz_dct2",
+    "solve_helmholtz_dst",
+    "solve_helmholtz_dst1",
+    "solve_helmholtz_dst2",
+    "solve_helmholtz_fft",
+    # Spectral Helmholtz solvers — 1D
+    "solve_helmholtz_dct1_1d",
+    "solve_helmholtz_dct2_1d",
+    "solve_helmholtz_dst1_1d",
+    "solve_helmholtz_dst2_1d",
+    "solve_helmholtz_fft_1d",
+    # Spectral Helmholtz solvers — 3D
+    "solve_helmholtz_dct1_3d",
+    "solve_helmholtz_dct2_3d",
+    "solve_helmholtz_dst1_3d",
+    "solve_helmholtz_dst2_3d",
+    "solve_helmholtz_fft_3d",
+    # Spectral Poisson solvers — 2D
+    "solve_poisson_dct",
+    "solve_poisson_dct1",
+    "solve_poisson_dct2",
+    "solve_poisson_dst",
+    "solve_poisson_dst1",
+    "solve_poisson_dst2",
+    "solve_poisson_fft",
+    # Spectral Poisson solvers — 1D
+    "solve_poisson_dct1_1d",
+    "solve_poisson_dct2_1d",
+    "solve_poisson_dst1_1d",
+    "solve_poisson_dst2_1d",
+    "solve_poisson_fft_1d",
+    # Spectral Poisson solvers — 3D
+    "solve_poisson_dct1_3d",
+    "solve_poisson_dct2_3d",
+    "solve_poisson_dst1_3d",
+    "solve_poisson_dst2_3d",
+    "solve_poisson_fft_3d",
+    # Capacitance matrix method
+    "CapacitanceSolver",
+    "build_capacitance_solver",
+    # Preconditioners
+    "make_multigrid_preconditioner",
+    "make_gaussx_multigrid_preconditioner",
+    "make_nystrom_preconditioner",
+    "make_preconditioner",
+    "make_spectral_preconditioner",
+    # Preconditioned Conjugate Gradient
+    "CGInfo",
+    "masked_laplacian",
+    "solve_cg",
+    # Convenience solver wrappers
+    "streamfunction_from_vorticity",
+    "pressure_from_divergence",
+    "pv_inversion",
+    # Known-value lifting (inhomogeneous BCs)
+    "coast_ring",
+    "boundary_ring",
+    "SolveDomain",
+    "KnownValueLifting",
+    # The Helmholtz operator as a gaussx operator
+    "helmholtz_operator",
+    "masked_helmholtz_operator",
+    # Multigrid Helmholtz solver
+    "MultigridSolver",
+    "build_multigrid_solver",
+    # Tridiagonal (TDMA) solver
+    "solve_tridiagonal",
+    "solve_tridiagonal_batched",
+    # Time integration — pure functional (deprecated aliases of
+    # integrix.march, served by __getattr__ below, except semi_lagrangian_step)
+    "euler_step",
+    "heun_step",
+    "rk3_ssp_step",
+    "rk4_step",
+    "ab2_step",
+    "ab3_step",
+    "leapfrog_raf_step",
+    "imex_ssp2_step",
+    "split_explicit_step",
+    "semi_lagrangian_step",
+    # Time integration — diffrax solvers (deprecated aliases of integrix.march,
+    # served by __getattr__ below, except the semi-Lagrangian pair)
+    "ForwardEulerDfx",
+    "RK2Heun",
+    "RK3SSP",
+    "RK4Classic",
+    "SSP_RK2",
+    "SSP_RK104",
+    "IMEX_SSP2",
+    "AB2Solver",
+    "AB3Solver",
+    "LeapfrogRAFSolver",
+    "SplitExplicitRKSolver",
+    "SemiLagrangianSolver",
+    "SemiLagrangianTerm",
+    "solve_ocean_pde",
+]
+
+
+def __getattr__(name: str) -> object:
+    # The generic time steppers moved to integrix.march; their old
+    # names stay for one release and warn on access.
+    if name in _MOVED_STEPPERS or name in _ADAPTED_STEPPERS:
+        return _deprecated_stepper(name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

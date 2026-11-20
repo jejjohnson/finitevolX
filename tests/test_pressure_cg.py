@@ -10,8 +10,8 @@ which fails on a tracer.
 
 from __future__ import annotations
 
-import gridax_ops as fvx
-from gridax_ops._src.solvers.iterative import (
+import gridax_jax as fvx
+from gridax_jax._src.solvers.iterative import (
     _masked_face_dirichlet_laplacian,
     _masked_neumann_laplacian,
 )

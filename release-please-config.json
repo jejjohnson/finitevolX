@@ -18,16 +18,16 @@
     ".": {
       "release-type": "python",
       "package-name": "finitevolx",
-      "exclude-paths": ["packages/gridax", "packages/gridax-ops"],
+      "exclude-paths": ["packages/gridax", "packages/gridax-jax"],
       "changelog-path": "CHANGELOG.md",
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": true,
       "extra-files": ["pyproject.toml"]
     },
-    "packages/gridax-ops": {
+    "packages/gridax-jax": {
       "release-type": "python",
-      "package-name": "gridax-ops",
-      "component": "gridax-ops",
+      "package-name": "gridax-jax",
+      "component": "gridax-jax",
       "include-component-in-tag": true,
       "changelog-path": "CHANGELOG.md",
       "bump-minor-pre-major": true,

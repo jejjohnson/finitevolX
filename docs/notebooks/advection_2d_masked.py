@@ -65,7 +65,7 @@ import numpy as np
 
 jax.config.update("jax_enable_x64", True)
 
-import gridax_ops as fvx
+import gridax_jax as fvx
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "advection_2d_masked"
 IMG_DIR.mkdir(parents=True, exist_ok=True)

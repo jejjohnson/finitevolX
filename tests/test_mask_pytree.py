@@ -13,7 +13,7 @@ import dataclasses
 from pathlib import Path
 
 import equinox as eqx
-from gridax_ops import (
+from gridax_jax import (
     Advection1D,
     Advection2D,
     Advection3D,

@@ -67,13 +67,13 @@ import numpy as np
 
 jax.config.update("jax_enable_x64", True)
 
-import gridax_ops as fvx
+import gridax_jax as fvx
 
 # Internal import: _apply_operator applies the multigrid's finest operator.
 # With coeff=None and the default bc="dirichlet" it equals fvx.masked_laplacian;
 # the variable-coefficient notch (section 6) needs it, since masked_laplacian
 # has no c(x, y).  There is no public equivalent yet.
-from gridax_ops._src.solvers.multigrid import _apply_operator
+from gridax_jax._src.solvers.multigrid import _apply_operator
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "demo_solvers"
 IMG_DIR.mkdir(parents=True, exist_ok=True)

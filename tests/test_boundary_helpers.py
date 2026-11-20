@@ -10,7 +10,7 @@ Covers:
 
 from __future__ import annotations
 
-from gridax_ops import (
+from gridax_jax import (
     fix_boundary_corners,
     free_slip_boundaries,
     no_flux_boundaries,

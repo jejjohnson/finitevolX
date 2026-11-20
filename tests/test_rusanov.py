@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from gridax_ops import rusanov_flux
+from gridax_jax import rusanov_flux
 import jax
 import jax.numpy as jnp
 import numpy as np

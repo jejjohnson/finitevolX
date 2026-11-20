@@ -10,7 +10,7 @@ import subprocess
 import sys
 import textwrap
 
-from gridax_ops import check_dtype
+from gridax_jax import check_dtype
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -41,7 +41,7 @@ def test_x64_off():
         import jax.numpy as jnp
         import numpy as np
 
-        from gridax_ops import check_dtype
+        from gridax_jax import check_dtype
 
         assert not jax.config.read("jax_enable_x64")
         for bad, narrow in (

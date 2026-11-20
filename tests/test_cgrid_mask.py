@@ -223,7 +223,7 @@ class TestConstruction:
         )
 
     def test_top_level_import(self):
-        from gridax_ops import Mask2D as ACM, StencilCapability2D as SC
+        from gridax_jax import Mask2D as ACM, StencilCapability2D as SC
 
         assert ACM is not None
         assert SC is not None

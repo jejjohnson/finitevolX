@@ -1,11 +1,11 @@
 # pipekit Operators
 
-`gridax_ops.pipekit` wraps the 2-D Cartesian operators as
+`gridax_jax.pipekit` wraps the 2-D Cartesian operators as
 [pipekit](https://github.com/jejjohnson/pipekit) operators: JSON
 configuration, `Sequential` / `Graph` composition, and Equinox pytree leaves
 so `jit`, `grad` and `vmap` see through them. Each operator is one Tier-A
 call on `[*batch, Ny, Nx]` fields. Requires the `pipekit` extra:
-`pip install "gridax-ops[pipekit]"`. Walkthrough:
+`pip install "gridax-jax[pipekit]"`. Walkthrough:
 [Composing finitevolX with pipekit](../notebooks/pipekit_composition.py).
 
 | Tier-B operator | Tier-A counterpart | in → out |
@@ -34,66 +34,66 @@ call on `[*batch, Ny, Nx]` fields. Requires the `pipekit` extra:
 
 ## Base classes and helpers
 
-::: gridax_ops.pipekit.FVXOperator
+::: gridax_jax.pipekit.FVXOperator
 
-::: gridax_ops.pipekit.GridOperator
+::: gridax_jax.pipekit.GridOperator
 
-::: gridax_ops.pipekit.as_grid_spec
+::: gridax_jax.pipekit.as_grid_spec
 
-::: gridax_ops.pipekit.build_grid
+::: gridax_jax.pipekit.build_grid
 
-::: gridax_ops.pipekit.over_leading
+::: gridax_jax.pipekit.over_leading
 
-::: gridax_ops.pipekit.testing.check_operator
+::: gridax_jax.pipekit.testing.check_operator
 
 ## Stencils, interpolation, boundaries and masks
 
-::: gridax_ops.pipekit.Difference
+::: gridax_jax.pipekit.Difference
 
-::: gridax_ops.pipekit.Divergence
+::: gridax_jax.pipekit.Divergence
 
-::: gridax_ops.pipekit.Curl
+::: gridax_jax.pipekit.Curl
 
-::: gridax_ops.pipekit.Laplacian
+::: gridax_jax.pipekit.Laplacian
 
-::: gridax_ops.pipekit.GradPerp
+::: gridax_jax.pipekit.GradPerp
 
-::: gridax_ops.pipekit.Interp
+::: gridax_jax.pipekit.Interp
 
-::: gridax_ops.pipekit.Coriolis
+::: gridax_jax.pipekit.Coriolis
 
-::: gridax_ops.pipekit.FillGhosts
+::: gridax_jax.pipekit.FillGhosts
 
-::: gridax_ops.pipekit.ApplyMask
+::: gridax_jax.pipekit.ApplyMask
 
 ## Diagnostics and reductions
 
-::: gridax_ops.pipekit.RelativeVorticity
+::: gridax_jax.pipekit.RelativeVorticity
 
-::: gridax_ops.pipekit.PotentialVorticity
+::: gridax_jax.pipekit.PotentialVorticity
 
-::: gridax_ops.pipekit.Enstrophy
+::: gridax_jax.pipekit.Enstrophy
 
-::: gridax_ops.pipekit.QGPotentialVorticity
+::: gridax_jax.pipekit.QGPotentialVorticity
 
-::: gridax_ops.pipekit.KineticEnergy
+::: gridax_jax.pipekit.KineticEnergy
 
-::: gridax_ops.pipekit.AvailablePE
+::: gridax_jax.pipekit.AvailablePE
 
-::: gridax_ops.pipekit.Strain
+::: gridax_jax.pipekit.Strain
 
-::: gridax_ops.pipekit.OkuboWeiss
+::: gridax_jax.pipekit.OkuboWeiss
 
-::: gridax_ops.pipekit.TotalEnergy
+::: gridax_jax.pipekit.TotalEnergy
 
-::: gridax_ops.pipekit.DomainIntegral
+::: gridax_jax.pipekit.DomainIntegral
 
-::: gridax_ops.pipekit.DomainMean
+::: gridax_jax.pipekit.DomainMean
 
 ## Time stepping and graph plumbing
 
-::: gridax_ops.pipekit.ExplicitStep
+::: gridax_jax.pipekit.ExplicitStep
 
-::: gridax_ops.pipekit.Pick
+::: gridax_jax.pipekit.Pick
 
-::: gridax_ops.pipekit.LinComb
+::: gridax_jax.pipekit.LinComb

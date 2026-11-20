@@ -9,7 +9,7 @@ the re-export smoke tests.
 from __future__ import annotations
 
 import equinox as eqx
-from gridax_ops._src.solvers.elliptic import (
+from gridax_jax._src.solvers.elliptic import (
     CapacitanceSolver,
     CGInfo,
     build_capacitance_solver,
@@ -72,14 +72,14 @@ class TestSpectralReexports:
     """Verify spectraldiffx re-exports are available via finitevolx."""
 
     def test_transforms_importable(self):
-        from gridax_ops import dct, dctn, dst, dstn, idct, idctn, idst, idstn
+        from gridax_jax import dct, dctn, dst, dstn, idct, idctn, idst, idstn
 
         assert all(
             callable(f) for f in [dct, dst, dctn, dstn, idct, idst, idctn, idstn]
         )
 
     def test_solvers_importable(self):
-        from gridax_ops import (
+        from gridax_jax import (
             solve_helmholtz_dct,
             solve_helmholtz_dst,
             solve_helmholtz_fft,
@@ -146,26 +146,26 @@ class TestSpectralReexports:
         ],
     )
     def test_new_solvers_importable(self, name):
-        import gridax_ops
+        import gridax_jax
 
-        fn = getattr(gridax_ops, name, None)
+        fn = getattr(gridax_jax, name, None)
         assert fn is not None, f"finitevolx.{name} not found"
         assert callable(fn), f"finitevolx.{name} is not callable"
 
     def test_eigenvalues_importable(self):
-        import gridax_ops
+        import gridax_jax
 
         assert all(
             callable(f)
             for f in [
-                gridax_ops.dst1_eigenvalues,
-                gridax_ops.dct2_eigenvalues,
-                gridax_ops.fft_eigenvalues,
+                gridax_jax.dst1_eigenvalues,
+                gridax_jax.dct2_eigenvalues,
+                gridax_jax.fft_eigenvalues,
             ]
         )
 
     def test_new_eigenvalues_importable(self):
-        import gridax_ops
+        import gridax_jax
 
         # FD2 eigenvalues
         for name in [
@@ -179,7 +179,7 @@ class TestSpectralReexports:
             "dst4_eigenvalues",
             "fft_eigenvalues",
         ]:
-            assert callable(getattr(gridax_ops, name)), f"{name} not callable"
+            assert callable(getattr(gridax_jax, name)), f"{name} not callable"
 
         # Pseudo-spectral eigenvalues
         for name in [
@@ -193,7 +193,7 @@ class TestSpectralReexports:
             "dst4_eigenvalues_ps",
             "fft_eigenvalues_ps",
         ]:
-            assert callable(getattr(gridax_ops, name)), f"{name} not callable"
+            assert callable(getattr(gridax_jax, name)), f"{name} not callable"
 
     @pytest.mark.parametrize(
         "name",
@@ -212,22 +212,22 @@ class TestSpectralReexports:
     def test_solver_classes_importable(self, name):
         import inspect
 
-        import gridax_ops
+        import gridax_jax
 
-        cls = getattr(gridax_ops, name, None)
+        cls = getattr(gridax_jax, name, None)
         assert cls is not None, f"finitevolx.{name} not found"
         assert inspect.isclass(cls), f"finitevolx.{name} is not a class"
 
     def test_boundary_condition_type_importable(self):
-        from gridax_ops import BoundaryCondition
+        from gridax_jax import BoundaryCondition
 
         # BoundaryCondition is a type alias, not a class — just verify it exists
         assert BoundaryCondition is not None
 
     def test_capacitance_importable(self):
-        import gridax_ops
+        import gridax_jax
 
-        assert callable(gridax_ops.build_capacitance_solver)
+        assert callable(gridax_jax.build_capacitance_solver)
 
 
 # ---------------------------------------------------------------------------

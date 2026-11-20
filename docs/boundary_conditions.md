@@ -98,7 +98,7 @@ same face as `U[:, Nx-2]`).
     `BoundaryConditionSet.closed(point="U")` for the whole basin.
 
 ```python
-import gridax_ops as fvx
+import gridax_jax as fvx
 
 bc_u = fvx.BoundaryConditionSet.closed(point="U")  # u = 0 on W/E faces, no-slip on S/N
 bc_v = fvx.BoundaryConditionSet.closed(point="V")  # v = 0 on S/N faces, no-slip on W/E
@@ -227,7 +227,7 @@ processed in **south → north → west → east** order, so west/east BCs
 overwrite corner ghost cells filled by south/north BCs:
 
 ```python
-from gridax_ops import BoundaryConditionSet, Dirichlet1D, Periodic1D
+from gridax_jax import BoundaryConditionSet, Dirichlet1D, Periodic1D
 
 # Closed basin: Dirichlet ψ=0 on all walls
 bc_set = BoundaryConditionSet(
@@ -274,7 +274,7 @@ Maps a BC set to a named field in a state dictionary or pytree.  Useful
 for model state vectors with multiple fields, each needing different BCs:
 
 ```python
-from gridax_ops import BoundaryConditionSet, Dirichlet1D, FieldBCSet, Neumann1D
+from gridax_jax import BoundaryConditionSet, Dirichlet1D, FieldBCSet, Neumann1D
 
 # Free-slip velocity BCs: zero normal flow on the wall faces (point="U"),
 # zero tangential gradient on the south / north walls
@@ -301,7 +301,7 @@ ghost-ring layout.  Useful when you have a field defined only on interior
 points and need to apply ghost-cell BCs:
 
 ```python
-from gridax_ops import pad_interior
+from gridax_jax import pad_interior
 
 q_interior = jnp.ones((Ny - 2, Nx - 2))   # interior only
 q_full     = pad_interior(q_interior, mode="constant", constant_values=0.0)
@@ -314,7 +314,7 @@ Supported modes match `jnp.pad`: `"constant"`, `"edge"`, `"reflect"`, `"wrap"`.
 Convenience wrapper: applies periodic BCs in x, y, or both directions:
 
 ```python
-from gridax_ops import enforce_periodic
+from gridax_jax import enforce_periodic
 
 q = enforce_periodic(q, x=True, y=True)   # both directions
 ```

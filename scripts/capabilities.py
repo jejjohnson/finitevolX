@@ -38,7 +38,7 @@ INDEX = ROOT / "docs" / "capabilities.md"
 
 # Public homes, in order: (distribution, [public modules]).
 PACKAGES: dict[str, list[str]] = {
-    "gridax_ops": ["gridax_ops"],
+    "gridax_jax": ["gridax_jax"],
 }
 
 # GeoML-stack libraries finitevolX builds on.
@@ -81,7 +81,7 @@ UPSTREAM_BLURB = {
 # and why.
 ALLOWED_SHARED_NAMES: dict[str, str] = {
     "divergence_2d": (
-        "gridax_ops' is the staggered C-grid divergence of face velocities"
+        "gridax_jax' is the staggered C-grid divergence of face velocities"
         " (u on U-points, v on V-points) to T-points; gridax.analysis's is the"
         " divergence of collocated components with centred stencils, the"
         " analysis kernel behind geoops' and xrops' Divergence2D"

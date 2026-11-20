@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from gridax import CartesianGrid2D
-from gridax_ops._src.operators.difference import Difference2D
-from gridax_ops._src.operators.divergence import Divergence2D, divergence_2d
+from gridax_jax._src.operators.difference import Difference2D
+from gridax_jax._src.operators.divergence import Divergence2D, divergence_2d
 import jax.numpy as jnp
 import numpy as np
 import pytest

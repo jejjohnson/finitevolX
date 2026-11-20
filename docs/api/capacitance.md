@@ -12,15 +12,15 @@ dry cells next to water): the same problem `masked_laplacian` and
     `CapacitanceSolver` is re-exported from spectraldiffx, so its docstring
     describes spectraldiffx's own builder (unknowns: the wet cells off the
     inner ring, ψ = 0 on that ring).  finitevolX's
-    [`build_capacitance_solver`][gridax_ops.build_capacitance_solver] fills
+    [`build_capacitance_solver`][gridax_jax.build_capacitance_solver] fills
     the same class with every wet cell as an unknown and ψ = 0 on the coast.
 
-::: gridax_ops.CapacitanceSolver
+::: gridax_jax.CapacitanceSolver
 
 ## Factory
 
-::: gridax_ops.build_capacitance_solver
+::: gridax_jax.build_capacitance_solver
 
 ## Masked Laplacian
 
-::: gridax_ops.masked_laplacian
+::: gridax_jax.masked_laplacian

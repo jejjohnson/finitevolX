@@ -43,7 +43,7 @@ uv sync --all-extras
 
 ```python
 import jax.numpy as jnp
-from gridax_ops import Advection2D, CartesianGrid2D
+from gridax_jax import Advection2D, CartesianGrid2D
 
 # Create a 2D Arakawa C-grid
 grid = CartesianGrid2D.from_interior(64, 64, 1.0, 1.0)
@@ -62,9 +62,9 @@ dh_dt = advection(h, u, v)
 
 ## Precision
 
-Every operation returns the floating dtype of its input: float32 in gives float32 out, and float64 in gives float64 out when JAX's `jax_enable_x64` flag is on. The one case JAX would get wrong silently is float64 data with x64 off, which JAX computes in float32 without a warning. Kernels that take host data (NumPy arrays, such as a reanalysis cube read chunk by chunk) call `gridax_ops.check_dtype` on entry and raise a `TypeError` in that case, so the caller chooses: enable x64 to keep float64, or pass float32 on purpose. Grid metrics are not data: they take the dtype of the field they scale.
+Every operation returns the floating dtype of its input: float32 in gives float32 out, and float64 in gives float64 out when JAX's `jax_enable_x64` flag is on. The one case JAX would get wrong silently is float64 data with x64 off, which JAX computes in float32 without a warning. Kernels that take host data (NumPy arrays, such as a reanalysis cube read chunk by chunk) call `gridax_jax.check_dtype` on entry and raise a `TypeError` in that case, so the caller chooses: enable x64 to keep float64, or pass float32 on purpose. Grid metrics are not data: they take the dtype of the field they scale.
 
-::: gridax_ops.check_dtype
+::: gridax_jax.check_dtype
 
 ## Examples
 

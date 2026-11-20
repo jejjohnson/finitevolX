@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from gridax_ops._src.operators.eos import (
+from gridax_jax._src.operators.eos import (
     buoyancy,
     linear_density,
     linear_density_anomaly,

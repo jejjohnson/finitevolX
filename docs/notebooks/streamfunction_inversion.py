@@ -60,8 +60,8 @@ import numpy as np
 
 jax.config.update("jax_enable_x64", True)
 
-import gridax_ops as fvx
-from gridax_ops import solve_poisson_dst2
+import gridax_jax as fvx
+from gridax_jax import solve_poisson_dst2
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "streamfunction_inversion"
 IMG_DIR.mkdir(parents=True, exist_ok=True)

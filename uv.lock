@@ -14,7 +14,7 @@ resolution-markers = [
 members = [
     "finitevolx",
     "gridax",
-    "gridax-ops",
+    "gridax-jax",
 ]
 overrides = [{ name = "gaussx", git = "https://github.com/jejjohnson/gaussx?tag=v0.6.5" }]
 
@@ -515,7 +515,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "gridax" },
-    { name = "gridax-ops" },
+    { name = "gridax-jax" },
 ]
 
 [package.optional-dependencies]
@@ -542,7 +542,7 @@ examples = [
     { name = "zarr" },
 ]
 pipekit = [
-    { name = "gridax-ops", extra = ["pipekit"] },
+    { name = "gridax-jax", extra = ["pipekit"] },
 ]
 test = [
     { name = "coverage" },
@@ -567,8 +567,8 @@ requires-dist = [
     { name = "coverage", marker = "extra == 'test'", specifier = ">=7.6.0" },
     { name = "cyclopts", marker = "extra == 'examples'", specifier = ">=2.0.0" },
     { name = "gridax", editable = "packages/gridax" },
-    { name = "gridax-ops", editable = "packages/gridax-ops" },
-    { name = "gridax-ops", extras = ["pipekit"], marker = "extra == 'pipekit'", editable = "packages/gridax-ops" },
+    { name = "gridax-jax", editable = "packages/gridax-jax" },
+    { name = "gridax-jax", extras = ["pipekit"], marker = "extra == 'pipekit'", editable = "packages/gridax-jax" },
     { name = "loguru", marker = "extra == 'examples'", specifier = ">=0.7.2" },
     { name = "matplotlib", marker = "extra == 'examples'", specifier = ">=3.9.0" },
     { name = "matplotlib", marker = "extra == 'test'", specifier = ">=3.9.0" },
@@ -713,9 +713,9 @@ requires-dist = [
 ]
 
 [[package]]
-name = "gridax-ops"
+name = "gridax-jax"
 version = "0.1.0"
-source = { editable = "packages/gridax-ops" }
+source = { editable = "packages/gridax-jax" }
 dependencies = [
     { name = "beartype" },
     { name = "diffrax" },

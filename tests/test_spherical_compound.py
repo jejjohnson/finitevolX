@@ -5,8 +5,8 @@ from gridax import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
-from gridax_ops._src.operators.reductions import spherical_area_weights
-from gridax_ops._src.operators.spherical_compound import (
+from gridax_jax._src.operators.reductions import spherical_area_weights
+from gridax_jax._src.operators.spherical_compound import (
     SphericalDivergence2D,
     SphericalDivergence3D,
     SphericalLaplacian2D,
@@ -15,8 +15,8 @@ from gridax_ops._src.operators.spherical_compound import (
     SphericalVorticity3D,
     geostrophic_velocity_sphere,
 )
-from gridax_ops._src.operators.spherical_difference import SphericalDifference2D
-from gridax_ops._src.operators.vorticity import Vorticity2D
+from gridax_jax._src.operators.spherical_difference import SphericalDifference2D
+from gridax_jax._src.operators.vorticity import Vorticity2D
 import jax
 import jax.numpy as jnp
 import numpy as np

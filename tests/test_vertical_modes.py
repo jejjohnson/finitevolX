@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Tests for vertical coupling matrix and layer/mode transforms."""
 
-from gridax_ops._src.vertical.vertical_modes import (
+from gridax_jax._src.vertical.vertical_modes import (
     build_coupling_matrix,
     decompose_vertical_modes,
     layer_to_mode,

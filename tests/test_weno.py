@@ -11,7 +11,7 @@ Tests cover:
 
 from __future__ import annotations
 
-from gridax_ops._src.advection.weno import (
+from gridax_jax._src.advection.weno import (
     weno_3pts,
     weno_3pts_improved,
     weno_3pts_improved_right,

@@ -54,8 +54,8 @@ jax.config.update("jax_enable_x64", True)
 
 import equinox as eqx
 
-import gridax_ops as fvx
-from gridax_ops import (
+import gridax_jax as fvx
+from gridax_jax import (
     solve_poisson_dst,
     solve_poisson_dst2,
     StaggeredDirichletHelmholtzSolver2D,

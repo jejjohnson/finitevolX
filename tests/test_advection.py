@@ -7,7 +7,7 @@ from gridax import (
     Mask2D,
     Mask3D,
 )
-from gridax_ops._src.advection.advection import Advection1D, Advection2D, Advection3D
+from gridax_jax._src.advection.advection import Advection1D, Advection2D, Advection3D
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -503,7 +503,7 @@ class TestAdvection2DRotationStability:
     @pytest.mark.slow
     def test_rotation_stays_finite(self, rotation_setup, method, min_peak):
         grid, q0, u, v, pbc, dt, nsteps, ng = rotation_setup
-        from gridax_ops import Advection2D, rk3_ssp_step
+        from gridax_jax import Advection2D, rk3_ssp_step
 
         advect = Advection2D(grid)
 
@@ -574,7 +574,7 @@ class TestNegativeFlowConvergence:
     @staticmethod
     def _run_1d_advection(n_interior, method, n_periods=1):
         """Advect sin(2π x) with u=-1 for *n_periods* on a periodic domain."""
-        from gridax_ops import Advection1D, rk3_ssp_step
+        from gridax_jax import Advection1D, rk3_ssp_step
 
         ng = 4
         Lx = 1.0
@@ -646,7 +646,7 @@ class TestAdvectionConservation:
         ["upwind1", "weno3", "weno5", "weno7", "weno9", "minmod", "van_leer"],
     )
     def test_1d_conservation(self, method):
-        from gridax_ops import Advection1D, rk3_ssp_step
+        from gridax_jax import Advection1D, rk3_ssp_step
 
         ng = 4
         n = 64

@@ -34,7 +34,7 @@ import jax
 
 jax.config.update("jax_enable_x64", True)
 
-import gridax_ops as fvx
+import gridax_jax as fvx
 import jax.numpy as jnp
 import numpy as np
 from scipy.special import erf

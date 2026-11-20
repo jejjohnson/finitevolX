@@ -17,7 +17,7 @@ one cell inside the coast where CG puts the wall.
 
 from __future__ import annotations
 
-import gridax_ops as fvx
+import gridax_jax as fvx
 import jax.numpy as jnp
 import numpy as np
 import pytest

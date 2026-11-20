@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from gridax_ops import (
+from gridax_jax import (
     AbstractForcing,
     CartesianGrid3D,
     LinearDrag2D,

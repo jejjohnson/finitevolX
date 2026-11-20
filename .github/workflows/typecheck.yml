@@ -22,4 +22,4 @@ jobs:
         run: uv sync --extra dev --extra pipekit
 
       - name: Type check
-        run: uv run ty check packages/gridax-ops/src packages/gridax/src finitevolx
+        run: uv run ty check packages/gridax-jax/src packages/gridax/src finitevolx

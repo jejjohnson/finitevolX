@@ -31,9 +31,9 @@ PACKAGES: dict[str, tuple[str, tuple[str, ...]]] = {
         "pyproject.toml",
         ("finitevolx",),
     ),
-    "gridax-ops": (
-        "packages/gridax-ops/pyproject.toml",
-        ("packages/gridax-ops/src/gridax_ops",),
+    "gridax-jax": (
+        "packages/gridax-jax/pyproject.toml",
+        ("packages/gridax-jax/src/gridax_jax",),
     ),
     "gridax": (
         "packages/gridax/pyproject.toml",
@@ -63,7 +63,7 @@ FORBIDDEN: dict[str, str] = {
 ALLOWED: dict[str, str] = {
     "finitevolx": "finitevolx",
     "gridax": "gridax",
-    "gridax_ops": "gridax-ops",
+    "gridax_jax": "gridax-jax",
     "gaussx": "gaussx",
     "geocatalog": "geotoolz-catalog",
     "geocloud": "geotoolz-cloud",

@@ -10,12 +10,12 @@ from gridax import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
-from gridax_ops._src.advection.advection import Advection2D, Advection3D
-from gridax_ops._src.advection.spherical_advection import (
+from gridax_jax._src.advection.advection import Advection2D, Advection3D
+from gridax_jax._src.advection.spherical_advection import (
     SphericalAdvection2D,
     SphericalAdvection3D,
 )
-from gridax_ops._src.operators.reductions import spherical_area_weights
+from gridax_jax._src.operators.reductions import spherical_area_weights
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -458,7 +458,7 @@ class TestSphericalTelescoping:
     def test_divergence_zonally_periodic(self):
         """``Σ A · SphericalDivergence2D(u, v)`` over the interior: the metric
         is self-consistent (#297 audit), so this is rounding."""
-        from gridax_ops import SphericalDivergence2D
+        from gridax_jax import SphericalDivergence2D
 
         grid, (_, u, v), _ = _periodic_setup(halo=1)
         div = SphericalDivergence2D(grid=grid)(u, v)
@@ -466,7 +466,7 @@ class TestSphericalTelescoping:
         assert abs(_relative_net(area, div)) < TELESCOPE_RTOL
 
     def test_divergence_zero_boundary_velocity(self):
-        from gridax_ops import SphericalDivergence2D
+        from gridax_jax import SphericalDivergence2D
 
         grid, (_, u, v), _ = _periodic_setup(halo=1)
         u = u.at[:, 0].set(0.0).at[:, -2].set(0.0)  # west / east wall faces

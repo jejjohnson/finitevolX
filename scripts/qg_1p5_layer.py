@@ -76,7 +76,7 @@ import jax.numpy as jnp
 import matplotlib
 
 matplotlib.use("Agg")
-from gridax_ops import (
+from gridax_jax import (
     Advection2D,
     CartesianGrid2D,
     Difference2D,

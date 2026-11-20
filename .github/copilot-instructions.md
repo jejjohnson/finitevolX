@@ -8,9 +8,9 @@ the docs, git and PR rules).
 
 The essentials, in case you only read this file:
 
-- Two packages: `packages/gridax-ops` (import `gridax_ops`, formerly
-  finitevolx; implementation in `gridax_ops/_src/`, public API in
-  `gridax_ops.__all__`) and `packages/gridax` (grids and masks on NumPy).
+- Two packages: `packages/gridax-jax` (import `gridax_jax`, formerly
+  finitevolx; implementation in `gridax_jax/_src/`, public API in
+  `gridax_jax.__all__`) and `packages/gridax` (grids and masks on NumPy).
   `finitevolx/` at the root is a deprecated shim. Search
   [`docs/capabilities.md`](../docs/capabilities.md) before writing a helper:
   spectral solves and transforms come from spectraldiffx, tridiagonal solves
@@ -34,7 +34,7 @@ The essentials, in case you only read this file:
 - NumPy-style docstrings; every stencil commented with its half-index
   formula (`dh_dx[j, i+1/2] = ...`) and array shapes (`[Ny, Nx]`).
 - Before committing, from the repo root: `make test`, `uv run ruff check .`,
-  `uv run ruff format --check .`, `uv run ty check packages/gridax-ops/src packages/gridax/src finitevolx`;
+  `uv run ruff format --check .`, `uv run ty check packages/gridax-jax/src packages/gridax/src finitevolx`;
   `make capabilities` after a public API change; regenerate the golden
   fixtures (`uv run python tests/fixtures/_gen_golden.py`) only when an
   operator's output changes on purpose.

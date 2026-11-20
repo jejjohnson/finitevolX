@@ -1,7 +1,7 @@
 [project]
 name = "finitevolx"
 version = "0.1.0"
-description = "Deprecated: finitevolX is now gridax-ops (import gridax_ops) on gridax."
+description = "Deprecated: finitevolX is now gridax-jax (import gridax_jax) on gridax."
 authors = [
     { name = "Juan Emmanuel Johnson", email = "jemanjohnson34@gmail.com" },
     { name = "Takaya Uchida", email = "roxyboy.guppy@gmail.com" },
@@ -23,10 +23,10 @@ classifiers = [
     "Development Status :: 2 - Pre-Alpha",
 ]
 # The finitevolx distribution is a deprecated shim for one 0.X release: the
-# code is gridax-ops (packages/gridax-ops, import gridax_ops) on gridax
+# code is gridax-jax (packages/gridax-jax, import gridax_jax) on gridax
 # (packages/gridax, import gridax). `import finitevolx` warns and re-exports.
 dependencies = [
-    "gridax-ops>=0.1.0",
+    "gridax-jax>=0.1.0",
     "gridax>=0.0.0",
 ]
 
@@ -35,11 +35,11 @@ dependencies = [
 # This repository is a uv workspace: the root project (finitevolx) and
 # packages/gridax, the NumPy-only grid and mask package it builds on.
 [tool.uv.workspace]
-members = ["packages/gridax", "packages/gridax-ops"]
+members = ["packages/gridax", "packages/gridax-jax"]
 
 [tool.uv.sources]
 gridax = { workspace = true }
-gridax-ops = { workspace = true }
+gridax-jax = { workspace = true }
 spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "0.1.1" }
 gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.6.5" }
 # integrix owns the generic time steppers. Its own gaussx pin (v0.6.12) is
@@ -98,9 +98,9 @@ examples = [
     "zarr>=3.1.5",
 ]
 pipekit = [
-    # Tier-B operator layer, `gridax_ops.pipekit` (pipekit Operators over
-    # the C-grid primitives). `import gridax_ops` never imports these.
-    "gridax-ops[pipekit]",
+    # Tier-B operator layer, `gridax_jax.pipekit` (pipekit Operators over
+    # the C-grid primitives). `import gridax_jax` never imports these.
+    "gridax-jax[pipekit]",
 ]
 docs = [
     "mkdocs>=1.6.0",
@@ -201,7 +201,7 @@ skip_covered = true
 branch = true
 command_line = "--module pytest"
 data_file = "reports/.coverage"
-source = ["gridax_ops", "gridax", "finitevolx"]
+source = ["gridax_jax", "gridax", "finitevolx"]
 
 [tool.coverage.xml]
 output = "reports/coverage.xml"

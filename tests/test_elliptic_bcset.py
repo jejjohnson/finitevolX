@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import gridax_ops as fvx
-from gridax_ops import (
+import gridax_jax as fvx
+from gridax_jax import (
     BoundaryConditionSet,
     Dirichlet1D,
     Mask2D,

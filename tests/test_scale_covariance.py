@@ -36,45 +36,45 @@ from gridax import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
-from gridax_ops._src.advection.advection import (
+from gridax_jax._src.advection.advection import (
     Advection1D,
     Advection2D,
     Advection3D,
 )
-from gridax_ops._src.advection.spherical_advection import (
+from gridax_jax._src.advection.spherical_advection import (
     SphericalAdvection2D,
     SphericalAdvection3D,
 )
-from gridax_ops._src.diffusion.diffusion import (
+from gridax_jax._src.diffusion.diffusion import (
     BiharmonicDiffusion2D,
     BiharmonicDiffusion3D,
     Diffusion2D,
     Diffusion3D,
 )
-from gridax_ops._src.diffusion.spherical_diffusion import (
+from gridax_jax._src.diffusion.spherical_diffusion import (
     SphericalBiharmonicDiffusion2D,
     SphericalBiharmonicDiffusion3D,
     SphericalDiffusion2D,
     SphericalDiffusion3D,
 )
-from gridax_ops._src.operators.diagnostic_operators import QGPotentialVorticity2D
-from gridax_ops._src.operators.diagnostics import (
+from gridax_jax._src.operators.diagnostic_operators import QGPotentialVorticity2D
+from gridax_jax._src.operators.diagnostics import (
     potential_vorticity_multilayer,
     stretching_term,
 )
-from gridax_ops._src.operators.difference import (
+from gridax_jax._src.operators.difference import (
     Difference1D,
     Difference2D,
     Difference3D,
 )
-from gridax_ops._src.operators.divergence import Divergence2D
-from gridax_ops._src.operators.interpolation import (
+from gridax_jax._src.operators.divergence import Divergence2D
+from gridax_jax._src.operators.interpolation import (
     Interpolation1D,
     Interpolation2D,
     Interpolation3D,
 )
-from gridax_ops._src.operators.jacobian import arakawa_jacobian
-from gridax_ops._src.operators.spherical_compound import (
+from gridax_jax._src.operators.jacobian import arakawa_jacobian
+from gridax_jax._src.operators.spherical_compound import (
     SphericalDivergence2D,
     SphericalDivergence3D,
     SphericalLaplacian2D,
@@ -82,16 +82,16 @@ from gridax_ops._src.operators.spherical_compound import (
     SphericalVorticity2D,
     SphericalVorticity3D,
 )
-from gridax_ops._src.operators.spherical_difference import (
+from gridax_jax._src.operators.spherical_difference import (
     SphericalDifference2D,
     SphericalDifference3D,
 )
-from gridax_ops._src.operators.vorticity import Vorticity2D, Vorticity3D
-from gridax_ops._src.solvers.spectral import (
+from gridax_jax._src.operators.vorticity import Vorticity2D, Vorticity3D
+from gridax_jax._src.solvers.spectral import (
     solve_poisson_dst,
     solve_poisson_fft,
 )
-from gridax_ops._src.vertical.vertical_modes import build_coupling_matrix
+from gridax_jax._src.vertical.vertical_modes import build_coupling_matrix
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -800,9 +800,9 @@ def _audited_modules():
     root = (
         pathlib.Path(__file__).resolve().parents[1]
         / "packages"
-        / "gridax-ops"
+        / "gridax-jax"
         / "src"
-        / "gridax_ops"
+        / "gridax_jax"
         / "_src"
     )
     for package in AUDITED_PACKAGES:
@@ -810,7 +810,7 @@ def _audited_modules():
 
 
 #: Dotted path of the module the constants live in.
-CONSTANTS_MODULE = "gridax_ops._src.utils.constants"
+CONSTANTS_MODULE = "gridax_jax._src.utils.constants"
 
 
 def _constant_aliases(tree):
@@ -854,7 +854,7 @@ def _referenced_constant(node, aliases, modules):
     the constants module. Matching on the attribute name alone would
     fail the audit on innocent code such as ``state.RHO`` or
     ``config.GRAVITY``, which have nothing to do with
-    :mod:`gridax_ops._src.utils.constants`.
+    :mod:`gridax_jax._src.utils.constants`.
     """
     if isinstance(node, ast.Name):
         return aliases.get(node.id) or (
@@ -930,7 +930,7 @@ class TestConstantsAudit:
         """``GRAVITY as g`` is the same constant under another name."""
         offending = tmp_path / "aliased.py"
         offending.write_text(
-            "from gridax_ops._src.utils.constants import GRAVITY as g\n"
+            "from gridax_jax._src.utils.constants import GRAVITY as g\n"
             "def f(h):\n"
             "    return g * h\n"
         )
@@ -940,7 +940,7 @@ class TestConstantsAudit:
         """``constants.GRAVITY`` bakes in SI just as surely."""
         offending = tmp_path / "qualified.py"
         offending.write_text(
-            "from gridax_ops._src.utils import constants\n"
+            "from gridax_jax._src.utils import constants\n"
             "def f(h):\n"
             "    return constants.GRAVITY * h\n"
         )
@@ -950,7 +950,7 @@ class TestConstantsAudit:
         """The alias is still overridable when it is only a default."""
         fine = tmp_path / "aliased_default.py"
         fine.write_text(
-            "from gridax_ops._src.utils.constants import GRAVITY as g\n"
+            "from gridax_jax._src.utils.constants import GRAVITY as g\n"
             "def f(h, gravity=g):\n"
             "    return gravity * h\n"
         )
@@ -959,7 +959,7 @@ class TestConstantsAudit:
     def test_audit_allows_a_qualified_default(self, tmp_path):
         fine = tmp_path / "qualified_default.py"
         fine.write_text(
-            "from gridax_ops._src.utils import constants\n"
+            "from gridax_jax._src.utils import constants\n"
             "def f(h, gravity=constants.GRAVITY):\n"
             "    return gravity * h\n"
         )
@@ -979,7 +979,7 @@ class TestConstantsAudit:
         """Renaming the module on import must not switch the audit off."""
         offending = tmp_path / "module_alias.py"
         offending.write_text(
-            "from gridax_ops._src.utils import constants as c\n"
+            "from gridax_jax._src.utils import constants as c\n"
             "def f(h):\n"
             "    return c.RHO * h\n"
         )
@@ -989,7 +989,7 @@ class TestConstantsAudit:
         """The audit must fail on the pattern it exists to catch."""
         offending = tmp_path / "bad_operator.py"
         offending.write_text(
-            "from gridax_ops._src.utils.constants import GRAVITY\n"
+            "from gridax_jax._src.utils.constants import GRAVITY\n"
             "def tendency(h, dx):\n"
             "    return GRAVITY * h / dx\n"
         )
@@ -998,7 +998,7 @@ class TestConstantsAudit:
     def test_audit_allows_an_overridable_default(self, tmp_path):
         fine = tmp_path / "good_operator.py"
         fine.write_text(
-            "from gridax_ops._src.utils.constants import GRAVITY\n"
+            "from gridax_jax._src.utils.constants import GRAVITY\n"
             "def tendency(h, dx, g: float = GRAVITY):\n"
             "    return g * h / dx\n"
         )

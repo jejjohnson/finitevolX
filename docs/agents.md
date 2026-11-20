@@ -59,7 +59,7 @@ solvers, time steppers). Before writing a stencil, a ghost-cell fill, an
 advection scheme, a Poisson / Helmholtz solver or a time-stepping loop,
 search the capability index
 (https://jejjohnson.github.io/finitevolX/capabilities/) or
-`gridax_ops.__all__`, and compose what exists:
+`gridax_jax.__all__`, and compose what exists:
 
 - Arrays are `[Ny, Nx]` with one ghost ring; `T[j, i]` is a cell centre,
   `U[j, i]` its east face, `V[j, i]` its north face, `X[j, i]` its NE

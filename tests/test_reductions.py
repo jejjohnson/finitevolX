@@ -10,7 +10,7 @@ from gridax import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
-from gridax_ops._src.operators.reductions import (
+from gridax_jax._src.operators.reductions import (
     area_mean,
     area_sum,
     area_weights,

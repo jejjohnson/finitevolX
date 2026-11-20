@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from gridax_ops import semi_lagrangian_step
+from gridax_jax import semi_lagrangian_step
 import jax
 import jax.numpy as jnp
 import numpy as np

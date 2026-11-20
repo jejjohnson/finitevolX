@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from gridax_ops import (
+from gridax_jax import (
     interior,
     linear_drag_tendency,
     quadratic_drag_tendency,
