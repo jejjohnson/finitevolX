@@ -29,7 +29,7 @@ from finitevolx._src.grid.spherical import (
 )
 from finitevolx._src.mask import Mask2D, Mask3D
 from finitevolx._src.operators._ghost import interior, zero_z_ghosts
-from finitevolx._src.operators._utils import _safe_div_cos
+from finitevolx._src.operators._utils import _metric_like, _safe_div_cos
 from finitevolx._src.operators.spherical_compound import _geostrophic_velocity_sphere
 from finitevolx._src.operators.stencils import (
     diff_x_bwd,
@@ -77,7 +77,7 @@ class SphericalDifference2D(eqx.Module):
         dh/dx[j, i+½] = (h[j, i+1] − h[j, i]) / (R · cos(lat_U) · dlon)
         """
         raw = diff_x_fwd(h)
-        cos_U = self.grid.cos_lat_U[1:-1, 1:-1]
+        cos_U = _metric_like(self.grid.cos_lat_U, h)[1:-1, 1:-1]
         out = interior(_safe_div_cos(raw, cos_U, self.grid.R * self.grid.dlon), h)
         if self.mask is not None:
             out = out * self.mask.u
@@ -100,7 +100,7 @@ class SphericalDifference2D(eqx.Module):
         dv/dx[j+½, i+½] = (v[j+½, i+1] − v[j+½, i]) / (R · cos(lat_X) · dlon)
         """
         raw = diff_x_fwd(v)
-        cos_X = self.grid.cos_lat_X[1:-1, 1:-1]
+        cos_X = _metric_like(self.grid.cos_lat_X, v)[1:-1, 1:-1]
         out = interior(_safe_div_cos(raw, cos_X, self.grid.R * self.grid.dlon), v)
         if self.mask is not None:
             out = out * self.mask.xy_corner_strict
@@ -127,7 +127,7 @@ class SphericalDifference2D(eqx.Module):
         du/dx[j, i] = (u[j, i+½] − u[j, i−½]) / (R · cos(lat_T) · dlon)
         """
         raw = diff_x_bwd(u)
-        cos_T = self.grid.cos_lat_T[1:-1, 1:-1]
+        cos_T = _metric_like(self.grid.cos_lat_T, u)[1:-1, 1:-1]
         out = interior(_safe_div_cos(raw, cos_T, self.grid.R * self.grid.dlon), u)
         if self.mask is not None:
             out = out * self.mask.h
@@ -153,7 +153,7 @@ class SphericalDifference2D(eqx.Module):
 
         d²h/dx² = 1/(R² cos²φ) · (h[j,i+1] − 2h[j,i] + h[j,i−1]) / dlon²
         """
-        cos_T = self.grid.cos_lat_T[1:-1, 1:-1]
+        cos_T = _metric_like(self.grid.cos_lat_T, h)[1:-1, 1:-1]
         # h_c sliced once (see `_Neighbours2D`); same arithmetic as
         #   (diff_x_fwd(h) - diff_x_bwd(h)) / dlon**2
         h_c, h_e, h_w = h[1:-1, 1:-1], h[1:-1, 2:], h[1:-1, :-2]
@@ -168,7 +168,7 @@ class SphericalDifference2D(eqx.Module):
 
         1/(R² cosφ) · d/dφ(cosφ · dh/dφ)
         """
-        cos_T = self.grid.cos_lat_T[1:-1, 1:-1]
+        cos_T = _metric_like(self.grid.cos_lat_T, h)[1:-1, 1:-1]
         dlat = self.grid.dlat
         # dh/dlat at half-indices
         # h_c sliced once (see `_Neighbours2D`)
@@ -178,8 +178,9 @@ class SphericalDifference2D(eqx.Module):
         # cos(lat) at the V-faces, read from the grid (not averaged from T):
         #   cos_N = cos_lat_V[j]   (north face of cell j)
         #   cos_S = cos_lat_V[j-1] (south face of cell j)
-        cos_N = self.grid.cos_lat_V[1:-1, 1:-1]
-        cos_S = self.grid.cos_lat_V[:-2, 1:-1]
+        cos_V = _metric_like(self.grid.cos_lat_V, h)
+        cos_N = cos_V[1:-1, 1:-1]
+        cos_S = cos_V[:-2, 1:-1]
         d_cos_dh = (cos_N * dh_N - cos_S * dh_S) / dlat
         out = interior(_safe_div_cos(d_cos_dh, cos_T, self.grid.R**2), h)
         if self.mask is not None:
