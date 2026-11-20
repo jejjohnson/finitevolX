@@ -364,6 +364,9 @@ apply BCs to intermediate fields before chaining operators.
 - No Python `if` / `bool()` / `float()` on traced values; a mask or option
   that selects a code path is a concrete Python value or a static field.
 - Dtypes follow the input: float32 in gives float32 out even with x64 on.
+  A kernel that takes host data calls `check_dtype` on entry, so float64
+  with x64 off raises instead of computing in float32; grid metrics take the
+  field's dtype (`_metric_like`).
 - Divisions and square roots that can hit zero are guarded with
   `jnp.where` on the argument as well as the result
   (`forcing/_utils.safe_speed`, `safe_denominator`), so the gradient stays

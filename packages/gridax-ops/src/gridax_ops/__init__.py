@@ -394,6 +394,7 @@ from gridax_ops._src.timestepping.semi_lagrangian import (
     SemiLagrangianTerm,
     semi_lagrangian_step,
 )
+from gridax_ops._src.utils.dtype import check_dtype
 from gridax_ops._src.vertical.multilayer import multilayer
 from gridax_ops._src.vertical.vertical_modes import (
     build_coupling_matrix,
@@ -664,6 +665,8 @@ __all__ = [
     "smooth_abs",
     "smooth_clamp",
     "smooth_max",
+    # The dtype rule: the caller decides, a silent downcast is an error
+    "check_dtype",
     # Vertical coupling and mode transforms
     "build_coupling_matrix",
     "decompose_vertical_modes",
