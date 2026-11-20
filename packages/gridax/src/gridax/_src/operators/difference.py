@@ -81,6 +81,27 @@ def _divergence_2d(
     return interior(diff_x_bwd_2d(u) / dx + diff_y_bwd_2d(v) / dy, like)
 
 
+def _laplacian_2d_interior(
+    h: Float[Array, "*batch Ny Nx"],
+    dx: float,
+    dy: float,
+) -> Float[Array, "*batch Ny-2 Nx-2"]:
+    """Laplacian at the interior T-points.  Shared implementation.
+
+    nabla2_h[j, i] = (h[j, i+1] - 2*h[j, i] + h[j, i-1]) / dx^2
+                   + (h[j+1, i] - 2*h[j, i] + h[j-1, i]) / dy^2
+
+    Each offset is sliced once (see `_Neighbours2D`); the arithmetic is
+    that of ``(diff_x_fwd_2d(h) - diff_x_bwd_2d(h)) / dx**2`` plus the same
+    in y.  Returns the interior only, so a caller can combine it with other
+    interior terms before padding.
+    """
+    nb = _neighbours(h)  # c, e, w, n, s views, each [Ny-2, Nx-2]
+    d2x = ((nb.e - nb.c) - (nb.c - nb.w)) / dx**2
+    d2y = ((nb.n - nb.c) - (nb.c - nb.s)) / dy**2
+    return d2x + d2y
+
+
 @pytree_dataclass
 class Difference1D:
     """Finite-difference operators on a 1-D Arakawa C-grid.
@@ -476,14 +497,7 @@ class Difference2D:
             Laplacian at T-points.  When ``self.mask`` is set, the
             output is zeroed at dry T-cells via ``* mask.h``.
         """
-        # nabla2_h[j, i] = d^2h/dx^2 + d^2h/dy^2, with each offset sliced
-        # once (see `_Neighbours2D`); same arithmetic as
-        #   d2x = (diff_x_fwd_2d(h) - diff_x_bwd_2d(h)) / dx**2
-        #   d2y = (diff_y_fwd_2d(h) - diff_y_bwd_2d(h)) / dy**2
-        nb = _neighbours(h)  # c, e, w, n, s views, each [Ny-2, Nx-2]
-        d2x = ((nb.e - nb.c) - (nb.c - nb.w)) / self.grid.dx**2
-        d2y = ((nb.n - nb.c) - (nb.c - nb.s)) / self.grid.dy**2
-        out = interior(d2x + d2y, h)
+        out = interior(_laplacian_2d_interior(h, self.grid.dx, self.grid.dy), h)
         if self.mask is not None:
             out = out * self.mask.h
         return out

@@ -17,7 +17,7 @@ from gridax._src.backend import set_at, vmap
 from gridax._src.constants import GRAVITY, OMEGA, R_EARTH
 from gridax._src.mask import Mask3D
 from gridax._src.operators._ghost import interior
-from gridax._src.operators.difference import _curl_2d
+from gridax._src.operators.difference import _curl_2d, _laplacian_2d_interior
 from gridax._src.operators.stencils import (
     avg_x_bwd_2d,
     avg_xfwd_yfwd_2d,
@@ -456,11 +456,11 @@ def qg_potential_vorticity(
         QG potential vorticity at T-points.
         Ghost ring is zero; interior is ``[1:-1, 1:-1]``.
     """
-    # Laplacian at T-points via centred second differences:
-    d2x = (diff_x_fwd_2d(psi) - diff_x_bwd_2d(psi)) / dx**2
-    d2y = (diff_y_fwd_2d(psi) - diff_y_bwd_2d(psi)) / dy**2
-    # q[j,i] = (d2psi/dx2 + d2psi/dy2) / f0 + beta * (y - y0) / f0
-    q_int = (d2x + d2y) / f0 + beta * (y[..., 1:-1, 1:-1] - y0) / f0
+    # q[j,i] = (d2psi/dx2 + d2psi/dy2) / f0 + beta * (y - y0) / f0, with the
+    # Laplacian of Difference2D.laplacian
+    q_int = (
+        _laplacian_2d_interior(psi, dx, dy) / f0 + beta * (y[..., 1:-1, 1:-1] - y0) / f0
+    )
     out = interior(q_int, psi)
     return out
 

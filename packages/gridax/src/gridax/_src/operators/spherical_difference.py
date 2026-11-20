@@ -28,7 +28,12 @@ from gridax._src.backend import vmap
 from gridax._src.grid import SphericalGrid2D, SphericalGrid3D
 from gridax._src.mask import Mask2D, Mask3D
 from gridax._src.operators._ghost import interior, zero_z_ghosts
-from gridax._src.operators._utils import _metric_like, _safe_div_cos
+from gridax._src.operators._utils import (
+    _metric_like,
+    _safe_div_cos,
+    _spherical_d2_lon,
+    _spherical_laplacian_merid,
+)
 from gridax._src.operators.spherical_compound import _geostrophic_velocity_sphere
 from gridax._src.operators.stencils import (
     diff_x_bwd_2d,
@@ -160,11 +165,10 @@ class SphericalDifference2D:
         d²h/dx² = 1/(R² cos²φ) · (h[j,i+1] − 2h[j,i] + h[j,i−1]) / dlon²
         """
         cos_T = _metric_like(self.grid.cos_lat_T, h)[1:-1, 1:-1]
-        # h_c sliced once (see `_Neighbours2D`); same arithmetic as
-        #   (diff_x_fwd_2d(h) - diff_x_bwd_2d(h)) / dlon**2
+        # h_c sliced once (see `_Neighbours2D`)
         h_c, h_e, h_w = h[1:-1, 1:-1], h[1:-1, 2:], h[1:-1, :-2]
-        d2h = ((h_e - h_c) - (h_c - h_w)) / self.grid.dlon**2
-        out = interior(_safe_div_cos(d2h, cos_T, self.grid.R**2 * cos_T), h)
+        d2h = _spherical_d2_lon(h_c, h_e, h_w, cos_T, self.grid.dlon, self.grid.R)
+        out = interior(d2h, h)
         if self.mask is not None:
             out = out * self.mask.h
         return out
@@ -175,20 +179,18 @@ class SphericalDifference2D:
         1/(R² cosφ) · d/dφ(cosφ · dh/dφ)
         """
         cos_T = _metric_like(self.grid.cos_lat_T, h)[1:-1, 1:-1]
-        dlat = self.grid.dlat
-        # dh/dlat at half-indices
         # h_c sliced once (see `_Neighbours2D`)
         h_c, h_n, h_s = h[1:-1, 1:-1], h[2:, 1:-1], h[:-2, 1:-1]
-        dh_N = (h_n - h_c) / dlat  # (h[2:, 1:-1] - h[1:-1, 1:-1]) / dlat
-        dh_S = (h_c - h_s) / dlat  # (h[1:-1, 1:-1] - h[:-2, 1:-1]) / dlat
         # cos(lat) at the V-faces, read from the grid (not averaged from T):
         #   cos_N = cos_lat_V[j]   (north face of cell j)
         #   cos_S = cos_lat_V[j-1] (south face of cell j)
         cos_V = _metric_like(self.grid.cos_lat_V, h)
         cos_N = cos_V[1:-1, 1:-1]
         cos_S = cos_V[:-2, 1:-1]
-        d_cos_dh = (cos_N * dh_N - cos_S * dh_S) / dlat
-        out = interior(_safe_div_cos(d_cos_dh, cos_T, self.grid.R**2), h)
+        merid = _spherical_laplacian_merid(
+            h_c, h_n, h_s, cos_N, cos_S, cos_T, self.grid.dlat, self.grid.R
+        )
+        out = interior(merid, h)
         if self.mask is not None:
             out = out * self.mask.h
         return out

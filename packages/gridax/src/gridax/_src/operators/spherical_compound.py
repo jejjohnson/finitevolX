@@ -20,7 +20,12 @@ from gridax._src.backend import vmap
 from gridax._src.grid import SphericalGrid2D, SphericalGrid3D
 from gridax._src.mask import Mask2D, Mask3D
 from gridax._src.operators._ghost import interior, zero_z_ghosts
-from gridax._src.operators._utils import _metric_like, _safe_div_cos
+from gridax._src.operators._utils import (
+    _metric_like,
+    _safe_div_cos,
+    _spherical_d2_lon,
+    _spherical_laplacian_merid,
+)
 from gridax._src.operators.interpolation import Interpolation2D
 from gridax._src.operators.stencils import (
     _neighbours,
@@ -291,30 +296,22 @@ class SphericalLaplacian2D:
     def __call__(self, h: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """Laplacian at T-points on a sphere."""
         R = self.grid.R
-        dlon = self.grid.dlon
-        dlat = self.grid.dlat
         cos_T = _metric_like(self.grid.cos_lat_T, h)[1:-1, 1:-1]
 
-        # Each offset of h is sliced once (see `_Neighbours2D`); same
-        # arithmetic as diff_x_fwd_2d(h) - diff_x_bwd_2d(h) and the original
-        # dh_N / dh_S slices, but the VJP is one fused pass.
+        # Each offset of h is sliced once (see `_Neighbours2D`), so the VJP
+        # is one fused pass; the two terms are SphericalDifference2D's
+        # diff2_lon and laplacian_merid.
         nb = _neighbours(h)  # c, e, w, n, s views  [Ny-2, Nx-2]
-
-        # d²h/dλ²
-        d2h_dlon2 = ((nb.e - nb.c) - (nb.c - nb.w)) / dlon**2
-
-        # d/dφ(cosφ · dh/dφ)
-        dh_N = (nb.n - nb.c) / dlat  # (h[2:, 1:-1] - h[1:-1, 1:-1]) / dlat
-        dh_S = (nb.c - nb.s) / dlat  # (h[1:-1, 1:-1] - h[:-2, 1:-1]) / dlat
         # V-face cosines from the grid, as SphericalDivergence2D reads them:
         #   cos_V_N = cos_lat_V[j] (north face), cos_V_S = cos_lat_V[j-1]
         cos_V = _metric_like(self.grid.cos_lat_V, h)
         cos_V_N = cos_V[1:-1, 1:-1]
         cos_V_S = cos_V[:-2, 1:-1]
-        d_coslat_dh = (cos_V_N * dh_N - cos_V_S * dh_S) / dlat
 
-        lon_term = _safe_div_cos(d2h_dlon2, cos_T, R**2 * cos_T)
-        lat_term = _safe_div_cos(d_coslat_dh, cos_T, R**2)
+        lon_term = _spherical_d2_lon(nb.c, nb.e, nb.w, cos_T, self.grid.dlon, R)
+        lat_term = _spherical_laplacian_merid(
+            nb.c, nb.n, nb.s, cos_V_N, cos_V_S, cos_T, self.grid.dlat, R
+        )
         out = interior(lon_term + lat_term, h)
         if self.mask is not None:
             out = out * self.mask.h

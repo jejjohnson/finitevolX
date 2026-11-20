@@ -283,6 +283,15 @@ class TestOnePadPerOffset:
         op = fvx.Difference2D(self.g2)
         assert _vjp_pads(op.laplacian, _field(NY, NX)) == 5
 
+    def test_qg_potential_vorticity(self):
+        # the Laplacian of Difference2D.laplacian: c, e, w, n, s
+        y = _field(NY, NX, seed=3)
+        pads = _vjp_pads(
+            lambda psi: fvx.qg_potential_vorticity(psi, 1e-4, 2e-11, 3.0, 2.0, y, 0.5),
+            _field(NY, NX),
+        )
+        assert pads == 5
+
     def test_laplacian_3d(self):
         op = fvx.Difference3D(self.g3)
         # 5 horizontal offsets on the z-interior, plus the z-interior slice
