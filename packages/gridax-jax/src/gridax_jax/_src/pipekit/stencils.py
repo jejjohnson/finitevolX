@@ -23,6 +23,7 @@ import re
 from typing import Any, ClassVar
 
 import equinox as eqx
+from geophysix.rotation import beta_plane
 from gridax import Mask2D
 from gridax._src.boundary.boundary import (
     enforce_periodic,
@@ -34,7 +35,6 @@ from gridax._src.boundary.boundary import (
     zero_gradient_boundaries,
 )
 from gridax._src.operators.coriolis import Coriolis2D
-from gridax._src.operators.diagnostics import coriolis_fn
 from gridax._src.operators.difference import Difference2D
 from gridax._src.operators.interpolation import Interpolation2D
 import jax
@@ -166,7 +166,7 @@ class Coriolis(GridOperator):
         Meridional gradient ∂f/∂y.
     y0 : float or None
         Reference latitude coordinate; ``None`` uses the mean of the T-point
-        y coordinates (as `coriolis_fn`).
+        y coordinates.
     """
 
     f0: jax.Array = eqx.field(converter=jnp.asarray, kw_only=True)
@@ -178,7 +178,9 @@ class Coriolis(GridOperator):
         g = self.cartesian_grid
         y = jnp.arange(g.Ny, dtype=dtype) * g.dy  # T[j] sits at y = j Δy
         Y = jnp.broadcast_to(y[:, None], (g.Ny, g.Nx))
-        return coriolis_fn(Y, f0=self.f0, beta=self.beta, y0=self.y0)
+        # f = f0 + beta (y - y0), with y0 the mean T-point y when unset
+        y0 = jnp.mean(Y) if self.y0 is None else self.y0
+        return beta_plane(Y, f0=self.f0, beta=self.beta, y0=y0)
 
     def _apply(self, u: Field, v: Field) -> tuple[Field, Field]:
         f = self.coriolis_parameter(jnp.result_type(u, v))

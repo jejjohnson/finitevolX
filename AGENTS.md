@@ -46,7 +46,7 @@ the grid and mask classes of `gridax` (the mask construction helpers stay
 | Time integration | `timestepping/` | `semi_lagrangian_step`, `SemiLagrangianSolver`, `SemiLagrangianTerm` (`semi_lagrangian.py`); `solve_ocean_pde` (`_solve.py`); the generic steppers live in `integrix.march`, and their `gridax_jax.*` (formerly `finitevolx.*`) names are deprecated aliases (`_deprecated.py`, served by `__getattr__` in `gridax_jax/__init__.py`) |
 | Vertical | `vertical/` | `multilayer` (vmap a 2-D operator over layers), vertical modes (`build_coupling_matrix`, `layer_to_mode`, …) |
 | pipekit layer (Tier B) | `pipekit/` (public: `gridax_jax/pipekit/`) | `FVXOperator` / `GridOperator` on `pipekit_jax.JaxOperator`, `GridSpec`, `over_leading`, `check_operator` (`gridax_jax.pipekit.testing`); behind the `pipekit` extra, never imported by `import gridax_jax` |
-| Shared | `gridax/_src/constants.py` (re-exported by `gridax_jax/_src/utils/constants.py`), `gridax/_src/backend.py`, `gridax/_src/pytree.py` | `GRAVITY`, `R_EARTH`, `OMEGA`, `RHO`, `DEG2M` (parameter defaults only; see contract 6); the backend hooks and `pytree_dataclass` (see Boundaries) |
+| Shared | `gridax/_src/backend.py`, `gridax/_src/pytree.py`; constants from geophysix | the backend hooks and `pytree_dataclass` (see Boundaries); physical constants are geophysix records (`geophysix.earth.SPHERE`, `WGS84`, `geophysix.constants.STANDARD`), used as parameter defaults only (contract 6). `gridax/_src/constants.py` (`R_EARTH`, `GRAVITY`, `OMEGA`, `RHO`, `DEG2M`) is a deprecated shim of geophysix's values, and the Coriolis helpers and the linear EOS are deprecated in favour of `geophysix.rotation` and `geophysix.seawater` (#446) |
 
 The three operator layers are the ones `docs/stencils.md` and
 `docs/masks.md` describe: Layer 1 raw stencils, Layer 2 functional helpers
@@ -355,7 +355,8 @@ apply BCs to intermediate fields before chaining operators.
   arguments. Forcings are time-agnostic and compose with `ForcingSum`,
   `ForcingProduct` and `TimeVaryingForcing` inside the RHS function. The
   core math lives in a functional primitive (`forcing/functional.py`).
-- **Operators are unit-agnostic.** Physical constants (`GRAVITY`,
+- **Operators are unit-agnostic.** Physical constants (the geophysix
+  records `SPHERE`, `WGS84`, `STANDARD`, and the deprecated `GRAVITY`,
   `R_EARTH`, `OMEGA`, `RHO`, `DEG2M`) appear only as overridable parameter
   defaults, never inside an expression, in `operators/`, `advection/`,
   `diffusion/` and `solvers/`; rescaling the grid by `L` and the fields by

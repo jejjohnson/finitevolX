@@ -10,11 +10,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import warnings
 
+from geophysix.constants import STANDARD
+from geophysix.earth import SPHERE, WGS84
 from jaxtyping import Float
 import numpy as np
 
 from gridax._src.backend import set_at, vmap
-from gridax._src.constants import GRAVITY, OMEGA, R_EARTH
 from gridax._src.mask import Mask3D
 from gridax._src.operators._ghost import interior
 from gridax._src.operators.difference import _curl_2d, _laplacian_2d_interior
@@ -87,7 +88,7 @@ def bernoulli_potential(
     h: Float[Array, "*batch Ny Nx"],
     u: Float[Array, "*batch Ny Nx"],
     v: Float[Array, "*batch Ny Nx"],
-    gravity: float = GRAVITY,
+    gravity: float = STANDARD.standard_gravity,
 ) -> Float[Array, "*batch Ny Nx"]:
     """Bernoulli potential at T-points on an Arakawa C-grid.
 
@@ -668,7 +669,7 @@ def vertical_velocity(
 
 
 def coriolis_param(
-    lat: float | Float[Array, "..."], omega: float = OMEGA
+    lat: float | Float[Array, "..."], omega: float = WGS84.rotation_rate
 ) -> float | Float[Array, ""]:
     """Reference Coriolis parameter from latitude.
 
@@ -679,7 +680,7 @@ def coriolis_param(
     lat : float or array
         Latitude(s) in degrees.  If an array, the mean is used.
     omega : float
-        Earth's angular velocity (rad/s).  Default ``OMEGA``.
+        Earth's angular velocity (rad/s).  Default: WGS84's, 7.292115e-5.
 
     Returns
     -------
@@ -692,7 +693,9 @@ def coriolis_param(
 
 
 def beta_param(
-    lat: float | Float[Array, "..."], omega: float = OMEGA, radius: float = R_EARTH
+    lat: float | Float[Array, "..."],
+    omega: float = WGS84.rotation_rate,
+    radius: float = SPHERE.semi_major,
 ) -> float | Float[Array, ""]:
     """Meridional gradient of the Coriolis parameter from latitude.
 
@@ -703,9 +706,9 @@ def beta_param(
     lat : float or array
         Latitude(s) in degrees.  If an array, the mean is used.
     omega : float
-        Earth's angular velocity (rad/s).  Default ``OMEGA``.
+        Earth's angular velocity (rad/s).  Default: WGS84's, 7.292115e-5.
     radius : float
-        Earth's radius (m).  Default ``R_EARTH``.
+        Earth's radius (m).  Default: the IUGG mean radius, 6,371,008.77 m.
 
     Returns
     -------
@@ -756,7 +759,7 @@ def coriolis_fn(
 def streamfn_to_ssh(
     psi: Float[Array, "..."],
     f0: float,
-    g: float = GRAVITY,
+    g: float = STANDARD.standard_gravity,
 ) -> Float[Array, "..."]:
     """Convert streamfunction to sea surface height.
 
@@ -769,7 +772,7 @@ def streamfn_to_ssh(
     f0 : float
         Reference Coriolis parameter (1/s).
     g : float
-        Gravitational acceleration (m/s²).  Default ``GRAVITY``.
+        Gravitational acceleration (m/s²).  Default: standard gravity, 9.80665.
 
     Returns
     -------
@@ -782,7 +785,7 @@ def streamfn_to_ssh(
 def ssh_to_streamfn(
     ssh: Float[Array, "..."],
     f0: float,
-    g: float = GRAVITY,
+    g: float = STANDARD.standard_gravity,
 ) -> Float[Array, "..."]:
     """Convert sea surface height to streamfunction.
 
@@ -795,7 +798,7 @@ def ssh_to_streamfn(
     f0 : float
         Reference Coriolis parameter (1/s).
     g : float
-        Gravitational acceleration (m/s²).  Default ``GRAVITY``.
+        Gravitational acceleration (m/s²).  Default: standard gravity, 9.80665.
 
     Returns
     -------

@@ -45,8 +45,9 @@ the forward / backward asymmetry in contract 1 above all) and
    operators keep their energy / enstrophy identities. A per-cell
    recomputation of a face flux, or a wall face left non-zero under
    `wall="closed"`, breaks it.
-5. **Units.** A physical constant (`GRAVITY`, `R_EARTH`, `OMEGA`, `RHO`,
-   `DEG2M`) inside an expression instead of a parameter default; an
+5. **Units.** A physical constant (a geophysix record such as `SPHERE`,
+   `WGS84` or `STANDARD`, or the deprecated `GRAVITY`, `R_EARTH`, `OMEGA`,
+   `RHO`, `DEG2M`) inside an expression instead of a parameter default; an
    absolute epsilon guarding a ratio of dimensional quantities; a metric
    applied with the wrong power (an operator of order p must scale as
    `L**-p`). `tests/test_scale_covariance.py` is the reference.

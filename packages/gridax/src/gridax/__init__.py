@@ -100,7 +100,6 @@ from gridax._src.boundary.boundary import (
     zero_boundaries,
     zero_gradient_boundaries,
 )
-from gridax._src.constants import R_EARTH
 from gridax._src.diffusion.diffusion import (
     BiharmonicDiffusion2D,
     BiharmonicDiffusion3D,
@@ -161,9 +160,6 @@ from gridax._src.operators.diagnostic_operators import (
 from gridax._src.operators.diagnostics import (
     available_potential_energy,
     bernoulli_potential,
-    beta_param,
-    coriolis_fn,
-    coriolis_param,
     enstrophy,
     kinetic_energy,
     okubo_weiss,
@@ -432,9 +428,6 @@ __all__ = [
     # Functional diagnostics
     "available_potential_energy",
     "bernoulli_potential",
-    "beta_param",
-    "coriolis_fn",
-    "coriolis_param",
     "enstrophy",
     "kinetic_energy",
     "okubo_weiss",
@@ -521,5 +514,32 @@ __all__ = [
     "zero_boundaries",
     "zero_gradient_boundaries",
     # Constants
-    "R_EARTH",
 ]
+
+
+# Moved to geophysix (#446): the physical constants, and the Coriolis helpers,
+# which evaluate at the mean latitude where geophysix.rotation is pointwise.
+# The old names stay for one release and warn on access.
+_MOVED_TO_GEOPHYSIX = {
+    "R_EARTH": "geophysix.earth.SPHERE.semi_major",
+    "coriolis_param": "geophysix.rotation.coriolis (pointwise; pass the mean latitude)",
+    "beta_param": "geophysix.rotation.beta (pointwise; pass the mean latitude)",
+    "coriolis_fn": "geophysix.rotation.beta_plane (y0 is required there)",
+}
+
+
+def __getattr__(name: str) -> object:
+    if name in _MOVED_TO_GEOPHYSIX:
+        import warnings
+
+        from gridax._src import constants
+        from gridax._src.operators import diagnostics
+
+        warnings.warn(
+            f"gridax.{name} is deprecated and will be removed in the next release:"
+            f" use {_MOVED_TO_GEOPHYSIX[name]}.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return getattr(constants if name == "R_EARTH" else diagnostics, name)
+    raise AttributeError(f"module 'gridax' has no attribute {name!r}")

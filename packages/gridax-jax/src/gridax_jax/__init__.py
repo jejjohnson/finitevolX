@@ -91,15 +91,12 @@ from gridax import (
     avg_y_fwd_2d,
     avg_y_fwd_3d,
     bernoulli_potential,
-    beta_param,
     cartesian_area_mean,
     cartesian_area_sum,
     cartesian_area_weights,
     cartesian_volume_mean,
     cartesian_volume_sum,
     cartesian_volume_weights,
-    coriolis_fn,
-    coriolis_param,
     diff_x_bwd_1d,
     diff_x_bwd_2d,
     diff_x_bwd_3d,
@@ -215,14 +212,6 @@ from gridax_jax._src.forcing.functional import (
 from gridax_jax._src.forcing.rayleigh import RayleighDamping2D, RayleighDamping3D
 from gridax_jax._src.forcing.wind import WindCurl2D, WindStress2D, WindStress3D
 from gridax_jax._src.operators.barotropic import barotropic_filter
-from gridax_jax._src.operators.eos import (
-    buoyancy,
-    linear_density,
-    linear_density_anomaly,
-    linear_drho_dS,
-    linear_drho_dT,
-    reduced_gravity,
-)
 from gridax_jax._src.operators.relaxation import linear_drag, rayleigh_relaxation
 from gridax_jax._src.solvers.elliptic import (
     # Types
@@ -554,12 +543,6 @@ __all__ = [
     "StencilCapability2D",
     "StencilCapability3D",
     # Equation of state
-    "linear_density",
-    "linear_density_anomaly",
-    "linear_drho_dT",
-    "linear_drho_dS",
-    "buoyancy",
-    "reduced_gravity",
     # Diagnostics
     "Energetics2D",
     "QGPotentialVorticity2D",
@@ -585,9 +568,6 @@ __all__ = [
     "sw_potential_vorticity",
     "sw_potential_vorticity_multilayer",
     # Coriolis / beta-plane constructors
-    "coriolis_fn",
-    "coriolis_param",
-    "beta_param",
     # Streamfunction / SSH conversion
     "streamfn_to_ssh",
     "ssh_to_streamfn",
@@ -793,7 +773,38 @@ __all__ = [
 ]
 
 
+# Moved to geophysix (#446): the linear equation of state (geophysix.seawater,
+# whose parameters are one LinearEOS record) and gridax's mean-latitude
+# Coriolis helpers (geophysix.rotation is pointwise). The old names stay for
+# one release and warn on access.
+_MOVED_TO_GEOPHYSIX = {
+    "linear_density": "geophysix.seawater.linear_density",
+    "linear_density_anomaly": "geophysix.seawater.linear_density_anomaly",
+    "linear_drho_dT": "geophysix.seawater.linear_drho_dT",
+    "linear_drho_dS": "geophysix.seawater.linear_drho_dS",
+    "buoyancy": "geophysix.seawater.buoyancy",
+    "reduced_gravity": "geophysix.seawater.reduced_gravity",
+    "coriolis_param": "geophysix.rotation.coriolis (pointwise; pass the mean latitude)",
+    "beta_param": "geophysix.rotation.beta (pointwise; pass the mean latitude)",
+    "coriolis_fn": "geophysix.rotation.beta_plane (y0 is required there)",
+}
+
+
 def __getattr__(name: str) -> object:
+    if name in _MOVED_TO_GEOPHYSIX:
+        import warnings
+
+        from gridax._src.operators import diagnostics
+
+        from gridax_jax._src.operators import eos
+
+        warnings.warn(
+            f"gridax_jax.{name} is deprecated and will be removed in the next"
+            f" release: use {_MOVED_TO_GEOPHYSIX[name]}.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return getattr(eos if hasattr(eos, name) else diagnostics, name)
     # The generic time steppers moved to integrix.march; their old
     # names stay for one release and warn on access.
     if name in _MOVED_STEPPERS or name in _ADAPTED_STEPPERS:
