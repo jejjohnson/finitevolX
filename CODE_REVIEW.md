@@ -127,9 +127,7 @@ order); review what they cannot see.
   `docs/capabilities.md` regenerated.
 - NumPy-style docstrings with the formula, shapes and an `Examples` section
   that actually runs (doctests are not collected, so run it).
-- A new theory section or notebook is in the `mkdocs.yml` nav, and
-  `uv run mkdocs build` adds no `WARNING` lines (`--strict` does not pass
-  yet: the existing docstrings raise griffe warnings).
+- A new theory page or notebook is in the `toc` of `docs/myst.yml`, and `make docs` passes (it fails on any MyST warning and any broken link).
 
 ### 8. Tests
 

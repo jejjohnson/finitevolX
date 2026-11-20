@@ -90,12 +90,13 @@ mirror $2\phi_{\text{wall}} - \phi_{\text{adjacent}}$.  `Periodic1D` needs no
 `point`: wrapping by one period is right for every stagger (`U[:, 0]` is the
 same face as `U[:, Nx-2]`).
 
-!!! warning "Normal velocity needs `point=`"
-    `Dirichlet1D("east", 0.0)` on a U-field sets the ghost column
-    `U[:, Nx-1] = -U[:, Nx-2]` and leaves the east wall face `U[:, Nx-2]`
-    untouched, so mass flows through a "closed" wall.  Use
-    `Dirichlet1D("east", 0.0, point="U")`, or
-    `BoundaryConditionSet.closed(point="U")` for the whole basin.
+:::{warning} Normal velocity needs `point=`
+`Dirichlet1D("east", 0.0)` on a U-field sets the ghost column
+`U[:, Nx-1] = -U[:, Nx-2]` and leaves the east wall face `U[:, Nx-2]`
+untouched, so mass flows through a "closed" wall.  Use
+`Dirichlet1D("east", 0.0, point="U")`, or
+`BoundaryConditionSet.closed(point="U")` for the whole basin.
+:::
 
 ```python
 import gridax_jax as fvx
@@ -128,10 +129,11 @@ the opposite face.
 - Doubly-periodic channels and basins.
 - Zonal re-entrant channels (periodic in x, closed in y).
 
-!!! note "enforce_periodic helper"
-    For fully periodic domains the helper `enforce_periodic(field, ...)` is
-    available as a thin wrapper that applies `Periodic1D` on all four faces
-    simultaneously.  Prefer `BoundaryConditionSet` for per-face control.
+:::{note} enforce_periodic helper
+For fully periodic domains the helper `enforce_periodic(field, ...)` is
+available as a thin wrapper that applies `Periodic1D` on all four faces
+simultaneously.  Prefer `BoundaryConditionSet` for per-face control.
+:::
 
 ### `Reflective1D`
 

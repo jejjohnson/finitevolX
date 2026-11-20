@@ -37,11 +37,12 @@ The physical interior is `[1:-1, 1:-1]`.  Four location types are defined:
 | **V** | North face | `V[j, i]` at `(j+½, i)` | y-velocity, y-flux |
 | **X** | NE corner | `X[j, i]` at `(j+½, i+½)` | Vorticity, PV, corner quantities |
 
-!!! note "Same-index convention"
-    `U[j, i]` stores the value at the **east** face of cell `(j, i)`, i.e. at
-    position `(j, i+½)`.  Similarly `V[j, i]` is at the **north** face `(j+½, i)`.
-    This means the forward difference `T → U` uses `h[i+1] − h[i]`, whereas
-    the backward difference `U → T` uses `u[i] − u[i−1]`.
+:::{note} Same-index convention
+`U[j, i]` stores the value at the **east** face of cell `(j, i)`, i.e. at
+position `(j, i+½)`.  Similarly `V[j, i]` is at the **north** face `(j+½, i)`.
+This means the forward difference `T → U` uses `h[i+1] − h[i]`, whereas
+the backward difference `U → T` uses `u[i] − u[i−1]`.
+:::
 
 ---
 
@@ -85,11 +86,12 @@ $$
 | `diff_y_X_to_U` | $(q_j - q_{j-1})/\Delta y$ | Coriolis & vorticity-flux term |
 | `diff_x_X_to_V` | $(q_i - q_{i-1})/\Delta x$ | Coriolis & vorticity-flux term |
 
-!!! tip "Forward → Backward pairs"
-    Every forward operator has a corresponding backward operator that reverses
-    the shift.  Composing `diff_x_T_to_U` followed by `diff_x_U_to_T`
-    gives a second-order centred difference at T-points (i.e. the Laplacian
-    in x), which is the basis for the diffusion operator.
+:::{tip} Forward → Backward pairs
+Every forward operator has a corresponding backward operator that reverses
+the shift.  Composing `diff_x_T_to_U` followed by `diff_x_U_to_T`
+gives a second-order centred difference at T-points (i.e. the Laplacian
+in x), which is the basis for the diffusion operator.
+:::
 
 ---
 
@@ -168,12 +170,13 @@ ring is used as follows:
 | Backward x (U → T) | West U ghost `U[:, 0]` | `u[1:-1, :-2]` at first col |
 | Backward y (V → T) | South V ghost `V[0, :]` | `v[:-2, 1:-1]` at first row |
 
-!!! warning "Caller responsibility"
-    Ghost cells for **backward** operators (west U-face, south V-face) are **not**
-    filled by any forward operator — the caller must set them via boundary
-    conditions before composing operators.  Leaving them at zero is equivalent to
-    imposing a homogeneous Dirichlet condition on the flux, which is correct for
-    closed-wall BCs but wrong for periodic or open boundaries.
+:::{warning} Caller responsibility
+Ghost cells for **backward** operators (west U-face, south V-face) are **not**
+filled by any forward operator — the caller must set them via boundary
+conditions before composing operators.  Leaving them at zero is equivalent to
+imposing a homogeneous Dirichlet condition on the flux, which is correct for
+closed-wall BCs but wrong for periodic or open boundaries.
+:::
 
 ---
 

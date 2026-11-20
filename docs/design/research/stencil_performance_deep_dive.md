@@ -10,11 +10,12 @@ convolutions, no custom kernels), how fast can each operator be made, and what i
 the slicing is written well? Rules distilled from this note live in
 [Writing fast stencils](../../performance.md).
 
-!!! warning "One backend measured"
-    Every number below is **XLA:CPU** (a 2-vCPU cloud VM, JAX 0.10.1, float32). The structural
-    quantities (jaxpr `slice` / `pad` counts, XLA fusion counts, temporary buffers) explain
-    *why* a rewrite is faster and transfer across backends; the ratios themselves must be
-    re-measured on GPU / TPU (§5, phase 3).
+:::{warning} One backend measured
+Every number below is **XLA:CPU** (a 2-vCPU cloud VM, JAX 0.10.1, float32). The structural
+quantities (jaxpr `slice` / `pad` counts, XLA fusion counts, temporary buffers) explain
+*why* a rewrite is faster and transfer across backends; the ratios themselves must be
+re-measured on GPU / TPU (§5, phase 3).
+:::
 
 -----
 

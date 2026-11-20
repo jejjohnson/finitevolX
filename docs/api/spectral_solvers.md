@@ -9,7 +9,7 @@ one node outside the input), so pass them only the unknowns of your
 staggering.  On the C-grid, `streamfunction_from_vorticity`,
 `pressure_from_divergence` and `pv_inversion` do that for you from the full
 `[Ny, Nx]` array; see the
-[wall table](../elliptic_solvers.md#boundary-conditions).
+[wall table](../elliptic-solvers/#boundary-conditions).
 
 ## DST-I (Dirichlet BCs)
 

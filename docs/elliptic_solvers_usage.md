@@ -65,39 +65,42 @@ and `preconditioner` keyword arguments.
 
 Solves $\nabla^2 \psi - \lambda\psi = \zeta$ for ψ at X points.
 
-=== "Spectral (rectangular domain)"
+::::{tab-set}
+:::{tab-item} Spectral (rectangular domain)
 
-    ```python
-    # Dirichlet BCs (ψ = 0 on the C-grid wall nodes, X index 0 and N-2) — most common
-    psi = fvx.streamfunction_from_vorticity(zeta, dx, dy, bc="dst")
+```python
+# Dirichlet BCs (ψ = 0 on the C-grid wall nodes, X index 0 and N-2) — most common
+psi = fvx.streamfunction_from_vorticity(zeta, dx, dy, bc="dst")
 
-    # With a Helmholtz parameter (QG inversion, λ = 1/Rd²)
-    psi = fvx.streamfunction_from_vorticity(
-        zeta, dx, dy, bc="dst", lambda_=lambda_
-    )
-    ```
+# With a Helmholtz parameter (QG inversion, λ = 1/Rd²)
+psi = fvx.streamfunction_from_vorticity(
+    zeta, dx, dy, bc="dst", lambda_=lambda_
+)
+```
+:::
+:::{tab-item} CG (masked domain)
 
-=== "CG (masked domain)"
+```python
+# A Mask2D gives the psi mask xy_corner_strict: psi = 0 on the coast nodes
+psi = fvx.streamfunction_from_vorticity(
+    zeta, dx, dy, method="cg", mask=mask, lambda_=lambda_
+)
+```
+:::
+:::{tab-item} Capacitance (masked domain, fast)
 
-    ```python
-    # A Mask2D gives the psi mask xy_corner_strict: psi = 0 on the coast nodes
-    psi = fvx.streamfunction_from_vorticity(
-        zeta, dx, dy, method="cg", mask=mask, lambda_=lambda_
-    )
-    ```
+```python
+# One-time precomputation, for this mask and this λ
+solver = fvx.build_capacitance_solver(mask, dx, dy, lambda_=lambda_)
 
-=== "Capacitance (masked domain, fast)"
-
-    ```python
-    # One-time precomputation, for this mask and this λ
-    solver = fvx.build_capacitance_solver(mask, dx, dy, lambda_=lambda_)
-
-    # Reuse for many solves
-    psi = fvx.streamfunction_from_vorticity(
-        zeta, dx, dy, lambda_=lambda_, method="capacitance",
-        capacitance_solver=solver,
-    )
-    ```
+# Reuse for many solves
+psi = fvx.streamfunction_from_vorticity(
+    zeta, dx, dy, lambda_=lambda_, method="capacitance",
+    capacitance_solver=solver,
+)
+```
+:::
+::::
 
 A plain array `mask=` is taken as the mask of the field being solved for
 (ψ: X points); a `Mask2D` supplies the right one itself.
@@ -127,6 +130,7 @@ preconditioner is the spectral solve with the same `bc`.
 cell centres, not on the faces), and so do `known_values` / `known_mask`;
 `bc="fft"` is for the rectangular spectral solve only.
 
+(staggering-and-walls)=
 ### Staggering and walls
 
 The wrappers know the staggering of what they solve for (ψ at X points,
@@ -139,52 +143,56 @@ embedded in zeros, so the wall is the C-grid wall for every `bc` and
 Solves $(\nabla^2 - \lambda_k)\,\psi_k = q_k$ for each vertical mode, with
 $\lambda_k = 1/R_{d,k}^2 \ge 0$.
 
-=== "Single layer"
+::::{tab-set}
+:::{tab-item} Single layer
 
-    ```python
-    pv = zeta
-    psi = fvx.pv_inversion(pv, dx, dy, lambda_=lambda_, bc="dst")
-    ```
+```python
+pv = zeta
+psi = fvx.pv_inversion(pv, dx, dy, lambda_=lambda_, bc="dst")
+```
+:::
+:::{tab-item} Multi-layer (per-mode λ)
 
-=== "Multi-layer (per-mode λ)"
+```python
+# lambda_ array: one value per vertical mode, 1/Rd² per mode
+lambdas = 1.0 / jnp.array([40e3, 20e3, 10e3]) ** 2
 
-    ```python
-    # lambda_ array: one value per vertical mode, 1/Rd² per mode
-    lambdas = 1.0 / jnp.array([40e3, 20e3, 10e3]) ** 2
+# pv shape: (nl, Ny, Nx) or (batch, nl, Ny, Nx)
+pv = jnp.stack([zeta, 0.5 * zeta, 0.1 * zeta])
+psi = fvx.pv_inversion(pv, dx, dy, lambda_=lambdas, bc="dst")
+```
+:::
+:::{tab-item} With vertical mode decomposition
 
-    # pv shape: (nl, Ny, Nx) or (batch, nl, Ny, Nx)
-    pv = jnp.stack([zeta, 0.5 * zeta, 0.1 * zeta])
-    psi = fvx.pv_inversion(pv, dx, dy, lambda_=lambdas, bc="dst")
-    ```
+```python
+# Decompose layer PV into vertical modes
+H_layers = jnp.array([500.0, 1500.0, 3000.0])  # thicknesses [m]
+g_prime = jnp.array([9.81, 0.025, 0.0125])     # reduced gravities [m s⁻²]
+A_vert = fvx.build_coupling_matrix(H_layers, g_prime)
+radii, Cl2m, Cm2l = fvx.decompose_vertical_modes(A_vert, f0=1e-4)
+lambdas_k = 1.0 / radii**2  # 1/Rd_k² ≥ 0 per mode
 
-=== "With vertical mode decomposition"
+# Transform to mode space
+pv_layers = jnp.stack([zeta, 0.5 * zeta, 0.1 * zeta])
+pv_modes = fvx.layer_to_mode(pv_layers, Cl2m)
 
-    ```python
-    # Decompose layer PV into vertical modes
-    H_layers = jnp.array([500.0, 1500.0, 3000.0])  # thicknesses [m]
-    g_prime = jnp.array([9.81, 0.025, 0.0125])     # reduced gravities [m s⁻²]
-    A_vert = fvx.build_coupling_matrix(H_layers, g_prime)
-    radii, Cl2m, Cm2l = fvx.decompose_vertical_modes(A_vert, f0=1e-4)
-    lambdas_k = 1.0 / radii**2  # 1/Rd_k² ≥ 0 per mode
+# Invert each mode with its own λ_k
+psi_modes = fvx.pv_inversion(pv_modes, dx, dy, lambda_=lambdas_k, bc="dst")
 
-    # Transform to mode space
-    pv_layers = jnp.stack([zeta, 0.5 * zeta, 0.1 * zeta])
-    pv_modes = fvx.layer_to_mode(pv_layers, Cl2m)
-
-    # Invert each mode with its own λ_k
-    psi_modes = fvx.pv_inversion(pv_modes, dx, dy, lambda_=lambdas_k, bc="dst")
-
-    # Transform back to layer space
-    psi_layers = fvx.mode_to_layer(psi_modes, Cm2l)
-    ```
+# Transform back to layer space
+psi_layers = fvx.mode_to_layer(psi_modes, Cm2l)
+```
+:::
+::::
 
 
 ### Known Boundary Values (Inhomogeneous Dirichlet)
 
-!!! tip "Tutorial"
-    For the full derivation — notation, the block linear system, pseudocode,
-    a from-scratch NumPy implementation, convergence and gradients — see the
-    [Known Boundary Values tutorial](notebooks/inhomogeneous_bcs_tutorial.py).
+:::{tip} Tutorial
+For the full derivation — notation, the block linear system, pseudocode,
+a from-scratch NumPy implementation, convergence and gradients — see the
+[Known Boundary Values tutorial](notebooks/inhomogeneous_bcs_tutorial.ipynb).
+:::
 
 By default every solver assumes $\psi = 0$ on the boundary.  When the
 boundary values are known but non-zero — SSH from a parent model, a tide
@@ -223,36 +231,39 @@ $$
 on the remaining cells, and return
 $\psi = \psi_{\text{lift}} + \psi_{\text{hom}}$.
 
-=== "CG (any mask)"
+::::{tab-set}
+:::{tab-item} CG (any mask)
 
-    ```python
-    psi = fvx.streamfunction_from_vorticity(
-        zeta, dx, dy, lambda_=lambda_, method="cg", mask=mask, known_values=g
-    )
-    ```
+```python
+psi = fvx.streamfunction_from_vorticity(
+    zeta, dx, dy, lambda_=lambda_, method="cg", mask=mask, known_values=g
+)
+```
+:::
+:::{tab-item} Capacitance
 
-=== "Capacitance"
+```python
+# Build on the SAME mask: its unknowns are every wet cell with
+# psi = 0 on the coast, exactly the cells left to solve.
+solver = fvx.build_capacitance_solver(mask, dx, dy, lambda_=lambda_)
+psi = fvx.streamfunction_from_vorticity(
+    zeta, dx, dy, lambda_=lambda_, method="capacitance", mask=mask,
+    capacitance_solver=solver, known_values=g,
+)
+```
+:::
+:::{tab-item} Spectral (rectangular basin)
 
-    ```python
-    # Build on the SAME mask: its unknowns are every wet cell with
-    # psi = 0 on the coast, exactly the cells left to solve.
-    solver = fvx.build_capacitance_solver(mask, dx, dy, lambda_=lambda_)
-    psi = fvx.streamfunction_from_vorticity(
-        zeta, dx, dy, lambda_=lambda_, method="capacitance", mask=mask,
-        capacitance_solver=solver, known_values=g,
-    )
-    ```
-
-=== "Spectral (rectangular basin)"
-
-    ```python
-    # No mask: solves the psi basin of the rectangle -- wet X nodes
-    # [1:-2, 1:-2] -- with the known values on its wall nodes (rows/columns
-    # 0 and N-2).  Requires bc="dst".
-    psi = fvx.streamfunction_from_vorticity(
-        zeta, dx, dy, bc="dst", lambda_=lambda_, known_values=g
-    )
-    ```
+```python
+# No mask: solves the psi basin of the rectangle -- wet X nodes
+# [1:-2, 1:-2] -- with the known values on its wall nodes (rows/columns
+# 0 and N-2).  Requires bc="dst".
+psi = fvx.streamfunction_from_vorticity(
+    zeta, dx, dy, bc="dst", lambda_=lambda_, known_values=g
+)
+```
+:::
+::::
 
 The spectral path solves exactly the problem `method="cg"` solves with the
 rectangle's `Mask2D` (its `xy_corner_strict` is wet on `[1:-2, 1:-2]`), and
@@ -528,87 +539,92 @@ multiply by the mask as above; the wrappers do.
 
 ### Preconditioners
 
-=== "Spectral (cheapest)"
+:::::{tab-set}
+::::{tab-item} Spectral (cheapest)
 
-    ```python
-    M_inv = fvx.make_spectral_preconditioner(
-        dx, dy, lambda_=lambda_, bc="fft"
-    )
-    ```
+```python
+M_inv = fvx.make_spectral_preconditioner(
+    dx, dy, lambda_=lambda_, bc="fft"
+)
+```
 
-    Uses the rectangular spectral solver on the whole array as an
-    approximate inverse.  No setup and one transform pair per iteration,
-    but it ignores the mask and puts its wall at the array edge, so it is
-    not exact even on a rectangular basin: CG still takes 15–63 iterations
-    at 128²–256² (see the [Solver Comparison](solver_comparison.md)).
+Uses the rectangular spectral solver on the whole array as an
+approximate inverse.  No setup and one transform pair per iteration,
+but it ignores the mask and puts its wall at the array edge, so it is
+not exact even on a rectangular basin: CG still takes 15–63 iterations
+at 128²–256² (see the [Solver Comparison](solver_comparison.md)).
+::::
+::::{tab-item} Nyström (operator-only)
 
-=== "Nyström (operator-only)"
+```python
+M_inv = fvx.make_nystrom_preconditioner(
+    A, shape=(Ny, Nx), rank=100, key=jax.random.PRNGKey(0)
+)
+psi, info = fvx.solve_cg(A, rhs, preconditioner=M_inv, rtol=1e-8)
+```
 
-    ```python
-    M_inv = fvx.make_nystrom_preconditioner(
-        A, shape=(Ny, Nx), rank=100, key=jax.random.PRNGKey(0)
-    )
-    psi, info = fvx.solve_cg(A, rhs, preconditioner=M_inv, rtol=1e-8)
-    ```
+Builds a low-rank approximate inverse by probing the operator with
+random vectors.  Only needs `matvec` access — useful when you have a
+black-box operator with no analytic structure to exploit.
 
-    Builds a low-rank approximate inverse by probing the operator with
-    random vectors.  Only needs `matvec` access — useful when you have a
-    black-box operator with no analytic structure to exploit.
+:::{warning} Nyström is a niche preconditioner
+For standard Helmholtz/Poisson problems on known grids, the spectral
+or multigrid preconditioners are significantly more effective.
+Nyström captures only `rank` directions of the inverse; the remaining
+directions receive a scalar fallback, so the iteration count may not
+improve much over unpreconditioned CG.  Consider Nyström only when
+no other preconditioner is available (e.g., a non-standard operator
+known only through `matvec`).
+:::
+::::
+::::{tab-item} Multigrid (most powerful)
 
-    !!! warning "Nyström is a niche preconditioner"
-        For standard Helmholtz/Poisson problems on known grids, the spectral
-        or multigrid preconditioners are significantly more effective.
-        Nyström captures only `rank` directions of the inverse; the remaining
-        directions receive a scalar fallback, so the iteration count may not
-        improve much over unpreconditioned CG.  Consider Nyström only when
-        no other preconditioner is available (e.g., a non-standard operator
-        known only through `matvec`).
+```python
+mg = fvx.build_multigrid_solver(mask, dx, dy, lambda_=lambda_)  # coeff= for c(x, y)
+M_inv = fvx.make_multigrid_preconditioner(mg)
+psi, info = fvx.solve_cg(A, rhs, preconditioner=M_inv, rtol=1e-8)
+```
 
-=== "Multigrid (most powerful)"
+A single multigrid V-cycle as an approximate inverse.  Captures both
+high- and low-frequency error across the grid hierarchy, handles
+variable coefficients and masked domains natively, and its operator is
+exactly `masked_laplacian` on the same mask.  CG needs 5–7 iterations
+at 128² and 256² on a rectangle and an island basin, independent of the
+grid size.
+::::
+::::{tab-item} Factory (dispatches by name)
 
-    ```python
-    mg = fvx.build_multigrid_solver(mask, dx, dy, lambda_=lambda_)  # coeff= for c(x, y)
-    M_inv = fvx.make_multigrid_preconditioner(mg)
-    psi, info = fvx.solve_cg(A, rhs, preconditioner=M_inv, rtol=1e-8)
-    ```
+```python
+# Dispatches to spectral, nystrom, or multigrid
+M_inv = fvx.make_preconditioner("spectral", dx=dx, dy=dy, lambda_=lambda_)
+M_inv = fvx.make_preconditioner(
+    "nystrom", matvec=A, shape=(Ny, Nx), key=jax.random.PRNGKey(0)
+)
+M_inv = fvx.make_preconditioner("multigrid", mg_solver=mg)
+```
 
-    A single multigrid V-cycle as an approximate inverse.  Captures both
-    high- and low-frequency error across the grid hierarchy, handles
-    variable coefficients and masked domains natively, and its operator is
-    exactly `masked_laplacian` on the same mask.  CG needs 5–7 iterations
-    at 128² and 256² on a rectangle and an island basin, independent of the
-    grid size.
+Convenient when the preconditioner choice is a configurable parameter.
+::::
+::::{tab-item} Custom
 
-=== "Factory (dispatches by name)"
+```python
+def my_preconditioner(r):
+    """Any callable (Ny, Nx) -> (Ny, Nx) that approximates A^{-1}."""
+    return -r / (2 / dx**2 + 2 / dy**2 + lambda_)  # Jacobi: 1 / diag(A)
 
-    ```python
-    # Dispatches to spectral, nystrom, or multigrid
-    M_inv = fvx.make_preconditioner("spectral", dx=dx, dy=dy, lambda_=lambda_)
-    M_inv = fvx.make_preconditioner(
-        "nystrom", matvec=A, shape=(Ny, Nx), key=jax.random.PRNGKey(0)
-    )
-    M_inv = fvx.make_preconditioner("multigrid", mg_solver=mg)
-    ```
+psi, info = fvx.solve_cg(A, rhs, preconditioner=my_preconditioner)
+```
+::::
+:::::
 
-    Convenient when the preconditioner choice is a configurable parameter.
-
-=== "Custom"
-
-    ```python
-    def my_preconditioner(r):
-        """Any callable (Ny, Nx) -> (Ny, Nx) that approximates A^{-1}."""
-        return -r / (2 / dx**2 + 2 / dy**2 + lambda_)  # Jacobi: 1 / diag(A)
-
-    psi, info = fvx.solve_cg(A, rhs, preconditioner=my_preconditioner)
-    ```
-
-!!! tip "Which preconditioner should I use?"
-    See the [Preconditioner Decision Guide](elliptic_solvers.md#decision-guide)
-    in the theory page and the measured
-    [Solver Comparison](solver_comparison.md).  **TL;DR**: on a masked
-    domain, CG + multigrid takes the fewest iterations and is the fastest
-    CG; the spectral preconditioners need no setup but 3–13× more
-    iterations.
+:::{tip} Which preconditioner should I use?
+See the [Preconditioner Decision Guide](elliptic_solvers.md#decision-guide)
+in the theory page and the measured
+[Solver Comparison](solver_comparison.md).  **TL;DR**: on a masked
+domain, CG + multigrid takes the fewest iterations and is the fastest
+CG; the spectral preconditioners need no setup but 3–13× more
+iterations.
+:::
 
 ---
 

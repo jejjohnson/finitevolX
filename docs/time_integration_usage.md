@@ -56,37 +56,40 @@ prototyping, and simple models.
 
 All share the same signature: `step_fn(state, rhs_fn, dt) -> new_state`.
 
-=== "SSP-RK3 (recommended)"
+::::{tab-set}
+:::{tab-item} SSP-RK3 (recommended)
 
-    ```python
-    from integrix.march import rk3_ssp_step
+```python
+from integrix.march import rk3_ssp_step
 
-    state = rk3_ssp_step(state, rhs, dt)
-    ```
+state = rk3_ssp_step(state, rhs, dt)
+```
+:::
+:::{tab-item} Forward Euler
 
-=== "Forward Euler"
+```python
+from integrix.march import euler_step
 
-    ```python
-    from integrix.march import euler_step
+state = euler_step(state, rhs, dt)
+```
+:::
+:::{tab-item} Heun (RK2)
 
-    state = euler_step(state, rhs, dt)
-    ```
+```python
+from integrix.march import heun_step
 
-=== "Heun (RK2)"
+state = heun_step(state, rhs, dt)
+```
+:::
+:::{tab-item} Classic RK4
 
-    ```python
-    from integrix.march import heun_step
+```python
+from integrix.march import rk4_step
 
-    state = heun_step(state, rhs, dt)
-    ```
-
-=== "Classic RK4"
-
-    ```python
-    from integrix.march import rk4_step
-
-    state = rk4_step(state, rhs, dt)
-    ```
+state = rk4_step(state, rhs, dt)
+```
+:::
+::::
 
 ### Adams-Bashforth (Multistep)
 
@@ -397,8 +400,9 @@ y_3d, y_2d = run(
 )
 ```
 
-!!! warning "Deprecated finitevolX adapters"
-    `finitevolx.AB2Solver`, `finitevolx.LeapfrogRAFSolver` and `finitevolx.SplitExplicitRKSolver` keep their old call shapes for one release: `rhs(t, y)` without `args`, `solver.init(rhs, t0, y0, dt) -> (solver, y1)`, `solver.step(rhs, t, y, dt) -> (y, solver)` with the history held in the module, and `SplitExplicitRKSolver.step(rhs_slow, rhs_fast, t, y_3d, y_2d, dt_slow, slow_forcing=None, couple_2d_to_3d=None)`. Their arithmetic is the integrix steppers'.
+:::{warning} Deprecated finitevolX adapters
+`finitevolx.AB2Solver`, `finitevolx.LeapfrogRAFSolver` and `finitevolx.SplitExplicitRKSolver` keep their old call shapes for one release: `rhs(t, y)` without `args`, `solver.init(rhs, t0, y0, dt) -> (solver, y1)`, `solver.step(rhs, t, y, dt) -> (y, solver)` with the history held in the module, and `SplitExplicitRKSolver.step(rhs_slow, rhs_fast, t, y_3d, y_2d, dt_slow, slow_forcing=None, couple_2d_to_3d=None)`. Their arithmetic is the integrix steppers'.
+:::
 
 ---
 

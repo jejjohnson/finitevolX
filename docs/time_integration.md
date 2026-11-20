@@ -58,10 +58,11 @@ functional (TV norm, positivity, entropy) that is non-increasing under Forward
 Euler is also non-increasing under the SSP-RK method, up to a CFL number
 scaled by the SSP coefficient $C$.
 
-!!! tip "Recommendation"
-    **SSP-RK3** (`rk3_ssp_step` / `RK3SSP`) is the default choice for most
-    ocean PDE work.  It is the optimal 3rd-order SSP method (C=1) and is used
-    by ROMS, MOM6, and many other models.
+:::{tip} Recommendation
+**SSP-RK3** (`rk3_ssp_step` / `RK3SSP`) is the default choice for most
+ocean PDE work.  It is the optimal 3rd-order SSP method (C=1) and is used
+by ROMS, MOM6, and many other models.
+:::
 
 ### Multistep Methods
 
@@ -75,15 +76,16 @@ The trade-off is that they need history and a bootstrap phase.
 | **Adams-Bashforth 3 (AB3)** | 3 | 1 | Needs 2-step history and a ≥ 2nd-order start (RK3 in `AB3Solver`); a first-order start gives order 2 |
 | **Leapfrog + Robert-Asselin** | 2 for $\alpha = 0$, **1** for $\alpha > 0$ | 1 | Classic NWP scheme; computational mode damped by filter |
 
-!!! note "Leapfrog trade-offs"
-    Leapfrog is a centred (non-dissipative) scheme, making it attractive for
-    wave propagation.  However, it supports a spurious computational mode that
-    must be damped by the Robert-Asselin filter (parameter $\alpha$, typically
-    0.01–0.1).  The filter introduces $O(\alpha)$ dissipation and lowers the
-    scheme to **first order** for any $\alpha > 0$ (measured rates 1.21,
-    1.14, 1.08 at $\alpha = 0.05$ on $y' = -1.5y$; 2.2 at $\alpha = 0$).  The
-    Robert–Asselin–Williams (RAW) filter would restore second order; it is
-    not implemented.
+:::{note} Leapfrog trade-offs
+Leapfrog is a centred (non-dissipative) scheme, making it attractive for
+wave propagation.  However, it supports a spurious computational mode that
+must be damped by the Robert-Asselin filter (parameter $\alpha$, typically
+0.01–0.1).  The filter introduces $O(\alpha)$ dissipation and lowers the
+scheme to **first order** for any $\alpha > 0$ (measured rates 1.21,
+1.14, 1.08 at $\alpha = 0.05$ on $y' = -1.5y$; 2.2 at $\alpha = 0$).  The
+Robert–Asselin–Williams (RAW) filter would restore second order; it is
+not implemented.
+:::
 
 ### IMEX (Implicit-Explicit)
 

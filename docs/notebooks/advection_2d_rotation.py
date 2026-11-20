@@ -30,7 +30,7 @@
 #
 # > **Prerequisites** — read the
 # > [Advection Theory](../advection.md) page and the
-# > [1-D Advection](advection_1d_schemes.py) tutorial first.
+# > [1-D Advection](advection_1d_schemes.ipynb) tutorial first.
 
 # %% [markdown]
 # ## The Test Problem
@@ -269,7 +269,7 @@ fig.tight_layout()
 fig.savefig(IMG_DIR / "initial_condition.png", dpi=150, bbox_inches="tight")
 
 # %% [markdown]
-# ![Initial condition](../../images/advection_2d_rotation/initial_condition.png)
+# ![Initial condition](../images/advection_2d_rotation/initial_condition.png)
 
 # %% [markdown]
 # ## Time Integration
@@ -367,7 +367,7 @@ fig.suptitle("WENO5: Cosine Bell Solid-Body Rotation", fontsize=13)
 fig.savefig(IMG_DIR / "weno5_snapshots.png", dpi=150, bbox_inches="tight")
 
 # %% [markdown]
-# ![WENO5 snapshots](../../images/advection_2d_rotation/weno5_snapshots.png)
+# ![WENO5 snapshots](../images/advection_2d_rotation/weno5_snapshots.png)
 
 # %% [markdown]
 # ## Scheme Comparison After One Revolution
@@ -407,7 +407,7 @@ fig.suptitle("Scheme Comparison After One Full Revolution", fontsize=13)
 fig.savefig(IMG_DIR / "scheme_comparison.png", dpi=150, bbox_inches="tight")
 
 # %% [markdown]
-# ![Scheme comparison](../../images/advection_2d_rotation/scheme_comparison.png)
+# ![Scheme comparison](../images/advection_2d_rotation/scheme_comparison.png)
 
 # %% [markdown]
 # ## Error Maps
@@ -445,7 +445,7 @@ fig.suptitle("Error After One Revolution", fontsize=13)
 fig.savefig(IMG_DIR / "error_maps.png", dpi=150, bbox_inches="tight")
 
 # %% [markdown]
-# ![Error maps](../../images/advection_2d_rotation/error_maps.png)
+# ![Error maps](../images/advection_2d_rotation/error_maps.png)
 
 # %% [markdown]
 # ## Cross-Section Through the Bell Peak
@@ -485,7 +485,7 @@ fig.tight_layout()
 fig.savefig(IMG_DIR / "cross_section.png", dpi=150, bbox_inches="tight")
 
 # %% [markdown]
-# ![Cross-section](../../images/advection_2d_rotation/cross_section.png)
+# ![Cross-section](../images/advection_2d_rotation/cross_section.png)
 
 # %% [markdown]
 # ## Quantitative Summary
@@ -510,7 +510,7 @@ fig.savefig(IMG_DIR / "cross_section.png", dpi=150, bbox_inches="tight")
 #   (smoother TVD limiter).
 # - Increase resolution to see convergence.
 # - Add a **masked domain** (island) to test the adaptive stencil
-#   selection — see the [Advection Theory](../advection.md#adaptive-stencil-selection-mask-aware)
+#   selection — see the [Advection Theory](../advection.md#masks-land-safe-advection)
 #   page.
 # - Combine advection with a physical model — see the
-#   [Shallow Water](shallow_water.py) tutorial.
+#   [Shallow Water](shallow_water.ipynb) tutorial.

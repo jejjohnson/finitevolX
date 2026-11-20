@@ -6,7 +6,7 @@ configuration, `Sequential` / `Graph` composition, and Equinox pytree leaves
 so `jit`, `grad` and `vmap` see through them. Each operator is one Tier-A
 call on `[*batch, Ny, Nx]` fields. Requires the `pipekit` extra:
 `pip install "gridax-jax[pipekit]"`. Walkthrough:
-[Composing finitevolX with pipekit](../notebooks/pipekit_composition.py).
+[Composing finitevolX with pipekit](../pipekit-composition/).
 
 | Tier-B operator | Tier-A counterpart | in → out |
 |---|---|---|

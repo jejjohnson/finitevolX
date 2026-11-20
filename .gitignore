@@ -119,9 +119,14 @@ venv.bak/
 # Rope project settings
 .ropeproject
 
-# mkdocs documentation
+# the Zensical API reference and the assembled two-tool docs site
+# (scripts/build_docs.py)
 /site
 site/
+/public
+
+# notebooks that scripts/build_docs.py converts from the jupytext sources
+docs/notebooks/*.ipynb
 
 # reports directory
 reports/

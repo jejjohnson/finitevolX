@@ -14,7 +14,7 @@ The domain-integrated `total_energy` / `total_enstrophy` and
 are already masked (e.g. from the class operators), and give
 `vertical_velocity` a `Mask3D` as its per-call `mask=` argument.
 
-See [Masks → Operator API](../masks.md#operator-api-how-operators-consume-masks)
+See [Masks → Operator API](../masks/#operator-api-how-operators-consume-masks)
 for the stagger → mask mapping.
 
 | Diagnostic | Class method | Functional helper | Output |

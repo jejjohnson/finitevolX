@@ -12,25 +12,26 @@ $$
 **measured** numbers: build time, solve time, gradient time, iteration
 counts, memory and error against a sparse direct solve.
 
-!!! note "Reproducing these numbers"
-    Every number and figure on this page comes from
-    `scripts/generate_solver_figures.py`:
+:::{note} Reproducing these numbers
+Every number and figure on this page comes from
+`scripts/generate_solver_figures.py`:
 
-    ```bash
-    uv run python scripts/generate_solver_figures.py
-    ```
+```bash
+uv run python scripts/generate_solver_figures.py
+```
 
-    **Hardware:** a 2-vCPU cloud VM, XLA:CPU, float64, JAX 0.10.1, shared
-    with other jobs while it ran.  Iteration counts and errors are
-    deterministic; timings are the **minimum** over 7 jitted calls (3 for
-    gradients; builds: minimum of 2, multigrid builds minimum of 7 in a later run after a build-speed fix) and still vary by tens of percent
-    between runs.  Compare orders of magnitude and ratios, not the third
-    digit.  On a GPU the balance shifts towards the FFT-based and
-    matrix-free methods.
+**Hardware:** a 2-vCPU cloud VM, XLA:CPU, float64, JAX 0.10.1, shared
+with other jobs while it ran.  Iteration counts and errors are
+deterministic; timings are the **minimum** over 7 jitted calls (3 for
+gradients; builds: minimum of 2, multigrid builds minimum of 7 in a later run after a build-speed fix) and still vary by tens of percent
+between runs.  Compare orders of magnitude and ratios, not the third
+digit.  On a GPU the balance shifts towards the FFT-based and
+matrix-free methods.
+:::
 
 For a visual walk-through of the solvers on four geometries (including a
 variable-coefficient one), see the
-[Elliptic Solvers notebook](notebooks/demo_solvers.py).
+[Elliptic Solvers notebook](notebooks/demo_solvers.ipynb).
 
 ---
 

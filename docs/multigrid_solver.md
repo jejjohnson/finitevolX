@@ -149,12 +149,13 @@ damps every mode in the upper half of the 5-point spectrum by at least
 $3/5$ per sweep; $\omega$ near 1 barely damps the checkerboard mode
 ($|1 - 2\omega|$).
 
-!!! note "Why Jacobi, not Gauss-Seidel?"
-    Red-black Gauss-Seidel is the traditional multigrid smoother, but it
-    requires sequential updates that are difficult to express efficiently
-    in JAX.  Weighted Jacobi is fully parallel, composes naturally with
-    `jax.lax.fori_loop`, and is symmetric, which keeps the V-cycle
-    symmetric.
+:::{note} Why Jacobi, not Gauss-Seidel?
+Red-black Gauss-Seidel is the traditional multigrid smoother, but it
+requires sequential updates that are difficult to express efficiently
+in JAX.  Weighted Jacobi is fully parallel, composes naturally with
+`jax.lax.fori_loop`, and is symmetric, which keeps the V-cycle
+symmetric.
+:::
 
 ### Coarsening
 
@@ -286,10 +287,11 @@ multigrid call with the same operator.
 - Memory: $O(1)$ — no iteration history stored
 - Gradients: **exact** (up to solver tolerance)
 
-!!! tip "When to use"
-    This is the default and recommended mode.  Use it whenever you need
-    gradients through the solve (e.g. learning $c(x,y)$ or $\lambda$
-    from data).
+:::{tip} When to use
+This is the default and recommended mode.  Use it whenever you need
+gradients through the solve (e.g. learning $c(x,y)$ or $\lambda$
+from data).
+:::
 
 ### Strategy 2: One-Step Differentiation
 
@@ -312,11 +314,12 @@ $34^2$ basin the one-step gradient is within 4 % of the implicit one).
 - Memory: $O(1\text{ V-cycle})$
 - Gradients: **approximate**, error $O(\rho)$
 
-!!! note "When to use"
-    When you need cheap gradients and can tolerate small approximation
-    error — e.g. in training loops where the solver is called many times
-    and the gradient noise from one-step differentiation is small relative
-    to stochastic gradient noise.
+:::{note} When to use
+When you need cheap gradients and can tolerate small approximation
+error — e.g. in training loops where the solver is called many times
+and the gradient noise from one-step differentiation is small relative
+to stochastic gradient noise.
+:::
 
 ### Strategy 3: Unrolled Differentiation
 
@@ -330,10 +333,11 @@ iteration via `jax.lax.fori_loop`:
 - Memory: $O(K)$ — stores intermediate states for backprop
 - Gradients: **exact** through the iteration process
 
-!!! note "When to use"
-    When you specifically need gradients through the iteration dynamics
-    itself (e.g. analysing convergence behaviour, or when the number of
-    iterations is very small).
+:::{note} When to use
+When you specifically need gradients through the iteration dynamics
+itself (e.g. analysing convergence behaviour, or when the number of
+iterations is very small).
+:::
 
 ### Comparison
 

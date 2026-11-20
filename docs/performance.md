@@ -8,12 +8,13 @@ profiling every operator; the measurements, the negative results and the
 roadmap are in the
 [stencil performance deep dive](design/research/stencil_performance_deep_dive.md).
 
-!!! note "Where the numbers come from"
-    All timings here are XLA:CPU (2-vCPU VM, JAX 0.10, float32). The
-    *structural* effects (number of `pad`s in the VJP, number of fusions,
-    temporary buffers) are backend-independent; the speedups are not.
-    Re-measure on GPU / TPU with `scripts/benchmark_operators.py` before
-    relying on a ratio there.
+:::{note} Where the numbers come from
+All timings here are XLA:CPU (2-vCPU VM, JAX 0.10, float32). The
+*structural* effects (number of `pad`s in the VJP, number of fusions,
+temporary buffers) are backend-independent; the speedups are not.
+Re-measure on GPU / TPU with `scripts/benchmark_operators.py` before
+relying on a ratio there.
+:::
 
 ## The cost model in one paragraph
 

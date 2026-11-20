@@ -1,0 +1,149 @@
+# ---------------------------------------------------------------------------
+# mystmd builds the prose half of the documentation: the home page, the theory
+# pages, the usage guides, the research notes and the example notebooks. The
+# API reference is built separately by Zensical + mkdocstrings and mounted at
+# `/reference/`. See `docs/README.md`.
+#
+# The notebooks are jupytext `.py` files, which mystmd cannot read;
+# `scripts/build_docs.py` writes an unexecuted `.ipynb` beside each one
+# (gitignored) before this build, and the toc lists those.
+#
+# `references.api` points at a LOCAL server because mystmd only loads
+# intersphinx inventories over http(s) — a filesystem path is rejected and a
+# `file://` URL is silently ignored. `scripts/build_docs.py` serves the freshly
+# built API `site/` on this exact port, then rewrites the resulting localhost
+# URLs to the deployed `/reference/` path. Keep the port in sync with API_PORT
+# in that script.
+# ---------------------------------------------------------------------------
+version: 1
+
+project:
+  id: finitevolx-docs
+  title: finitevolX
+  description: Finite volume operators for JAX on Arakawa C-grids.
+  github: https://github.com/jejjohnson/finitevolX
+  authors:
+    - name: Juan Emmanuel Johnson
+    - name: Takaya Uchida
+  references:
+    api: http://127.0.0.1:8910/
+  exclude:
+    - README.md
+    - api/**
+    - design/research/boundaries/plan.md
+  toc:
+    - file: index.md
+    - title: Getting started
+      children:
+        - file: capabilities.md
+          title: Capability index
+        - file: agents.md
+          title: Building with agents
+    - title: The C-grid
+      children:
+        - file: cgrid_discretization.md
+          title: C-grid discretization
+        - file: masks.md
+          title: Masks
+        - file: multilayer_vs_3d.md
+          title: Vertical structure
+    - title: Stencils
+      children:
+        - file: stencils.md
+          title: Raw stencils
+        - file: performance.md
+          title: Writing fast stencils
+    - title: Operators
+      children:
+        - file: difference.md
+          title: Difference operators
+        - file: interpolation.md
+          title: Interpolation operators
+        - file: advection.md
+          title: Advection
+        - file: boundary_conditions.md
+          title: Boundary conditions
+        - file: spatial_operators.md
+          title: Spatial operators
+    - title: Time integration
+      children:
+        - file: time_integration.md
+          title: Theory and overview
+        - file: time_integration_usage.md
+          title: Usage guide
+    - title: Elliptic solvers
+      children:
+        - file: elliptic_solvers.md
+          title: Theory and overview
+        - file: elliptic_solvers_usage.md
+          title: Usage guide
+        - file: multigrid_solver.md
+          title: Multigrid theory
+        - file: multigrid_solver_usage.md
+          title: Multigrid usage guide
+        - file: solver_comparison.md
+          title: Solver comparison
+    - title: Examples
+      children:
+        - file: examples.md
+          title: Overview
+        - title: Grids and masks
+          children:
+            - file: notebooks/demo_masks.ipynb
+              title: Masks
+        - title: Elliptic problems
+          children:
+            - file: notebooks/demo_solvers.ipynb
+              title: Elliptic solvers
+            - file: notebooks/inhomogeneous_bcs_tutorial.ipynb
+              title: Known boundary values
+            - file: notebooks/pressure_poisson.ipynb
+              title: Pressure Poisson
+            - file: notebooks/streamfunction_inversion.ipynb
+              title: Streamfunction inversion
+            - file: notebooks/helmholtz_screening.ipynb
+              title: Helmholtz screening
+            - file: notebooks/spde_prior.ipynb
+              title: SPDE priors with gaussx
+        - title: Advection
+          children:
+            - file: notebooks/advection_1d_schemes.ipynb
+              title: 1-D advection schemes
+            - file: notebooks/advection_2d_rotation.ipynb
+              title: 2-D rotating advection
+            - file: notebooks/advection_2d_masked.ipynb
+              title: 2-D masked advection
+        - title: Ocean models
+          children:
+            - file: notebooks/swm_linear.ipynb
+              title: Linear shallow water
+            - file: notebooks/shallow_water.ipynb
+              title: Nonlinear shallow water
+            - file: notebooks/qg_1p5_layer.ipynb
+              title: 1.5-layer QG
+        - title: Composition
+          children:
+            - file: notebooks/pipekit_composition.ipynb
+              title: Composing with pipekit
+    - title: Research notes
+      children:
+        - file: design/research/stencil_performance_deep_dive.md
+          title: Stencil performance deep dive
+        - file: design/research/massh_gap_analysis.md
+          title: Gap analysis vs MASSH
+        - file: design/research/boundaries/inhomogeneous_bcs_current.md
+          title: "Boundary conditions: current state"
+        - file: design/research/boundaries/inhomogeneous_bcs_design.md
+          title: "Boundary conditions: design"
+    - title: Project
+      children:
+        - file: CHANGELOG.md
+          title: Changelog
+
+site:
+  template: book-theme
+  options:
+    logo_text: finitevolX
+  nav:
+    - title: API reference
+      url: https://jejjohnson.github.io/finitevolX/reference/

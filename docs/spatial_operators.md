@@ -98,9 +98,10 @@ $$
 
 where $f$ and $h$ are interpolated from T-points to X-points via `T_to_X`.
 
-!!! warning "Thin-layer singularity"
-    $q$ is set to `NaN` where $h = 0$ to avoid division by zero.  Guard
-    against this with a minimum thickness clamp before calling the PV operator.
+:::{warning} Thin-layer singularity
+$q$ is set to `NaN` where $h = 0$ to avoid division by zero.  Guard
+against this with a minimum thickness clamp before calling the PV operator.
+:::
 
 ### PV Fluxes
 
@@ -121,12 +122,13 @@ potential enstrophy for non-divergent flow.  Passed the same-component
 fields, e.g. `(q, u*h, v*h)`, the methods return the PV *transport* flux
 $(q\,Uh, q\,Vh)$ and neither label applies.
 
-!!! warning "The blend is not the Arakawa–Lamb (1981) scheme"
-    `pv_flux_blend` is a linear blend of the two Sadourny forms and, for
-    $0 < \alpha < 1$, conserves neither invariant exactly.  The
-    Arakawa–Lamb (1981) scheme is a distinct eight-point stencil and is not
-    implemented.  The old name `pv_flux_arakawa_lamb` (and
-    `scheme="al"` below) is a deprecated alias that warns (#283).
+:::{warning} The blend is not the Arakawa–Lamb (1981) scheme
+`pv_flux_blend` is a linear blend of the two Sadourny forms and, for
+$0 < \alpha < 1$, conserves neither invariant exactly.  The
+Arakawa–Lamb (1981) scheme is a distinct eight-point stencil and is not
+implemented.  The old name `pv_flux_arakawa_lamb` (and
+`scheme="al"` below) is a deprecated alias that warns (#283).
+:::
 
 The corner products are formed on the full arrays, so the first interior
 row and column read the south / west ghost corners of the caller's
@@ -205,12 +207,13 @@ for a wavenumber $k$, harmonic damping scales as $\kappa k^2$
 while biharmonic scales as $\kappa k^4$.  This is used to remove
 grid-scale noise without excessively damping the resolved mesoscale.
 
-!!! tip "Which diffusion to use"
-    - **Harmonic** (`Diffusion2D`): simple, physically motivated, appropriate for
-      tracer diffusion when scale-selectivity is not critical.
-    - **Biharmonic** (`BiharmonicDiffusion2D`): preferred for **velocity**
-      diffusion in eddy-resolving models because it acts mainly on unresolved
-      scales.  Requires a larger $\kappa$ to achieve the same total dissipation.
+:::{tip} Which diffusion to use
+- **Harmonic** (`Diffusion2D`): simple, physically motivated, appropriate for
+  tracer diffusion when scale-selectivity is not critical.
+- **Biharmonic** (`BiharmonicDiffusion2D`): preferred for **velocity**
+  diffusion in eddy-resolving models because it acts mainly on unresolved
+  scales.  Requires a larger $\kappa$ to achieve the same total dissipation.
+:::
 
 ### Mask Support
 
@@ -328,13 +331,14 @@ the vorticity-flux product is evaluated.  Three schemes are available:
 | `'enstrophy'` | $\overline{\zeta}^{y}\,\overline{v}^{xy}$: average to the face, then multiply | Conserves potential enstrophy | Sadourny (1975) Z-scheme |
 | `'blend'` | $\tfrac13 E + \tfrac23 Z$ | Conserves neither exactly | linear blend, **not** Arakawa & Lamb (1981); `'al'` is a deprecated alias |
 
-!!! tip "When to use each scheme"
-    - **`'energy'`**: energy-conserving vortex force, the usual choice for
-      long integrations.
-    - **`'enstrophy'`**: preferred when enstrophy conservation matters (e.g.
-      turbulence spindown experiments).
-    - **`'blend'`**: a ⅓–⅔ blend of the two; it is not the Arakawa–Lamb
-      (1981) scheme, which conserves both (not implemented, #283).
+:::{tip} When to use each scheme
+- **`'energy'`**: energy-conserving vortex force, the usual choice for
+  long integrations.
+- **`'enstrophy'`**: preferred when enstrophy conservation matters (e.g.
+  turbulence spindown experiments).
+- **`'blend'`**: a ⅓–⅔ blend of the two; it is not the Arakawa–Lamb
+  (1981) scheme, which conserves both (not implemented, #283).
+:::
 
 ### Usage
 
@@ -375,19 +379,21 @@ The three terms are:
 - $J^{+\times}$: flux form in one direction
 - $J^{\times+}$: flux form in the other direction
 
-!!! warning "Conservation under a mask"
-    The discrete identities above hold for the unmasked operator with
-    suitable boundary conditions (e.g. $\psi$ constant on the boundary).
-    `ArakawaJacobian2D(grid, mask=mask)` zeroes land inputs and dry output
-    cells, so sums over a masked domain such as $\sum J$ or
-    $\sum q\,J$ are **not** guaranteed to vanish exactly.
+:::{warning} Conservation under a mask
+The discrete identities above hold for the unmasked operator with
+suitable boundary conditions (e.g. $\psi$ constant on the boundary).
+`ArakawaJacobian2D(grid, mask=mask)` zeroes land inputs and dry output
+cells, so sums over a masked domain such as $\sum J$ or
+$\sum q\,J$ are **not** guaranteed to vanish exactly.
+:::
 
-!!! note "Output shape"
-    The class `ArakawaJacobian2D` returns the full `[..., Ny, Nx]` array with
-    a zero ghost ring (and dry cells zeroed when given a mask), ready for a
-    time-stepping loop.  The functional `arakawa_jacobian` returns only the
-    interior `[..., Ny−2, Nx−2]`; the caller must embed it into the full
-    array.
+:::{note} Output shape
+The class `ArakawaJacobian2D` returns the full `[..., Ny, Nx]` array with
+a zero ghost ring (and dry cells zeroed when given a mask), ready for a
+time-stepping loop.  The functional `arakawa_jacobian` returns only the
+interior `[..., Ny−2, Nx−2]`; the caller must embed it into the full
+array.
+:::
 
 ### Usage
 

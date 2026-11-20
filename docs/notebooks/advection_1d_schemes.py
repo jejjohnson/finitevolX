@@ -239,7 +239,7 @@ fig.tight_layout()
 fig.savefig(IMG_DIR / "initial_condition.png", dpi=150, bbox_inches="tight")
 
 # %% [markdown]
-# ![Initial condition](../../images/advection_1d_schemes/initial_condition.png)
+# ![Initial condition](../images/advection_1d_schemes/initial_condition.png)
 
 # %% [markdown]
 # ## Time Integration
@@ -350,7 +350,7 @@ fig.tight_layout()
 fig.savefig(IMG_DIR / "scheme_comparison.png", dpi=150, bbox_inches="tight")
 
 # %% [markdown]
-# ![Scheme comparison](../../images/advection_1d_schemes/scheme_comparison.png)
+# ![Scheme comparison](../images/advection_1d_schemes/scheme_comparison.png)
 
 # %% [markdown]
 # ## Zoom: Rising and Falling Edges
@@ -386,7 +386,7 @@ fig.tight_layout()
 fig.savefig(IMG_DIR / "edge_zoom.png", dpi=150, bbox_inches="tight")
 
 # %% [markdown]
-# ![Edge zoom](../../images/advection_1d_schemes/edge_zoom.png)
+# ![Edge zoom](../images/advection_1d_schemes/edge_zoom.png)
 
 # %% [markdown]
 # ## Error Norms
@@ -499,7 +499,7 @@ fig.tight_layout()
 fig.savefig(IMG_DIR / "convergence.png", dpi=150, bbox_inches="tight")
 
 # %% [markdown]
-# ![Convergence](../../images/advection_1d_schemes/convergence.png)
+# ![Convergence](../images/advection_1d_schemes/convergence.png)
 
 # %% [markdown]
 # ## Summary

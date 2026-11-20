@@ -103,10 +103,19 @@ pipekit = [
     "gridax-jax[pipekit]",
 ]
 docs = [
-    "mkdocs>=1.6.0",
-    "mkdocs-material>=9.5.0",
-    "mkdocstrings[python]>=0.25.0",
-    "mkdocs-jupyter>=0.24.0",
+    # The prose half of the site (theory pages, usage guides and the example
+    # notebooks) is built by mystmd, a Node CLI installed with
+    # `npm install -g mystmd` rather than through uv. Zensical (the successor to
+    # Material for MkDocs, which reached end of life on 2026-11-05) builds only
+    # the API reference from mkdocs.yml; its `objects.inv` is what lets the MyST
+    # prose cross-reference into it. See docs/README.md.
+    "zensical>=0.0.74",
+    "mkdocstrings[python]>=1.0.8",
+    # scripts/build_docs.py converts the jupytext notebooks to .ipynb for
+    # mystmd, builds both halves and checks their links.
+    "jupytext>=1.16",
+    "cyclopts>=4",
+    "loguru>=0.7",
 ]
 
 [build-system]

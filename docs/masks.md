@@ -162,11 +162,11 @@ adaptive = masks.get_adaptive_masks(direction="x", source="h")
 
 ## Jupyter notebook
 
-A complete interactive demo is available as a jupytext notebook:
-[`notebooks/demo_masks.py`](https://github.com/jejjohnson/finitevolX/blob/main/notebooks/demo_masks.py)
+A complete demo is in the [masks notebook](notebooks/demo_masks.ipynb).
 
 ---
 
+(operator-api-how-operators-consume-masks)=
 ## Operator API: how operators consume masks
 
 Every class operator in `finitevolx` takes an optional `mask` class

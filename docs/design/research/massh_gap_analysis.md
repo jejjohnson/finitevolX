@@ -9,21 +9,23 @@ implementation (with `file:line`), proposes a `finitevolx` API, and gives a work
 The proposals are written against the existing Arakawa-C-grid / Equinox style in
 `finitevolx/_src/operators/` and `_src/advection/`.
 
-!!! warning "Provenance of references"
-    The finitevolX-side claims in this doc were **verified against the local source on `main`**
-    (version `0.0.42`, 2026-06-05) with concrete `file:line` citations and verbatim signatures.
-    The MASSH `file:line` citations come from the upstream `VarDyn` branch and were **not**
-    re-verified — treat them as pointers, not exact-line guarantees.
+:::{warning} Provenance of references
+The finitevolX-side claims in this doc were **verified against the local source on `main`**
+(version `0.0.42`, 2026-06-05) with concrete `file:line` citations and verbatim signatures.
+The MASSH `file:line` citations come from the upstream `VarDyn` branch and were **not**
+re-verified — treat them as pointers, not exact-line guarantees.
+:::
 
-!!! important "Two conventions this doc corrects relative to an earlier draft"
-    1. **The public API is flat, not namespaced.** `finitevolx/__init__.py` re-exports every
-       symbol at the top level (`fvx.divergence_2d`, `fvx.Advection2D`, `fvx.MomentumAdvection2D`).
-       There are **no** `fvx.operators.*` / `fvx.advection.*` submodule namespaces — the earlier
-       draft's `fvx.operators.divergence_2d(...)` / `fvx.advection.rusanov_flux(...)` would raise
-       `AttributeError`. All examples below use the real flat form.
-    2. **The energy/enstrophy-conserving SW vorticity scheme already exists** (see §2). The earlier
-       draft listed Arakawa–Lamb (1981) as the headline gap; it is in fact implemented. The
-       residual §2 gap is narrower.
+:::{important} Two conventions this doc corrects relative to an earlier draft
+1. **The public API is flat, not namespaced.** `finitevolx/__init__.py` re-exports every
+   symbol at the top level (`fvx.divergence_2d`, `fvx.Advection2D`, `fvx.MomentumAdvection2D`).
+   There are **no** `fvx.operators.*` / `fvx.advection.*` submodule namespaces — the earlier
+   draft's `fvx.operators.divergence_2d(...)` / `fvx.advection.rusanov_flux(...)` would raise
+   `AttributeError`. All examples below use the real flat form.
+2. **The energy/enstrophy-conserving SW vorticity scheme already exists** (see §2). The earlier
+   draft listed Arakawa–Lamb (1981) as the headline gap; it is in fact implemented. The
+   residual §2 gap is narrower.
+:::
 
 -----
 
@@ -114,13 +116,14 @@ Re-export it flat in `finitevolx/__init__.py` (and add to `__all__`), exactly li
 `uv_center_flux` / `divergence_2d`. Keep `eps` exposed: `eps=0` recovers the textbook flux;
 `eps>0` is the AD-safe variant.
 
-!!! warning "Reduced-shape output — `divergence_2d` does not apply directly"
-    `rusanov_flux` returns the `N−1` face values along `axis` (e.g. `(Ny, Nx−1)` for
-    `axis=-1`), **not** a full ghost-padded C-grid array. finitevolX's `divergence_2d`
-    expects both inputs to be full `[Ny, Nx]` arrays with the ghost ring (it takes
-    `diff_x_bwd`/`diff_y_bwd` internally), so it cannot consume the reduced output.
-    Take the continuity divergence by differencing the faces along the same axis (see
-    the example), or embed the fluxes into ghost-padded arrays first.
+:::{warning} Reduced-shape output — `divergence_2d` does not apply directly
+`rusanov_flux` returns the `N−1` face values along `axis` (e.g. `(Ny, Nx−1)` for
+`axis=-1`), **not** a full ghost-padded C-grid array. finitevolX's `divergence_2d`
+expects both inputs to be full `[Ny, Nx]` arrays with the ghost ring (it takes
+`diff_x_bwd`/`diff_y_bwd` internally), so it cannot consume the reduced output.
+Take the continuity divergence by differencing the faces along the same axis (see
+the example), or embed the fluxes into ghost-padded arrays first.
+:::
 
 ### Example
 
@@ -148,14 +151,15 @@ dhdt = dhdt.at[1:-1, 1:-1].set(
 
 ## 2. Upwind vorticity-flux operator + a public AL81 free function  *(narrowed gap)*
 
-!!! warning "The conservative scheme already exists"
-    The earlier draft listed the Arakawa–Lamb (1981) energy- and enstrophy-conserving SW scheme
-    as the headline gap. **It is already implemented** in finitevolX:
-    `operators/vorticity.py:202` `Vorticity2D.pv_flux_arakawa_lamb` (a weighted blend of
-    `pv_flux_energy_conserving:128` and `pv_flux_enstrophy_conserving:163`), and the
-    momentum-level operator `diffusion/momentum.py:35` `MomentumAdvection2D` offers the Sadourny
-    (1975) E-scheme, Z-scheme, and the AL81 blend via a `scheme=` argument — citing
-    *Arakawa & Lamb (1981), MWR 109, 18–36* in its docstring. Both are in the public `__all__`.
+:::{warning} The conservative scheme already exists
+The earlier draft listed the Arakawa–Lamb (1981) energy- and enstrophy-conserving SW scheme
+as the headline gap. **It is already implemented** in finitevolX:
+`operators/vorticity.py:202` `Vorticity2D.pv_flux_arakawa_lamb` (a weighted blend of
+`pv_flux_energy_conserving:128` and `pv_flux_enstrophy_conserving:163`), and the
+momentum-level operator `diffusion/momentum.py:35` `MomentumAdvection2D` offers the Sadourny
+(1975) E-scheme, Z-scheme, and the AL81 blend via a `scheme=` argument — citing
+*Arakawa & Lamb (1981), MWR 109, 18–36* in its docstring. Both are in the public `__all__`.
+:::
 
 ### What is actually missing
 
@@ -235,15 +239,16 @@ omega_V, omega_U = fvx.vorticity_flux_upwind(omega_abs, U, V, order=3)
 
 ## 3. Barotropic-mode (external gravity wave) filter / split  *(operator gap; infrastructure present)*
 
-!!! note "The hard parts already exist"
-    finitevolX already has (a) **variable-coefficient** multigrid for `∇·(c∇u) − λu = rhs`
-    (`solvers/multigrid.py`, factory `build_multigrid_solver(..., coeff=...)`; the per-face
-    coefficients are `cx`/`cy` from `_interpolate_coeff_to_faces`, **not** the
-    `coef_ugrid`/`coef_vgrid` the earlier draft named), and (b) a **split-explicit**
-    barotropic/baroclinic time-stepper (`timestepping/split_explicit.py:23` `split_explicit_step`)
-    plus vertical-mode decomposition (`vertical/vertical_modes.py`). What is missing is the
-    specific *implicit barotropic filter operator*; the solver and the mode machinery it needs
-    are already there, so this is **wiring + one operator**, not new solver math.
+:::{note} The hard parts already exist
+finitevolX already has (a) **variable-coefficient** multigrid for `∇·(c∇u) − λu = rhs`
+(`solvers/multigrid.py`, factory `build_multigrid_solver(..., coeff=...)`; the per-face
+coefficients are `cx`/`cy` from `_interpolate_coeff_to_faces`, **not** the
+`coef_ugrid`/`coef_vgrid` the earlier draft named), and (b) a **split-explicit**
+barotropic/baroclinic time-stepper (`timestepping/split_explicit.py:23` `split_explicit_step`)
+plus vertical-mode decomposition (`vertical/vertical_modes.py`). What is missing is the
+specific *implicit barotropic filter operator*; the solver and the mode machinery it needs
+are already there, so this is **wiring + one operator**, not new solver math.
+:::
 
 ### Why
 
@@ -305,15 +310,16 @@ def barotropic_filter(
 `__call__` (there is no `.solve` method; the other entry points are `solve_onestep` /
 `solve_unrolled`).
 
-!!! warning "Coefficient is frozen at solver-construction time"
-    `build_multigrid_solver(coeff=h)` converts `coeff` to NumPy, interpolates it to the
-    staggered face coefficients `cx`/`cy`, and **freezes** them in the level hierarchy when
-    the solver is built. MASSH, by contrast, passes the current `coef_ugrid`/`coef_vgrid`
-    into every solve. So a prebuilt `helm_solve` is only correct when the barotropic
-    coefficient is **time-invariant**. If `h_u`/`h_v` evolve, either (a) treat the
-    coefficient as fixed (a common, well-justified barotropic-mode approximation), or
-    (b) rebuild the solver each step (cheap relative to the solve), or (c) extend the
-    solver with a per-step-coefficient interface. The signature above assumes (a)/(b).
+:::{warning} Coefficient is frozen at solver-construction time
+`build_multigrid_solver(coeff=h)` converts `coeff` to NumPy, interpolates it to the
+staggered face coefficients `cx`/`cy`, and **freezes** them in the level hierarchy when
+the solver is built. MASSH, by contrast, passes the current `coef_ugrid`/`coef_vgrid`
+into every solve. So a prebuilt `helm_solve` is only correct when the barotropic
+coefficient is **time-invariant**. If `h_u`/`h_v` evolve, either (a) treat the
+coefficient as fixed (a common, well-justified barotropic-mode approximation), or
+(b) rebuild the solver each step (cheap relative to the solve), or (c) extend the
+solver with a per-step-coefficient interface. The signature above assumes (a)/(b).
+:::
 
 So this gap is **a thin operator over an existing solver**, not new elliptic machinery. (It is
 the same variable-coef use-case flagged on the spectraldiffx side; finitevolX is the better home
@@ -373,10 +379,11 @@ def rayleigh_relaxation(
 Re-export both flat in `__init__.py`. `rayleigh_relaxation` is the single operator behind sponge
 layers, BC forcing, BFN nudging, and tracer restoring — define once, reuse everywhere.
 
-!!! note "This is the operator the somax tracer-transport gap needs"
-    The companion somax gap analysis flags `forcing_tracer_from_bc` and notes that no
-    `rayleigh_relaxation` op exists anywhere yet. **This §4 is that operator's home.** Landing it
-    here unblocks tracer-to-BC nudging in somax without per-model bespoke code.
+:::{note} This is the operator the somax tracer-transport gap needs
+The companion somax gap analysis flags `forcing_tracer_from_bc` and notes that no
+`rayleigh_relaxation` op exists anywhere yet. **This §4 is that operator's home.** Landing it
+here unblocks tracer-to-BC nudging in somax without per-model bespoke code.
+:::
 
 ### Example
 

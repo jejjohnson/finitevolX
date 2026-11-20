@@ -138,7 +138,7 @@ fig.savefig(IMG_DIR / "rectangle_samples.png", dpi=120, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
-# ![Exact Matérn samples and marginal standard deviation](../../images/spde_prior/rectangle_samples.png)
+# ![Exact Matérn samples and marginal standard deviation](../images/spde_prior/rectangle_samples.png)
 #
 # The Neumann walls inflate the variance within about one correlation length
 # of the boundary (up to $2\times$ on an edge, $4\times$ in a corner); extend
@@ -219,7 +219,7 @@ fig.savefig(IMG_DIR / "peninsula_correlation.png", dpi=120, bbox_inches="tight")
 plt.show()
 
 # %% [markdown]
-# ![Correlation with one point, rectangle vs masked prior](../../images/spde_prior/peninsula_correlation.png)
+# ![Correlation with one point, rectangle vs masked prior](../images/spde_prior/peninsula_correlation.png)
 #
 # The rectangle prior correlates the two sides of the peninsula through the
 # land; the masked prior has to go around it, so the correlation across is

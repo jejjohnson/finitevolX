@@ -45,9 +45,9 @@
 # 4. Tips and tricks for getting masked advection to work smoothly.
 #
 # > **Prerequisites** — read the
-# > [1-D Advection](advection_1d_schemes.py) and
-# > [2-D Rotation](advection_2d_rotation.py) tutorials for the basics,
-# > and the [Advection Theory](../advection.md#adaptive-stencil-selection-mask-aware)
+# > [1-D Advection](advection_1d_schemes.ipynb) and
+# > [2-D Rotation](advection_2d_rotation.ipynb) tutorials for the basics,
+# > and the [Advection Theory](../advection.md#masks-land-safe-advection)
 # > page for the mathematical background.
 
 # %%
@@ -145,7 +145,7 @@ fig.tight_layout()
 fig.savefig(IMG_DIR / "domain.png", dpi=150, bbox_inches="tight")
 
 # %% [markdown]
-# ![Domain](../../images/advection_2d_masked/domain.png)
+# ![Domain](../images/advection_2d_masked/domain.png)
 
 # %% [markdown]
 # ## Step 2: Build the Mask and Inspect Stencil Capabilities
@@ -197,7 +197,7 @@ fig.tight_layout()
 fig.savefig(IMG_DIR / "stencil_capability.png", dpi=150, bbox_inches="tight")
 
 # %% [markdown]
-# ![Stencil capability](../../images/advection_2d_masked/stencil_capability.png)
+# ![Stencil capability](../images/advection_2d_masked/stencil_capability.png)
 #
 # Notice how the values **drop to 1-2** right next to coastlines.  WENO5
 # needs at least 3 in *both* directions to use the full 6-point stencil.
@@ -258,7 +258,7 @@ cbar.ax.set_yticklabels(["land", "upwind1", "WENO3", "WENO5"])
 fig.savefig(IMG_DIR / "adaptive_stencils.png", dpi=150, bbox_inches="tight")
 
 # %% [markdown]
-# ![Adaptive stencils](../../images/advection_2d_masked/adaptive_stencils.png)
+# ![Adaptive stencils](../images/advection_2d_masked/adaptive_stencils.png)
 #
 # Key things to notice:
 #
@@ -383,7 +383,7 @@ fig.colorbar(im, ax=axes, shrink=0.85, label="q")
 fig.savefig(IMG_DIR / "comparison.png", dpi=150, bbox_inches="tight")
 
 # %% [markdown]
-# ![Comparison](../../images/advection_2d_masked/comparison.png)
+# ![Comparison](../images/advection_2d_masked/comparison.png)
 
 # %% [markdown]
 # ### What to look for
@@ -513,7 +513,7 @@ fig.suptitle("Zoom: C-Island Channel", fontsize=13)
 fig.savefig(IMG_DIR / "channel_zoom.png", dpi=150, bbox_inches="tight")
 
 # %% [markdown]
-# ![Channel zoom](../../images/advection_2d_masked/channel_zoom.png)
+# ![Channel zoom](../images/advection_2d_masked/channel_zoom.png)
 #
 # In the narrow channel opening at the bottom of the C-island, the
 # stencil transitions smoothly:
@@ -529,8 +529,8 @@ fig.savefig(IMG_DIR / "channel_zoom.png", dpi=150, bbox_inches="tight")
 # ## Next Steps
 #
 # - Combine masked advection with a full dynamical model — see the
-#   [Shallow Water](shallow_water.py) tutorial.
+#   [Shallow Water](shallow_water.ipynb) tutorial.
 # - Explore the mask infrastructure in detail — see the
-#   [Masks Demo](demo_masks.py) notebook.
+#   [Masks Demo](demo_masks.ipynb) notebook.
 # - For the mathematical background on the cascade, see
-#   [Advection Theory: Adaptive Stencil Selection](../advection.md#adaptive-stencil-selection-mask-aware).
+#   [Advection Theory: Adaptive Stencil Selection](../advection.md#masks-land-safe-advection).

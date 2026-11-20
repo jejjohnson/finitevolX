@@ -126,10 +126,11 @@ stencil data for the last interior cell:
 | U → T (x-backward) | West U ghost `U[:, 0]` | `u[1:-1, :-2]` |
 | V → T (y-backward) | South V ghost `V[0, :]` | `v[:-2, 1:-1]` |
 
-!!! note "Bilinear averages"
-    `T_to_X`, `U_to_V`, `V_to_U`, and `X_to_T` each read ghost cells in
-    *both* directions.  Make sure the appropriate BCs are applied before
-    calling these operators in a boundary region.
+:::{note} Bilinear averages
+`T_to_X`, `U_to_V`, `V_to_U`, and `X_to_T` each read ghost cells in
+*both* directions.  Make sure the appropriate BCs are applied before
+calling these operators in a boundary region.
+:::
 
 ---
 
