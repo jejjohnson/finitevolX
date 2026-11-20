@@ -191,28 +191,6 @@ from gridax import (
 )
 from gridax._src.operators.stencils import RENAMED as _RENAMED_STENCILS
 
-from gridax_jax._src.forcing._base import (
-    AbstractForcing,
-    ForcingProduct,
-    ForcingSum,
-    TimeVaryingForcing,
-)
-from gridax_jax._src.forcing.drag import (
-    LinearDrag2D,
-    LinearDrag3D,
-    QuadraticDrag2D,
-    QuadraticDrag3D,
-)
-from gridax_jax._src.forcing.functional import (
-    linear_drag_tendency,
-    quadratic_drag_tendency,
-    rayleigh_tendency,
-    wind_stress_tendency,
-)
-from gridax_jax._src.forcing.rayleigh import RayleighDamping2D, RayleighDamping3D
-from gridax_jax._src.forcing.wind import WindCurl2D, WindStress2D, WindStress3D
-from gridax_jax._src.operators.barotropic import barotropic_filter
-from gridax_jax._src.operators.relaxation import linear_drag, rayleigh_relaxation
 from gridax_jax._src.solvers.elliptic import (
     # Types
     BoundaryCondition,
@@ -353,13 +331,6 @@ from gridax_jax._src.timestepping.semi_lagrangian import (
     semi_lagrangian_step,
 )
 from gridax_jax._src.utils.dtype import check_dtype
-from gridax_jax._src.vertical.multilayer import multilayer
-from gridax_jax._src.vertical.vertical_modes import (
-    build_coupling_matrix,
-    decompose_vertical_modes,
-    layer_to_mode,
-    mode_to_layer,
-)
 
 __all__ = [
     # Upwind flux dispatch
@@ -435,7 +406,6 @@ __all__ = [
     "spherical_volume_sum",
     "spherical_volume_mean",
     # Multilayer vmap helper
-    "multilayer",
     # Grid — abstract topology
     "ArakawaCGrid1D",
     "ArakawaCGrid2D",
@@ -585,31 +555,11 @@ __all__ = [
     "pv_flux_blend",
     "vorticity_flux_upwind",
     # Barotropic-mode filter
-    "barotropic_filter",
     # Linear drag / Rayleigh relaxation
-    "linear_drag",
-    "rayleigh_relaxation",
     # Forcing — Layer 0 functional primitives
-    "wind_stress_tendency",
-    "linear_drag_tendency",
-    "quadratic_drag_tendency",
-    "rayleigh_tendency",
     # Forcing — base class and composition
-    "AbstractForcing",
-    "ForcingSum",
-    "ForcingProduct",
-    "TimeVaryingForcing",
     # Forcing — 2D operators
-    "WindStress2D",
-    "WindCurl2D",
-    "LinearDrag2D",
-    "QuadraticDrag2D",
-    "RayleighDamping2D",
     # Forcing — 3D operators
-    "WindStress3D",
-    "LinearDrag3D",
-    "QuadraticDrag3D",
-    "RayleighDamping3D",
     # Differentiable surrogates
     "smooth_abs",
     "smooth_clamp",
@@ -617,10 +567,6 @@ __all__ = [
     # The dtype rule: the caller decides, a silent downcast is an error
     "check_dtype",
     # Vertical coupling and mode transforms
-    "build_coupling_matrix",
-    "decompose_vertical_modes",
-    "layer_to_mode",
-    "mode_to_layer",
     # Spectral transforms
     "dct",
     "dctn",
@@ -773,6 +719,66 @@ __all__ = [
 ]
 
 
+# Moved to sesmax-core (#422, jejjohnson/sesmax#121): forcing, vertical modes,
+# relaxation and the barotropic filter are physics next to the model state,
+# not grid operations. The old names stay for one release and warn on access;
+# gridax-jax imports nothing from sesmax (edges point down).
+_MOVED_TO_SESMAX = {
+    "AbstractForcing": ("gridax_jax._src.forcing._base", "sesmax_core.forcing"),
+    "ForcingProduct": ("gridax_jax._src.forcing._base", "sesmax_core.forcing"),
+    "ForcingSum": ("gridax_jax._src.forcing._base", "sesmax_core.forcing"),
+    "LinearDrag2D": ("gridax_jax._src.forcing.drag", "sesmax_core.forcing"),
+    "LinearDrag3D": ("gridax_jax._src.forcing.drag", "sesmax_core.forcing"),
+    "QuadraticDrag2D": ("gridax_jax._src.forcing.drag", "sesmax_core.forcing"),
+    "QuadraticDrag3D": ("gridax_jax._src.forcing.drag", "sesmax_core.forcing"),
+    "RayleighDamping2D": ("gridax_jax._src.forcing.rayleigh", "sesmax_core.forcing"),
+    "RayleighDamping3D": ("gridax_jax._src.forcing.rayleigh", "sesmax_core.forcing"),
+    "TimeVaryingForcing": ("gridax_jax._src.forcing._base", "sesmax_core.forcing"),
+    "WindCurl2D": ("gridax_jax._src.forcing.wind", "sesmax_core.forcing"),
+    "WindStress2D": ("gridax_jax._src.forcing.wind", "sesmax_core.forcing"),
+    "WindStress3D": ("gridax_jax._src.forcing.wind", "sesmax_core.forcing"),
+    "barotropic_filter": (
+        "gridax_jax._src.operators.barotropic",
+        "sesmax_core.vertical",
+    ),
+    "build_coupling_matrix": (
+        "gridax_jax._src.vertical.vertical_modes",
+        "sesmax_core.vertical",
+    ),
+    "decompose_vertical_modes": (
+        "gridax_jax._src.vertical.vertical_modes",
+        "sesmax_core.vertical",
+    ),
+    "layer_to_mode": (
+        "gridax_jax._src.vertical.vertical_modes",
+        "sesmax_core.vertical",
+    ),
+    "linear_drag": ("gridax_jax._src.operators.relaxation", "sesmax_core.forcing"),
+    "linear_drag_tendency": (
+        "gridax_jax._src.forcing.functional",
+        "sesmax_core.forcing",
+    ),
+    "mode_to_layer": (
+        "gridax_jax._src.vertical.vertical_modes",
+        "sesmax_core.vertical",
+    ),
+    "multilayer": ("gridax_jax._src.vertical.multilayer", "sesmax_core.vertical"),
+    "quadratic_drag_tendency": (
+        "gridax_jax._src.forcing.functional",
+        "sesmax_core.forcing",
+    ),
+    "rayleigh_relaxation": (
+        "gridax_jax._src.operators.relaxation",
+        "sesmax_core.forcing",
+    ),
+    "rayleigh_tendency": ("gridax_jax._src.forcing.functional", "sesmax_core.forcing"),
+    "wind_stress_tendency": (
+        "gridax_jax._src.forcing.functional",
+        "sesmax_core.forcing",
+    ),
+}
+
+
 # Moved to geophysix (#446): the linear equation of state (geophysix.seawater,
 # whose parameters are one LinearEOS record) and gridax's mean-latitude
 # Coriolis helpers (geophysix.rotation is pointwise). The old names stay for
@@ -791,6 +797,18 @@ _MOVED_TO_GEOPHYSIX = {
 
 
 def __getattr__(name: str) -> object:
+    if name in _MOVED_TO_SESMAX:
+        import importlib
+        import warnings
+
+        module, home = _MOVED_TO_SESMAX[name]
+        warnings.warn(
+            f"gridax_jax.{name} is deprecated and will be removed in the next"
+            f" release: it moved to {home}.{name} (pip install sesmax-core).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return getattr(importlib.import_module(module), name)
     if name in _MOVED_TO_GEOPHYSIX:
         import warnings
 
