@@ -50,9 +50,9 @@ Poisson solver or an RK loop, look it up:
 | Integrals and means | `fvx.area_sum`, `fvx.area_mean`, `fvx.volume_mean`, `fvx.masked_mean` |
 | Poisson / Helmholtz | `fvx.streamfunction_from_vorticity`, `fvx.pressure_from_divergence`, `fvx.pv_inversion` (`bc="dst"` / `"dct"` / `"fft"`; `method="cg"` / `"capacitance"` on masked domains); `fvx.solve_cg`, `fvx.make_preconditioner`, `fvx.build_capacitance_solver`, `fvx.build_multigrid_solver` |
 | The Laplacian as a linear operator (GP / DA priors, log-determinants, sampling) | `fvx.helmholtz_operator(shape, dx, dy, lambda_, bc)` (a `gaussx.DiagonalizedOperator`: `gaussx.solve` / `logdet` / `sqrt` / `inv`), `fvx.masked_helmholtz_operator(mask, dx, dy, lambda_)` (a `gaussx.MaskedOperator`, capacitance solve); an SPDE / Matérn precision `τ²(κ² − ∇²)^α` from its eigenvalues; `fvx.make_gaussx_multigrid_preconditioner(mg)` for `gaussx.CGSolver` |
-| Forcing | `fvx.WindStress2D`, `fvx.LinearDrag2D`, `fvx.QuadraticDrag2D`, `fvx.RayleighDamping2D`, combined with `fvx.ForcingSum` / `fvx.ForcingProduct` / `fvx.TimeVaryingForcing` |
+| Forcing | moved to `sesmax_core.forcing` (#422): `WindStress2D`, `LinearDrag2D`, `QuadraticDrag2D`, `RayleighDamping2D`, combined with `ForcingSum` / `ForcingProduct` / `TimeVaryingForcing`; the `fvx.*` names warn for one release |
 | Time stepping | `fvx.rk3_ssp_step(state, rhs_fn, dt)`, `fvx.rk4_step`, `fvx.ab2_step`, `fvx.leapfrog_raf_step`, `fvx.imex_ssp2_step`; diffrax solvers `fvx.RK3SSP`, `fvx.SSP_RK104`, `fvx.IMEX_SSP2` with `fvx.solve_ocean_pde` |
-| Several layers | `fvx.multilayer(op.method)` over `[nl, Ny, Nx]`; vertical modes `fvx.decompose_vertical_modes`, `fvx.layer_to_mode` |
+| Several layers | `sesmax_core.vertical.multilayer(op.method)` over `[nl, Ny, Nx]`; vertical modes `sesmax_core.vertical.decompose_vertical_modes`, `layer_to_mode` (moved from finitevolX, #422) |
 
 Spectral transforms and solvers come from spectraldiffx (finitevolX
 re-exports them); structured linear algebra (tridiagonal solves, Nyström
@@ -168,7 +168,7 @@ tendency is exactly zero on every land cell.
 | A hand-written RK3 / AB2 / leapfrog loop | `fvx.rk3_ssp_step`, `fvx.ab2_step`, `fvx.leapfrog_raf_step`, or `fvx.RK3SSP` with `fvx.solve_ocean_pde` |
 | `jnp.sum(q * dx * dy)` | `fvx.area_sum(q, grid)` (excludes the ghost ring; `mask=` drops land) |
 | Kinetic energy / PV / Okubo–Weiss by hand | `fvx.Energetics2D`, `fvx.Vorticity2D`, `fvx.Strain2D` |
-| A `vmap` over layers | `fvx.multilayer(diff.laplacian)(psi_layers)` |
+| A `vmap` over layers | `sesmax_core.vertical.multilayer(diff.laplacian)(psi_layers)` |
 
 ## Self-check before you finish
 

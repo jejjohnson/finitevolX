@@ -78,9 +78,9 @@ list grouped by module, plus spectraldiffx and gaussx.
      `finitevolx.rk3_ssp_step`, `finitevolx.rk4_step`,
      `finitevolx.ab2_step`, `finitevolx.leapfrog_raf_step`, or a diffrax
      solver such as `finitevolx.RK3SSP` with `finitevolx.solve_ocean_pde`;
-   - wind stress, bottom drag, sponge damping → `finitevolx.WindStress2D`,
-     `finitevolx.LinearDrag2D`, `finitevolx.QuadraticDrag2D`,
-     `finitevolx.RayleighDamping2D`.
+   - wind stress, bottom drag, sponge damping → `sesmax_core.forcing`
+     (`WindStress2D`, `LinearDrag2D`, `QuadraticDrag2D`, `RayleighDamping2D`),
+     which took them over from finitevolX (#422).
 3. For code that already uses finitevolX, flag misuse: a field passed to a
    stencil without its ghost ring filled for the intended boundary
    condition (especially inside a time-stepper RHS); a field on the wrong
