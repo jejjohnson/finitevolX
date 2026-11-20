@@ -29,10 +29,10 @@ from gridax import (
 from gridax._src.operators._ghost import interior, zero_z_ghosts
 from gridax._src.operators._utils import _metric_like, _safe_div_cos
 from gridax._src.operators.stencils import (
-    diff_x_bwd,
-    diff_x_fwd,
-    diff_y_bwd,
-    diff_y_fwd,
+    diff_x_bwd_2d,
+    diff_x_fwd_2d,
+    diff_y_bwd_2d,
+    diff_y_fwd_2d,
 )
 import jax.numpy as jnp
 from jaxtyping import Array, Float
@@ -77,7 +77,7 @@ class SphericalDifference2D(eqx.Module):
 
         dh/dx[j, i+½] = (h[j, i+1] − h[j, i]) / (R · cos(lat_U) · dlon)
         """
-        raw = diff_x_fwd(h)
+        raw = diff_x_fwd_2d(h)
         cos_U = _metric_like(self.grid.cos_lat_U, h)[1:-1, 1:-1]
         out = interior(_safe_div_cos(raw, cos_U, self.grid.R * self.grid.dlon), h)
         if self.mask is not None:
@@ -89,7 +89,7 @@ class SphericalDifference2D(eqx.Module):
 
         dh/dy[j+½, i] = (h[j+1, i] − h[j, i]) / (R · dlat)
         """
-        raw = diff_y_fwd(h)
+        raw = diff_y_fwd_2d(h)
         out = interior(raw / (self.grid.R * self.grid.dlat), h)
         if self.mask is not None:
             out = out * self.mask.v
@@ -100,7 +100,7 @@ class SphericalDifference2D(eqx.Module):
 
         dv/dx[j+½, i+½] = (v[j+½, i+1] − v[j+½, i]) / (R · cos(lat_X) · dlon)
         """
-        raw = diff_x_fwd(v)
+        raw = diff_x_fwd_2d(v)
         cos_X = _metric_like(self.grid.cos_lat_X, v)[1:-1, 1:-1]
         out = interior(_safe_div_cos(raw, cos_X, self.grid.R * self.grid.dlon), v)
         if self.mask is not None:
@@ -112,7 +112,7 @@ class SphericalDifference2D(eqx.Module):
 
         du/dy[j+½, i+½] = (u[j+1, i+½] − u[j, i+½]) / (R · dlat)
         """
-        raw = diff_y_fwd(u)
+        raw = diff_y_fwd_2d(u)
         out = interior(raw / (self.grid.R * self.grid.dlat), u)
         if self.mask is not None:
             out = out * self.mask.xy_corner_strict
@@ -127,7 +127,7 @@ class SphericalDifference2D(eqx.Module):
 
         du/dx[j, i] = (u[j, i+½] − u[j, i−½]) / (R · cos(lat_T) · dlon)
         """
-        raw = diff_x_bwd(u)
+        raw = diff_x_bwd_2d(u)
         cos_T = _metric_like(self.grid.cos_lat_T, u)[1:-1, 1:-1]
         out = interior(_safe_div_cos(raw, cos_T, self.grid.R * self.grid.dlon), u)
         if self.mask is not None:
@@ -139,7 +139,7 @@ class SphericalDifference2D(eqx.Module):
 
         dv/dy[j, i] = (v[j+½, i] − v[j−½, i]) / (R · dlat)
         """
-        raw = diff_y_bwd(v)
+        raw = diff_y_bwd_2d(v)
         out = interior(raw / (self.grid.R * self.grid.dlat), v)
         if self.mask is not None:
             out = out * self.mask.h
@@ -156,7 +156,7 @@ class SphericalDifference2D(eqx.Module):
         """
         cos_T = _metric_like(self.grid.cos_lat_T, h)[1:-1, 1:-1]
         # h_c sliced once (see `_Neighbours2D`); same arithmetic as
-        #   (diff_x_fwd(h) - diff_x_bwd(h)) / dlon**2
+        #   (diff_x_fwd_2d(h) - diff_x_bwd_2d(h)) / dlon**2
         h_c, h_e, h_w = h[1:-1, 1:-1], h[1:-1, 2:], h[1:-1, :-2]
         d2h = ((h_e - h_c) - (h_c - h_w)) / self.grid.dlon**2
         out = interior(_safe_div_cos(d2h, cos_T, self.grid.R**2 * cos_T), h)

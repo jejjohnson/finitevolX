@@ -27,15 +27,15 @@ from gridax import (
 from gridax._src.operators._ghost import interior
 from gridax._src.operators.stencils import (
     _neighbours,
-    diff_x_bwd,
     diff_x_bwd_1d,
+    diff_x_bwd_2d,
     diff_x_bwd_3d,
-    diff_x_fwd,
     diff_x_fwd_1d,
+    diff_x_fwd_2d,
     diff_x_fwd_3d,
-    diff_y_bwd,
+    diff_y_bwd_2d,
     diff_y_bwd_3d,
-    diff_y_fwd,
+    diff_y_fwd_2d,
     diff_y_fwd_3d,
 )
 import jax.numpy as jnp
@@ -57,7 +57,7 @@ def _curl_2d(
     zeta[j+1/2, i+1/2] = (v[j+1/2, i+1] - v[j+1/2, i]) / dx
                         - (u[j+1, i+1/2] - u[j, i+1/2]) / dy
     """
-    out = interior(diff_x_fwd(v) / dx - diff_y_fwd(u) / dy, u)
+    out = interior(diff_x_fwd_2d(v) / dx - diff_y_fwd_2d(u) / dy, u)
     return out
 
 
@@ -73,7 +73,7 @@ def _divergence_2d(
                 + (v[j+1/2, i] - v[j-1/2, i]) / dy
     """
     like = jnp.zeros(u.shape, dtype=jnp.result_type(u, v))
-    return interior(diff_x_bwd(u) / dx + diff_y_bwd(v) / dy, like)
+    return interior(diff_x_bwd_2d(u) / dx + diff_y_bwd_2d(v) / dy, like)
 
 
 class Difference1D(eqx.Module):
@@ -215,7 +215,7 @@ class Difference2D(eqx.Module):
             Forward x-difference at U-points.  When ``self.mask`` is
             set, the output is zeroed at dry U-faces via ``* mask.u``.
         """
-        out = interior(diff_x_fwd(h) / self.grid.dx, h)
+        out = interior(diff_x_fwd_2d(h) / self.grid.dx, h)
         if self.mask is not None:
             out = out * self.mask.u
         return out
@@ -238,7 +238,7 @@ class Difference2D(eqx.Module):
             Forward y-difference at V-points.  When ``self.mask`` is
             set, the output is zeroed at dry V-faces via ``* mask.v``.
         """
-        out = interior(diff_y_fwd(h) / self.grid.dy, h)
+        out = interior(diff_y_fwd_2d(h) / self.grid.dy, h)
         if self.mask is not None:
             out = out * self.mask.v
         return out
@@ -262,7 +262,7 @@ class Difference2D(eqx.Module):
             set, the output is zeroed at dry X-corners via
             ``* mask.xy_corner_strict``.
         """
-        out = interior(diff_y_fwd(u) / self.grid.dy, u)
+        out = interior(diff_y_fwd_2d(u) / self.grid.dy, u)
         if self.mask is not None:
             out = out * self.mask.xy_corner_strict
         return out
@@ -286,7 +286,7 @@ class Difference2D(eqx.Module):
             set, the output is zeroed at dry X-corners via
             ``* mask.xy_corner_strict``.
         """
-        out = interior(diff_x_fwd(v) / self.grid.dx, v)
+        out = interior(diff_x_fwd_2d(v) / self.grid.dx, v)
         if self.mask is not None:
             out = out * self.mask.xy_corner_strict
         return out
@@ -313,7 +313,7 @@ class Difference2D(eqx.Module):
             Backward y-difference at U-points.  When ``self.mask`` is
             set, the output is zeroed at dry U-faces via ``* mask.u``.
         """
-        out = interior(diff_y_bwd(q) / self.grid.dy, q)
+        out = interior(diff_y_bwd_2d(q) / self.grid.dy, q)
         if self.mask is not None:
             out = out * self.mask.u
         return out
@@ -336,7 +336,7 @@ class Difference2D(eqx.Module):
             Backward x-difference at V-points.  When ``self.mask`` is
             set, the output is zeroed at dry V-faces via ``* mask.v``.
         """
-        out = interior(diff_x_bwd(q) / self.grid.dx, q)
+        out = interior(diff_x_bwd_2d(q) / self.grid.dx, q)
         if self.mask is not None:
             out = out * self.mask.v
         return out
@@ -359,7 +359,7 @@ class Difference2D(eqx.Module):
             Backward x-difference at T-points.  When ``self.mask`` is
             set, the output is zeroed at dry T-cells via ``* mask.h``.
         """
-        out = interior(diff_x_bwd(u) / self.grid.dx, u)
+        out = interior(diff_x_bwd_2d(u) / self.grid.dx, u)
         if self.mask is not None:
             out = out * self.mask.h
         return out
@@ -382,7 +382,7 @@ class Difference2D(eqx.Module):
             Backward y-difference at T-points.  When ``self.mask`` is
             set, the output is zeroed at dry T-cells via ``* mask.h``.
         """
-        out = interior(diff_y_bwd(v) / self.grid.dy, v)
+        out = interior(diff_y_bwd_2d(v) / self.grid.dy, v)
         if self.mask is not None:
             out = out * self.mask.h
         return out
@@ -471,8 +471,8 @@ class Difference2D(eqx.Module):
         """
         # nabla2_h[j, i] = d^2h/dx^2 + d^2h/dy^2, with each offset sliced
         # once (see `_Neighbours2D`); same arithmetic as
-        #   d2x = (diff_x_fwd(h) - diff_x_bwd(h)) / dx**2
-        #   d2y = (diff_y_fwd(h) - diff_y_bwd(h)) / dy**2
+        #   d2x = (diff_x_fwd_2d(h) - diff_x_bwd_2d(h)) / dx**2
+        #   d2y = (diff_y_fwd_2d(h) - diff_y_bwd_2d(h)) / dy**2
         nb = _neighbours(h)  # c, e, w, n, s views, each [Ny-2, Nx-2]
         d2x = ((nb.e - nb.c) - (nb.c - nb.w)) / self.grid.dx**2
         d2y = ((nb.n - nb.c) - (nb.c - nb.s)) / self.grid.dy**2

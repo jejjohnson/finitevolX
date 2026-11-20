@@ -483,30 +483,30 @@ if it is almost here, extend it where it lives. Regenerate with
 | `StencilCapability1D` | class | Directional count of contiguous wet neighbours for each 1-D grid cell. |
 | `StencilCapability2D` | class | Directional count of contiguous wet neighbours for each 2-D grid cell. |
 | `StencilCapability3D` | class | Directional count of contiguous wet neighbours for each 3-D grid cell. |
-| `avg_x_bwd` | function | Backward average in x (east face → centre). |
-| `avg_x_bwd_1d` | function | Backward average in x (east face → centre), 1-D. |
-| `avg_x_bwd_3d` | function | Backward average in x over all z-levels (east face → centre). |
-| `avg_x_fwd` | function | Forward average in x (centre → east face). |
-| `avg_x_fwd_1d` | function | Forward average in x (centre → east face), 1-D. |
-| `avg_x_fwd_3d` | function | Forward average in x over all z-levels (centre → east face). |
-| `avg_xbwd_yfwd` | function | Bilinear average: U-points → V-points (backward-x, forward-y). |
-| `avg_xfwd_ybwd` | function | Bilinear average: V-points → U-points (forward-x, backward-y). |
-| `avg_xy_bwd` | function | Bilinear average from corners to centre (backward in both x and y). |
-| `avg_xy_fwd` | function | Bilinear average to NE corner (forward in both x and y). |
-| `avg_y_bwd` | function | Backward average in y (north face → centre). |
-| `avg_y_bwd_3d` | function | Backward average in y over all z-levels (north face → centre). |
-| `avg_y_fwd` | function | Forward average in y (centre → north face). |
-| `avg_y_fwd_3d` | function | Forward average in y over all z-levels (centre → north face). |
-| `diff_x_bwd` | function | Backward difference in x (east face → centre). |
-| `diff_x_bwd_1d` | function | Backward difference in x (east face → centre), 1-D. |
-| `diff_x_bwd_3d` | function | Backward difference in x over all z-levels (east face → centre). |
-| `diff_x_fwd` | function | Forward difference in x (centre → east face). |
-| `diff_x_fwd_1d` | function | Forward difference in x (centre → east face), 1-D. |
-| `diff_x_fwd_3d` | function | Forward difference in x over all z-levels (centre → east face). |
-| `diff_y_bwd` | function | Backward difference in y (north face → centre). |
-| `diff_y_bwd_3d` | function | Backward difference in y over all z-levels (north face → centre). |
-| `diff_y_fwd` | function | Forward difference in y (centre → north face). |
-| `diff_y_fwd_3d` | function | Forward difference in y over all z-levels (centre → north face). |
+| `avg_x_bwd_1d` | function | Backward average in x, 1-D: U (or X) → T (or V) points. |
+| `avg_x_bwd_2d` | function | Backward average in x, 2-D: U (or X) → T (or V) points. |
+| `avg_x_bwd_3d` | function | Backward average in x, 3-D: U (or X) → T (or V) points. |
+| `avg_x_fwd_1d` | function | Forward average in x, 1-D: T (or V) → U (or X) points. |
+| `avg_x_fwd_2d` | function | Forward average in x, 2-D: T (or V) → U (or X) points. |
+| `avg_x_fwd_3d` | function | Forward average in x, 3-D: T (or V) → U (or X) points. |
+| `avg_xbwd_ybwd_2d` | function | Four-point average, bwd in x and bwd in y, 2-D: X → T points. |
+| `avg_xbwd_yfwd_2d` | function | Four-point average, bwd in x and fwd in y, 2-D: U → V points. |
+| `avg_xfwd_ybwd_2d` | function | Four-point average, fwd in x and bwd in y, 2-D: V → U points. |
+| `avg_xfwd_yfwd_2d` | function | Four-point average, fwd in x and fwd in y, 2-D: T → X points. |
+| `avg_y_bwd_2d` | function | Backward average in y, 2-D: V (or X) → T (or U) points. |
+| `avg_y_bwd_3d` | function | Backward average in y, 3-D: V (or X) → T (or U) points. |
+| `avg_y_fwd_2d` | function | Forward average in y, 2-D: T (or U) → V (or X) points. |
+| `avg_y_fwd_3d` | function | Forward average in y, 3-D: T (or U) → V (or X) points. |
+| `diff_x_bwd_1d` | function | Backward difference in x, 1-D: U (or X) → T (or V) points. |
+| `diff_x_bwd_2d` | function | Backward difference in x, 2-D: U (or X) → T (or V) points. |
+| `diff_x_bwd_3d` | function | Backward difference in x, 3-D: U (or X) → T (or V) points. |
+| `diff_x_fwd_1d` | function | Forward difference in x, 1-D: T (or V) → U (or X) points. |
+| `diff_x_fwd_2d` | function | Forward difference in x, 2-D: T (or V) → U (or X) points. |
+| `diff_x_fwd_3d` | function | Forward difference in x, 3-D: T (or V) → U (or X) points. |
+| `diff_y_bwd_2d` | function | Backward difference in y, 2-D: V (or X) → T (or U) points. |
+| `diff_y_bwd_3d` | function | Backward difference in y, 3-D: V (or X) → T (or U) points. |
+| `diff_y_fwd_2d` | function | Forward difference in y, 2-D: T (or U) → V (or X) points. |
+| `diff_y_fwd_3d` | function | Forward difference in y, 3-D: T (or U) → V (or X) points. |
 | `interior` | function | Create an array shaped like ``like``, zero everywhere except the interior. |
 | `smooth_abs` | function | Smooth approximation of ``\|x\|`` with a nonzero gradient at the origin. |
 | `smooth_clamp` | function | Smooth approximation of ``max(x, x_min)`` (a soft lower clamp). |
@@ -654,31 +654,39 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `StencilCapability1D` | class | Directional count of contiguous wet neighbours for each 1-D grid cell. |
 | `StencilCapability2D` | class | Directional count of contiguous wet neighbours for each 2-D grid cell. |
 | `StencilCapability3D` | class | Directional count of contiguous wet neighbours for each 3-D grid cell. |
-| `avg_x_bwd` | function | Backward average in x (east face → centre). |
-| `avg_x_bwd_1d` | function | Backward average in x (east face → centre), 1-D. |
-| `avg_x_bwd_3d` | function | Backward average in x over all z-levels (east face → centre). |
-| `avg_x_fwd` | function | Forward average in x (centre → east face). |
-| `avg_x_fwd_1d` | function | Forward average in x (centre → east face), 1-D. |
-| `avg_x_fwd_3d` | function | Forward average in x over all z-levels (centre → east face). |
-| `avg_xbwd_yfwd` | function | Bilinear average: U-points → V-points (backward-x, forward-y). |
-| `avg_xfwd_ybwd` | function | Bilinear average: V-points → U-points (forward-x, backward-y). |
-| `avg_xy_bwd` | function | Bilinear average from corners to centre (backward in both x and y). |
-| `avg_xy_fwd` | function | Bilinear average to NE corner (forward in both x and y). |
-| `avg_y_bwd` | function | Backward average in y (north face → centre). |
-| `avg_y_bwd_3d` | function | Backward average in y over all z-levels (north face → centre). |
-| `avg_y_fwd` | function | Forward average in y (centre → north face). |
-| `avg_y_fwd_3d` | function | Forward average in y over all z-levels (centre → north face). |
+| `avg_x_bwd_1d` | function | Backward average in x, 1-D: U (or X) → T (or V) points. |
+| `avg_x_bwd_2d` | function | Backward average in x, 2-D: U (or X) → T (or V) points. |
+| `avg_x_bwd_3d` | function | Backward average in x, 3-D: U (or X) → T (or V) points. |
+| `avg_x_fwd_1d` | function | Forward average in x, 1-D: T (or V) → U (or X) points. |
+| `avg_x_fwd_2d` | function | Forward average in x, 2-D: T (or V) → U (or X) points. |
+| `avg_x_fwd_3d` | function | Forward average in x, 3-D: T (or V) → U (or X) points. |
+| `avg_xbwd_ybwd_2d` | function | Four-point average, bwd in x and bwd in y, 2-D: X → T points. |
+| `avg_xbwd_ybwd_3d` | function | Four-point average, bwd in x and bwd in y, 3-D: X → T points on every z-level. |
+| `avg_xbwd_yfwd_2d` | function | Four-point average, bwd in x and fwd in y, 2-D: U → V points. |
+| `avg_xbwd_yfwd_3d` | function | Four-point average, bwd in x and fwd in y, 3-D: U → V points on every z-level. |
+| `avg_xfwd_ybwd_2d` | function | Four-point average, fwd in x and bwd in y, 2-D: V → U points. |
+| `avg_xfwd_ybwd_3d` | function | Four-point average, fwd in x and bwd in y, 3-D: V → U points on every z-level. |
+| `avg_xfwd_yfwd_2d` | function | Four-point average, fwd in x and fwd in y, 2-D: T → X points. |
+| `avg_xfwd_yfwd_3d` | function | Four-point average, fwd in x and fwd in y, 3-D: T → X points on every z-level. |
+| `avg_y_bwd_2d` | function | Backward average in y, 2-D: V (or X) → T (or U) points. |
+| `avg_y_bwd_3d` | function | Backward average in y, 3-D: V (or X) → T (or U) points. |
+| `avg_y_fwd_2d` | function | Forward average in y, 2-D: T (or U) → V (or X) points. |
+| `avg_y_fwd_3d` | function | Forward average in y, 3-D: T (or U) → V (or X) points. |
+| `avg_z_bwd_3d` | function | Backward average in z, 3-D: W → T points. |
+| `avg_z_fwd_3d` | function | Forward average in z, 3-D: T → W points. |
 | `count_contiguous` | function | Count contiguous wet cells from each point along one axis (n-D). |
-| `diff_x_bwd` | function | Backward difference in x (east face → centre). |
-| `diff_x_bwd_1d` | function | Backward difference in x (east face → centre), 1-D. |
-| `diff_x_bwd_3d` | function | Backward difference in x over all z-levels (east face → centre). |
-| `diff_x_fwd` | function | Forward difference in x (centre → east face). |
-| `diff_x_fwd_1d` | function | Forward difference in x (centre → east face), 1-D. |
-| `diff_x_fwd_3d` | function | Forward difference in x over all z-levels (centre → east face). |
-| `diff_y_bwd` | function | Backward difference in y (north face → centre). |
-| `diff_y_bwd_3d` | function | Backward difference in y over all z-levels (north face → centre). |
-| `diff_y_fwd` | function | Forward difference in y (centre → north face). |
-| `diff_y_fwd_3d` | function | Forward difference in y over all z-levels (centre → north face). |
+| `diff_x_bwd_1d` | function | Backward difference in x, 1-D: U (or X) → T (or V) points. |
+| `diff_x_bwd_2d` | function | Backward difference in x, 2-D: U (or X) → T (or V) points. |
+| `diff_x_bwd_3d` | function | Backward difference in x, 3-D: U (or X) → T (or V) points. |
+| `diff_x_fwd_1d` | function | Forward difference in x, 1-D: T (or V) → U (or X) points. |
+| `diff_x_fwd_2d` | function | Forward difference in x, 2-D: T (or V) → U (or X) points. |
+| `diff_x_fwd_3d` | function | Forward difference in x, 3-D: T (or V) → U (or X) points. |
+| `diff_y_bwd_2d` | function | Backward difference in y, 2-D: V (or X) → T (or U) points. |
+| `diff_y_bwd_3d` | function | Backward difference in y, 3-D: V (or X) → T (or U) points. |
+| `diff_y_fwd_2d` | function | Forward difference in y, 2-D: T (or U) → V (or X) points. |
+| `diff_y_fwd_3d` | function | Forward difference in y, 3-D: T (or U) → V (or X) points. |
+| `diff_z_bwd_3d` | function | Backward difference in z, 3-D: W → T points. |
+| `diff_z_fwd_3d` | function | Forward difference in z, 3-D: T → W points. |
 | `dilate_mask` | function | Binary dilation by 1 cell with an n-D *cross* structuring element. |
 | `h_from_pooled` | function | Inverse of `pool_bool` for binary inputs. |
 | `interior` | function | Create an array shaped like ``like``, zero everywhere except the interior. |

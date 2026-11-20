@@ -7,7 +7,7 @@ Covers the public ``pv_flux_blend`` free function (parity with the
 from __future__ import annotations
 
 from gridax._src.operators._ghost import interior
-from gridax._src.operators.stencils import avg_xfwd_ybwd, avg_y_bwd
+from gridax._src.operators.stencils import avg_xfwd_ybwd_2d, avg_y_bwd_2d
 from gridax_jax import (
     CartesianGrid2D,
     SphericalGrid2D,
@@ -78,7 +78,7 @@ class TestVorticityFluxUpwind:
         c = 2.5
         omega = jnp.full((grid.Ny, grid.Nx), c)
         U, V = _rand(3, (grid.Ny, grid.Nx)), _rand(4, (grid.Ny, grid.Nx))
-        v_on_u = interior(avg_xfwd_ybwd(V), V)
+        v_on_u = interior(avg_xfwd_ybwd_2d(V), V)
         oV, _ = vorticity_flux_upwind(omega, U, V, order=order)
         expected = interior(c * v_on_u[1:-1, 1:-1], omega)
         np.testing.assert_allclose(oV, expected, atol=1e-12)
@@ -90,8 +90,8 @@ class TestVorticityFluxUpwind:
         omega = jnp.broadcast_to(0.3 * j + 0.7, (grid.Ny, grid.Nx))  # linear in y
         U = jnp.zeros((grid.Ny, grid.Nx))
         V = jnp.ones((grid.Ny, grid.Nx))  # uniform positive advection
-        v_on_u = interior(avg_xfwd_ybwd(V), V)
-        centred = interior(avg_y_bwd(omega), omega)  # exact midpoint for linear
+        v_on_u = interior(avg_xfwd_ybwd_2d(V), V)
+        centred = interior(avg_y_bwd_2d(omega), omega)  # exact midpoint for linear
         expected = interior(centred[1:-1, 1:-1] * v_on_u[1:-1, 1:-1], omega)
         oV, _ = vorticity_flux_upwind(omega, U, V, order=3)
         np.testing.assert_allclose(oV[2:-2, 2:-2], expected[2:-2, 2:-2], atol=1e-10)

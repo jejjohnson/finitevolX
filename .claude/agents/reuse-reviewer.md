@@ -39,7 +39,7 @@ in `AGENTS.md`.
 3. Also flag, wherever they appear in the diff:
    - a shifted-slice difference or average (`h[1:-1, 2:] - h[1:-1, 1:-1]`,
      `0.25 * (h[1:-1, 1:-1] + h[2:, 1:-1] + ...)`) → the raw stencils
-     `diff_x_fwd`, `avg_xy_fwd`, … or an `Interpolation*` / `Difference*`
+     `diff_x_fwd_2d`, `avg_xfwd_yfwd_2d`, … or an `Interpolation*` / `Difference*`
      method;
    - `jnp.zeros_like(x).at[1:-1, 1:-1].set(...)` → `interior(values, x)`;
    - a hand-filled ghost ring (`.at[0, :].set(...)` on a field) →

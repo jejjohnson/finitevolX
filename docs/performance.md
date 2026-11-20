@@ -34,7 +34,7 @@ pass.
 
    ```python
    nb = _neighbours(h)  # nb.c, nb.e, nb.w, nb.n, nb.s, nb.ne, ...  [..., Ny-2, Nx-2]
-   # same arithmetic as (diff_x_fwd(h) - diff_x_bwd(h)) / dx**2
+   # same arithmetic as (diff_x_fwd_2d(h) - diff_x_bwd_2d(h)) / dx**2
    d2x = ((nb.e - nb.c) - (nb.c - nb.w)) / dx**2
    ```
 

@@ -13,15 +13,15 @@ import equinox as eqx
 from gridax import Mask3D
 from gridax._src.operators._ghost import interior
 from gridax._src.operators.stencils import (
-    avg_x_bwd,
-    avg_xy_fwd,
-    avg_y_bwd,
-    diff_x_bwd,
+    avg_x_bwd_2d,
+    avg_xfwd_yfwd_2d,
+    avg_y_bwd_2d,
+    diff_x_bwd_2d,
     diff_x_bwd_3d,
-    diff_x_fwd,
-    diff_y_bwd,
+    diff_x_fwd_2d,
+    diff_y_bwd_2d,
     diff_y_bwd_3d,
-    diff_y_fwd,
+    diff_y_fwd_2d,
 )
 import jax.numpy as jnp
 from jaxtyping import (
@@ -71,8 +71,8 @@ def kinetic_energy(
     v2 = v_float**2
     # u²_on_T[j, i] = 0.5 * (u²[j, i] + u²[j, i-1])  (east + west U-faces)
     # v²_on_T[j, i] = 0.5 * (v²[j, i] + v²[j-1, i])  (north + south V-faces)
-    u2_on_T = avg_x_bwd(u2)
-    v2_on_T = avg_y_bwd(v2)
+    u2_on_T = avg_x_bwd_2d(u2)
+    v2_on_T = avg_y_bwd_2d(v2)
     ke_int = 0.5 * (u2_on_T + v2_on_T)
     out = interior(ke_int, u_float)
     return out
@@ -214,7 +214,7 @@ def shear_strain(
     Float[Array, "*batch Ny Nx"]
         Shear strain at X-points.  Ghost ring is zero.
     """
-    out = interior(diff_x_fwd(v) / dx + diff_y_fwd(u) / dy, u)
+    out = interior(diff_x_fwd_2d(v) / dx + diff_y_fwd_2d(u) / dy, u)
     return out
 
 
@@ -246,7 +246,7 @@ def tensor_strain(
     Float[Array, "*batch Ny Nx"]
         Tensor strain at T-points.  Ghost ring is zero.
     """
-    out = interior(diff_x_bwd(u) / dx - diff_y_bwd(v) / dy, u)
+    out = interior(diff_x_bwd_2d(u) / dx - diff_y_bwd_2d(v) / dy, u)
     return out
 
 
@@ -450,8 +450,8 @@ def qg_potential_vorticity(
         Ghost ring is zero; interior is ``[1:-1, 1:-1]``.
     """
     # Laplacian at T-points via centred second differences:
-    d2x = (diff_x_fwd(psi) - diff_x_bwd(psi)) / dx**2
-    d2y = (diff_y_fwd(psi) - diff_y_bwd(psi)) / dy**2
+    d2x = (diff_x_fwd_2d(psi) - diff_x_bwd_2d(psi)) / dx**2
+    d2y = (diff_y_fwd_2d(psi) - diff_y_bwd_2d(psi)) / dy**2
     # q[j,i] = (d2psi/dx2 + d2psi/dy2) / f0 + beta * (y - y0) / f0
     q_int = (d2x + d2y) / f0 + beta * (y[..., 1:-1, 1:-1] - y0) / f0
     out = interior(q_int, psi)
@@ -863,7 +863,7 @@ def _interp_T_to_X(field: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch 
 
     Uses the same NE-corner stencil as :meth:`Interpolation2D.T_to_X`.
     """
-    return interior(avg_xy_fwd(field), field)
+    return interior(avg_xfwd_yfwd_2d(field), field)
 
 
 def sw_potential_vorticity(

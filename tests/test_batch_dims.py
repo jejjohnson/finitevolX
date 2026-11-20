@@ -47,7 +47,10 @@ MODULES = (
 
 
 def _batched(fn: Callable) -> bool:
-    return any("*batch" in str(p.annotation) for p in _params(fn))
+    # 2-D entry points only: the fields built below are [*batch, Ny, Nx]. The
+    # 1-D and 3-D raw stencils (annotated "*batch Nx", "*batch Nz Ny Nx") are
+    # checked for batch axes in packages/gridax/tests/test_stencils_backends.py.
+    return any("*batch Ny Nx" in str(p.annotation) for p in _params(fn))
 
 
 def _params(fn: Callable) -> list[inspect.Parameter]:

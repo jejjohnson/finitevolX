@@ -12,10 +12,10 @@ import equinox as eqx
 from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
 from gridax._src.operators._ghost import interior, zero_z_ghosts
 from gridax._src.operators.stencils import (
-    avg_x_bwd,
-    avg_xbwd_yfwd,
-    avg_xfwd_ybwd,
-    avg_y_bwd,
+    avg_x_bwd_2d,
+    avg_xbwd_yfwd_2d,
+    avg_xfwd_ybwd_2d,
+    avg_y_bwd_2d,
 )
 import jax.numpy as jnp
 from jaxtyping import Array, Float
@@ -524,8 +524,8 @@ def pv_flux_blend(
     qu_e, qv_e = _pv_flux_corner_product(q, u, v)
 
     # Enstrophy-conserving: average q to the faces, then multiply.
-    q_on_u = interior(avg_y_bwd(q), q)  # X_to_U
-    q_on_v = interior(avg_x_bwd(q), q)  # X_to_V
+    q_on_u = interior(avg_y_bwd_2d(q), q)  # X_to_U
+    q_on_v = interior(avg_x_bwd_2d(q), q)  # X_to_V
     qu_s = interior(q_on_u[..., 1:-1, 1:-1] * u[..., 1:-1, 1:-1], u)
     qv_s = interior(q_on_v[..., 1:-1, 1:-1] * v[..., 1:-1, 1:-1], v)
 
@@ -577,7 +577,7 @@ def _upwind_face_bwd_last(
 
     Faces follow the backward-average stagger: face ``i`` lies between cells
     ``i-1`` (minus side) and ``i`` (plus side), so the centred limit matches
-    :func:`avg_x_bwd` / :func:`avg_y_bwd`.  The upwind bias is chosen by the
+    :func:`avg_x_bwd_2d` / :func:`avg_y_bwd_2d`.  The upwind bias is chosen by the
     sign of ``vel`` at each face.  Returns the ``N - 2`` interior-face values
     along the last axis (all other axes untouched).  Higher orders fall back
     to a lower-order stencil on the outer face(s) where the wide stencil does
@@ -688,8 +688,8 @@ def vorticity_flux_upwind(
         raise ValueError(f"order must be 1, 3, or 5, got {order!r}")
 
     # Cross mass flux advecting each velocity face.
-    v_on_u = interior(avg_xfwd_ybwd(V), V)  # V_to_U: north flux at U-points
-    u_on_v = interior(avg_xbwd_yfwd(U), U)  # U_to_V: east flux at V-points
+    v_on_u = interior(avg_xfwd_ybwd_2d(V), V)  # V_to_U: north flux at U-points
+    u_on_v = interior(avg_xbwd_yfwd_2d(U), U)  # U_to_V: east flux at V-points
 
     # omega reconstructed to U-points along y (axis -2): swap y to the last axis.
     omega_y = jnp.swapaxes(omega, -2, -1)

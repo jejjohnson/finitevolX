@@ -45,7 +45,7 @@ list grouped by module, plus spectraldiffx and gaussx.
    - shifted-slice differences or averages on a staggered grid
      (`(h[1:-1, 2:] - h[1:-1, 1:-1]) / dx`, `0.5 * (u[:, 1:] + u[:, :-1])`)
      → `finitevolx.Difference2D` / `Interpolation2D` methods or the raw
-     stencils `finitevolx.diff_x_fwd`, `finitevolx.avg_x_fwd`, … with
+     stencils `finitevolx.diff_x_fwd_2d`, `finitevolx.avg_x_fwd_2d`, … with
      `finitevolx.interior`;
    - ghost-cell fills (`q.at[:, 0].set(q[:, -2])`, `jnp.pad(..., mode="wrap")`)
      → `finitevolx.enforce_periodic`, `finitevolx.zero_gradient_boundaries`,

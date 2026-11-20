@@ -20,8 +20,8 @@ Step 2 – North-face flux at V-points (forward diff T → V):
 
 A spatially varying ``κ`` given at T-points is interpolated to the faces by
 the arithmetic mean of the two cells the face separates,
-``κ[j, i+1/2] = (κ[j, i] + κ[j, i+1]) / 2`` (the ``avg_x_fwd`` /
-``avg_y_fwd`` stencils), which keeps ``∇·(κ∇h)`` second-order accurate; a
+``κ[j, i+1/2] = (κ[j, i] + κ[j, i+1]) / 2`` (the ``avg_x_fwd_2d`` /
+``avg_y_fwd_2d`` stencils), which keeps ``∇·(κ∇h)`` second-order accurate; a
 scalar ``κ`` is used as is.
 
 Step 3 – Tendency at T-points (backward diff of fluxes, U → T and V → T):
@@ -87,7 +87,7 @@ from __future__ import annotations
 import equinox as eqx
 from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
 from gridax._src.operators._ghost import interior, zero_z_ghosts
-from gridax._src.operators.stencils import _materialize, avg_x_fwd, avg_y_fwd
+from gridax._src.operators.stencils import _materialize, avg_x_fwd_2d, avg_y_fwd_2d
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 
@@ -127,15 +127,15 @@ def _face_kappa(
     if kappa.ndim < 2:
         return kappa, kappa
     if wall == "open":
-        # κ[j, i+1/2] for i = 0..Nx-2 (avg_x_fwd extended to the west wall)
+        # κ[j, i+1/2] for i = 0..Nx-2 (avg_x_fwd_2d extended to the west wall)
         kx = 0.5 * (kappa[1:-1, :-1] + kappa[1:-1, 1:])  # [Ny-2, Nx-1]
-        # κ[j+1/2, i] for j = 0..Ny-2 (avg_y_fwd extended to the south wall)
+        # κ[j+1/2, i] for j = 0..Ny-2 (avg_y_fwd_2d extended to the south wall)
         ky = 0.5 * (kappa[:-1, 1:-1] + kappa[1:, 1:-1])  # [Ny-1, Nx-2]
     else:
-        # κ[j, i+1/2] for i = 1..Nx-3: avg_x_fwd without the east wall face
-        kx = avg_x_fwd(kappa)[:, :-1]  # [Ny-2, Nx-3]
-        # κ[j+1/2, i] for j = 1..Ny-3: avg_y_fwd without the north wall face
-        ky = avg_y_fwd(kappa)[:-1, :]  # [Ny-3, Nx-2]
+        # κ[j, i+1/2] for i = 1..Nx-3: avg_x_fwd_2d without the east wall face
+        kx = avg_x_fwd_2d(kappa)[:, :-1]  # [Ny-2, Nx-3]
+        # κ[j+1/2, i] for j = 1..Ny-3: avg_y_fwd_2d without the north wall face
+        ky = avg_y_fwd_2d(kappa)[:-1, :]  # [Ny-3, Nx-2]
     return kx, ky
 
 

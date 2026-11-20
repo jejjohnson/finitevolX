@@ -1,23 +1,30 @@
 """Raw finite-difference and averaging stencils for Arakawa C-grids.
 
-These functions compute the pure index arithmetic of C-grid stencils without
-any metric scaling (no division by dx, dy, etc.) or ghost-ring padding.
-They return arrays sized to the **interior** of the output grid location.
+One rule names and shapes every function here. ``<op>_<axis>_<side>_<d>d``
+reads the trailing ``d`` axes of a ``[*batch, *spatial]`` array (any leading
+axes are batch axes: time, ensemble member, layer), returns the interior of
+all ``d`` spatial axes (each one cell shorter at both ends), and shifts by
+one cell along ``<axis>``:
 
-Use these as building blocks for custom operators on any coordinate system —
-Cartesian, spherical, cylindrical, or curvilinear — by applying the
-appropriate metric scale factors to the result.
+- ``<op>``: ``diff`` (``h[+] - h[-]``) or ``avg`` (``(h[+] + h[-]) / 2``);
+- ``<axis>``: ``x`` (last axis), ``y`` (second to last) or ``z`` (third);
+- ``<side>``: ``fwd`` (the destination is half a cell ahead of the source,
+  e.g. T → U) or ``bwd`` (half a cell behind, e.g. U → T);
+- ``<d>``: the spatial rank, 1, 2 or 3.
 
-All functions are pure and stateless, and are plain slicing and arithmetic,
-so they run on any array backend (NumPy, JAX, CuPy, ...); on JAX they are
-compatible with ``jax.jit``, ``jax.vmap`` and ``jax.grad``.
+The four-point corner averages ``avg_x<side>_y<side>_<d>d`` shift in both x
+and y. No function applies a metric (no division by ``dx`` or
+``R cos φ dλ``) or pads the result: the caller scales it and pads it back
+with :func:`interior`. They are plain slicing and arithmetic, so they run on
+any array backend (NumPy, JAX, CuPy, ...); on JAX they are compatible with
+``jax.jit``, ``jax.vmap`` and ``jax.grad``.
 
 Example
 -------
->>> from gridax import diff_x_fwd, interior
->>> raw = diff_x_fwd(h)  # pure index arithmetic
->>> scaled = raw / my_custom_metric  # user applies their own scaling
->>> result = interior(scaled, h)  # pad back to full grid shape
+>>> from gridax import diff_x_fwd_2d, interior
+>>> raw = diff_x_fwd_2d(h)  # pure index arithmetic, [*batch, Ny-2, Nx-2]
+>>> scaled = raw / my_custom_metric  # the caller applies the metric
+>>> result = interior(scaled, h)  # pad back to [*batch, Ny, Nx]
 """
 
 from __future__ import annotations
@@ -34,589 +41,667 @@ if TYPE_CHECKING:
 else:
     Array = np.ndarray
 
-# =====================================================================
-# 1-D difference stencils
-# =====================================================================
+# Names of the previous API (the 2-D stencils had no rank suffix, the corner
+# averages mixed two schemes) -> the names of this module. gridax-jax serves
+# the old names as deprecated aliases for one release.
+RENAMED = {
+    "diff_x_fwd": "diff_x_fwd_2d",
+    "diff_x_bwd": "diff_x_bwd_2d",
+    "diff_y_fwd": "diff_y_fwd_2d",
+    "diff_y_bwd": "diff_y_bwd_2d",
+    "avg_x_fwd": "avg_x_fwd_2d",
+    "avg_x_bwd": "avg_x_bwd_2d",
+    "avg_y_fwd": "avg_y_fwd_2d",
+    "avg_y_bwd": "avg_y_bwd_2d",
+    "avg_xy_fwd": "avg_xfwd_yfwd_2d",
+    "avg_xy_bwd": "avg_xbwd_ybwd_2d",
+    "avg_xbwd_yfwd": "avg_xbwd_yfwd_2d",
+    "avg_xfwd_ybwd": "avg_xfwd_ybwd_2d",
+}
 
 
-def diff_x_fwd_1d(h: Float[Array, "Nx"]) -> Float[Array, "Nx-2"]:
-    """Forward difference in x (centre → east face), 1-D.
+def diff_x_fwd_1d(h: Float[Array, "*batch Nx"]) -> Float[Array, "*batch Nx-2"]:
+    """Forward difference in x, 1-D: T (or V) → U (or X) points.
 
     Δx h[i+½] = h[i+1] − h[i]
 
-    Maps T-points → U-points.
-
     Parameters
     ----------
-    h : Float[Array, "Nx"]
-        Field on T-points, including ghost cells.
+    h : Float[Array, "*batch Nx"]
+        Field with its ghost ring on the trailing 1 axis; leading axes are batch axes.
 
     Returns
     -------
-    Float[Array, "Nx-2"]
-        Raw difference at interior U-points.
-
-    Notes
-    -----
-    No metric scaling is applied.  The caller divides by ``dx``,
-    ``R·cos(φ)·dλ``, or whatever metric is appropriate.
+    Float[Array, "*batch Nx-2"]
+        The raw difference on the interior of all 1 spatial axis; no metric applied.
     """
-    return h[2:] - h[1:-1]
+    return h[..., 2:] - h[..., 1:-1]
 
 
-def diff_x_bwd_1d(h: Float[Array, "Nx"]) -> Float[Array, "Nx-2"]:
-    """Backward difference in x (east face → centre), 1-D.
+def diff_x_bwd_1d(h: Float[Array, "*batch Nx"]) -> Float[Array, "*batch Nx-2"]:
+    """Backward difference in x, 1-D: U (or X) → T (or V) points.
 
     Δx h[i] = h[i+½] − h[i−½]
 
-    Maps U-points → T-points.
-
     Parameters
     ----------
-    h : Float[Array, "Nx"]
-        Field on U-points, including ghost cells.
+    h : Float[Array, "*batch Nx"]
+        Field with its ghost ring on the trailing 1 axis; leading axes are batch axes.
 
     Returns
     -------
-    Float[Array, "Nx-2"]
-        Raw difference at interior T-points.
-
-    Notes
-    -----
-    No metric scaling is applied.  The caller divides by ``dx``,
-    ``R·cos(φ)·dλ``, or whatever metric is appropriate.
+    Float[Array, "*batch Nx-2"]
+        The raw difference on the interior of all 1 spatial axis; no metric applied.
     """
-    return h[1:-1] - h[:-2]
+    return h[..., 1:-1] - h[..., :-2]
 
 
-# =====================================================================
-# 2-D difference stencils
-# =====================================================================
+def avg_x_fwd_1d(h: Float[Array, "*batch Nx"]) -> Float[Array, "*batch Nx-2"]:
+    """Forward average in x, 1-D: T (or V) → U (or X) points.
+
+    h̄[i+½] = ½ (h[i] + h[i+1])
+
+    Parameters
+    ----------
+    h : Float[Array, "*batch Nx"]
+        Field with its ghost ring on the trailing 1 axis; leading axes are batch axes.
+
+    Returns
+    -------
+    Float[Array, "*batch Nx-2"]
+        The raw average on the interior of all 1 spatial axis; no metric applied.
+    """
+    return 0.5 * (h[..., 1:-1] + h[..., 2:])
 
 
-def diff_x_fwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
-    """Forward difference in x (centre → east face).
+def avg_x_bwd_1d(h: Float[Array, "*batch Nx"]) -> Float[Array, "*batch Nx-2"]:
+    """Backward average in x, 1-D: U (or X) → T (or V) points.
+
+    h̄[i] = ½ (h[i+½] + h[i−½])
+
+    Parameters
+    ----------
+    h : Float[Array, "*batch Nx"]
+        Field with its ghost ring on the trailing 1 axis; leading axes are batch axes.
+
+    Returns
+    -------
+    Float[Array, "*batch Nx-2"]
+        The raw average on the interior of all 1 spatial axis; no metric applied.
+    """
+    return 0.5 * (h[..., 1:-1] + h[..., :-2])
+
+
+def diff_x_fwd_2d(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
+    """Forward difference in x, 2-D: T (or V) → U (or X) points.
 
     Δx h[j, i+½] = h[j, i+1] − h[j, i]
-
-    Maps T-points → U-points (or V-points → X-points).
 
     Parameters
     ----------
     h : Float[Array, "*batch Ny Nx"]
-        Field on source points (T or V), including ghost ring.
+        Field with its ghost ring on the trailing 2 axes; leading axes are batch axes.
 
     Returns
     -------
     Float[Array, "*batch Ny-2 Nx-2"]
-        Raw difference at interior destination points (U or X).
-
-    Notes
-    -----
-    No metric scaling is applied.  The caller divides by ``dx``,
-    ``R·cos(φ)·dλ``, or whatever metric is appropriate.
+        The raw difference on the interior of all 2 spatial axes; no metric applied.
     """
     return h[..., 1:-1, 2:] - h[..., 1:-1, 1:-1]
 
 
-def diff_y_fwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
-    """Forward difference in y (centre → north face).
-
-    Δy h[j+½, i] = h[j+1, i] − h[j, i]
-
-    Maps T-points → V-points (or U-points → X-points).
-
-    Parameters
-    ----------
-    h : Float[Array, "*batch Ny Nx"]
-        Field on source points (T or U), including ghost ring.
-
-    Returns
-    -------
-    Float[Array, "*batch Ny-2 Nx-2"]
-        Raw difference at interior destination points (V or X).
-
-    Notes
-    -----
-    No metric scaling is applied.  The caller divides by ``dy``,
-    ``R·dφ``, or whatever metric is appropriate.
-    """
-    return h[..., 2:, 1:-1] - h[..., 1:-1, 1:-1]
-
-
-def diff_x_bwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
-    """Backward difference in x (east face → centre).
+def diff_x_bwd_2d(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
+    """Backward difference in x, 2-D: U (or X) → T (or V) points.
 
     Δx h[j, i] = h[j, i+½] − h[j, i−½]
 
-    Maps U-points → T-points (or X-points → V-points).
-
     Parameters
     ----------
     h : Float[Array, "*batch Ny Nx"]
-        Field on source points (U or X), including ghost ring.
+        Field with its ghost ring on the trailing 2 axes; leading axes are batch axes.
 
     Returns
     -------
     Float[Array, "*batch Ny-2 Nx-2"]
-        Raw difference at interior destination points (T or V).
-
-    Notes
-    -----
-    No metric scaling is applied.  The caller divides by ``dx``,
-    ``R·cos(φ)·dλ``, or whatever metric is appropriate.
+        The raw difference on the interior of all 2 spatial axes; no metric applied.
     """
     return h[..., 1:-1, 1:-1] - h[..., 1:-1, :-2]
 
 
-def diff_y_bwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
-    """Backward difference in y (north face → centre).
+def diff_y_fwd_2d(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
+    """Forward difference in y, 2-D: T (or U) → V (or X) points.
 
-    Δy h[j, i] = h[j+½, i] − h[j−½, i]
-
-    Maps V-points → T-points (or X-points → U-points).
+    Δy h[j+½, i] = h[j+1, i] − h[j, i]
 
     Parameters
     ----------
     h : Float[Array, "*batch Ny Nx"]
-        Field on source points (V or X), including ghost ring.
+        Field with its ghost ring on the trailing 2 axes; leading axes are batch axes.
 
     Returns
     -------
     Float[Array, "*batch Ny-2 Nx-2"]
-        Raw difference at interior destination points (T or U).
+        The raw difference on the interior of all 2 spatial axes; no metric applied.
+    """
+    return h[..., 2:, 1:-1] - h[..., 1:-1, 1:-1]
 
-    Notes
-    -----
-    No metric scaling is applied.  The caller divides by ``dy``,
-    ``R·dφ``, or whatever metric is appropriate.
+
+def diff_y_bwd_2d(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
+    """Backward difference in y, 2-D: V (or X) → T (or U) points.
+
+    Δy h[j, i] = h[j+½, i] − h[j−½, i]
+
+    Parameters
+    ----------
+    h : Float[Array, "*batch Ny Nx"]
+        Field with its ghost ring on the trailing 2 axes; leading axes are batch axes.
+
+    Returns
+    -------
+    Float[Array, "*batch Ny-2 Nx-2"]
+        The raw difference on the interior of all 2 spatial axes; no metric applied.
     """
     return h[..., 1:-1, 1:-1] - h[..., :-2, 1:-1]
 
 
-# =====================================================================
-# 3-D difference stencils (horizontal plane per z-level)
-# =====================================================================
-
-
-def diff_x_fwd_3d(
-    h: Float[Array, "Nz Ny Nx"],
-) -> Float[Array, "Nz-2 Ny-2 Nx-2"]:
-    """Forward difference in x over all z-levels (centre → east face).
-
-    Δx h[k, j, i+½] = h[k, j, i+1] − h[k, j, i]
-
-    Maps T-points → U-points (or V-points → X-points).
-
-    Parameters
-    ----------
-    h : Float[Array, "Nz Ny Nx"]
-        Field on source points (T or V), including ghost ring.
-
-    Returns
-    -------
-    Float[Array, "Nz-2 Ny-2 Nx-2"]
-        Raw difference at interior destination points (U or X).
-
-    Notes
-    -----
-    No metric scaling is applied.  The caller divides by ``dx``,
-    ``R·cos(φ)·dλ``, or whatever metric is appropriate.
-    """
-    return h[..., 1:-1, 1:-1, 2:] - h[..., 1:-1, 1:-1, 1:-1]
-
-
-def diff_y_fwd_3d(
-    h: Float[Array, "Nz Ny Nx"],
-) -> Float[Array, "Nz-2 Ny-2 Nx-2"]:
-    """Forward difference in y over all z-levels (centre → north face).
-
-    Δy h[k, j+½, i] = h[k, j+1, i] − h[k, j, i]
-
-    Maps T-points → V-points (or U-points → X-points).
-
-    Parameters
-    ----------
-    h : Float[Array, "Nz Ny Nx"]
-        Field on source points (T or U), including ghost ring.
-
-    Returns
-    -------
-    Float[Array, "Nz-2 Ny-2 Nx-2"]
-        Raw difference at interior destination points (V or X).
-
-    Notes
-    -----
-    No metric scaling is applied.  The caller divides by ``dy``,
-    ``R·dφ``, or whatever metric is appropriate.
-    """
-    return h[..., 1:-1, 2:, 1:-1] - h[..., 1:-1, 1:-1, 1:-1]
-
-
-def diff_x_bwd_3d(
-    h: Float[Array, "Nz Ny Nx"],
-) -> Float[Array, "Nz-2 Ny-2 Nx-2"]:
-    """Backward difference in x over all z-levels (east face → centre).
-
-    Δx h[k, j, i] = h[k, j, i+½] − h[k, j, i−½]
-
-    Maps U-points → T-points (or X-points → V-points).
-
-    Parameters
-    ----------
-    h : Float[Array, "Nz Ny Nx"]
-        Field on source points (U or X), including ghost ring.
-
-    Returns
-    -------
-    Float[Array, "Nz-2 Ny-2 Nx-2"]
-        Raw difference at interior destination points (T or V).
-
-    Notes
-    -----
-    No metric scaling is applied.  The caller divides by ``dx``,
-    ``R·cos(φ)·dλ``, or whatever metric is appropriate.
-    """
-    return h[..., 1:-1, 1:-1, 1:-1] - h[..., 1:-1, 1:-1, :-2]
-
-
-def diff_y_bwd_3d(
-    h: Float[Array, "Nz Ny Nx"],
-) -> Float[Array, "Nz-2 Ny-2 Nx-2"]:
-    """Backward difference in y over all z-levels (north face → centre).
-
-    Δy h[k, j, i] = h[k, j+½, i] − h[k, j−½, i]
-
-    Maps V-points → T-points (or X-points → U-points).
-
-    Parameters
-    ----------
-    h : Float[Array, "Nz Ny Nx"]
-        Field on source points (V or X), including ghost ring.
-
-    Returns
-    -------
-    Float[Array, "Nz-2 Ny-2 Nx-2"]
-        Raw difference at interior destination points (T or U).
-
-    Notes
-    -----
-    No metric scaling is applied.  The caller divides by ``dy``,
-    ``R·dφ``, or whatever metric is appropriate.
-    """
-    return h[..., 1:-1, 1:-1, 1:-1] - h[..., 1:-1, :-2, 1:-1]
-
-
-# =====================================================================
-# 1-D averaging stencils
-# =====================================================================
-
-
-def avg_x_fwd_1d(h: Float[Array, "Nx"]) -> Float[Array, "Nx-2"]:
-    """Forward average in x (centre → east face), 1-D.
-
-    h̄[i+½] = ½ (h[i] + h[i+1])
-
-    Maps T-points → U-points.
-
-    Parameters
-    ----------
-    h : Float[Array, "Nx"]
-        Field on T-points, including ghost cells.
-
-    Returns
-    -------
-    Float[Array, "Nx-2"]
-        Averaged values at interior U-points.
-    """
-    return 0.5 * (h[1:-1] + h[2:])
-
-
-def avg_x_bwd_1d(h: Float[Array, "Nx"]) -> Float[Array, "Nx-2"]:
-    """Backward average in x (east face → centre), 1-D.
-
-    h̄[i] = ½ (h[i−½] + h[i+½])
-
-    Maps U-points → T-points.
-
-    Parameters
-    ----------
-    h : Float[Array, "Nx"]
-        Field on U-points, including ghost cells.
-
-    Returns
-    -------
-    Float[Array, "Nx-2"]
-        Averaged values at interior T-points.
-    """
-    return 0.5 * (h[1:-1] + h[:-2])
-
-
-# =====================================================================
-# 2-D averaging stencils (2-point)
-# =====================================================================
-
-
-def avg_x_fwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
-    """Forward average in x (centre → east face).
+def avg_x_fwd_2d(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
+    """Forward average in x, 2-D: T (or V) → U (or X) points.
 
     h̄[j, i+½] = ½ (h[j, i] + h[j, i+1])
-
-    Maps T-points → U-points (or V-points → X-points).
 
     Parameters
     ----------
     h : Float[Array, "*batch Ny Nx"]
-        Field on source points (T or V), including ghost ring.
+        Field with its ghost ring on the trailing 2 axes; leading axes are batch axes.
 
     Returns
     -------
     Float[Array, "*batch Ny-2 Nx-2"]
-        Averaged values at interior destination points (U or X).
+        The raw average on the interior of all 2 spatial axes; no metric applied.
     """
     return 0.5 * (h[..., 1:-1, 1:-1] + h[..., 1:-1, 2:])
 
 
-def avg_y_fwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
-    """Forward average in y (centre → north face).
+def avg_x_bwd_2d(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
+    """Backward average in x, 2-D: U (or X) → T (or V) points.
 
-    h̄[j+½, i] = ½ (h[j, i] + h[j+1, i])
-
-    Maps T-points → V-points (or U-points → X-points).
+    h̄[j, i] = ½ (h[j, i+½] + h[j, i−½])
 
     Parameters
     ----------
     h : Float[Array, "*batch Ny Nx"]
-        Field on source points (T or U), including ghost ring.
+        Field with its ghost ring on the trailing 2 axes; leading axes are batch axes.
 
     Returns
     -------
     Float[Array, "*batch Ny-2 Nx-2"]
-        Averaged values at interior destination points (V or X).
-    """
-    return 0.5 * (h[..., 1:-1, 1:-1] + h[..., 2:, 1:-1])
-
-
-def avg_x_bwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
-    """Backward average in x (east face → centre).
-
-    h̄[j, i] = ½ (h[j, i−½] + h[j, i+½])
-
-    Maps U-points → T-points (or X-points → V-points).
-
-    Parameters
-    ----------
-    h : Float[Array, "*batch Ny Nx"]
-        Field on source points (U or X), including ghost ring.
-
-    Returns
-    -------
-    Float[Array, "*batch Ny-2 Nx-2"]
-        Averaged values at interior destination points (T or V).
+        The raw average on the interior of all 2 spatial axes; no metric applied.
     """
     return 0.5 * (h[..., 1:-1, 1:-1] + h[..., 1:-1, :-2])
 
 
-def avg_y_bwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
-    """Backward average in y (north face → centre).
+def avg_y_fwd_2d(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
+    """Forward average in y, 2-D: T (or U) → V (or X) points.
 
-    h̄[j, i] = ½ (h[j−½, i] + h[j+½, i])
-
-    Maps V-points → T-points (or X-points → U-points).
+    h̄[j+½, i] = ½ (h[j, i] + h[j+1, i])
 
     Parameters
     ----------
     h : Float[Array, "*batch Ny Nx"]
-        Field on source points (V or X), including ghost ring.
+        Field with its ghost ring on the trailing 2 axes; leading axes are batch axes.
 
     Returns
     -------
     Float[Array, "*batch Ny-2 Nx-2"]
-        Averaged values at interior destination points (T or U).
+        The raw average on the interior of all 2 spatial axes; no metric applied.
+    """
+    return 0.5 * (h[..., 1:-1, 1:-1] + h[..., 2:, 1:-1])
+
+
+def avg_y_bwd_2d(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
+    """Backward average in y, 2-D: V (or X) → T (or U) points.
+
+    h̄[j, i] = ½ (h[j+½, i] + h[j−½, i])
+
+    Parameters
+    ----------
+    h : Float[Array, "*batch Ny Nx"]
+        Field with its ghost ring on the trailing 2 axes; leading axes are batch axes.
+
+    Returns
+    -------
+    Float[Array, "*batch Ny-2 Nx-2"]
+        The raw average on the interior of all 2 spatial axes; no metric applied.
     """
     return 0.5 * (h[..., 1:-1, 1:-1] + h[..., :-2, 1:-1])
 
 
-# =====================================================================
-# 2-D averaging stencils (4-point bilinear)
-# =====================================================================
+def diff_x_fwd_3d(
+    h: Float[Array, "*batch Nz Ny Nx"],
+) -> Float[Array, "*batch Nz-2 Ny-2 Nx-2"]:
+    """Forward difference in x, 3-D: T (or V) → U (or X) points.
+
+    Δx h[k, j, i+½] = h[k, j, i+1] − h[k, j, i]
+
+    Parameters
+    ----------
+    h : Float[Array, "*batch Nz Ny Nx"]
+        Field with its ghost ring on the trailing 3 axes; leading axes are batch axes.
+
+    Returns
+    -------
+    Float[Array, "*batch Nz-2 Ny-2 Nx-2"]
+        The raw difference on the interior of all 3 spatial axes; no metric applied.
+    """
+    return h[..., 1:-1, 1:-1, 2:] - h[..., 1:-1, 1:-1, 1:-1]
 
 
-def avg_xy_fwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
-    """Bilinear average to NE corner (forward in both x and y).
+def diff_x_bwd_3d(
+    h: Float[Array, "*batch Nz Ny Nx"],
+) -> Float[Array, "*batch Nz-2 Ny-2 Nx-2"]:
+    """Backward difference in x, 3-D: U (or X) → T (or V) points.
 
-    h̄[j+½, i+½] = ¼ (h[j,i] + h[j,i+1] + h[j+1,i] + h[j+1,i+1])
+    Δx h[k, j, i] = h[k, j, i+½] − h[k, j, i−½]
 
-    Maps T-points → X-points.
+    Parameters
+    ----------
+    h : Float[Array, "*batch Nz Ny Nx"]
+        Field with its ghost ring on the trailing 3 axes; leading axes are batch axes.
+
+    Returns
+    -------
+    Float[Array, "*batch Nz-2 Ny-2 Nx-2"]
+        The raw difference on the interior of all 3 spatial axes; no metric applied.
+    """
+    return h[..., 1:-1, 1:-1, 1:-1] - h[..., 1:-1, 1:-1, :-2]
+
+
+def diff_y_fwd_3d(
+    h: Float[Array, "*batch Nz Ny Nx"],
+) -> Float[Array, "*batch Nz-2 Ny-2 Nx-2"]:
+    """Forward difference in y, 3-D: T (or U) → V (or X) points.
+
+    Δy h[k, j+½, i] = h[k, j+1, i] − h[k, j, i]
+
+    Parameters
+    ----------
+    h : Float[Array, "*batch Nz Ny Nx"]
+        Field with its ghost ring on the trailing 3 axes; leading axes are batch axes.
+
+    Returns
+    -------
+    Float[Array, "*batch Nz-2 Ny-2 Nx-2"]
+        The raw difference on the interior of all 3 spatial axes; no metric applied.
+    """
+    return h[..., 1:-1, 2:, 1:-1] - h[..., 1:-1, 1:-1, 1:-1]
+
+
+def diff_y_bwd_3d(
+    h: Float[Array, "*batch Nz Ny Nx"],
+) -> Float[Array, "*batch Nz-2 Ny-2 Nx-2"]:
+    """Backward difference in y, 3-D: V (or X) → T (or U) points.
+
+    Δy h[k, j, i] = h[k, j+½, i] − h[k, j−½, i]
+
+    Parameters
+    ----------
+    h : Float[Array, "*batch Nz Ny Nx"]
+        Field with its ghost ring on the trailing 3 axes; leading axes are batch axes.
+
+    Returns
+    -------
+    Float[Array, "*batch Nz-2 Ny-2 Nx-2"]
+        The raw difference on the interior of all 3 spatial axes; no metric applied.
+    """
+    return h[..., 1:-1, 1:-1, 1:-1] - h[..., 1:-1, :-2, 1:-1]
+
+
+def diff_z_fwd_3d(
+    h: Float[Array, "*batch Nz Ny Nx"],
+) -> Float[Array, "*batch Nz-2 Ny-2 Nx-2"]:
+    """Forward difference in z, 3-D: T → W points.
+
+    Δz h[k+½, j, i] = h[k+1, j, i] − h[k, j, i]
+
+    Parameters
+    ----------
+    h : Float[Array, "*batch Nz Ny Nx"]
+        Field with its ghost ring on the trailing 3 axes; leading axes are batch axes.
+
+    Returns
+    -------
+    Float[Array, "*batch Nz-2 Ny-2 Nx-2"]
+        The raw difference on the interior of all 3 spatial axes; no metric applied.
+    """
+    return h[..., 2:, 1:-1, 1:-1] - h[..., 1:-1, 1:-1, 1:-1]
+
+
+def diff_z_bwd_3d(
+    h: Float[Array, "*batch Nz Ny Nx"],
+) -> Float[Array, "*batch Nz-2 Ny-2 Nx-2"]:
+    """Backward difference in z, 3-D: W → T points.
+
+    Δz h[k, j, i] = h[k+½, j, i] − h[k−½, j, i]
+
+    Parameters
+    ----------
+    h : Float[Array, "*batch Nz Ny Nx"]
+        Field with its ghost ring on the trailing 3 axes; leading axes are batch axes.
+
+    Returns
+    -------
+    Float[Array, "*batch Nz-2 Ny-2 Nx-2"]
+        The raw difference on the interior of all 3 spatial axes; no metric applied.
+    """
+    return h[..., 1:-1, 1:-1, 1:-1] - h[..., :-2, 1:-1, 1:-1]
+
+
+def avg_x_fwd_3d(
+    h: Float[Array, "*batch Nz Ny Nx"],
+) -> Float[Array, "*batch Nz-2 Ny-2 Nx-2"]:
+    """Forward average in x, 3-D: T (or V) → U (or X) points.
+
+    h̄[k, j, i+½] = ½ (h[k, j, i] + h[k, j, i+1])
+
+    Parameters
+    ----------
+    h : Float[Array, "*batch Nz Ny Nx"]
+        Field with its ghost ring on the trailing 3 axes; leading axes are batch axes.
+
+    Returns
+    -------
+    Float[Array, "*batch Nz-2 Ny-2 Nx-2"]
+        The raw average on the interior of all 3 spatial axes; no metric applied.
+    """
+    return 0.5 * (h[..., 1:-1, 1:-1, 1:-1] + h[..., 1:-1, 1:-1, 2:])
+
+
+def avg_x_bwd_3d(
+    h: Float[Array, "*batch Nz Ny Nx"],
+) -> Float[Array, "*batch Nz-2 Ny-2 Nx-2"]:
+    """Backward average in x, 3-D: U (or X) → T (or V) points.
+
+    h̄[k, j, i] = ½ (h[k, j, i+½] + h[k, j, i−½])
+
+    Parameters
+    ----------
+    h : Float[Array, "*batch Nz Ny Nx"]
+        Field with its ghost ring on the trailing 3 axes; leading axes are batch axes.
+
+    Returns
+    -------
+    Float[Array, "*batch Nz-2 Ny-2 Nx-2"]
+        The raw average on the interior of all 3 spatial axes; no metric applied.
+    """
+    return 0.5 * (h[..., 1:-1, 1:-1, 1:-1] + h[..., 1:-1, 1:-1, :-2])
+
+
+def avg_y_fwd_3d(
+    h: Float[Array, "*batch Nz Ny Nx"],
+) -> Float[Array, "*batch Nz-2 Ny-2 Nx-2"]:
+    """Forward average in y, 3-D: T (or U) → V (or X) points.
+
+    h̄[k, j+½, i] = ½ (h[k, j, i] + h[k, j+1, i])
+
+    Parameters
+    ----------
+    h : Float[Array, "*batch Nz Ny Nx"]
+        Field with its ghost ring on the trailing 3 axes; leading axes are batch axes.
+
+    Returns
+    -------
+    Float[Array, "*batch Nz-2 Ny-2 Nx-2"]
+        The raw average on the interior of all 3 spatial axes; no metric applied.
+    """
+    return 0.5 * (h[..., 1:-1, 1:-1, 1:-1] + h[..., 1:-1, 2:, 1:-1])
+
+
+def avg_y_bwd_3d(
+    h: Float[Array, "*batch Nz Ny Nx"],
+) -> Float[Array, "*batch Nz-2 Ny-2 Nx-2"]:
+    """Backward average in y, 3-D: V (or X) → T (or U) points.
+
+    h̄[k, j, i] = ½ (h[k, j+½, i] + h[k, j−½, i])
+
+    Parameters
+    ----------
+    h : Float[Array, "*batch Nz Ny Nx"]
+        Field with its ghost ring on the trailing 3 axes; leading axes are batch axes.
+
+    Returns
+    -------
+    Float[Array, "*batch Nz-2 Ny-2 Nx-2"]
+        The raw average on the interior of all 3 spatial axes; no metric applied.
+    """
+    return 0.5 * (h[..., 1:-1, 1:-1, 1:-1] + h[..., 1:-1, :-2, 1:-1])
+
+
+def avg_z_fwd_3d(
+    h: Float[Array, "*batch Nz Ny Nx"],
+) -> Float[Array, "*batch Nz-2 Ny-2 Nx-2"]:
+    """Forward average in z, 3-D: T → W points.
+
+    h̄[k+½, j, i] = ½ (h[k, j, i] + h[k+1, j, i])
+
+    Parameters
+    ----------
+    h : Float[Array, "*batch Nz Ny Nx"]
+        Field with its ghost ring on the trailing 3 axes; leading axes are batch axes.
+
+    Returns
+    -------
+    Float[Array, "*batch Nz-2 Ny-2 Nx-2"]
+        The raw average on the interior of all 3 spatial axes; no metric applied.
+    """
+    return 0.5 * (h[..., 1:-1, 1:-1, 1:-1] + h[..., 2:, 1:-1, 1:-1])
+
+
+def avg_z_bwd_3d(
+    h: Float[Array, "*batch Nz Ny Nx"],
+) -> Float[Array, "*batch Nz-2 Ny-2 Nx-2"]:
+    """Backward average in z, 3-D: W → T points.
+
+    h̄[k, j, i] = ½ (h[k+½, j, i] + h[k−½, j, i])
+
+    Parameters
+    ----------
+    h : Float[Array, "*batch Nz Ny Nx"]
+        Field with its ghost ring on the trailing 3 axes; leading axes are batch axes.
+
+    Returns
+    -------
+    Float[Array, "*batch Nz-2 Ny-2 Nx-2"]
+        The raw average on the interior of all 3 spatial axes; no metric applied.
+    """
+    return 0.5 * (h[..., 1:-1, 1:-1, 1:-1] + h[..., :-2, 1:-1, 1:-1])
+
+
+def avg_xfwd_yfwd_2d(
+    h: Float[Array, "*batch Ny Nx"],
+) -> Float[Array, "*batch Ny-2 Nx-2"]:
+    """Four-point average, fwd in x and fwd in y, 2-D: T → X points.
+
+    h̄[j+½, i+½] = ¼ (h[j, i] + h[j, i+1] + h[j+1, i] + h[j+1, i+1])
 
     Parameters
     ----------
     h : Float[Array, "*batch Ny Nx"]
-        Field on T-points, including ghost ring.
+        Field with its ghost ring on the trailing 2 axes; leading axes are batch axes.
 
     Returns
     -------
     Float[Array, "*batch Ny-2 Nx-2"]
-        Averaged values at interior X-points.
+        The raw average on the interior of all 2 spatial axes.
     """
     return 0.25 * (
         h[..., 1:-1, 1:-1] + h[..., 1:-1, 2:] + h[..., 2:, 1:-1] + h[..., 2:, 2:]
     )
 
 
-def avg_xy_bwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
-    """Bilinear average from corners to centre (backward in both x and y).
+def avg_xbwd_ybwd_2d(
+    h: Float[Array, "*batch Ny Nx"],
+) -> Float[Array, "*batch Ny-2 Nx-2"]:
+    """Four-point average, bwd in x and bwd in y, 2-D: X → T points.
 
-    h̄[j, i] = ¼ (h[j+½,i+½] + h[j−½,i+½] + h[j+½,i−½] + h[j−½,i−½])
-
-    Maps X-points → T-points.
+    h̄[j, i] = ¼ (h[j+½, i+½] + h[j−½, i+½] + h[j+½, i−½] + h[j−½, i−½])
 
     Parameters
     ----------
     h : Float[Array, "*batch Ny Nx"]
-        Field on X-points, including ghost ring.
+        Field with its ghost ring on the trailing 2 axes; leading axes are batch axes.
 
     Returns
     -------
     Float[Array, "*batch Ny-2 Nx-2"]
-        Averaged values at interior T-points.
+        The raw average on the interior of all 2 spatial axes.
     """
     return 0.25 * (
         h[..., 1:-1, 1:-1] + h[..., :-2, 1:-1] + h[..., 1:-1, :-2] + h[..., :-2, :-2]
     )
 
 
-def avg_xbwd_yfwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
-    """Bilinear average: U-points → V-points (backward-x, forward-y).
+def avg_xbwd_yfwd_2d(
+    h: Float[Array, "*batch Ny Nx"],
+) -> Float[Array, "*batch Ny-2 Nx-2"]:
+    """Four-point average, bwd in x and fwd in y, 2-D: U → V points.
 
-    h̄[j+½, i] = ¼ (h[j,i+½] + h[j+1,i+½] + h[j,i−½] + h[j+1,i−½])
+    h̄[j+½, i] = ¼ (h[j, i+½] + h[j+1, i+½] + h[j, i−½] + h[j+1, i−½])
 
     Parameters
     ----------
     h : Float[Array, "*batch Ny Nx"]
-        Field on U-points, including ghost ring.
+        Field with its ghost ring on the trailing 2 axes; leading axes are batch axes.
 
     Returns
     -------
     Float[Array, "*batch Ny-2 Nx-2"]
-        Averaged values at interior V-points.
+        The raw average on the interior of all 2 spatial axes.
     """
     return 0.25 * (
         h[..., 1:-1, 1:-1] + h[..., 2:, 1:-1] + h[..., 1:-1, :-2] + h[..., 2:, :-2]
     )
 
 
-def avg_xfwd_ybwd(h: Float[Array, "*batch Ny Nx"]) -> Float[Array, "*batch Ny-2 Nx-2"]:
-    """Bilinear average: V-points → U-points (forward-x, backward-y).
+def avg_xfwd_ybwd_2d(
+    h: Float[Array, "*batch Ny Nx"],
+) -> Float[Array, "*batch Ny-2 Nx-2"]:
+    """Four-point average, fwd in x and bwd in y, 2-D: V → U points.
 
-    h̄[j, i+½] = ¼ (h[j+½,i] + h[j−½,i] + h[j+½,i+1] + h[j−½,i+1])
+    h̄[j, i+½] = ¼ (h[j+½, i] + h[j−½, i] + h[j+½, i+1] + h[j−½, i+1])
 
     Parameters
     ----------
     h : Float[Array, "*batch Ny Nx"]
-        Field on V-points, including ghost ring.
+        Field with its ghost ring on the trailing 2 axes; leading axes are batch axes.
 
     Returns
     -------
     Float[Array, "*batch Ny-2 Nx-2"]
-        Averaged values at interior U-points.
+        The raw average on the interior of all 2 spatial axes.
     """
     return 0.25 * (
         h[..., 1:-1, 1:-1] + h[..., :-2, 1:-1] + h[..., 1:-1, 2:] + h[..., :-2, 2:]
     )
 
 
-# =====================================================================
-# 3-D averaging stencils (horizontal plane per z-level)
-# =====================================================================
+def avg_xfwd_yfwd_3d(
+    h: Float[Array, "*batch Nz Ny Nx"],
+) -> Float[Array, "*batch Nz-2 Ny-2 Nx-2"]:
+    """Four-point average, fwd in x and fwd in y, 3-D: T → X points on every z-level.
 
-
-def avg_x_fwd_3d(
-    h: Float[Array, "Nz Ny Nx"],
-) -> Float[Array, "Nz-2 Ny-2 Nx-2"]:
-    """Forward average in x over all z-levels (centre → east face).
-
-    h̄[k, j, i+½] = ½ (h[k, j, i] + h[k, j, i+1])
-
-    Maps T-points → U-points (or V-points → X-points).
+    h̄[j+½, i+½] = ¼ (h[j, i] + h[j, i+1] + h[j+1, i] + h[j+1, i+1])
 
     Parameters
     ----------
-    h : Float[Array, "Nz Ny Nx"]
-        Field on source points (T or V), including ghost ring.
+    h : Float[Array, "*batch Nz Ny Nx"]
+        Field with its ghost ring on the trailing 3 axes; leading axes are batch axes.
 
     Returns
     -------
-    Float[Array, "Nz-2 Ny-2 Nx-2"]
-        Averaged values at interior destination points (U or X).
+    Float[Array, "*batch Nz-2 Ny-2 Nx-2"]
+        The raw average on the interior of all 3 spatial axes.
     """
-    return 0.5 * (h[..., 1:-1, 1:-1, 1:-1] + h[..., 1:-1, 1:-1, 2:])
+    return 0.25 * (
+        h[..., 1:-1, 1:-1, 1:-1]
+        + h[..., 1:-1, 1:-1, 2:]
+        + h[..., 1:-1, 2:, 1:-1]
+        + h[..., 1:-1, 2:, 2:]
+    )
 
 
-def avg_y_fwd_3d(
-    h: Float[Array, "Nz Ny Nx"],
-) -> Float[Array, "Nz-2 Ny-2 Nx-2"]:
-    """Forward average in y over all z-levels (centre → north face).
+def avg_xbwd_ybwd_3d(
+    h: Float[Array, "*batch Nz Ny Nx"],
+) -> Float[Array, "*batch Nz-2 Ny-2 Nx-2"]:
+    """Four-point average, bwd in x and bwd in y, 3-D: X → T points on every z-level.
 
-    h̄[k, j+½, i] = ½ (h[k, j, i] + h[k, j+1, i])
-
-    Maps T-points → V-points (or U-points → X-points).
+    h̄[j, i] = ¼ (h[j+½, i+½] + h[j−½, i+½] + h[j+½, i−½] + h[j−½, i−½])
 
     Parameters
     ----------
-    h : Float[Array, "Nz Ny Nx"]
-        Field on source points (T or U), including ghost ring.
+    h : Float[Array, "*batch Nz Ny Nx"]
+        Field with its ghost ring on the trailing 3 axes; leading axes are batch axes.
 
     Returns
     -------
-    Float[Array, "Nz-2 Ny-2 Nx-2"]
-        Averaged values at interior destination points (V or X).
+    Float[Array, "*batch Nz-2 Ny-2 Nx-2"]
+        The raw average on the interior of all 3 spatial axes.
     """
-    return 0.5 * (h[..., 1:-1, 1:-1, 1:-1] + h[..., 1:-1, 2:, 1:-1])
+    return 0.25 * (
+        h[..., 1:-1, 1:-1, 1:-1]
+        + h[..., 1:-1, :-2, 1:-1]
+        + h[..., 1:-1, 1:-1, :-2]
+        + h[..., 1:-1, :-2, :-2]
+    )
 
 
-def avg_x_bwd_3d(
-    h: Float[Array, "Nz Ny Nx"],
-) -> Float[Array, "Nz-2 Ny-2 Nx-2"]:
-    """Backward average in x over all z-levels (east face → centre).
+def avg_xbwd_yfwd_3d(
+    h: Float[Array, "*batch Nz Ny Nx"],
+) -> Float[Array, "*batch Nz-2 Ny-2 Nx-2"]:
+    """Four-point average, bwd in x and fwd in y, 3-D: U → V points on every z-level.
 
-    h̄[k, j, i] = ½ (h[k, j, i−½] + h[k, j, i+½])
-
-    Maps U-points → T-points (or X-points → V-points).
+    h̄[j+½, i] = ¼ (h[j, i+½] + h[j+1, i+½] + h[j, i−½] + h[j+1, i−½])
 
     Parameters
     ----------
-    h : Float[Array, "Nz Ny Nx"]
-        Field on source points (U or X), including ghost ring.
+    h : Float[Array, "*batch Nz Ny Nx"]
+        Field with its ghost ring on the trailing 3 axes; leading axes are batch axes.
 
     Returns
     -------
-    Float[Array, "Nz-2 Ny-2 Nx-2"]
-        Averaged values at interior destination points (T or V).
+    Float[Array, "*batch Nz-2 Ny-2 Nx-2"]
+        The raw average on the interior of all 3 spatial axes.
     """
-    return 0.5 * (h[..., 1:-1, 1:-1, 1:-1] + h[..., 1:-1, 1:-1, :-2])
+    return 0.25 * (
+        h[..., 1:-1, 1:-1, 1:-1]
+        + h[..., 1:-1, 2:, 1:-1]
+        + h[..., 1:-1, 1:-1, :-2]
+        + h[..., 1:-1, 2:, :-2]
+    )
 
 
-def avg_y_bwd_3d(
-    h: Float[Array, "Nz Ny Nx"],
-) -> Float[Array, "Nz-2 Ny-2 Nx-2"]:
-    """Backward average in y over all z-levels (north face → centre).
+def avg_xfwd_ybwd_3d(
+    h: Float[Array, "*batch Nz Ny Nx"],
+) -> Float[Array, "*batch Nz-2 Ny-2 Nx-2"]:
+    """Four-point average, fwd in x and bwd in y, 3-D: V → U points on every z-level.
 
-    h̄[k, j, i] = ½ (h[k, j−½, i] + h[k, j+½, i])
-
-    Maps V-points → T-points (or X-points → U-points).
+    h̄[j, i+½] = ¼ (h[j+½, i] + h[j−½, i] + h[j+½, i+1] + h[j−½, i+1])
 
     Parameters
     ----------
-    h : Float[Array, "Nz Ny Nx"]
-        Field on source points (V or X), including ghost ring.
+    h : Float[Array, "*batch Nz Ny Nx"]
+        Field with its ghost ring on the trailing 3 axes; leading axes are batch axes.
 
     Returns
     -------
-    Float[Array, "Nz-2 Ny-2 Nx-2"]
-        Averaged values at interior destination points (T or U).
+    Float[Array, "*batch Nz-2 Ny-2 Nx-2"]
+        The raw average on the interior of all 3 spatial axes.
     """
-    return 0.5 * (h[..., 1:-1, 1:-1, 1:-1] + h[..., 1:-1, :-2, 1:-1])
+    return 0.25 * (
+        h[..., 1:-1, 1:-1, 1:-1]
+        + h[..., 1:-1, :-2, 1:-1]
+        + h[..., 1:-1, 1:-1, 2:]
+        + h[..., 1:-1, :-2, 2:]
+    )
 
 
 # =====================================================================
@@ -646,7 +731,7 @@ class _Neighbours2D(NamedTuple):
     ========  ================  ========================
 
     Why: a stencil that slices the same offset twice (e.g. ``h[1:-1, 1:-1]``
-    in both ``diff_x_fwd(h)`` and ``diff_x_bwd(h)``) computes the same forward
+    in both ``diff_x_fwd_2d(h)`` and ``diff_x_bwd_2d(h)``) computes the same forward
     values, but reverse-mode AD transposes *each* slice into its own ``pad``
     of the cotangent.  Slicing each offset once lets JAX sum the cotangents
     of that view first, so the VJP is one fused pass with one ``pad`` per

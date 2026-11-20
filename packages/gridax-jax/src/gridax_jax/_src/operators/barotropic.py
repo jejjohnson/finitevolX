@@ -30,7 +30,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from gridax._src.operators._ghost import interior
-from gridax._src.operators.stencils import diff_x_fwd, diff_y_fwd
+from gridax._src.operators.stencils import diff_x_fwd_2d, diff_y_fwd_2d
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
@@ -149,6 +149,6 @@ def barotropic_filter(
     w = helm_solve(rhs)
 
     # Implicit fast-mode correction: minus the (scaled) gradient of w at faces.
-    filt_u = interior(-g * tau * diff_x_fwd(w) / dx, w)
-    filt_v = interior(-g * tau * diff_y_fwd(w) / dy, w)
+    filt_u = interior(-g * tau * diff_x_fwd_2d(w) / dx, w)
+    filt_v = interior(-g * tau * diff_y_fwd_2d(w) / dy, w)
     return filt_u, filt_v

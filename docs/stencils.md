@@ -165,7 +165,7 @@ $$
 $$
 
 Each term is a **backward difference** of a face quantity returning to
-the cell centre — this is `diff_x_bwd(u) / dx + diff_y_bwd(v) / dy`.
+the cell centre — this is `diff_x_bwd_2d(u) / dx + diff_y_bwd_2d(v) / dy`.
 
 Similarly, the **curl** (relative vorticity) at X-point $(j+½, i+½)$
 reads the four surrounding face values:
@@ -177,7 +177,7 @@ $$
 $$
 
 Each term is a **forward difference** of a face quantity advancing to
-the corner — this is `diff_x_fwd(v) / dx - diff_y_fwd(u) / dy`.
+the corner — this is `diff_x_fwd_2d(v) / dx - diff_y_fwd_2d(u) / dy`.
 
 !!! note "Discrete conservation"
     Because the east-face flux of cell $(j,i)$ is identically the west-face
@@ -205,8 +205,8 @@ For full details on ghost-cell layout and boundary interactions, see the
 
 | Layer | What | Example |
 |-------|------|---------|
-| **1 — Raw stencils** | Pure index arithmetic, no scaling | `diff_x_fwd(h)` returns `h[j, i+1] − h[j, i]` |
-| **2 — Scaled primitives** | Layer 1 + metric scaling | `Difference2D.diff_x_T_to_U(h)` returns `diff_x_fwd(h) / dx` |
+| **1 — Raw stencils** | Pure index arithmetic, no scaling | `diff_x_fwd_2d(h)` returns `h[j, i+1] − h[j, i]` |
+| **2 — Scaled primitives** | Layer 1 + metric scaling | `Difference2D.diff_x_T_to_U(h)` returns `diff_x_fwd_2d(h) / dx` |
 | **3 — Compound operators** | Compose Layer 2 | `Difference2D.divergence(u, v)` = `diff_x_U_to_T(u) + diff_y_V_to_T(v)` |
 
 **Layer 1** — the raw stencils documented here — is the foundation.
@@ -232,7 +232,7 @@ $$
 $$
 
 ```python
-def diff_x_fwd(h):
+def diff_x_fwd_2d(h):
     return h[1:-1, 2:] - h[1:-1, 1:-1]
 ```
 
@@ -243,7 +243,7 @@ $$
 $$
 
 ```python
-def diff_y_fwd(h):
+def diff_y_fwd_2d(h):
     return h[2:, 1:-1] - h[1:-1, 1:-1]
 ```
 
@@ -259,7 +259,7 @@ $$
 $$
 
 ```python
-def diff_x_bwd(h):
+def diff_x_bwd_2d(h):
     return h[1:-1, 1:-1] - h[1:-1, :-2]
 ```
 
@@ -270,7 +270,7 @@ $$
 $$
 
 ```python
-def diff_y_bwd(h):
+def diff_y_bwd_2d(h):
     return h[1:-1, 1:-1] - h[:-2, 1:-1]
 ```
 
@@ -284,8 +284,8 @@ $$
 $$
 
 ```python
-d2h_dx2 = (diff_x_fwd(h) - diff_x_bwd(h)) / dx**2
-d2h_dy2 = (diff_y_fwd(h) - diff_y_bwd(h)) / dy**2
+d2h_dx2 = (diff_x_fwd_2d(h) - diff_x_bwd_2d(h)) / dx**2
+d2h_dy2 = (diff_y_fwd_2d(h) - diff_y_bwd_2d(h)) / dy**2
 laplacian = d2h_dx2 + d2h_dy2
 ```
 
@@ -308,7 +308,7 @@ $$
 $$
 
 ```python
-def avg_x_fwd(h):
+def avg_x_fwd_2d(h):
     return 0.5 * (h[1:-1, 1:-1] + h[1:-1, 2:])
 ```
 
@@ -319,11 +319,11 @@ $$
 $$
 
 ```python
-def avg_x_bwd(h):
+def avg_x_bwd_2d(h):
     return 0.5 * (h[1:-1, 1:-1] + h[1:-1, :-2])
 ```
 
-The y-direction analogues `avg_y_fwd` and `avg_y_bwd` follow the same
+The y-direction analogues `avg_y_fwd_2d` and `avg_y_bwd_2d` follow the same
 pattern along the j-axis.
 
 ### 4-point bilinear averages
@@ -339,7 +339,7 @@ $$
 $$
 
 ```python
-def avg_xy_fwd(h):
+def avg_xfwd_yfwd_2d(h):
     return 0.25 * (h[1:-1, 1:-1] + h[1:-1, 2:]
                    + h[2:, 1:-1] + h[2:, 2:])
 ```
@@ -352,7 +352,7 @@ $$
  + q_{j+\frac{1}{2},i-\frac{1}{2}} + q_{j-\frac{1}{2},i-\frac{1}{2}})
 $$
 
-**U → V** (`avg_xbwd_yfwd`) and **V → U** (`avg_xfwd_ybwd`) use the same
+**U → V** (`avg_xbwd_yfwd_2d`) and **V → U** (`avg_xfwd_ybwd_2d`) use the same
 4-point pattern but with mixed forward/backward shifts in each direction.
 
 ---
@@ -363,10 +363,10 @@ $$
 
 | Function | Formula | Maps |
 |----------|---------|------|
-| `diff_x_fwd` | $h_{j,i+1} - h_{j,i}$ | T→U, V→X |
-| `diff_y_fwd` | $h_{j+1,i} - h_{j,i}$ | T→V, U→X |
-| `diff_x_bwd` | $h_{j,i+½} - h_{j,i-½}$ | U→T, X→V |
-| `diff_y_bwd` | $h_{j+½,i} - h_{j-½,i}$ | V→T, X→U |
+| `diff_x_fwd_2d` | $h_{j,i+1} - h_{j,i}$ | T→U, V→X |
+| `diff_y_fwd_2d` | $h_{j+1,i} - h_{j,i}$ | T→V, U→X |
+| `diff_x_bwd_2d` | $h_{j,i+½} - h_{j,i-½}$ | U→T, X→V |
+| `diff_y_bwd_2d` | $h_{j+½,i} - h_{j-½,i}$ | V→T, X→U |
 | `diff_x_fwd_1d` | $h_{i+1} - h_i$ | T→U (1D) |
 | `diff_x_bwd_1d` | $h_{i+½} - h_{i-½}$ | U→T (1D) |
 | `diff_x_fwd_3d` | $h_{k,j,i+1} - h_{k,j,i}$ | T→U (3D) |
@@ -378,14 +378,14 @@ $$
 
 | Function | Formula | Maps |
 |----------|---------|------|
-| `avg_x_fwd` | $\frac{1}{2}(h_{j,i} + h_{j,i+1})$ | T→U, V→X |
-| `avg_y_fwd` | $\frac{1}{2}(h_{j,i} + h_{j+1,i})$ | T→V, U→X |
-| `avg_x_bwd` | $\frac{1}{2}(h_{j,i-½} + h_{j,i+½})$ | U→T, X→V |
-| `avg_y_bwd` | $\frac{1}{2}(h_{j-½,i} + h_{j+½,i})$ | V→T, X→U |
-| `avg_xy_fwd` | $\frac{1}{4}\sum$ (NE quad) | T→X |
-| `avg_xy_bwd` | $\frac{1}{4}\sum$ (SW quad) | X→T |
-| `avg_xbwd_yfwd` | $\frac{1}{4}\sum$ (bwd-x, fwd-y) | U→V |
-| `avg_xfwd_ybwd` | $\frac{1}{4}\sum$ (fwd-x, bwd-y) | V→U |
+| `avg_x_fwd_2d` | $\frac{1}{2}(h_{j,i} + h_{j,i+1})$ | T→U, V→X |
+| `avg_y_fwd_2d` | $\frac{1}{2}(h_{j,i} + h_{j+1,i})$ | T→V, U→X |
+| `avg_x_bwd_2d` | $\frac{1}{2}(h_{j,i-½} + h_{j,i+½})$ | U→T, X→V |
+| `avg_y_bwd_2d` | $\frac{1}{2}(h_{j-½,i} + h_{j+½,i})$ | V→T, X→U |
+| `avg_xfwd_yfwd_2d` | $\frac{1}{4}\sum$ (NE quad) | T→X |
+| `avg_xbwd_ybwd_2d` | $\frac{1}{4}\sum$ (SW quad) | X→T |
+| `avg_xbwd_yfwd_2d` | $\frac{1}{4}\sum$ (bwd-x, fwd-y) | U→V |
+| `avg_xfwd_ybwd_2d` | $\frac{1}{4}\sum$ (fwd-x, bwd-y) | V→U |
 | `avg_x_fwd_1d` | $\frac{1}{2}(h_i + h_{i+1})$ | T→U (1D) |
 | `avg_x_bwd_1d` | $\frac{1}{2}(h_{i-½} + h_{i+½})$ | U→T (1D) |
 | `avg_x_fwd_3d` | $\frac{1}{2}(h_{k,j,i} + h_{k,j,i+1})$ | T→U (3D) |
@@ -412,10 +412,10 @@ $$
 $$
 
 ```python
-from gridax_jax import diff_x_fwd, interior
+from gridax_jax import diff_x_fwd_2d, interior
 
 # Pure index arithmetic — same for any coordinate system
-raw = diff_x_fwd(h)
+raw = diff_x_fwd_2d(h)
 
 # Apply spherical metric (array, not scalar!)
 scaled = raw / (R * cos_lat[1:-1, 1:-1] * dlon)
@@ -427,17 +427,17 @@ result = interior(scaled, h)
 ### Example: Strain from raw stencils
 
 ```python
-from gridax_jax import diff_x_fwd, diff_y_fwd, diff_x_bwd, diff_y_bwd, interior
+from gridax_jax import diff_x_fwd_2d, diff_y_fwd_2d, diff_x_bwd_2d, diff_y_bwd_2d, interior
 
 # Shear strain at X-points: dv/dx + du/dy
 shear = interior(
-    diff_x_fwd(v) / dx + diff_y_fwd(u) / dy,
+    diff_x_fwd_2d(v) / dx + diff_y_fwd_2d(u) / dy,
     u,
 )
 
 # Tensor strain at T-points: du/dx - dv/dy
 tensor = interior(
-    diff_x_bwd(u) / dx - diff_y_bwd(v) / dy,
+    diff_x_bwd_2d(u) / dx - diff_y_bwd_2d(v) / dy,
     u,
 )
 ```

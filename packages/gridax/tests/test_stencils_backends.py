@@ -23,17 +23,9 @@ except ImportError:  # the gridax-numpy-only CI job
 
 needs_jax = pytest.mark.skipif(jax is None, reason="needs JAX")
 
-STENCILS_1D = [
-    n for n in gridax.__all__ if n.endswith("_1d") and n[:4] in ("diff", "avg_")
-]
-STENCILS_3D = [
-    n for n in gridax.__all__ if n.endswith("_3d") and n[:4] in ("diff", "avg_")
-]
-STENCILS_2D = [
-    n
-    for n in gridax.__all__
-    if n[:4] in ("diff", "avg_") and n not in STENCILS_1D and n not in STENCILS_3D
-]
+STENCILS = [n for n in gridax.__all__ if n.startswith(("diff_", "avg_"))]
+RANK = {n: int(n[-2]) for n in STENCILS}
+SPATIAL = {1: (9,), 2: (7, 9), 3: (5, 7, 9)}
 
 
 @pytest.fixture(autouse=True)
@@ -52,13 +44,26 @@ def _field(*shape: int) -> np.ndarray:
 
 
 def _cases():
-    yield from ((name, (9,)) for name in STENCILS_1D)
-    yield from ((name, (3, 7, 9)) for name in STENCILS_2D)  # a leading batch axis
-    yield from ((name, (5, 7, 9)) for name in STENCILS_3D)
+    for name in STENCILS:
+        yield name, (2, *SPATIAL[RANK[name]])  # one leading batch axis
 
 
-def test_every_stencil_is_covered():
-    assert len(STENCILS_1D) == 4 and len(STENCILS_2D) == 12 and len(STENCILS_3D) == 8
+def test_every_name_follows_the_rule():
+    """``<op>_<axis>_<side>_<d>d``: 4 stencils in 1-D, 12 in 2-D, 16 in 3-D."""
+    counts = {d: sum(RANK[n] == d for n in STENCILS) for d in (1, 2, 3)}
+    assert counts == {1: 4, 2: 12, 3: 16}
+    for name in STENCILS:
+        assert name.endswith(("_1d", "_2d", "_3d")), name
+
+
+@pytest.mark.parametrize("name", STENCILS)
+def test_trims_every_spatial_axis_and_keeps_batch_axes(name):
+    """Every spatial axis loses its ghost ring; leading axes are batch axes."""
+    d = RANK[name]
+    h = _field(3, 2, *SPATIAL[d])
+    out = getattr(gridax, name)(h)
+    assert out.shape == (3, 2, *(n - 2 for n in SPATIAL[d]))
+    np.testing.assert_array_equal(out[1, 0], getattr(gridax, name)(h[1, 0]))
 
 
 @pytest.mark.parametrize(("name", "shape"), list(_cases()))
@@ -83,7 +88,7 @@ def test_stencil_numpy_equals_jax(name, shape):
 
 def test_interior_keeps_float32_and_writes_only_the_interior():
     h = np.ones((5, 6), dtype=np.float32)
-    out = gridax.interior(gridax.diff_x_fwd(h) + 1.0, h)
+    out = gridax.interior(gridax.diff_x_fwd_2d(h) + 1.0, h)
     assert out.dtype == np.float32
     assert (
         (out[1:-1, 1:-1] == 1.0).all() and out[0].sum() == 0 and out[:, -1].sum() == 0
@@ -152,3 +157,13 @@ def test_hooks_keep_the_jax_calls():
     assert "optimization_barrier" in jaxpr and "pad" in jaxpr
     scatter = str(jax.make_jaxpr(lambda v: backend.set_at(v, (slice(1, 3),), 1.0))(x))
     assert "scatter" in scatter or "dynamic_update_slice" in scatter
+
+
+def test_old_names_warn_and_return_the_new_functions():
+    """The pre-#435 names stay in gridax-jax for one release."""
+    gridax_jax = pytest.importorskip("gridax_jax")
+    from gridax._src.operators.stencils import RENAMED
+
+    for old, new in RENAMED.items():
+        with pytest.warns(DeprecationWarning, match=new):
+            assert getattr(gridax_jax, old) is getattr(gridax, new)
