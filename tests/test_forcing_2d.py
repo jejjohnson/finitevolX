@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import equinox as eqx
-from gridax_ops import (
+from gridax_jax import (
     AbstractForcing,
     CartesianGrid2D,
     Difference2D,

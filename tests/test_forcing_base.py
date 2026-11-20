@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import diffrax as dfx
 import equinox as eqx
-from gridax_ops import (
+from gridax_jax import (
     AbstractForcing,
     ForcingProduct,
     ForcingSum,

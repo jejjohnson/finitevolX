@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
-from gridax_ops._src.advection.advection import Advection2D, Advection3D
-from gridax_ops._src.advection.flux import upwind_flux
-from gridax_ops._src.advection.reconstruction import Reconstruction2D
+from gridax_jax._src.advection.advection import Advection2D, Advection3D
+from gridax_jax._src.advection.flux import upwind_flux
+from gridax_jax._src.advection.reconstruction import Reconstruction2D
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -142,7 +142,7 @@ class TestUpwindFluxBasic:
             )
 
     def test_top_level_import(self):
-        from gridax_ops import upwind_flux as uf
+        from gridax_jax import upwind_flux as uf
 
         assert uf is not None
 

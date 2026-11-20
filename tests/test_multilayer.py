@@ -9,8 +9,8 @@ Covers:
 
 from __future__ import annotations
 
-import gridax_ops as fvx
-from gridax_ops import multilayer
+import gridax_jax as fvx
+from gridax_jax import multilayer
 import jax.numpy as jnp
 import numpy as np
 import pytest

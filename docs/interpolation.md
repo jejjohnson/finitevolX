@@ -146,7 +146,7 @@ and `V_to_T` are provided.
 
 ```python
 import jax.numpy as jnp
-from gridax_ops import CartesianGrid2D, Interpolation2D
+from gridax_jax import CartesianGrid2D, Interpolation2D
 
 grid = CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 interp = Interpolation2D(grid=grid)

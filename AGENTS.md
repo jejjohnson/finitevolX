@@ -17,21 +17,21 @@ library of primitives**: new code composes what is here, and anything
 genuinely new lands where the next person will find it.
 
 The repository is a uv workspace with two packages and a shim.
-`packages/gridax-ops/` (`src/gridax_ops/`, import `gridax_ops`; this
+`packages/gridax-jax/` (`src/gridax_jax/`, import `gridax_jax`; this
 library was called finitevolX) holds everything applied to a field and runs
 on JAX. `packages/gridax/` (`src/gridax/`, import `gridax`) holds the grids
 and masks as data and runs on NumPy alone: it depends on NumPy, SciPy and
 jaxtyping, never on JAX or Equinox, and CI installs it alone to check that
 (`gridax-numpy-only` in `ci.yml`). The root project is the deprecated
 `finitevolx` distribution: `finitevolx/__init__.py` warns and re-exports
-`gridax_ops` for one 0.X release; add nothing to it. Everything under
-`gridax_ops/_src/` and `gridax/_src/` is private; the public API is the flat
-`gridax_ops.__all__`, re-exported from `gridax_ops/__init__.py` (its order is
+`gridax_jax` for one 0.X release; add nothing to it. Everything under
+`gridax_jax/_src/` and `gridax/_src/` is private; the public API is the flat
+`gridax_jax.__all__`, re-exported from `gridax_jax/__init__.py` (its order is
 a logical grouping, not alphabetical: ruff's `RUF022` is off), which includes
 the grid and mask classes of `gridax` (the mask construction helpers stay
 `gridax`-only).
 
-| Area | Path (`gridax_ops/_src/`, or `gridax/_src/`) | Owns |
+| Area | Path (`gridax_jax/_src/`, or `gridax/_src/`) | Owns |
 |---|---|---|
 | Grids | `gridax/_src/grid/` | `ArakawaCGrid*` (topology) → `CurvilinearGrid*` (uniform metric) → `CartesianGrid1D/2D/3D`, `SphericalGrid2D/3D` (`base.py`, `cartesian.py`, `spherical.py`): frozen dataclasses built with NumPy, registered as JAX pytrees by `gridax/_src/pytree.py` when JAX is importable |
 | Masks | `gridax/_src/mask/` | `Mask1D/2D/3D` (`cartesian.py`), frozen NumPy dataclasses like the grids: staggered wet masks, coast classification, `StencilCapability*` (`base.py`), adaptive stencil hierarchies; numpy / scipy construction helpers (`utils.py`) |
@@ -42,9 +42,9 @@ the grid and mask classes of `gridax` (the mask construction helpers stay
 | Boundary conditions | `boundary/` | Per-face atoms `Dirichlet1D` … `Slip1D` (`bc_1d.py`), `BoundaryConditionSet` (`bc_set.py`), `FieldBCSet` (`bc_field.py`), functional ghost-ring fillers (`boundary.py`) |
 | Forcing | `forcing/` | `AbstractForcing`, `ForcingSum` / `ForcingProduct` / `TimeVaryingForcing` (`_base.py`); wind, drag, Rayleigh operators |
 | Solvers | `solvers/` | Spectral solvers re-exported from spectraldiffx (`spectral.py`, `spectral_transforms.py`); capacitance wrapper and the `streamfunction_from_vorticity` / `pressure_from_divergence` / `pv_inversion` wrappers (`elliptic.py`); `solve_cg` on lineax (`iterative.py`); preconditioners (`preconditioners.py`); `MultigridSolver` (`multigrid.py`); known-value lifting (`inhomogeneous.py`); tridiagonal solve re-exported from gaussx (`tridiagonal.py`) |
-| Time integration | `timestepping/` | `semi_lagrangian_step`, `SemiLagrangianSolver`, `SemiLagrangianTerm` (`semi_lagrangian.py`); `solve_ocean_pde` (`_solve.py`); the generic steppers live in `integrix.march`, and their `gridax_ops.*` (formerly `finitevolx.*`) names are deprecated aliases (`_deprecated.py`, served by `__getattr__` in `gridax_ops/__init__.py`) |
+| Time integration | `timestepping/` | `semi_lagrangian_step`, `SemiLagrangianSolver`, `SemiLagrangianTerm` (`semi_lagrangian.py`); `solve_ocean_pde` (`_solve.py`); the generic steppers live in `integrix.march`, and their `gridax_jax.*` (formerly `finitevolx.*`) names are deprecated aliases (`_deprecated.py`, served by `__getattr__` in `gridax_jax/__init__.py`) |
 | Vertical | `vertical/` | `multilayer` (vmap a 2-D operator over layers), vertical modes (`build_coupling_matrix`, `layer_to_mode`, …) |
-| pipekit layer (Tier B) | `pipekit/` (public: `gridax_ops/pipekit/`) | `FVXOperator` / `GridOperator` on `pipekit_jax.JaxOperator`, `GridSpec`, `over_leading`, `check_operator` (`gridax_ops.pipekit.testing`); behind the `pipekit` extra, never imported by `import gridax_ops` |
+| pipekit layer (Tier B) | `pipekit/` (public: `gridax_jax/pipekit/`) | `FVXOperator` / `GridOperator` on `pipekit_jax.JaxOperator`, `GridSpec`, `over_leading`, `check_operator` (`gridax_jax.pipekit.testing`); behind the `pipekit` extra, never imported by `import gridax_jax` |
 | Shared | `utils/constants.py` | `GRAVITY`, `R_EARTH`, `OMEGA`, `RHO`, `DEG2M` (parameter defaults only; see contract 6) |
 
 The three operator layers are the ones `docs/stencils.md` and
@@ -102,7 +102,7 @@ Before writing a stencil, an operator, a BC, a solver or a helper, find out
 whether it exists:
 
 1. **Search the capability index.** [`docs/capabilities.md`](docs/capabilities.md)
-   lists every name in `gridax_ops.__all__`, grouped by the module that
+   lists every name in `gridax_jax.__all__`, grouped by the module that
    defines it (re-exports grouped by library), with a one-line summary; then
    the public API of spectraldiffx and gaussx. It is generated
    (`make capabilities`) and checked by `tests/test_capabilities.py`.
@@ -379,8 +379,8 @@ apply BCs to intermediate fields before chaining operators.
 
 ### The public API
 
-- Export a new public name from `packages/gridax-ops/src/gridax_ops/__init__.py` (import plus an
-  entry in `__all__`, in its logical group), give it a `::: gridax_ops.Name`
+- Export a new public name from `packages/gridax-jax/src/gridax_jax/__init__.py` (import plus an
+  entry in `__all__`, in its logical group), give it a `::: gridax_jax.Name`
   entry on its page in `docs/api/` (no test checks this), and run
   `make capabilities`.
 - NumPy-style docstrings: the formula (half-index notation in ASCII or
@@ -453,7 +453,7 @@ make test-slow            # slow tier only;  make test-integration: integration 
 make test-cov             # the same with coverage (reports/coverage.xml)
 make uv-lint              # ruff check . + ruff format --check . + ty (mirrors CI)
 make uv-format            # ruff format . && ruff check --fix .
-make typecheck            # uv run ty check packages/gridax-ops/src packages/gridax/src finitevolx
+make typecheck            # uv run ty check packages/gridax-jax/src packages/gridax/src finitevolx
 make ci                   # lint, format check, ty, tests
 make capabilities         # regenerate docs/capabilities.md
 make docs                 # uv run mkdocs build
@@ -515,7 +515,7 @@ All of these must pass, from the repo root:
    `scripts/` (CI runs `ruff check .`; a subdirectory misses their import
    sorting). `docs/` and `notebooks/` are excluded by the ruff config.
 3. `uv run ruff format --check .`
-4. `uv run ty check packages/gridax-ops/src packages/gridax/src finitevolx` (`make typecheck`): no errors.
+4. `uv run ty check packages/gridax-jax/src packages/gridax/src finitevolx` (`make typecheck`): no errors.
 5. After changing a public API: `make capabilities`, and the `docs/api` page.
 6. After changing an operator's math on purpose: regenerate the goldens
    (`uv run python tests/fixtures/_gen_golden.py`) and explain the diff in
@@ -600,7 +600,7 @@ MkDocs + Material + mkdocstrings (NumPy docstring style) + mkdocs-jupyter,
 configured in `mkdocs.yml`; `pages.yml` runs `mkdocs gh-deploy` on every
 push to `main` (no workflow builds the docs on a pull request, so build them
 yourself). If `pandoc` is installed locally, mkdocs-jupyter's jupytext probe
-of every `.md` page can hang on the `::: gridax_ops.Name` blocks; build with
+of every `.md` page can hang on the `::: gridax_jax.Name` blocks; build with
 `pandoc` off your `PATH`. The nav pairs a theory page with an API page per topic:
 
 | Topic | Theory / usage | API |

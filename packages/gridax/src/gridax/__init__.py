@@ -11,7 +11,7 @@ so grids and masks pass through ``jax.jit`` and ``jax.vmap``.
 collocated grids: finite differences and axis remapping, written against the
 array API so they run on NumPy, JAX or any other backend. The staggered
 C-grid operations (differences on T / U / V / X points, advection, boundary
-conditions, solvers) live in gridax-ops, which builds on this package.
+conditions, solvers) live in gridax-jax, which builds on this package.
 """
 
 from gridax._src.constants import R_EARTH

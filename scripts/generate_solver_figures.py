@@ -44,7 +44,7 @@ import jax.numpy as jnp
 import matplotlib
 
 matplotlib.use("Agg")
-import gridax_ops as fvx
+import gridax_jax as fvx
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.sparse as sp

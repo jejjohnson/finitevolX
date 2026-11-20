@@ -8,7 +8,7 @@ interior, never the ghost ring.
 """
 
 from gridax import SphericalGrid2D, SphericalGrid3D
-from gridax_ops._src.utils.constants import R_EARTH
+from gridax_jax._src.utils.constants import R_EARTH
 import jax
 import jax.numpy as jnp
 import numpy as np

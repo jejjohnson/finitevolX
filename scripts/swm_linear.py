@@ -42,7 +42,7 @@ from jaxtyping import Array, Float
 import matplotlib
 
 matplotlib.use("Agg")
-from gridax_ops import (
+from gridax_jax import (
     CartesianGrid2D,
     Difference2D,
     Interpolation2D,

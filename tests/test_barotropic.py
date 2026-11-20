@@ -7,9 +7,9 @@ stand-in solvers.  One integration test runs the real multigrid solver.
 
 from __future__ import annotations
 
-from gridax_ops import barotropic_filter, build_multigrid_solver, divergence_2d
-from gridax_ops._src.operators._ghost import interior
-from gridax_ops._src.operators.stencils import diff_x_fwd
+from gridax_jax import barotropic_filter, build_multigrid_solver, divergence_2d
+from gridax_jax._src.operators._ghost import interior
+from gridax_jax._src.operators.stencils import diff_x_fwd
 import jax
 import jax.numpy as jnp
 import numpy as np

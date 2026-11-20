@@ -15,7 +15,7 @@ import inspect
 import itertools
 
 import equinox as eqx
-import gridax_ops as fvx
+import gridax_jax as fvx
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -32,17 +32,17 @@ SCALAR = 0.7  # value for every float argument (dx, dy, g_prime, f0, …)
 # public function and class method there that carries the annotation is
 # tested below, so the annotation and the behaviour cannot drift apart.
 MODULES = (
-    "gridax_ops._src.operators.stencils",
-    "gridax_ops._src.operators.difference",
-    "gridax_ops._src.operators.interpolation",
-    "gridax_ops._src.operators.divergence",
-    "gridax_ops._src.operators.vorticity",
-    "gridax_ops._src.operators.coriolis",
-    "gridax_ops._src.operators.diagnostics",
-    "gridax_ops._src.operators.diagnostic_operators",
-    "gridax_ops._src.boundary.bc_1d",
-    "gridax_ops._src.boundary.bc_set",
-    "gridax_ops._src.boundary.boundary",
+    "gridax_jax._src.operators.stencils",
+    "gridax_jax._src.operators.difference",
+    "gridax_jax._src.operators.interpolation",
+    "gridax_jax._src.operators.divergence",
+    "gridax_jax._src.operators.vorticity",
+    "gridax_jax._src.operators.coriolis",
+    "gridax_jax._src.operators.diagnostics",
+    "gridax_jax._src.operators.diagnostic_operators",
+    "gridax_jax._src.boundary.bc_1d",
+    "gridax_jax._src.boundary.bc_set",
+    "gridax_jax._src.boundary.boundary",
 )
 
 

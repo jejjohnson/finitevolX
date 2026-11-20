@@ -7,7 +7,7 @@ full-shape T-point output with a zero ghost ring, dry T-cells zeroed via
 
 from __future__ import annotations
 
-from gridax_ops import ArakawaJacobian2D, Mask2D, arakawa_jacobian
+from gridax_jax import ArakawaJacobian2D, Mask2D, arakawa_jacobian
 import jax.numpy as jnp
 import numpy as np
 

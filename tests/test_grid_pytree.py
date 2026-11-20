@@ -12,7 +12,7 @@ import dataclasses
 from pathlib import Path
 
 import equinox as eqx
-from gridax_ops import (
+from gridax_jax import (
     CartesianGrid1D,
     CartesianGrid2D,
     CartesianGrid3D,

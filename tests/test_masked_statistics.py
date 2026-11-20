@@ -7,7 +7,7 @@ always safe to divide by.
 """
 
 from gridax import Mask2D, Mask3D
-from gridax_ops._src.operators.reductions import (
+from gridax_jax._src.operators.reductions import (
     masked_mean,
     masked_moments,
     masked_std,

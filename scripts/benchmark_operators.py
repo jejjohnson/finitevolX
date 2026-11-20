@@ -40,7 +40,7 @@ import statistics
 import sys
 import time
 
-import gridax_ops as fvx
+import gridax_jax as fvx
 import jax
 import jax.numpy as jnp
 import numpy as np

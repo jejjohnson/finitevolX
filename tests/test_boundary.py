@@ -2,7 +2,7 @@
 
 from typing import ClassVar
 
-from gridax_ops import (
+from gridax_jax import (
     BoundaryConditionSet,
     CartesianGrid2D,
     Difference2D,
@@ -14,8 +14,8 @@ from gridax_ops import (
     Slip1D,
     Sponge1D,
 )
-from gridax_ops._src.boundary.bc_1d import Outflow1D, Periodic1D, Reflective1D
-from gridax_ops._src.boundary.boundary import enforce_periodic, pad_interior
+from gridax_jax._src.boundary.bc_1d import Outflow1D, Periodic1D, Reflective1D
+from gridax_jax._src.boundary.boundary import enforce_periodic, pad_interior
 import jax
 import jax.numpy as jnp
 import numpy as np

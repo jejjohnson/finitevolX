@@ -6,7 +6,7 @@ Covers: coriolis_param, beta_param, coriolis_fn,
 """
 
 from gridax import CartesianGrid2D
-from gridax_ops._src.operators.diagnostics import (
+from gridax_jax._src.operators.diagnostics import (
     beta_param,
     coriolis_fn,
     coriolis_param,
@@ -19,8 +19,8 @@ from gridax_ops._src.operators.diagnostics import (
     sw_potential_vorticity,
     sw_potential_vorticity_multilayer,
 )
-from gridax_ops._src.utils.constants import GRAVITY, OMEGA, R_EARTH
-from gridax_ops._src.vertical.multilayer import multilayer
+from gridax_jax._src.utils.constants import GRAVITY, OMEGA, R_EARTH
+from gridax_jax._src.vertical.multilayer import multilayer
 import jax
 import jax.numpy as jnp
 import numpy as np

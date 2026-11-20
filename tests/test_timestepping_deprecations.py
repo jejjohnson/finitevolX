@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import warnings
 
-import gridax_ops
-from gridax_ops._src.timestepping import _deprecated
+import gridax_jax
+from gridax_jax._src.timestepping import _deprecated
 import integrix.march as ixm
 import jax.numpy as jnp
 import numpy as np
@@ -25,20 +25,20 @@ ADAPTED = list(_deprecated.ADAPTED)
 @pytest.mark.parametrize("name", MOVED)
 def test_moved_name_warns_and_is_the_integrix_object(name: str) -> None:
     with pytest.warns(DeprecationWarning, match=rf"integrix\.march\.{name}\b"):
-        obj = getattr(gridax_ops, name)
+        obj = getattr(gridax_jax, name)
     assert obj is getattr(ixm, name)
 
 
 def test_from_import_warns() -> None:
     with pytest.warns(DeprecationWarning, match=r"integrix\.march\.RK3SSP"):
-        from gridax_ops import RK3SSP
+        from gridax_jax import RK3SSP
     assert RK3SSP is ixm.RK3SSP
 
 
 @pytest.mark.parametrize("name", ADAPTED)
 def test_adapted_name_warns_and_names_the_new_interface(name: str) -> None:
     with pytest.warns(DeprecationWarning, match=r"integrix\.march\.run") as record:
-        obj = getattr(gridax_ops, name)
+        obj = getattr(gridax_jax, name)
     assert f"integrix.march.{name}" in str(record[0].message)
     assert obj is getattr(_deprecated, name)
 
@@ -52,12 +52,12 @@ def test_names_that_stay_do_not_warn() -> None:
             "semi_lagrangian_step",
             "solve_ocean_pde",
         ):
-            getattr(gridax_ops, name)
+            getattr(gridax_jax, name)
 
 
 def test_unknown_name_raises() -> None:
     with pytest.raises(AttributeError, match="no_such_stepper"):
-        gridax_ops.no_such_stepper  # noqa: B018
+        gridax_jax.no_such_stepper  # noqa: B018
 
 
 def _march(solver, rhs, y0, dt, n_steps):

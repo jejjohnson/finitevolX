@@ -7,9 +7,9 @@ import pytest
 pytest.importorskip("pipekit_jax")
 
 import equinox as eqx
-import gridax_ops as fvx
-from gridax_ops import pipekit as fp
-from gridax_ops.pipekit.testing import check_operator
+import gridax_jax as fvx
+from gridax_jax import pipekit as fp
+from gridax_jax.pipekit.testing import check_operator
 import jax
 import jax.numpy as jnp
 import numpy as np

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from gridax_ops import linear_drag, rayleigh_relaxation
+from gridax_jax import linear_drag, rayleigh_relaxation
 import jax.numpy as jnp
 import numpy as np
 

@@ -1,4 +1,4 @@
-"""``import finitevolx`` is a deprecated shim over gridax_ops for one 0.X release.
+"""``import finitevolx`` is a deprecated shim over gridax_jax for one 0.X release.
 
 It warns once, re-exports every public name as the same object (the grid and
 mask classes come from gridax), keeps ``finitevolx.pipekit`` working, and
@@ -13,7 +13,7 @@ import sys
 import warnings
 
 import gridax
-import gridax_ops
+import gridax_jax
 import pytest
 
 
@@ -25,7 +25,7 @@ def test_import_warns_with_the_new_name():
         check=False,
     )
     assert result.returncode != 0
-    assert "renamed gridax_ops" in result.stderr
+    assert "renamed gridax_jax" in result.stderr
 
 
 @pytest.fixture(scope="module")
@@ -35,11 +35,11 @@ def finitevolx():
         return importlib.import_module("finitevolx")
 
 
-def test_every_name_is_the_gridax_ops_object(finitevolx):
-    assert finitevolx.__all__ == gridax_ops.__all__
-    for name in gridax_ops.__all__:
-        if name in gridax_ops.__dict__:  # the deprecated steppers are lazy
-            assert getattr(finitevolx, name) is getattr(gridax_ops, name), name
+def test_every_name_is_the_gridax_jax_object(finitevolx):
+    assert finitevolx.__all__ == gridax_jax.__all__
+    for name in gridax_jax.__all__:
+        if name in gridax_jax.__dict__:  # the deprecated steppers are lazy
+            assert getattr(finitevolx, name) is getattr(gridax_jax, name), name
 
 
 def test_grid_and_mask_classes_come_from_gridax(finitevolx):
@@ -58,11 +58,11 @@ def test_deprecated_steppers_stay_lazy(finitevolx):
 def test_pipekit_submodules(finitevolx):
     pytest.importorskip("pipekit_jax")
     shim = importlib.import_module("finitevolx.pipekit")
-    new = importlib.import_module("gridax_ops.pipekit")
+    new = importlib.import_module("gridax_jax.pipekit")
     for name in new.__all__:
         assert getattr(shim, name) is getattr(new, name), name
     testing = importlib.import_module("finitevolx.pipekit.testing")
     assert (
         testing.check_operator
-        is importlib.import_module("gridax_ops.pipekit.testing").check_operator
+        is importlib.import_module("gridax_jax.pipekit.testing").check_operator
     )

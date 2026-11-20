@@ -27,10 +27,10 @@
 **finitevolX** provides staggered finite-volume building blocks for ocean and atmosphere modelling in [JAX](https://github.com/jax-ml/jax).  Every operator is a pure function or stateless [equinox](https://docs.kidger.site/equinox/) Module — fully compatible with `jax.jit`, `jax.vmap`, and `jax.grad`.
 
 > [!NOTE]
-> finitevolX is now two packages in this repository: **gridax** (`packages/gridax`, `import gridax`), the grids and land / ocean masks as NumPy data, and **gridax-ops** (`packages/gridax-ops`, `import gridax_ops`), every operation on them in JAX. `import finitevolx` still works for one 0.X release: it warns and re-exports `gridax_ops`, whose names are unchanged.
+> finitevolX is now two packages in this repository: **gridax** (`packages/gridax`, `import gridax`), the grids and land / ocean masks as NumPy data, and **gridax-jax** (`packages/gridax-jax`, `import gridax_jax`), every operation on them in JAX. `import finitevolx` still works for one 0.X release: it warns and re-exports `gridax_jax`, whose names are unchanged.
 
 ```python
-import gridax_ops as fvx
+import gridax_jax as fvx
 from integrix.march import heun_step
 
 # Build an Arakawa C-grid (64x64 interior + 2-cell ghost ring)
@@ -136,7 +136,7 @@ Build a grid, compute vorticity, and invert for the streamfunction:
 ```python
 import jax
 import jax.numpy as jnp
-import gridax_ops as fvx
+import gridax_jax as fvx
 
 jax.config.update("jax_enable_x64", True)
 

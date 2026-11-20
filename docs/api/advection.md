@@ -2,8 +2,8 @@
 
 Flux-form advection operators for scalar transport on staggered C-grids.
 
-::: gridax_ops.Advection1D
+::: gridax_jax.Advection1D
 
-::: gridax_ops.Advection2D
+::: gridax_jax.Advection2D
 
-::: gridax_ops.Advection3D
+::: gridax_jax.Advection3D

@@ -11,8 +11,8 @@ RESET  := \033[0m
 PYTHON = python
 ROOT = ./
 SHELL = bash
-PKGROOT = gridax_ops
-TYROOTS = packages/gridax-ops/src packages/gridax/src finitevolx
+PKGROOT = gridax_jax
+TYROOTS = packages/gridax-jax/src packages/gridax/src finitevolx
 
 help:## Display this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -132,6 +132,6 @@ clean: ## Remove build artifacts and cache
 .PHONY: version
 version: ## Display version information
 	@printf "$(BLUE)>>> finitevolX version information:$(RESET)\n"
-	@uv run python -c "import importlib.metadata as m; print('gridax-ops', m.version('gridax-ops'), '/ gridax', m.version('gridax'))"
+	@uv run python -c "import importlib.metadata as m; print('gridax-jax', m.version('gridax-jax'), '/ gridax', m.version('gridax'))"
 	@printf "$(BLUE)>>> Python version:$(RESET)\n"
 	@uv run python --version

@@ -11,7 +11,7 @@ does not pollute the convergence measurement.
 from __future__ import annotations
 
 from gridax import CartesianGrid1D, CartesianGrid2D
-from gridax_ops._src.operators.difference import Difference1D, Difference2D
+from gridax_jax._src.operators.difference import Difference1D, Difference2D
 import jax.numpy as jnp
 import numpy as np
 

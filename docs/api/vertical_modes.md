@@ -4,14 +4,14 @@ Vertical mode decomposition and coupling for multi-layer quasi-geostrophic model
 
 ## Coupling Matrix
 
-::: gridax_ops.build_coupling_matrix
+::: gridax_jax.build_coupling_matrix
 
 ## Mode Decomposition
 
-::: gridax_ops.decompose_vertical_modes
+::: gridax_jax.decompose_vertical_modes
 
 ## Layer ↔ Mode Transforms
 
-::: gridax_ops.layer_to_mode
+::: gridax_jax.layer_to_mode
 
-::: gridax_ops.mode_to_layer
+::: gridax_jax.mode_to_layer

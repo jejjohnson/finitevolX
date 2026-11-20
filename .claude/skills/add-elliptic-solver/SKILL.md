@@ -1,6 +1,6 @@
 ---
 name: add-elliptic-solver
-description: Add or extend an elliptic (Poisson / Helmholtz) solver path in finitevolX — a convenience wrapper like streamfunction_from_vorticity / pv_inversion, a new method= option on the wrappers, a preconditioner for solve_cg, a multigrid option, or known-value / boundary-condition handling — while delegating spectral solves to spectraldiffx and structured linear algebra to gaussx and lineax. Use when asked to add, port or fix a Poisson, Helmholtz, PV-inversion, pressure or streamfunction solve, a CG preconditioner or a multigrid feature in gridax_ops/_src/solvers.
+description: Add or extend an elliptic (Poisson / Helmholtz) solver path in finitevolX — a convenience wrapper like streamfunction_from_vorticity / pv_inversion, a new method= option on the wrappers, a preconditioner for solve_cg, a multigrid option, or known-value / boundary-condition handling — while delegating spectral solves to spectraldiffx and structured linear algebra to gaussx and lineax. Use when asked to add, port or fix a Poisson, Helmholtz, PV-inversion, pressure or streamfunction solve, a CG preconditioner or a multigrid feature in gridax_jax/_src/solvers.
 ---
 
 # Add an elliptic solver path
@@ -14,7 +14,7 @@ Read contract 5 (solvers) in `AGENTS.md`, then `docs/elliptic_solvers.md`,
 |---|---|
 | A rectangular spectral solve, a new transform type, new eigenvalues, a capacitance-method change | **spectraldiffx** (finitevolX re-exports it from `solvers/spectral.py` / `spectral_transforms.py`): propose it upstream, then bump the pin (`bump-upstream-pins` skill) |
 | A tridiagonal / Kronecker / low-rank solve, a Nyström-style preconditioner | **gaussx** (finitevolX re-exports or wraps it: `solvers/tridiagonal.py`, `make_nystrom_preconditioner`) |
-| A masked-domain solve on the C-grid, a preconditioner adapted to the finitevolX sign convention, a one-call wrapper, multigrid | here, in `gridax_ops/_src/solvers/` |
+| A masked-domain solve on the C-grid, a preconditioner adapted to the finitevolX sign convention, a one-call wrapper, multigrid | here, in `gridax_jax/_src/solvers/` |
 
 Search `docs/capabilities.md` first: the wrappers
 (`streamfunction_from_vorticity`, `pressure_from_divergence`,
@@ -23,7 +23,7 @@ Search `docs/capabilities.md` first: the wrappers
 `build_capacitance_solver`, `build_multigrid_solver` / `MultigridSolver`,
 the lifting tools `boundary_ring` / `SolveDomain` / `KnownValueLifting`.
 
-## 2. Write it (`gridax_ops/_src/solvers/`)
+## 2. Write it (`gridax_jax/_src/solvers/`)
 
 - **Sign convention.** The operator is `(∇² − λ)` with `λ ≥ 0`: negative
   (semi)definite. A matvec for `solve_cg` implements that operator; a
@@ -59,7 +59,7 @@ the lifting tools `boundary_ring` / `SolveDomain` / `KnownValueLifting`.
 
 ## 3. Export and document
 
-`packages/gridax-ops/src/gridax_ops/__init__.py` (import + `__all__` in the solver groups), the
+`packages/gridax-jax/src/gridax_jax/__init__.py` (import + `__all__` in the solver groups), the
 `docs/api/` page (`elliptic.md`, `iterative.md`, `capacitance.md`,
 `multigrid.md`, `spectral_solvers.md`), the usage guide and, for a new
 solver type, a row in `docs/solver_comparison.md`; `make capabilities`.

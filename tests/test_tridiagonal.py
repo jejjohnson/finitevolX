@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from gridax_ops._src.solvers.tridiagonal import (
+from gridax_jax._src.solvers.tridiagonal import (
     solve_tridiagonal,
     solve_tridiagonal_batched,
 )

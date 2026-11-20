@@ -11,7 +11,7 @@ Every function computes in the namespace of its input (NumPy, JAX, CuPy, or
 anything ``array-api-compat`` knows), so the result has the input's dtype and
 backend: a float64 NumPy cube stays float64 NumPy, and a JAX array runs
 under ``jax.jit``. Fields are collocated (all on the same points); a
-staggered C-grid field goes through gridax-ops instead.
+staggered C-grid field goes through gridax-jax instead.
 """
 
 from __future__ import annotations
