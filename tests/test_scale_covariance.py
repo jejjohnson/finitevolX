@@ -791,7 +791,17 @@ class TestReconstructionAmplitudeCovariance:
 # Constants audit
 # ----------------------------------------------------------------------
 
-PHYSICAL_CONSTANTS = {"R_EARTH", "GRAVITY", "OMEGA", "RHO", "DEG2M"}
+# gridax's deprecated names, and the geophysix records that replace them (#446)
+PHYSICAL_CONSTANTS = {
+    "R_EARTH",
+    "GRAVITY",
+    "OMEGA",
+    "RHO",
+    "DEG2M",
+    "SPHERE",
+    "STANDARD",
+    "WGS84",
+}
 
 AUDITED_PACKAGES = ("operators", "advection", "diffusion", "solvers")
 
@@ -809,7 +819,12 @@ def _audited_modules():
 
 
 #: Dotted paths of the modules the constants live in.
-CONSTANTS_MODULES = {"gridax._src.constants", "gridax_jax._src.utils.constants"}
+CONSTANTS_MODULES = {
+    "gridax._src.constants",
+    "gridax_jax._src.utils.constants",
+    "geophysix.constants",
+    "geophysix.earth",
+}
 
 
 def _constant_aliases(tree):

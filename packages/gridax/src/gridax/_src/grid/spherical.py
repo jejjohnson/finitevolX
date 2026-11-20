@@ -21,10 +21,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from geophysix.earth import SPHERE
 from jaxtyping import Float
 import numpy as np
 
-from gridax._src.constants import R_EARTH
 from gridax._src.grid.base import CurvilinearGrid2D, CurvilinearGrid3D
 from gridax._src.pytree import array_namespace, pytree_dataclass
 
@@ -113,7 +113,7 @@ class SphericalGrid2D(CurvilinearGrid2D):
         ny_interior: int,
         lon_range: tuple[float, float],
         lat_range: tuple[float, float],
-        R: float = R_EARTH,
+        R: float = SPHERE.semi_major,
     ) -> SphericalGrid2D:
         """Construct a spherical grid from interior cell counts and coordinate ranges.
 
@@ -128,7 +128,8 @@ class SphericalGrid2D(CurvilinearGrid2D):
         lat_range : tuple[float, float]
             (lat_min, lat_max) in **degrees**.
         R : float
-            Planet radius in metres (default :data:`R_EARTH`).
+            Planet radius in metres (default: the IUGG mean radius of WGS84,
+            ``geophysix.earth.SPHERE``, 6,371,008.77 m).
 
         Returns
         -------
@@ -430,7 +431,7 @@ class SphericalGrid3D(CurvilinearGrid3D):
         lon_range: tuple[float, float],
         lat_range: tuple[float, float],
         Lz: float,
-        R: float = R_EARTH,
+        R: float = SPHERE.semi_major,
     ) -> SphericalGrid3D:
         """Construct a 3-D spherical grid from interior cell counts.
 
@@ -449,7 +450,8 @@ class SphericalGrid3D(CurvilinearGrid3D):
         Lz : float
             Physical domain depth/height.
         R : float
-            Planet radius in metres (default :data:`R_EARTH`).
+            Planet radius in metres (default: the IUGG mean radius of WGS84,
+            ``geophysix.earth.SPHERE``, 6,371,008.77 m).
 
         Returns
         -------

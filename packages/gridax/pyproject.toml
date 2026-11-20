@@ -23,6 +23,7 @@ dependencies = [
     "numpy>=2.0.0",
     "scipy>=1.14.0",
     "jaxtyping>=0.3.0",
+    "geophysix>=0.0.2",
 ]
 
 [project.urls]
@@ -39,3 +40,7 @@ packages = ["src/gridax"]
 filterwarnings = ["error"]
 testpaths = ["tests"]
 addopts = "--strict-markers"
+
+[tool.uv.sources]
+# not on PyPI yet (#426); the workspace root pins the same tag
+geophysix = { git = "https://github.com/jejjohnson/geophysix", tag = "v0.0.2" }

@@ -35,11 +35,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from geophysix.constants import STANDARD
 from jaxtyping import Float
 import numpy as np
 
 from gridax._src.backend import set_at
-from gridax._src.constants import GRAVITY
 from gridax._src.grid import CartesianGrid2D
 from gridax._src.mask import Mask2D
 from gridax._src.operators.diagnostics import (
@@ -177,7 +177,7 @@ class Energetics2D:
         h: Float[Array, "*batch Ny Nx"],
         u: Float[Array, "*batch Ny Nx"],
         v: Float[Array, "*batch Ny Nx"],
-        gravity: float = GRAVITY,
+        gravity: float = STANDARD.standard_gravity,
     ) -> Float[Array, "*batch Ny Nx"]:
         """Bernoulli potential at T-points.
 

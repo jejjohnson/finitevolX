@@ -40,6 +40,8 @@ members = ["packages/gridax", "packages/gridax-jax"]
 [tool.uv.sources]
 gridax = { workspace = true }
 gridax-jax = { workspace = true }
+# geophysix owns the physical constants, Coriolis and the linear equation of state (#446).
+geophysix = { git = "https://github.com/jejjohnson/geophysix", tag = "v0.0.2" }
 spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "0.1.1" }
 gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.6.5" }
 # integrix owns the generic time steppers. Its own gaussx pin (v0.6.12) is

@@ -16,7 +16,7 @@ call on `[*batch, Ny, Nx]` fields. Requires the `pipekit` extra:
 | `Laplacian` | `Difference2D.laplacian` | T → T |
 | `GradPerp` | `Difference2D.grad_perp` | X → (U, V) |
 | `Interp(src, dst)` | `Interpolation2D.{src}_to_{dst}` | 1 → 1 |
-| `Coriolis(f0, beta, y0)` | `coriolis_fn` + `Coriolis2D` | (U, V) → (U, V) |
+| `Coriolis(f0, beta, y0)` | `geophysix.rotation.beta_plane` + `Coriolis2D` | (U, V) → (U, V) |
 | `FillGhosts(kind)` | `enforce_periodic`, `zero_boundaries`, …, `wall_boundaries` | 1 → 1 |
 | `ApplyMask(mask, stagger)` | `jnp.where(mask.{h,u,v,xy_corner_strict}, x, 0)` | 1 → 1 |
 | `RelativeVorticity` | `Vorticity2D.relative_vorticity` | (U, V) → X |

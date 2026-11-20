@@ -102,7 +102,8 @@ order); review what they cannot see.
 - Step functions are pure on pytrees; diffrax solvers declare their tableau
   / order; forcings subclass `AbstractForcing`, stay time-agnostic and
   compose inside the RHS.
-- No physical constant (`GRAVITY`, `R_EARTH`, `OMEGA`, `RHO`, `DEG2M`)
+- No physical constant (the geophysix records `SPHERE`, `WGS84`, `STANDARD`,
+  or the deprecated `GRAVITY`, `R_EARTH`, `OMEGA`, `RHO`, `DEG2M`)
   inside an expression in `operators/`, `advection/`, `diffusion/` or
   `solvers/`; no absolute epsilon guarding a ratio of dimensional
   quantities. A new spatial operator gets a `Case` in
