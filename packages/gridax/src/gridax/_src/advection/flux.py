@@ -33,9 +33,18 @@ Typical 2-D usage::
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING
 
-import jax.numpy as jnp
-from jaxtyping import Array, Bool, Float
+from jaxtyping import Bool, Float
+import numpy as np
+
+from gridax._src.backend import set_at
+from gridax._src.pytree import array_namespace
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
 def narrow_mask_hierarchy(
@@ -198,6 +207,7 @@ def upwind_flux(
     >>> fe.shape
     (10, 10)
     """
+    xp = array_namespace(q, u)
     if not rec_funcs:
         raise ValueError("rec_funcs must not be empty")
     ndim = q.ndim
@@ -235,19 +245,19 @@ def upwind_flux(
         ``[1:-1, ..., 1:-1]``.  For negative flow it is one step in the
         positive direction along ``dim``.
         """
-        return jnp.where(pos_flow, m[interior_slice], m[shifted_slice])
+        return xp.where(pos_flow, m[interior_slice], m[shifted_slice])
 
     # Blend using mutually-exclusive masks.
     # Because exactly one mask[s] is True at each wet upwind cell, the sum
     # selects a single reconstruction tier per face:
     #   result = Σ_s  face_mask[s] * flux[s]
-    interior = jnp.zeros_like(q[interior_slice])
+    interior = xp.zeros_like(q[interior_slice])
     for s in stencil_sizes:
         face_mask = _upwind_mask(mask_hierarchy[s])
-        # Use jnp.where instead of face_mask * flux to avoid propagating
+        # Use xp.where instead of face_mask * flux to avoid propagating
         # NaNs/Infs from unused stencil tiers into the result.
-        safe_flux = jnp.where(face_mask, fluxes[s][interior_slice], 0.0)
+        safe_flux = xp.where(face_mask, fluxes[s][interior_slice], 0.0)
         interior = interior + safe_flux
 
-    out = jnp.zeros_like(q)
-    return out.at[interior_slice].set(interior)
+    out = xp.zeros_like(q)
+    return set_at(out, interior_slice, interior)

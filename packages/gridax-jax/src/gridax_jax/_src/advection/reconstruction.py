@@ -18,14 +18,9 @@ from gridax import (
     ArakawaCGrid3D,
     Mask2D,
 )
-from gridax._src.operators._ghost import interior
-import jax.numpy as jnp
-from jaxtyping import Array, Float
-import numpy as np
-
-from gridax_jax._src.advection.flux import upwind_flux
-from gridax_jax._src.advection.limiters import mc, minmod, superbee, van_leer
-from gridax_jax._src.advection.weno import (
+from gridax._src.advection.flux import upwind_flux
+from gridax._src.advection.limiters import mc, minmod, superbee, van_leer
+from gridax._src.advection.weno import (
     weno_3pts as _weno3,
     weno_3pts_improved as _wenoz3,
     weno_3pts_improved_right as _wenoz3_right,
@@ -39,6 +34,10 @@ from gridax_jax._src.advection.weno import (
     weno_9pts as _weno9,
     weno_9pts_right as _weno9_right,
 )
+from gridax._src.operators._ghost import interior
+import jax.numpy as jnp
+from jaxtyping import Array, Float
+import numpy as np
 
 # Relative TVD floor (#294): ``r = num / (den + copysign(eps, den))`` with
 # ``eps = eps_rel · |num| + tiny``, a floor relative to the stencil's own
@@ -1134,7 +1133,7 @@ class Reconstruction2D(eqx.Module):
     ) -> Float[Array, "Ny Nx"]:
         """TVD east-face flux with mask-aware stencil selection.
 
-        Delegates to :func:`~gridax_jax._src.advection.flux.upwind_flux` with a
+        Delegates to :func:`~gridax._src.advection.flux.upwind_flux` with a
         two-tier hierarchy (upwind1 / TVD).
 
         Parameters
@@ -1170,7 +1169,7 @@ class Reconstruction2D(eqx.Module):
     ) -> Float[Array, "Ny Nx"]:
         """TVD north-face flux with mask-aware stencil selection.
 
-        Delegates to :func:`~gridax_jax._src.advection.flux.upwind_flux` with a
+        Delegates to :func:`~gridax._src.advection.flux.upwind_flux` with a
         two-tier hierarchy (upwind1 / TVD).
 
         Parameters
@@ -1205,7 +1204,7 @@ class Reconstruction2D(eqx.Module):
     ) -> Float[Array, "Ny Nx"]:
         """5-point WENO east-face flux with mask-aware adaptive stencil selection.
 
-        Delegates to :func:`~gridax_jax._src.advection.flux.upwind_flux` with a
+        Delegates to :func:`~gridax._src.advection.flux.upwind_flux` with a
         three-tier hierarchy (upwind1 / WENO3 / WENO5).
 
         Parameters
@@ -1238,7 +1237,7 @@ class Reconstruction2D(eqx.Module):
     ) -> Float[Array, "Ny Nx"]:
         """5-point WENO north-face flux with mask-aware adaptive stencil selection.
 
-        Delegates to :func:`~gridax_jax._src.advection.flux.upwind_flux` with a
+        Delegates to :func:`~gridax._src.advection.flux.upwind_flux` with a
         three-tier hierarchy (upwind1 / WENO3 / WENO5).
 
         Parameters
@@ -1271,7 +1270,7 @@ class Reconstruction2D(eqx.Module):
     ) -> Float[Array, "Ny Nx"]:
         """5-point WENO-Z east-face flux with mask-aware adaptive stencil selection.
 
-        Delegates to :func:`~gridax_jax._src.advection.flux.upwind_flux` with a
+        Delegates to :func:`~gridax._src.advection.flux.upwind_flux` with a
         three-tier hierarchy (upwind1 / WENO-Z-3 / WENO-Z-5).
 
         Parameters
@@ -1304,7 +1303,7 @@ class Reconstruction2D(eqx.Module):
     ) -> Float[Array, "Ny Nx"]:
         """5-point WENO-Z north-face flux with mask-aware adaptive stencil selection.
 
-        Delegates to :func:`~gridax_jax._src.advection.flux.upwind_flux` with a
+        Delegates to :func:`~gridax._src.advection.flux.upwind_flux` with a
         three-tier hierarchy (upwind1 / WENO-Z-3 / WENO-Z-5).
 
         Parameters

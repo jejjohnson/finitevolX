@@ -33,43 +33,6 @@ if it is almost here, extend it where it lives. Regenerate with
 | `uv_center_flux` | function | Compute raw face fluxes for a cell-centred scalar on a C-grid. |
 | `uv_node_flux` | function | Compute raw face fluxes for a node-centred tracer on a C-grid. |
 
-#### Upwind flux with mask-aware stencil-width dispatch for non-rectangular domains (`gridax_jax._src.advection.flux`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `upwind_flux` | function | Compute upwind flux with automatic stencil fallback near boundaries. |
-
-#### Flux limiter functions for TVD (Total Variation Diminishing) reconstruction (`gridax_jax._src.advection.limiters`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `mc` | function | Monotonized Central (MC) flux limiter. |
-| `minmod` | function | Minmod flux limiter. |
-| `superbee` | function | Superbee flux limiter. |
-| `van_leer` | function | Van Leer flux limiter. |
-
-#### Linear (polynomial) face-value reconstruction stencils (`gridax_jax._src.advection.linear`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `linear_2pts` | function | 2-point centred reconstruction at face i+1/2. |
-| `linear_3pts_left` | function | 3-point left-biased reconstruction at face i+1/2. |
-| `linear_3pts_right` | function | 3-point right-biased reconstruction at face i+1/2. |
-| `linear_4pts` | function | 4-point centred reconstruction at face i+1/2. |
-| `linear_5pts_left` | function | 5-point left-biased reconstruction at face i+1/2. |
-| `linear_5pts_right` | function | 5-point right-biased reconstruction at face i+1/2. |
-| `linear_6pts` | function | 6-point centred reconstruction at face i+1/2. |
-
-#### Functional reconstruction dispatcher for upwind face-value computation (`gridax_jax._src.advection.reconstruct_fn`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `plusminus` | function | Split velocity into positive and negative parts. |
-| `reconstruct` | function | Compute upwind face flux along *dim* using the given reconstruction method. |
-| `upwind_1pt` | function | 1st-order upwind face value at interior faces along the last axis. |
-| `upwind_3pt` | function | 3-point upwind face value at i+1/2 along the last axis. |
-| `upwind_5pt` | function | 5-point upwind face value at i+1/2 along the last axis. |
-
 #### Face-value reconstruction operators for advective fluxes on Arakawa C-grids (`gridax_jax._src.advection.reconstruction`)
 
 | Name | Kind | What it does |
@@ -84,23 +47,6 @@ if it is almost here, extend it where it lives. Regenerate with
 |---|---|---|
 | `SphericalAdvection2D` | class | 2-D tracer advection on a spherical Arakawa C-grid. |
 | `SphericalAdvection3D` | class | 3-D tracer advection on a spherical Arakawa C-grid. |
-
-#### weno (`gridax_jax._src.advection.weno`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `weno_3pts` | function | 3-points non-linear left-biased stencil reconstruction: |
-| `weno_3pts_improved` | function | 3-points non-linear left-biased stencil reconstruction: |
-| `weno_3pts_improved_right` | function | 3-points non-linear right-biased WENO-Z stencil reconstruction at face q0+1/2: |
-| `weno_3pts_right` | function | 3-points non-linear right-biased stencil reconstruction at face q0+1/2: |
-| `weno_5pts` | function | 5-points non-linear left-biased stencil reconstruction |
-| `weno_5pts_improved` | function | 5-points non-linear left-biased stencil reconstruction |
-| `weno_5pts_improved_right` | function | 5-points non-linear right-biased WENO-Z stencil reconstruction at face q0+1/2: |
-| `weno_5pts_right` | function | 5-points non-linear right-biased stencil reconstruction at face q0+1/2: |
-| `weno_7pts` | function | 7-points non-linear left-biased stencil reconstruction |
-| `weno_7pts_right` | function | 7-points non-linear right-biased stencil reconstruction at face q0+1/2: |
-| `weno_9pts` | function | 9-points non-linear left-biased stencil reconstruction |
-| `weno_9pts_right` | function | 9-points non-linear right-biased stencil reconstruction at face q0+1/2: |
 
 #### Single-face boundary condition atoms for 2-D ghost-ring arrays (`gridax_jax._src.boundary.bc_1d`)
 
@@ -308,32 +254,6 @@ if it is almost here, extend it where it lives. Regenerate with
 | `ArakawaJacobian2D` | class | Arakawa (1966) Jacobian J(f, g) at T-points, on the full grid. |
 | `arakawa_jacobian` | function | Arakawa (1966) discretization of J(f, g). |
 
-#### Area- and volume-weighted reduction helpers for Arakawa C-grids (`gridax_jax._src.operators.reductions`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `area_mean` | function | Area-weighted mean over physical interior T-cells. |
-| `area_sum` | function | Area-weighted sum over physical interior T-cells. |
-| `area_weights` | function | Dispatch to `cartesian_area_weights` or `spherical_area_weights`. |
-| `cartesian_area_mean` | function | Cartesian area-weighted mean. |
-| `cartesian_area_sum` | function | Cartesian area-weighted sum (`area_sum` with Cartesian grid). |
-| `cartesian_area_weights` | function | T-cell areas on a Cartesian grid. |
-| `cartesian_volume_mean` | function | Cartesian volume-weighted mean. |
-| `cartesian_volume_sum` | function | Cartesian volume-weighted sum. |
-| `cartesian_volume_weights` | function | T-cell volumes on a Cartesian 3-D grid: ``dx · dy · dz``. |
-| `masked_mean` | function | Mean over ``axis``, excluding dry cells. |
-| `masked_moments` | function | ``(mean, std)`` in one call — see `masked_mean`, `masked_std`. |
-| `masked_std` | function | Standard deviation over ``axis``, excluding dry cells, floored at ``eps``. |
-| `spherical_area_mean` | function | Spherical area-weighted mean. |
-| `spherical_area_sum` | function | Spherical area-weighted sum. |
-| `spherical_area_weights` | function | T-cell areas on a spherical grid, exact for a lat-lon cell. |
-| `spherical_volume_mean` | function | Spherical volume-weighted mean. |
-| `spherical_volume_sum` | function | Spherical volume-weighted sum. |
-| `spherical_volume_weights` | function | T-cell volumes on a spherical 3-D grid. |
-| `volume_mean` | function | Volume-weighted mean over physical interior T-cells (3-D). |
-| `volume_sum` | function | Volume-weighted sum over physical interior T-cells (3-D). |
-| `volume_weights` | function | Dispatch to Cartesian/spherical volume weights based on grid type. |
-
 #### Linear drag and Rayleigh-sponge relaxation tendency operators (`gridax_jax._src.operators.relaxation`)
 
 | Name | Kind | What it does |
@@ -483,6 +403,9 @@ if it is almost here, extend it where it lives. Regenerate with
 | `StencilCapability1D` | class | Directional count of contiguous wet neighbours for each 1-D grid cell. |
 | `StencilCapability2D` | class | Directional count of contiguous wet neighbours for each 2-D grid cell. |
 | `StencilCapability3D` | class | Directional count of contiguous wet neighbours for each 3-D grid cell. |
+| `area_mean` | function | Area-weighted mean over physical interior T-cells. |
+| `area_sum` | function | Area-weighted sum over physical interior T-cells. |
+| `area_weights` | function | Dispatch to `cartesian_area_weights` or `spherical_area_weights`. |
 | `avg_x_bwd_1d` | function | Backward average in x, 1-D: U (or X) → T (or V) points. |
 | `avg_x_bwd_2d` | function | Backward average in x, 2-D: U (or X) → T (or V) points. |
 | `avg_x_bwd_3d` | function | Backward average in x, 3-D: U (or X) → T (or V) points. |
@@ -497,6 +420,12 @@ if it is almost here, extend it where it lives. Regenerate with
 | `avg_y_bwd_3d` | function | Backward average in y, 3-D: V (or X) → T (or U) points. |
 | `avg_y_fwd_2d` | function | Forward average in y, 2-D: T (or U) → V (or X) points. |
 | `avg_y_fwd_3d` | function | Forward average in y, 3-D: T (or U) → V (or X) points. |
+| `cartesian_area_mean` | function | Cartesian area-weighted mean. |
+| `cartesian_area_sum` | function | Cartesian area-weighted sum (`area_sum` with Cartesian grid). |
+| `cartesian_area_weights` | function | T-cell areas on a Cartesian grid. |
+| `cartesian_volume_mean` | function | Cartesian volume-weighted mean. |
+| `cartesian_volume_sum` | function | Cartesian volume-weighted sum. |
+| `cartesian_volume_weights` | function | T-cell volumes on a Cartesian 3-D grid: ``dx · dy · dz`` (``xp`` as in `area_weights`). |
 | `diff_x_bwd_1d` | function | Backward difference in x, 1-D: U (or X) → T (or V) points. |
 | `diff_x_bwd_2d` | function | Backward difference in x, 2-D: U (or X) → T (or V) points. |
 | `diff_x_bwd_3d` | function | Backward difference in x, 3-D: U (or X) → T (or V) points. |
@@ -508,9 +437,50 @@ if it is almost here, extend it where it lives. Regenerate with
 | `diff_y_fwd_2d` | function | Forward difference in y, 2-D: T (or U) → V (or X) points. |
 | `diff_y_fwd_3d` | function | Forward difference in y, 3-D: T (or U) → V (or X) points. |
 | `interior` | function | Create an array shaped like ``like``, zero everywhere except the interior. |
+| `linear_2pts` | function | 2-point centred reconstruction at face i+1/2. |
+| `linear_3pts_left` | function | 3-point left-biased reconstruction at face i+1/2. |
+| `linear_3pts_right` | function | 3-point right-biased reconstruction at face i+1/2. |
+| `linear_4pts` | function | 4-point centred reconstruction at face i+1/2. |
+| `linear_5pts_left` | function | 5-point left-biased reconstruction at face i+1/2. |
+| `linear_5pts_right` | function | 5-point right-biased reconstruction at face i+1/2. |
+| `linear_6pts` | function | 6-point centred reconstruction at face i+1/2. |
+| `masked_mean` | function | Mean over ``axis``, excluding dry cells. |
+| `masked_moments` | function | ``(mean, std)`` in one call — see `masked_mean`, `masked_std`. |
+| `masked_std` | function | Standard deviation over ``axis``, excluding dry cells, floored at ``eps``. |
+| `mc` | function | Monotonized Central (MC) flux limiter. |
+| `minmod` | function | Minmod flux limiter. |
+| `plusminus` | function | Split velocity into positive and negative parts. |
+| `reconstruct` | function | Compute upwind face flux along *dim* using the given reconstruction method. |
 | `smooth_abs` | function | Smooth approximation of ``\|x\|`` with a nonzero gradient at the origin. |
 | `smooth_clamp` | function | Smooth approximation of ``max(x, x_min)`` (a soft lower clamp). |
 | `smooth_max` | function | Smooth approximation of the elementwise ``max(x, y)``. |
+| `spherical_area_mean` | function | Spherical area-weighted mean. |
+| `spherical_area_sum` | function | Spherical area-weighted sum. |
+| `spherical_area_weights` | function | T-cell areas on a spherical grid, exact for a lat-lon cell. |
+| `spherical_volume_mean` | function | Spherical volume-weighted mean. |
+| `spherical_volume_sum` | function | Spherical volume-weighted sum. |
+| `spherical_volume_weights` | function | T-cell volumes on a spherical 3-D grid. |
+| `superbee` | function | Superbee flux limiter. |
+| `upwind_1pt` | function | 1st-order upwind face value at interior faces along the last axis. |
+| `upwind_3pt` | function | 3-point upwind face value at i+1/2 along the last axis. |
+| `upwind_5pt` | function | 5-point upwind face value at i+1/2 along the last axis. |
+| `upwind_flux` | function | Compute upwind flux with automatic stencil fallback near boundaries. |
+| `van_leer` | function | Van Leer flux limiter. |
+| `volume_mean` | function | Volume-weighted mean over physical interior T-cells (3-D). |
+| `volume_sum` | function | Volume-weighted sum over physical interior T-cells (3-D). |
+| `volume_weights` | function | Dispatch to Cartesian/spherical volume weights (``xp`` as in `area_weights`). |
+| `weno_3pts` | function | 3-points non-linear left-biased stencil reconstruction: |
+| `weno_3pts_improved` | function | 3-points non-linear left-biased stencil reconstruction: |
+| `weno_3pts_improved_right` | function | 3-points non-linear right-biased WENO-Z stencil reconstruction at face q0+1/2: |
+| `weno_3pts_right` | function | 3-points non-linear right-biased stencil reconstruction at face q0+1/2: |
+| `weno_5pts` | function | 5-points non-linear left-biased stencil reconstruction |
+| `weno_5pts_improved` | function | 5-points non-linear left-biased stencil reconstruction |
+| `weno_5pts_improved_right` | function | 5-points non-linear right-biased WENO-Z stencil reconstruction at face q0+1/2: |
+| `weno_5pts_right` | function | 5-points non-linear right-biased stencil reconstruction at face q0+1/2: |
+| `weno_7pts` | function | 7-points non-linear left-biased stencil reconstruction |
+| `weno_7pts_right` | function | 7-points non-linear right-biased stencil reconstruction at face q0+1/2: |
+| `weno_9pts` | function | 9-points non-linear left-biased stencil reconstruction |
+| `weno_9pts_right` | function | 9-points non-linear right-biased stencil reconstruction at face q0+1/2: |
 
 #### Re-exported from `spectraldiffx`
 
@@ -654,6 +624,9 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `StencilCapability1D` | class | Directional count of contiguous wet neighbours for each 1-D grid cell. |
 | `StencilCapability2D` | class | Directional count of contiguous wet neighbours for each 2-D grid cell. |
 | `StencilCapability3D` | class | Directional count of contiguous wet neighbours for each 3-D grid cell. |
+| `area_mean` | function | Area-weighted mean over physical interior T-cells. |
+| `area_sum` | function | Area-weighted sum over physical interior T-cells. |
+| `area_weights` | function | Dispatch to `cartesian_area_weights` or `spherical_area_weights`. |
 | `avg_x_bwd_1d` | function | Backward average in x, 1-D: U (or X) → T (or V) points. |
 | `avg_x_bwd_2d` | function | Backward average in x, 2-D: U (or X) → T (or V) points. |
 | `avg_x_bwd_3d` | function | Backward average in x, 3-D: U (or X) → T (or V) points. |
@@ -674,6 +647,12 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `avg_y_fwd_3d` | function | Forward average in y, 3-D: T (or U) → V (or X) points. |
 | `avg_z_bwd_3d` | function | Backward average in z, 3-D: W → T points. |
 | `avg_z_fwd_3d` | function | Forward average in z, 3-D: T → W points. |
+| `cartesian_area_mean` | function | Cartesian area-weighted mean. |
+| `cartesian_area_sum` | function | Cartesian area-weighted sum (`area_sum` with Cartesian grid). |
+| `cartesian_area_weights` | function | T-cell areas on a Cartesian grid. |
+| `cartesian_volume_mean` | function | Cartesian volume-weighted mean. |
+| `cartesian_volume_sum` | function | Cartesian volume-weighted sum. |
+| `cartesian_volume_weights` | function | T-cell volumes on a Cartesian 3-D grid: ``dx · dy · dz`` (``xp`` as in `area_weights`). |
 | `count_contiguous` | function | Count contiguous wet cells from each point along one axis (n-D). |
 | `diff_x_bwd_1d` | function | Backward difference in x, 1-D: U (or X) → T (or V) points. |
 | `diff_x_bwd_2d` | function | Backward difference in x, 2-D: U (or X) → T (or V) points. |
@@ -690,11 +669,52 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `dilate_mask` | function | Binary dilation by 1 cell with an n-D *cross* structuring element. |
 | `h_from_pooled` | function | Inverse of `pool_bool` for binary inputs. |
 | `interior` | function | Create an array shaped like ``like``, zero everywhere except the interior. |
+| `linear_2pts` | function | 2-point centred reconstruction at face i+1/2. |
+| `linear_3pts_left` | function | 3-point left-biased reconstruction at face i+1/2. |
+| `linear_3pts_right` | function | 3-point right-biased reconstruction at face i+1/2. |
+| `linear_4pts` | function | 4-point centred reconstruction at face i+1/2. |
+| `linear_5pts_left` | function | 5-point left-biased reconstruction at face i+1/2. |
+| `linear_5pts_right` | function | 5-point right-biased reconstruction at face i+1/2. |
+| `linear_6pts` | function | 6-point centred reconstruction at face i+1/2. |
 | `make_sponge` | function | n-D linear sponge ramp: 0 at every wall, 1 in the interior. |
+| `masked_mean` | function | Mean over ``axis``, excluding dry cells. |
+| `masked_moments` | function | ``(mean, std)`` in one call — see `masked_mean`, `masked_std`. |
+| `masked_std` | function | Standard deviation over ``axis``, excluding dry cells, floored at ``eps``. |
+| `mc` | function | Monotonized Central (MC) flux limiter. |
+| `minmod` | function | Minmod flux limiter. |
+| `plusminus` | function | Split velocity into positive and negative parts. |
 | `pool_bool` | function | n-D average-pool of a binary mask with one-sided zero padding. |
+| `reconstruct` | function | Compute upwind face flux along *dim* using the given reconstruction method. |
 | `smooth_abs` | function | Smooth approximation of ``\|x\|`` with a nonzero gradient at the origin. |
 | `smooth_clamp` | function | Smooth approximation of ``max(x, x_min)`` (a soft lower clamp). |
 | `smooth_max` | function | Smooth approximation of the elementwise ``max(x, y)``. |
+| `spherical_area_mean` | function | Spherical area-weighted mean. |
+| `spherical_area_sum` | function | Spherical area-weighted sum. |
+| `spherical_area_weights` | function | T-cell areas on a spherical grid, exact for a lat-lon cell. |
+| `spherical_volume_mean` | function | Spherical volume-weighted mean. |
+| `spherical_volume_sum` | function | Spherical volume-weighted sum. |
+| `spherical_volume_weights` | function | T-cell volumes on a spherical 3-D grid. |
+| `superbee` | function | Superbee flux limiter. |
+| `upwind_1pt` | function | 1st-order upwind face value at interior faces along the last axis. |
+| `upwind_3pt` | function | 3-point upwind face value at i+1/2 along the last axis. |
+| `upwind_5pt` | function | 5-point upwind face value at i+1/2 along the last axis. |
+| `upwind_flux` | function | Compute upwind flux with automatic stencil fallback near boundaries. |
+| `van_leer` | function | Van Leer flux limiter. |
+| `volume_mean` | function | Volume-weighted mean over physical interior T-cells (3-D). |
+| `volume_sum` | function | Volume-weighted sum over physical interior T-cells (3-D). |
+| `volume_weights` | function | Dispatch to Cartesian/spherical volume weights (``xp`` as in `area_weights`). |
+| `weno_3pts` | function | 3-points non-linear left-biased stencil reconstruction: |
+| `weno_3pts_improved` | function | 3-points non-linear left-biased stencil reconstruction: |
+| `weno_3pts_improved_right` | function | 3-points non-linear right-biased WENO-Z stencil reconstruction at face q0+1/2: |
+| `weno_3pts_right` | function | 3-points non-linear right-biased stencil reconstruction at face q0+1/2: |
+| `weno_5pts` | function | 5-points non-linear left-biased stencil reconstruction |
+| `weno_5pts_improved` | function | 5-points non-linear left-biased stencil reconstruction |
+| `weno_5pts_improved_right` | function | 5-points non-linear right-biased WENO-Z stencil reconstruction at face q0+1/2: |
+| `weno_5pts_right` | function | 5-points non-linear right-biased stencil reconstruction at face q0+1/2: |
+| `weno_7pts` | function | 7-points non-linear left-biased stencil reconstruction |
+| `weno_7pts_right` | function | 7-points non-linear right-biased stencil reconstruction at face q0+1/2: |
+| `weno_9pts` | function | 9-points non-linear left-biased stencil reconstruction |
+| `weno_9pts_right` | function | 9-points non-linear right-biased stencil reconstruction at face q0+1/2: |
 
 ### `gridax.analysis`
 

@@ -27,26 +27,37 @@ Example
 
 from __future__ import annotations
 
-from gridax import (
+from typing import TYPE_CHECKING, Any
+
+from jaxtyping import Bool, Float
+import numpy as np
+
+from gridax._src.grid import (
     ArakawaCGrid2D,
     ArakawaCGrid3D,
     CartesianGrid2D,
     CartesianGrid3D,
-    Mask2D,
-    Mask3D,
     SphericalGrid2D,
     SphericalGrid3D,
 )
+from gridax._src.mask import Mask2D, Mask3D
 from gridax._src.operators._utils import _metric_like
-import jax.numpy as jnp
-from jaxtyping import Array, Bool, Float
+from gridax._src.pytree import array_namespace
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
+
 
 # ----------------------------------------------------------------------
 # Cell-area / cell-volume metrics
 # ----------------------------------------------------------------------
 
 
-def cartesian_area_weights(grid: CartesianGrid2D) -> Float[Array, "Ny Nx"]:
+def cartesian_area_weights(
+    grid: CartesianGrid2D, *, xp: Any = None
+) -> Float[Array, "Ny Nx"]:
     """T-cell areas on a Cartesian grid.
 
     ``A[j, i] = dx · dy`` broadcast to the grid shape.
@@ -54,16 +65,24 @@ def cartesian_area_weights(grid: CartesianGrid2D) -> Float[Array, "Ny Nx"]:
     Parameters
     ----------
     grid : CartesianGrid2D
+    xp : array namespace, optional
+        The namespace to build the weights in. Default: the namespace of
+        the grid's own arrays (NumPy for a grid built with ``from_interior``,
+        JAX when the grid's leaves are traced). The reductions pass the
+        field's namespace.
 
     Returns
     -------
     Float[Array, "Ny Nx"]
         Per-cell area, constant everywhere.
     """
-    return jnp.full((grid.Ny, grid.Nx), grid.dx * grid.dy)
+    xp = array_namespace(grid.dx, grid.dy) if xp is None else xp
+    return xp.full((grid.Ny, grid.Nx), grid.dx * grid.dy)
 
 
-def spherical_area_weights(grid: SphericalGrid2D) -> Float[Array, "Ny Nx"]:
+def spherical_area_weights(
+    grid: SphericalGrid2D, *, xp: Any = None
+) -> Float[Array, "Ny Nx"]:
     """T-cell areas on a spherical grid, exact for a lat-lon cell.
 
     ``A[j, i] = R² · dlon · (sin lat_{j+1/2} − sin lat_{j−1/2})
@@ -82,25 +101,36 @@ def spherical_area_weights(grid: SphericalGrid2D) -> Float[Array, "Ny Nx"]:
     Parameters
     ----------
     grid : SphericalGrid2D
+    xp : array namespace, optional
+        The namespace to build the weights in. Default: the namespace of
+        the grid's own arrays (NumPy for a grid built with ``from_interior``,
+        JAX when the grid's leaves are traced). The reductions pass the
+        field's namespace.
 
     Returns
     -------
     Float[Array, "Ny Nx"]
         Per-T-cell area.
     """
-    cos_T = jnp.asarray(grid.cos_lat_T)
-    base = 2.0 * grid.R**2 * grid.dlon * jnp.sin(0.5 * grid.dlat)
-    degenerate = cos_T <= 8.0 * jnp.finfo(cos_T.dtype).eps
-    return jnp.where(degenerate, 0.0, base * cos_T)
+    xp = array_namespace(grid.cos_lat_T) if xp is None else xp
+    cos_T = xp.asarray(grid.cos_lat_T)
+    base = 2.0 * grid.R**2 * grid.dlon * xp.sin(xp.asarray(0.5 * grid.dlat))
+    degenerate = cos_T <= 8.0 * xp.finfo(cos_T.dtype).eps
+    return xp.where(degenerate, 0.0, base * cos_T)
 
 
-def area_weights(grid: ArakawaCGrid2D) -> Float[Array, "Ny Nx"]:
+def area_weights(grid: ArakawaCGrid2D, *, xp: Any = None) -> Float[Array, "Ny Nx"]:
     """Dispatch to :func:`cartesian_area_weights` or :func:`spherical_area_weights`.
 
     Parameters
     ----------
     grid : ArakawaCGrid2D
         A concrete 2-D grid (Cartesian or spherical).
+    xp : array namespace, optional
+        The namespace to build the weights in. Default: the namespace of
+        the grid's own arrays (NumPy for a grid built with ``from_interior``,
+        JAX when the grid's leaves are traced). The reductions pass the
+        field's namespace.
 
     Returns
     -------
@@ -113,37 +143,43 @@ def area_weights(grid: ArakawaCGrid2D) -> Float[Array, "Ny Nx"]:
         If the grid type is not recognized.
     """
     if isinstance(grid, SphericalGrid2D):
-        return spherical_area_weights(grid)
+        return spherical_area_weights(grid, xp=xp)
     if isinstance(grid, CartesianGrid2D):
-        return cartesian_area_weights(grid)
+        return cartesian_area_weights(grid, xp=xp)
     raise TypeError(
         f"area_weights: unsupported grid type {type(grid).__name__}. "
         "Use CartesianGrid2D or SphericalGrid2D."
     )
 
 
-def cartesian_volume_weights(grid: CartesianGrid3D) -> Float[Array, "Nz Ny Nx"]:
-    """T-cell volumes on a Cartesian 3-D grid: ``dx · dy · dz``."""
-    return jnp.full((grid.Nz, grid.Ny, grid.Nx), grid.dx * grid.dy * grid.dz)
+def cartesian_volume_weights(
+    grid: CartesianGrid3D, *, xp: Any = None
+) -> Float[Array, "Nz Ny Nx"]:
+    """T-cell volumes on a Cartesian 3-D grid: ``dx · dy · dz`` (``xp`` as in :func:`area_weights`)."""
+    xp = array_namespace(grid.dx, grid.dy, grid.dz) if xp is None else xp
+    return xp.full((grid.Nz, grid.Ny, grid.Nx), grid.dx * grid.dy * grid.dz)
 
 
-def spherical_volume_weights(grid: SphericalGrid3D) -> Float[Array, "Nz Ny Nx"]:
+def spherical_volume_weights(
+    grid: SphericalGrid3D, *, xp: Any = None
+) -> Float[Array, "Nz Ny Nx"]:
     """T-cell volumes on a spherical 3-D grid.
 
     ``V[k, j, i] = R² · cos(lat_T[j, i]) · dlon · dlat · dz`` — the
     horizontal area broadcast over z, times the uniform vertical
-    thickness.
+    thickness. ``xp`` as in :func:`area_weights`.
     """
-    area_2d = spherical_area_weights(grid.horizontal_grid())
-    return jnp.broadcast_to(area_2d * grid.dz, (grid.Nz, grid.Ny, grid.Nx))
+    xp = array_namespace(grid.cos_lat_T) if xp is None else xp
+    area_2d = spherical_area_weights(grid.horizontal_grid(), xp=xp)
+    return xp.broadcast_to(area_2d * grid.dz, (grid.Nz, grid.Ny, grid.Nx))
 
 
-def volume_weights(grid: ArakawaCGrid3D) -> Float[Array, "Nz Ny Nx"]:
-    """Dispatch to Cartesian/spherical volume weights based on grid type."""
+def volume_weights(grid: ArakawaCGrid3D, *, xp: Any = None) -> Float[Array, "Nz Ny Nx"]:
+    """Dispatch to Cartesian/spherical volume weights (``xp`` as in :func:`area_weights`)."""
     if isinstance(grid, SphericalGrid3D):
-        return spherical_volume_weights(grid)
+        return spherical_volume_weights(grid, xp=xp)
     if isinstance(grid, CartesianGrid3D):
-        return cartesian_volume_weights(grid)
+        return cartesian_volume_weights(grid, xp=xp)
     raise TypeError(
         f"volume_weights: unsupported grid type {type(grid).__name__}. "
         "Use CartesianGrid3D or SphericalGrid3D."
@@ -173,14 +209,15 @@ def _apply_mask_2d(
     totals.  Returns the inputs unchanged when ``mask is None``.  The
     dtype of ``field`` and ``weights`` is preserved.
     """
+    xp = array_namespace(field, weights)
     if mask is None:
         return field, weights
     m = mask.h  # Bool[Array, "Ny Nx"]
     # Use plain 0.0 (weak-typed) so the mask path does not introduce an
     # upcast to float64 on top of the input dtype; the actual dtype
     # comes from the field/weights arrays themselves.
-    safe_field = jnp.where(m, field, 0.0)
-    safe_weights = jnp.where(m, weights, 0.0)
+    safe_field = xp.where(m, field, 0.0)
+    safe_weights = xp.where(m, weights, 0.0)
     return safe_field, safe_weights
 
 
@@ -212,9 +249,10 @@ def area_sum(
         Scalar area-weighted sum.  Dtype follows the promoted dtype of
         ``field`` and the area weights.
     """
-    w = _metric_like(area_weights(grid), field)
+    xp = array_namespace(field)
+    w = _metric_like(area_weights(grid, xp=xp), field)
     f, w = _apply_mask_2d(field, w, mask)
-    return jnp.sum(_interior_2d(w * f))
+    return xp.sum(_interior_2d(w * f))
 
 
 def area_mean(
@@ -242,12 +280,13 @@ def area_mean(
     Float[Array, ""]
         Scalar area-weighted mean, or NaN if the total wet area is 0.
     """
-    w = _metric_like(area_weights(grid), field)
+    xp = array_namespace(field)
+    w = _metric_like(area_weights(grid, xp=xp), field)
     f, w = _apply_mask_2d(field, w, mask)
     wi = _interior_2d(w)
-    num = jnp.sum(wi * _interior_2d(f))
-    den = jnp.sum(wi)
-    return jnp.where(den == 0.0, jnp.nan, num / jnp.where(den == 0.0, 1.0, den))
+    num = xp.sum(wi * _interior_2d(f))
+    den = xp.sum(wi)
+    return xp.where(den == 0.0, xp.nan, num / xp.where(den == 0.0, 1.0, den))
 
 
 # ----------------------------------------------------------------------
@@ -270,12 +309,13 @@ def _apply_mask_3d(
 
     Same NaN/Inf-safe pattern as :func:`_apply_mask_2d`.
     """
+    xp = array_namespace(field, weights)
     if mask is None:
         return field, weights
     m = mask.h  # Bool[Array, "Nz Ny Nx"]
     # See _apply_mask_2d for the weak-typed 0.0 rationale.
-    safe_field = jnp.where(m, field, 0.0)
-    safe_weights = jnp.where(m, weights, 0.0)
+    safe_field = xp.where(m, field, 0.0)
+    safe_weights = xp.where(m, weights, 0.0)
     return safe_field, safe_weights
 
 
@@ -303,9 +343,10 @@ def volume_sum(
     -------
     Float[Array, ""]
     """
-    w = _metric_like(volume_weights(grid), field)
+    xp = array_namespace(field)
+    w = _metric_like(volume_weights(grid, xp=xp), field)
     f, w = _apply_mask_3d(field, w, mask)
-    return jnp.sum(_interior_3d(w * f))
+    return xp.sum(_interior_3d(w * f))
 
 
 def volume_mean(
@@ -318,12 +359,13 @@ def volume_mean(
     Returns ``(Σ V·field) / (Σ V)`` over wet T-cells.  NaN/Inf-safe
     under masking; NaN when the total wet volume is zero.
     """
-    w = _metric_like(volume_weights(grid), field)
+    xp = array_namespace(field)
+    w = _metric_like(volume_weights(grid, xp=xp), field)
     f, w = _apply_mask_3d(field, w, mask)
     wi = _interior_3d(w)
-    num = jnp.sum(wi * _interior_3d(f))
-    den = jnp.sum(wi)
-    return jnp.where(den == 0.0, jnp.nan, num / jnp.where(den == 0.0, 1.0, den))
+    num = xp.sum(wi * _interior_3d(f))
+    den = xp.sum(wi)
+    return xp.where(den == 0.0, xp.nan, num / xp.where(den == 0.0, 1.0, den))
 
 
 # ----------------------------------------------------------------------
@@ -445,6 +487,7 @@ def _sample_counts(
     entries per output element, and ``wet`` is the broadcast boolean
     mask (``None`` when no mask was supplied).
     """
+    xp = array_namespace(samples)
     dtype = _accumulation_dtype(samples)
     if mask is None:
         # The count is the same everywhere, so take it from the shape
@@ -455,16 +498,16 @@ def _sample_counts(
         count = 1
         for reduced in axes:
             count *= samples.shape[reduced]
-        return samples.astype(dtype), jnp.asarray(count, dtype=dtype), None
+        return samples.astype(dtype), xp.asarray(count, dtype=dtype), None
 
     m = _location_mask(mask, location)
-    wet = jnp.broadcast_to(m, samples.shape)
-    safe = jnp.where(wet, samples, 0.0).astype(dtype)
-    count = jnp.sum(wet.astype(dtype), axis=axis)
+    wet = xp.broadcast_to(m, samples.shape)
+    safe = xp.where(wet, samples, 0.0).astype(dtype)
+    count = xp.sum(wet.astype(dtype), axis=axis)
     return safe, count, wet
 
 
-def _accumulation_dtype(samples: Float[Array, "N ..."]) -> jnp.dtype:
+def _accumulation_dtype(samples: Float[Array, "N ..."]) -> Any:
     """Floating dtype wide enough to accumulate ``samples`` safely.
 
     At least float32.  A half-precision input is promoted rather than
@@ -479,7 +522,8 @@ def _accumulation_dtype(samples: Float[Array, "N ..."]) -> jnp.dtype:
     there is no half-precision value that could carry the guarantee.
     ``float32`` and ``float64`` inputs are returned unchanged.
     """
-    return jnp.promote_types(jnp.asarray(samples).dtype, jnp.float32)
+    xp = array_namespace(samples)
+    return xp.promote_types(xp.asarray(samples).dtype, xp.float32)
 
 
 def masked_mean(
@@ -524,10 +568,11 @@ def masked_mean(
         ``(x - loc) / scale`` leaves a dry cell at zero and the inverse
         map stays well defined.
     """
+    xp = array_namespace(samples)
     safe, count, _ = _sample_counts(samples, mask, location, axis)
-    total = jnp.sum(safe, axis=axis)
+    total = xp.sum(safe, axis=axis)
     empty = count == 0
-    return jnp.where(empty, 0.0, total / jnp.where(empty, 1.0, count))
+    return xp.where(empty, 0.0, total / xp.where(empty, 1.0, count))
 
 
 def masked_std(
@@ -575,23 +620,22 @@ def masked_std(
         form the estimate.  In the input dtype or ``float32``,
         whichever is wider — see :func:`_accumulation_dtype`.
     """
+    xp = array_namespace(samples)
     safe, count, wet = _sample_counts(samples, mask, location, axis)
     empty = count == 0
 
-    mean = jnp.where(
-        empty, 0.0, jnp.sum(safe, axis=axis) / jnp.where(empty, 1.0, count)
-    )
-    # ``jnp.expand_dims`` accepts a tuple, re-inserting every reduced
+    mean = xp.where(empty, 0.0, xp.sum(safe, axis=axis) / xp.where(empty, 1.0, count))
+    # ``xp.expand_dims`` accepts a tuple, re-inserting every reduced
     # axis as a size-1 dimension so the mean broadcasts back.
-    dev = safe - jnp.expand_dims(mean, axis)
+    dev = safe - xp.expand_dims(mean, axis)
     # Re-zero dry entries: ``safe - mean`` is ``-mean`` on land, which
     # would otherwise contribute to the variance of a spatial reduction.
     if wet is not None:
-        dev = jnp.where(wet, dev, 0.0)
+        dev = xp.where(wet, dev, 0.0)
 
     denom = count - ddof
     degenerate = denom <= 0
-    var = jnp.sum(dev**2, axis=axis) / jnp.where(degenerate, 1.0, denom)
+    var = xp.sum(dev**2, axis=axis) / xp.where(degenerate, 1.0, denom)
 
     # Two separate jobs, done in two steps rather than one.
     #
@@ -613,12 +657,12 @@ def masked_std(
     # where it is representable whatever its size. Where it binds, its
     # gradient is zero.
     positive = var > 0.0
-    std = jnp.where(positive, jnp.sqrt(jnp.where(positive, var, 1.0)), 0.0)
-    std = jnp.maximum(std, eps)
+    std = xp.where(positive, xp.sqrt(xp.where(positive, var, 1.0)), 0.0)
+    std = xp.maximum(std, eps)
     # ``empty`` as well as ``degenerate``: with a negative ddof a dry
     # cell has ``count == 0`` but ``denom > 0``, so it is not
     # degenerate and would be handed ``eps`` instead of the identity.
-    return jnp.where(degenerate | empty, 1.0, std)
+    return xp.where(degenerate | empty, 1.0, std)
 
 
 def masked_moments(

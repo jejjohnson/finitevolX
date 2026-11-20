@@ -5,7 +5,7 @@ from gridax import (
     SphericalGrid2D,
     SphericalGrid3D,
 )
-from gridax_jax._src.operators.reductions import spherical_area_weights
+from gridax._src.operators.reductions import spherical_area_weights
 from gridax_jax._src.operators.spherical_compound import (
     SphericalDivergence2D,
     SphericalDivergence3D,

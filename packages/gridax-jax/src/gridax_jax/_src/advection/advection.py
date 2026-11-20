@@ -32,11 +32,11 @@ from gridax import (
     Mask2D,
     Mask3D,
 )
+from gridax._src.advection.flux import narrow_mask_hierarchy, upwind_flux
 from gridax._src.operators._ghost import interior
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 
-from gridax_jax._src.advection.flux import narrow_mask_hierarchy, upwind_flux
 from gridax_jax._src.advection.reconstruction import (
     Reconstruction1D,
     Reconstruction2D,

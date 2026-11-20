@@ -1,9 +1,16 @@
 from __future__ import annotations
 
-import jax
-import jax.numpy as jnp
-from jaxtyping import Array
+from typing import TYPE_CHECKING
+
 import numpy as np
+
+from gridax._src.backend import stop_gradient
+from gridax._src.pytree import array_namespace
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 # Relative WENO floor (#243).  The weights are the textbook
 # ``g_k / (beta_k + eps)²`` with ``eps = eps_rel · Σβ``, a floor relative to
@@ -23,9 +30,10 @@ def _normalised(betas: tuple[Array, ...], *extra: Array) -> list[Array]:
     Exact (see above); ``extra`` carries WENO-Z's ``tau``, a difference of
     indicators that scales like them.
     """
-    total = jax.lax.stop_gradient(sum(betas))
-    tiny = jnp.finfo(jnp.result_type(total)).tiny
-    inv = 1.0 / jnp.where(total > tiny, total, 1.0)
+    xp = array_namespace(*betas)
+    total = stop_gradient(sum(betas))
+    tiny = xp.finfo(xp.result_type(total)).tiny
+    inv = 1.0 / xp.where(total > tiny, total, 1.0)
     return [v * inv for v in (*betas, *extra)]
 
 
@@ -362,13 +370,14 @@ def weno_3pts_improved(qm: Array, q0: Array, qp: Array) -> Array:
     An improved weighted essentially non-oscillatory scheme for hyperbolic
     conservation laws, Borges et al, Journal of Computational Physics 227 (2008).
     """
+    xp = array_namespace(qm, q0, qp)
 
     qi1 = -1.0 / 2.0 * qm + 3.0 / 2.0 * q0
     qi2 = 1.0 / 2.0 * (q0 + qp)
 
     beta1 = (q0 - qm) ** 2
     beta2 = (qp - q0) ** 2
-    tau = jnp.abs(beta2 - beta1)
+    tau = xp.abs(beta2 - beta1)
 
     g1, g2 = 1.0 / 3.0, 2.0 / 3.0
     b1, b2, t = _normalised((beta1, beta2), tau)
@@ -420,6 +429,7 @@ def weno_5pts_improved(
     An improved weighted essentially non-oscillatory scheme for hyperbolic
     conservation laws, Borges et al, Journal of Computational Physics 227 (2008)
     """
+    xp = array_namespace(qmm, qm, q0, qp, qpp)
 
     qi1 = 1.0 / 3.0 * qmm - 7.0 / 6.0 * qm + 11.0 / 6.0 * q0
     qi2 = -1.0 / 6.0 * qm + 5.0 / 6.0 * q0 + 1.0 / 3.0 * qp
@@ -430,7 +440,7 @@ def weno_5pts_improved(
     beta2 = k1 * (qm - 2 * q0 + qp) ** 2 + k2 * (qm - qp) ** 2
     beta3 = k1 * (q0 - 2 * qp + qpp) ** 2 + k2 * (3 * q0 - 4 * qp + qpp) ** 2
 
-    tau5 = jnp.abs(beta1 - beta3)
+    tau5 = xp.abs(beta1 - beta3)
 
     g1, g2, g3 = 0.1, 0.6, 0.3
     b1, b2, b3, t = _normalised((beta1, beta2, beta3), tau5)
@@ -476,13 +486,14 @@ def weno_3pts_improved_right(q0: Array, qp: Array, qpp: Array) -> Array:
 
     Borges et al, J. Comput. Phys. 227 (2008).
     """
+    xp = array_namespace(q0, qp, qpp)
 
     qi1 = 0.5 * (q0 + qp)
     qi2 = 1.5 * qp - 0.5 * qpp
 
     beta1 = (qp - q0) ** 2
     beta2 = (qpp - qp) ** 2
-    tau = jnp.abs(beta2 - beta1)
+    tau = xp.abs(beta2 - beta1)
 
     g1, g2 = 2.0 / 3.0, 1.0 / 3.0
     b1, b2, t = _normalised((beta1, beta2), tau)
@@ -534,6 +545,7 @@ def weno_5pts_improved_right(
 
     Borges et al, J. Comput. Phys. 227 (2008).
     """
+    xp = array_namespace(qm, q0, qp, qpp, qppp)
 
     qi1 = 1.0 / 3.0 * qppp - 7.0 / 6.0 * qpp + 11.0 / 6.0 * qp
     qi2 = -1.0 / 6.0 * qpp + 5.0 / 6.0 * qp + 1.0 / 3.0 * q0
@@ -544,7 +556,7 @@ def weno_5pts_improved_right(
     beta2 = k1 * (q0 - 2 * qp + qpp) ** 2 + k2 * (q0 - qpp) ** 2
     beta3 = k1 * (qm - 2 * q0 + qp) ** 2 + k2 * (qm - 4 * q0 + 3 * qp) ** 2
 
-    tau5 = jnp.abs(beta1 - beta3)
+    tau5 = xp.abs(beta1 - beta3)
 
     g1, g2, g3 = 0.1, 0.6, 0.3
     b1, b2, b3, t = _normalised((beta1, beta2, beta3), tau5)

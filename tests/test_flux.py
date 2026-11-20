@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
+from gridax._src.advection.flux import upwind_flux
 from gridax_jax._src.advection.advection import Advection2D, Advection3D
-from gridax_jax._src.advection.flux import upwind_flux
 from gridax_jax._src.advection.reconstruction import Reconstruction2D
 import jax.numpy as jnp
 import numpy as np

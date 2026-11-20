@@ -17,6 +17,9 @@ from gridax import (
     StencilCapability1D,
     StencilCapability2D,
     StencilCapability3D,
+    area_mean,
+    area_sum,
+    area_weights,
     avg_x_bwd_1d,
     avg_x_bwd_2d,
     avg_x_bwd_3d,
@@ -31,6 +34,12 @@ from gridax import (
     avg_y_bwd_3d,
     avg_y_fwd_2d,
     avg_y_fwd_3d,
+    cartesian_area_mean,
+    cartesian_area_sum,
+    cartesian_area_weights,
+    cartesian_volume_mean,
+    cartesian_volume_sum,
+    cartesian_volume_weights,
     diff_x_bwd_1d,
     diff_x_bwd_2d,
     diff_x_bwd_3d,
@@ -42,21 +51,6 @@ from gridax import (
     diff_y_fwd_2d,
     diff_y_fwd_3d,
     interior,
-    smooth_abs,
-    smooth_clamp,
-    smooth_max,
-)
-from gridax._src.operators.stencils import RENAMED as _RENAMED_STENCILS
-
-from gridax_jax._src.advection.advection import Advection1D, Advection2D, Advection3D
-from gridax_jax._src.advection.face_flux import (
-    rusanov_flux,
-    uv_center_flux,
-    uv_node_flux,
-)
-from gridax_jax._src.advection.flux import upwind_flux
-from gridax_jax._src.advection.limiters import mc, minmod, superbee, van_leer
-from gridax_jax._src.advection.linear import (
     linear_2pts,
     linear_3pts_left,
     linear_3pts_right,
@@ -64,24 +58,31 @@ from gridax_jax._src.advection.linear import (
     linear_5pts_left,
     linear_5pts_right,
     linear_6pts,
-)
-from gridax_jax._src.advection.reconstruct_fn import (
+    masked_mean,
+    masked_moments,
+    masked_std,
+    mc,
+    minmod,
     plusminus,
     reconstruct,
+    smooth_abs,
+    smooth_clamp,
+    smooth_max,
+    spherical_area_mean,
+    spherical_area_sum,
+    spherical_area_weights,
+    spherical_volume_mean,
+    spherical_volume_sum,
+    spherical_volume_weights,
+    superbee,
     upwind_1pt,
     upwind_3pt,
     upwind_5pt,
-)
-from gridax_jax._src.advection.reconstruction import (
-    Reconstruction1D,
-    Reconstruction2D,
-    Reconstruction3D,
-)
-from gridax_jax._src.advection.spherical_advection import (
-    SphericalAdvection2D,
-    SphericalAdvection3D,
-)
-from gridax_jax._src.advection.weno import (
+    upwind_flux,
+    van_leer,
+    volume_mean,
+    volume_sum,
+    volume_weights,
     weno_3pts,
     weno_3pts_improved,
     weno_3pts_improved_right,
@@ -94,6 +95,23 @@ from gridax_jax._src.advection.weno import (
     weno_7pts_right,
     weno_9pts,
     weno_9pts_right,
+)
+from gridax._src.operators.stencils import RENAMED as _RENAMED_STENCILS
+
+from gridax_jax._src.advection.advection import Advection1D, Advection2D, Advection3D
+from gridax_jax._src.advection.face_flux import (
+    rusanov_flux,
+    uv_center_flux,
+    uv_node_flux,
+)
+from gridax_jax._src.advection.reconstruction import (
+    Reconstruction1D,
+    Reconstruction2D,
+    Reconstruction3D,
+)
+from gridax_jax._src.advection.spherical_advection import (
+    SphericalAdvection2D,
+    SphericalAdvection3D,
 )
 from gridax_jax._src.boundary.bc_1d import (
     Dirichlet1D,
@@ -210,29 +228,6 @@ from gridax_jax._src.operators.interpolation import (
     Interpolation3D,
 )
 from gridax_jax._src.operators.jacobian import ArakawaJacobian2D, arakawa_jacobian
-from gridax_jax._src.operators.reductions import (
-    area_mean,
-    area_sum,
-    area_weights,
-    cartesian_area_mean,
-    cartesian_area_sum,
-    cartesian_area_weights,
-    cartesian_volume_mean,
-    cartesian_volume_sum,
-    cartesian_volume_weights,
-    masked_mean,
-    masked_moments,
-    masked_std,
-    spherical_area_mean,
-    spherical_area_sum,
-    spherical_area_weights,
-    spherical_volume_mean,
-    spherical_volume_sum,
-    spherical_volume_weights,
-    volume_mean,
-    volume_sum,
-    volume_weights,
-)
 from gridax_jax._src.operators.relaxation import linear_drag, rayleigh_relaxation
 from gridax_jax._src.operators.spherical_compound import (
     SphericalDivergence2D,
