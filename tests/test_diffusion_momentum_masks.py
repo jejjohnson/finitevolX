@@ -20,13 +20,13 @@ API on ``Mask2D`` / ``Mask3D`` class fields:
 from __future__ import annotations
 
 import equinox as eqx
-from gridax_jax._src.diffusion.diffusion import (
+from gridax._src.diffusion.diffusion import (
     BiharmonicDiffusion2D,
     BiharmonicDiffusion3D,
     Diffusion2D,
     Diffusion3D,
 )
-from gridax_jax._src.diffusion.momentum import (
+from gridax._src.diffusion.momentum import (
     MomentumAdvection2D,
     MomentumAdvection3D,
 )

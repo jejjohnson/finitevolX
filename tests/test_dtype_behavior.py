@@ -10,11 +10,11 @@ from __future__ import annotations
 
 from gridax import CartesianGrid1D, CartesianGrid2D
 from gridax._src.advection.reconstruction import Reconstruction1D, Reconstruction2D
+from gridax._src.diffusion.diffusion import Diffusion2D, diffusion_2d
 from gridax._src.operators.difference import Difference1D, Difference2D
 from gridax._src.operators.divergence import Divergence2D, divergence_2d
 from gridax._src.operators.interpolation import Interpolation2D
 from gridax._src.operators.vorticity import Vorticity2D
-from gridax_jax._src.diffusion.diffusion import Diffusion2D, diffusion_2d
 import jax.numpy as jnp
 import numpy as np
 import pytest

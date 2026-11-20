@@ -84,12 +84,22 @@ Users who want masked diffusion should use ``Diffusion2D`` / ``Diffusion3D``.
 
 from __future__ import annotations
 
-import equinox as eqx
-from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
+from typing import TYPE_CHECKING
+
+from jaxtyping import Bool, Float
+import numpy as np
+
+from gridax._src.backend import set_at, vmap
+from gridax._src.grid import CartesianGrid2D, CartesianGrid3D
+from gridax._src.mask import Mask2D, Mask3D
 from gridax._src.operators._ghost import interior, zero_z_ghosts
 from gridax._src.operators.stencils import _materialize, avg_x_fwd_2d, avg_y_fwd_2d
-import jax.numpy as jnp
-from jaxtyping import Array, Bool, Float
+from gridax._src.pytree import array_namespace, pytree_dataclass
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
 def _check_diffusion_wall(wall: str, mask: object) -> None:
@@ -123,7 +133,8 @@ def _face_kappa(
     constant field the mean is exact, so the result equals the scalar path
     bit for bit.
     """
-    kappa = jnp.asarray(kappa)
+    xp = array_namespace(kappa)
+    kappa = xp.asarray(kappa)
     if kappa.ndim < 2:
         return kappa, kappa
     if wall == "open":
@@ -210,6 +221,7 @@ def _diffusion_2d_impl(
 
     ``wall`` selects the domain-wall face treatment (see :class:`Diffusion2D`).
     """
+    xp = array_namespace(h, kappa, mh, mu, mv)
     if wall not in ("closed", "open"):
         raise ValueError(f"wall must be 'closed' or 'open'; got {wall!r}")
     # κ at the faces computed below (arithmetic mean of the two T cells)
@@ -253,10 +265,10 @@ def _diffusion_2d_impl(
             fy = fy * mv[1:-2, 1:-1]
         # flux at the east / west face of every interior cell; the closed
         # walls (east face of the last column, west face of the first) are 0
-        fx_e = jnp.pad(fx, ((0, 0), (0, 1)))  # [Ny-2, Nx-2]
-        fx_w = jnp.pad(fx, ((0, 0), (1, 0)))
-        fy_n = jnp.pad(fy, ((0, 1), (0, 0)))  # [Ny-2, Nx-2]
-        fy_s = jnp.pad(fy, ((1, 0), (0, 0)))
+        fx_e = xp.pad(fx, ((0, 0), (0, 1)))  # [Ny-2, Nx-2]
+        fx_w = xp.pad(fx, ((0, 0), (1, 0)))
+        fy_n = xp.pad(fy, ((0, 1), (0, 0)))  # [Ny-2, Nx-2]
+        fy_s = xp.pad(fy, ((1, 0), (0, 0)))
 
     # Step 3: Tendency at T-points (divergence of flux)
     # dh[j, i] = (flux_x[j, i+1/2] - flux_x[j, i-1/2]) / dx
@@ -288,13 +300,14 @@ def _diffusion_2d_fluxes_impl(
     the caller-filled ghost ring so lateral Dirichlet / periodic boundaries
     produce a diffusive flux through the wall.
     """
+    xp = array_namespace(h, kappa, mu, mv)
     if wall not in ("closed", "open"):
         raise ValueError(f"wall must be 'closed' or 'open'; got {wall!r}")
     # κ at the faces written below: the arithmetic mean of the two T cells
     kappa_x, kappa_y = _face_kappa(kappa, wall)
 
-    flux_x = jnp.zeros_like(h)
-    flux_y = jnp.zeros_like(h)
+    flux_x = xp.zeros_like(h)
+    flux_y = xp.zeros_like(h)
 
     if wall == "open":
         # East-face flux at ALL faces i = 0 ... Nx-2, including the west
@@ -308,17 +321,21 @@ def _diffusion_2d_fluxes_impl(
         # unconditionally.
         #   flux_x[j, i+1/2] = κ[j, i+1/2] * (h[j, i+1] - h[j, i]) / dx
         #   flux_y[j+1/2, i] = κ[j+1/2, i] * (h[j+1, i] - h[j, i]) / dy
-        flux_x = flux_x.at[1:-1, :-1].set(kappa_x * (h[1:-1, 1:] - h[1:-1, :-1]) / dx)
-        flux_y = flux_y.at[:-1, 1:-1].set(kappa_y * (h[1:, 1:-1] - h[:-1, 1:-1]) / dy)
+        flux_x = set_at(
+            flux_x, np.s_[1:-1, :-1], kappa_x * (h[1:-1, 1:] - h[1:-1, :-1]) / dx
+        )
+        flux_y = set_at(
+            flux_y, np.s_[:-1, 1:-1], kappa_y * (h[1:, 1:-1] - h[:-1, 1:-1]) / dy
+        )
     else:
         # Interior faces only; wall faces stay 0 → no-flux (closed) walls.
         #   flux_x[j, i+1/2] = κ[j, i+1/2] * (h[j, i+1] - h[j, i]) / dx
         #   flux_y[j+1/2, i] = κ[j+1/2, i] * (h[j+1, i] - h[j, i]) / dy
-        flux_x = flux_x.at[1:-1, 1:-2].set(
-            kappa_x * (h[1:-1, 2:-1] - h[1:-1, 1:-2]) / dx
+        flux_x = set_at(
+            flux_x, np.s_[1:-1, 1:-2], kappa_x * (h[1:-1, 2:-1] - h[1:-1, 1:-2]) / dx
         )
-        flux_y = flux_y.at[1:-2, 1:-1].set(
-            kappa_y * (h[2:-1, 1:-1] - h[1:-2, 1:-1]) / dy
+        flux_y = set_at(
+            flux_y, np.s_[1:-2, 1:-1], kappa_y * (h[2:-1, 1:-1] - h[1:-2, 1:-1]) / dy
         )
 
     if mu is not None:
@@ -329,7 +346,8 @@ def _diffusion_2d_fluxes_impl(
     return flux_x, flux_y
 
 
-class Diffusion2D(eqx.Module):
+@pytree_dataclass
+class Diffusion2D:
     """Horizontal diffusion operator (flux form) on a 2-D Arakawa C-grid.
 
     Computes ∂h/∂t = ∇·(κ ∇h) at T-points from staggered face fluxes via
@@ -489,7 +507,8 @@ class Diffusion2D(eqx.Module):
         )
 
 
-class Diffusion3D(eqx.Module):
+@pytree_dataclass
+class Diffusion3D:
     """Horizontal diffusion operator (flux form) on a 3-D Arakawa C-grid.
 
     Applies ∂h/∂t = ∇·(κ ∇h) independently at each z-level.
@@ -553,9 +572,10 @@ class Diffusion3D(eqx.Module):
             Diffusion tendency at T-points.  When ``self.mask`` is set,
             the intermediate-flux masking pattern is applied per-z-slice.
         """
+        xp = array_namespace(h, kappa)
         _check_diffusion_wall(wall, self.mask)
         dx, dy = self.grid.dx, self.grid.dy
-        kappa_arr = jnp.asarray(kappa)
+        kappa_arr = xp.asarray(kappa)
         kappa_ax = 0 if kappa_arr.ndim >= 3 else None
 
         if self.mask is None:
@@ -565,7 +585,7 @@ class Diffusion3D(eqx.Module):
                     h_k, kap_k, dx, dy, mh=None, mu=None, mv=None, wall=wall
                 )
 
-            out = eqx.filter_vmap(_apply_unmasked, in_axes=(0, kappa_ax))(h, kappa_arr)
+            out = vmap(_apply_unmasked, in_axes=(0, kappa_ax))(h, kappa_arr)
             return zero_z_ghosts(out)
 
         # Masked path: vmap with per-z slices of mask.h / mask.u / mask.v.
@@ -576,7 +596,7 @@ class Diffusion3D(eqx.Module):
         def _apply_masked(h_k, kap_k, mh_k, mu_k, mv_k):
             return _diffusion_2d_impl(h_k, kap_k, dx, dy, mh=mh_k, mu=mu_k, mv=mv_k)
 
-        out = eqx.filter_vmap(_apply_masked, in_axes=(0, kappa_ax, 0, 0, 0))(
+        out = vmap(_apply_masked, in_axes=(0, kappa_ax, 0, 0, 0))(
             h, kappa_arr, mh, mu, mv
         )
         return zero_z_ghosts(out)
@@ -607,9 +627,10 @@ class Diffusion3D(eqx.Module):
             ``flux_x`` is multiplied by ``mask.u`` and ``flux_y`` by
             ``mask.v`` at each z-level.
         """
+        xp = array_namespace(h, kappa)
         _check_diffusion_wall(wall, self.mask)
         dx, dy = self.grid.dx, self.grid.dy
-        kappa_arr = jnp.asarray(kappa)
+        kappa_arr = xp.asarray(kappa)
         kappa_ax = 0 if kappa_arr.ndim >= 3 else None
 
         if self.mask is None:
@@ -619,9 +640,7 @@ class Diffusion3D(eqx.Module):
                     h_k, kap_k, dx, dy, mu=None, mv=None, wall=wall
                 )
 
-            fx, fy = eqx.filter_vmap(_apply_unmasked, in_axes=(0, kappa_ax))(
-                h, kappa_arr
-            )
+            fx, fy = vmap(_apply_unmasked, in_axes=(0, kappa_ax))(h, kappa_arr)
             return zero_z_ghosts(fx), zero_z_ghosts(fy)
 
         mu = self.mask.u
@@ -630,13 +649,12 @@ class Diffusion3D(eqx.Module):
         def _apply_masked(h_k, kap_k, mu_k, mv_k):
             return _diffusion_2d_fluxes_impl(h_k, kap_k, dx, dy, mu=mu_k, mv=mv_k)
 
-        fx, fy = eqx.filter_vmap(_apply_masked, in_axes=(0, kappa_ax, 0, 0))(
-            h, kappa_arr, mu, mv
-        )
+        fx, fy = vmap(_apply_masked, in_axes=(0, kappa_ax, 0, 0))(h, kappa_arr, mu, mv)
         return zero_z_ghosts(fx), zero_z_ghosts(fy)
 
 
-class BiharmonicDiffusion2D(eqx.Module):
+@pytree_dataclass
+class BiharmonicDiffusion2D:
     """Biharmonic (∇⁴) diffusion operator on a 2-D Arakawa C-grid.
 
     Computes the local biharmonic diffusion tendency:
@@ -736,10 +754,11 @@ class BiharmonicDiffusion2D(eqx.Module):
             ``-kappa * Dm(Dm(h))`` (see the class docstring) and zero on
             dry cells.
         """
+        xp = array_namespace(h)
         if self.mask is not None:
             # land may hold NaN / 1e10: zero it before any stencil reads it
             # (NaN * 0 = NaN in the flux masking, and in its gradient)
-            h = jnp.where(self.mask.h, h, 0.0)
+            h = xp.where(self.mask.h, h, 0.0)
         # First Laplacian pass: kappa=1.0 gives pure nabla^2 h (Dm h when
         # masked: zero on dry cells, no flux through the coast).
         # _materialize: the second pass reads lap1 at four offsets; keep it as
@@ -751,7 +770,8 @@ class BiharmonicDiffusion2D(eqx.Module):
         return -kappa * lap2
 
 
-class BiharmonicDiffusion3D(eqx.Module):
+@pytree_dataclass
+class BiharmonicDiffusion3D:
     """Biharmonic (nabla^4) diffusion operator on a 3-D Arakawa C-grid.
 
     Applies the horizontal biharmonic Laplacian independently at each
@@ -828,9 +848,10 @@ class BiharmonicDiffusion3D(eqx.Module):
             When ``self.mask`` is set, it is ``-kappa * Dm(Dm(h))`` and zero
             on dry cells.
         """
+        xp = array_namespace(h)
         if self.mask is not None:
             # zero land (NaN / 1e10) before any stencil reads it
-            h = jnp.where(self.mask.h, h, 0.0)
+            h = xp.where(self.mask.h, h, 0.0)
         # _materialize: the second pass reads lap1 at four offsets; keep it as
         # one buffer rather than letting XLA recompute it per offset.
         lap1 = _materialize(self._harm(h, kappa=1.0))

@@ -22,14 +22,24 @@ References
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import warnings
 
-import equinox as eqx
-from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
+from jaxtyping import Float
+import numpy as np
+
+from gridax._src.backend import vmap
+from gridax._src.grid import CartesianGrid2D, CartesianGrid3D
+from gridax._src.mask import Mask2D, Mask3D
 from gridax._src.operators._ghost import interior, zero_z_ghosts
 from gridax._src.operators.difference import Difference2D
 from gridax._src.operators.interpolation import Interpolation2D
-from jaxtyping import Array, Float
+from gridax._src.pytree import pytree_dataclass
+
+if TYPE_CHECKING:
+    from jaxtyping import Array
+else:
+    Array = np.ndarray
 
 
 def _resolve_scheme(scheme: str) -> str:
@@ -49,7 +59,8 @@ def _resolve_scheme(scheme: str) -> str:
     return scheme
 
 
-class MomentumAdvection2D(eqx.Module):
+@pytree_dataclass
+class MomentumAdvection2D:
     """Energy-conserving momentum advection on a 2-D Arakawa C-grid.
 
     Computes the vortex-force form of the horizontal momentum advection:
@@ -234,7 +245,8 @@ class MomentumAdvection2D(eqx.Module):
         return du_adv, dv_adv
 
 
-class MomentumAdvection3D(eqx.Module):
+@pytree_dataclass
+class MomentumAdvection3D:
     """Energy-conserving momentum advection on a 3-D Arakawa C-grid.
 
     Applies ``MomentumAdvection2D``-equivalent stencils independently at
@@ -321,9 +333,9 @@ class MomentumAdvection3D(eqx.Module):
             or ``'blend'``.
         """
         scheme = _resolve_scheme(scheme)
-        du_adv, dv_adv = eqx.filter_vmap(
-            lambda u_k, v_k: self._madv2d(u_k, v_k, scheme=scheme)
-        )(u, v)
+        du_adv, dv_adv = vmap(lambda u_k, v_k: self._madv2d(u_k, v_k, scheme=scheme))(
+            u, v
+        )
         # Zero z-ghost slices.
         du_adv = zero_z_ghosts(du_adv)
         dv_adv = zero_z_ghosts(dv_adv)

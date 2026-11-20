@@ -57,39 +57,6 @@ if it is almost here, extend it where it lives. Regenerate with
 | `zero_boundaries` | function | Fill ghost ring with zeros (homogeneous Dirichlet). |
 | `zero_gradient_boundaries` | function | Fill ghost ring by copying nearest interior value (zero gradient / Neumann). |
 
-#### Harmonic and biharmonic diffusion operators (flux form) on Arakawa C-grids (`gridax_jax._src.diffusion.diffusion`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `BiharmonicDiffusion2D` | class | Biharmonic (∇⁴) diffusion operator on a 2-D Arakawa C-grid. |
-| `BiharmonicDiffusion3D` | class | Biharmonic (nabla^4) diffusion operator on a 3-D Arakawa C-grid. |
-| `Diffusion2D` | class | Horizontal diffusion operator (flux form) on a 2-D Arakawa C-grid. |
-| `Diffusion3D` | class | Horizontal diffusion operator (flux form) on a 3-D Arakawa C-grid. |
-| `diffusion_2d` | function | Horizontal tracer diffusion tendency at T-points (flux form). |
-
-#### Energy-conserving momentum advection operators for Arakawa C-grids (`gridax_jax._src.diffusion.momentum`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `MomentumAdvection2D` | class | Energy-conserving momentum advection on a 2-D Arakawa C-grid. |
-| `MomentumAdvection3D` | class | Energy-conserving momentum advection on a 3-D Arakawa C-grid. |
-
-#### Spherical-coordinate harmonic diffusion operators (flux form) (`gridax_jax._src.diffusion.spherical_diffusion`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `SphericalBiharmonicDiffusion2D` | class | Biharmonic (spherical ∇⁴) diffusion on a 2-D spherical C-grid. |
-| `SphericalBiharmonicDiffusion3D` | class | Biharmonic spherical diffusion on a 3-D Arakawa C-grid. |
-| `SphericalDiffusion2D` | class | Horizontal tracer diffusion (flux form) on a 2-D spherical C-grid. |
-| `SphericalDiffusion3D` | class | Horizontal tracer diffusion on a 3-D spherical Arakawa C-grid. |
-
-#### Energy-conserving momentum advection operators on spherical C-grids (`gridax_jax._src.diffusion.spherical_momentum`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `SphericalMomentumAdvection2D` | class | Energy-conserving momentum advection on a 2-D spherical C-grid. |
-| `SphericalMomentumAdvection3D` | class | Energy-conserving momentum advection on a 3-D spherical C-grid. |
-
 #### Forcing base class (Layer 1) and composition wrappers (Layer 3) (`gridax_jax._src.forcing._base`)
 
 | Name | Kind | What it does |
@@ -260,6 +227,8 @@ if it is almost here, extend it where it lives. Regenerate with
 | `ArakawaCGrid2D` | class | 2-D Arakawa C-grid topology (no metric). |
 | `ArakawaCGrid3D` | class | 3-D Arakawa C-grid topology (no metric). |
 | `ArakawaJacobian2D` | class | Arakawa (1966) Jacobian J(f, g) at T-points, on the full grid. |
+| `BiharmonicDiffusion2D` | class | Biharmonic (∇⁴) diffusion operator on a 2-D Arakawa C-grid. |
+| `BiharmonicDiffusion3D` | class | Biharmonic (nabla^4) diffusion operator on a 3-D Arakawa C-grid. |
 | `CartesianGrid1D` | class | 1-D Cartesian Arakawa C-grid (uniform spacing). |
 | `CartesianGrid2D` | class | 2-D Cartesian Arakawa C-grid (uniform spacing). |
 | `CartesianGrid3D` | class | 3-D Cartesian Arakawa C-grid (uniform spacing). |
@@ -271,6 +240,8 @@ if it is almost here, extend it where it lives. Regenerate with
 | `Difference1D` | class | Finite-difference operators on a 1-D Arakawa C-grid. |
 | `Difference2D` | class | Finite-difference operators on a 2-D Arakawa C-grid. |
 | `Difference3D` | class | Finite-difference operators on a 3-D Arakawa C-grid. |
+| `Diffusion2D` | class | Horizontal diffusion operator (flux form) on a 2-D Arakawa C-grid. |
+| `Diffusion3D` | class | Horizontal diffusion operator (flux form) on a 3-D Arakawa C-grid. |
 | `Divergence2D` | class | Divergence operator on a 2-D Arakawa C-grid. |
 | `Energetics2D` | class | Energy diagnostics at T-points on a 2-D Arakawa C-grid. |
 | `Interpolation1D` | class | 1-D averaging operators on an Arakawa C-grid. |
@@ -279,20 +250,28 @@ if it is almost here, extend it where it lives. Regenerate with
 | `Mask1D` | class | Unified Arakawa C-grid mask for a 1-D Cartesian domain. |
 | `Mask2D` | class | Unified Arakawa C-grid mask for a 2-D Cartesian domain. |
 | `Mask3D` | class | Unified Arakawa C-grid mask for a 3-D Cartesian domain. |
+| `MomentumAdvection2D` | class | Energy-conserving momentum advection on a 2-D Arakawa C-grid. |
+| `MomentumAdvection3D` | class | Energy-conserving momentum advection on a 3-D Arakawa C-grid. |
 | `QGPotentialVorticity2D` | class | Quasi-geostrophic potential vorticity at T-points. |
 | `Reconstruction1D` | class | 1-D face-value reconstruction. |
 | `Reconstruction2D` | class | 2-D face-value reconstruction for advective fluxes. |
 | `Reconstruction3D` | class | 3-D face-value reconstruction. |
 | `SphericalAdvection2D` | class | 2-D tracer advection on a spherical Arakawa C-grid. |
 | `SphericalAdvection3D` | class | 3-D tracer advection on a spherical Arakawa C-grid. |
+| `SphericalBiharmonicDiffusion2D` | class | Biharmonic (spherical ∇⁴) diffusion on a 2-D spherical C-grid. |
+| `SphericalBiharmonicDiffusion3D` | class | Biharmonic spherical diffusion on a 3-D Arakawa C-grid. |
 | `SphericalDifference2D` | class | Spherical finite-difference operators on a 2-D Arakawa C-grid. |
 | `SphericalDifference3D` | class | Spherical finite-difference operators on a 3-D Arakawa C-grid. |
+| `SphericalDiffusion2D` | class | Horizontal tracer diffusion (flux form) on a 2-D spherical C-grid. |
+| `SphericalDiffusion3D` | class | Horizontal tracer diffusion on a 3-D spherical Arakawa C-grid. |
 | `SphericalDivergence2D` | class | Horizontal divergence on a 2-D spherical Arakawa C-grid. |
 | `SphericalDivergence3D` | class | 3-D spherical divergence (vmap over z-levels). |
 | `SphericalGrid2D` | class | 2-D Arakawa C-grid on a sphere. |
 | `SphericalGrid3D` | class | 3-D Arakawa C-grid on a sphere. |
 | `SphericalLaplacian2D` | class | Spherical Laplacian on a 2-D Arakawa C-grid. |
 | `SphericalLaplacian3D` | class | 3-D spherical Laplacian (vmap over z-levels). |
+| `SphericalMomentumAdvection2D` | class | Energy-conserving momentum advection on a 2-D spherical C-grid. |
+| `SphericalMomentumAdvection3D` | class | Energy-conserving momentum advection on a 3-D spherical C-grid. |
 | `SphericalVorticity2D` | class | Vorticity and PV-flux operators on a 2-D spherical Arakawa C-grid. |
 | `SphericalVorticity3D` | class | 3-D spherical vorticity (vmap over z-levels). |
 | `StencilCapability1D` | class | Directional count of contiguous wet neighbours for each 1-D grid cell. |
@@ -340,6 +319,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `diff_y_bwd_3d` | function | Backward difference in y, 3-D: V (or X) → T (or U) points. |
 | `diff_y_fwd_2d` | function | Forward difference in y, 2-D: T (or U) → V (or X) points. |
 | `diff_y_fwd_3d` | function | Forward difference in y, 3-D: T (or U) → V (or X) points. |
+| `diffusion_2d` | function | Horizontal tracer diffusion tendency at T-points (flux form). |
 | `divergence_2d` | function | Compute ∇·(u, v) at T-points on the 2-D Arakawa C-grid. |
 | `enstrophy` | function | Enstrophy (pointwise). |
 | `interior` | function | Create an array shaped like ``like``, zero everywhere except the interior. |
@@ -543,6 +523,8 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `ArakawaCGrid2D` | class | 2-D Arakawa C-grid topology (no metric). |
 | `ArakawaCGrid3D` | class | 3-D Arakawa C-grid topology (no metric). |
 | `ArakawaJacobian2D` | class | Arakawa (1966) Jacobian J(f, g) at T-points, on the full grid. |
+| `BiharmonicDiffusion2D` | class | Biharmonic (∇⁴) diffusion operator on a 2-D Arakawa C-grid. |
+| `BiharmonicDiffusion3D` | class | Biharmonic (nabla^4) diffusion operator on a 3-D Arakawa C-grid. |
 | `CartesianGrid1D` | class | 1-D Cartesian Arakawa C-grid (uniform spacing). |
 | `CartesianGrid2D` | class | 2-D Cartesian Arakawa C-grid (uniform spacing). |
 | `CartesianGrid3D` | class | 3-D Cartesian Arakawa C-grid (uniform spacing). |
@@ -554,6 +536,8 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `Difference1D` | class | Finite-difference operators on a 1-D Arakawa C-grid. |
 | `Difference2D` | class | Finite-difference operators on a 2-D Arakawa C-grid. |
 | `Difference3D` | class | Finite-difference operators on a 3-D Arakawa C-grid. |
+| `Diffusion2D` | class | Horizontal diffusion operator (flux form) on a 2-D Arakawa C-grid. |
+| `Diffusion3D` | class | Horizontal diffusion operator (flux form) on a 3-D Arakawa C-grid. |
 | `Divergence2D` | class | Divergence operator on a 2-D Arakawa C-grid. |
 | `Energetics2D` | class | Energy diagnostics at T-points on a 2-D Arakawa C-grid. |
 | `Interpolation1D` | class | 1-D averaging operators on an Arakawa C-grid. |
@@ -562,6 +546,8 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `Mask1D` | class | Unified Arakawa C-grid mask for a 1-D Cartesian domain. |
 | `Mask2D` | class | Unified Arakawa C-grid mask for a 2-D Cartesian domain. |
 | `Mask3D` | class | Unified Arakawa C-grid mask for a 3-D Cartesian domain. |
+| `MomentumAdvection2D` | class | Energy-conserving momentum advection on a 2-D Arakawa C-grid. |
+| `MomentumAdvection3D` | class | Energy-conserving momentum advection on a 3-D Arakawa C-grid. |
 | `QGPotentialVorticity2D` | class | Quasi-geostrophic potential vorticity at T-points. |
 | `R_EARTH` | constant | `6371200.0` |
 | `Reconstruction1D` | class | 1-D face-value reconstruction. |
@@ -569,14 +555,20 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `Reconstruction3D` | class | 3-D face-value reconstruction. |
 | `SphericalAdvection2D` | class | 2-D tracer advection on a spherical Arakawa C-grid. |
 | `SphericalAdvection3D` | class | 3-D tracer advection on a spherical Arakawa C-grid. |
+| `SphericalBiharmonicDiffusion2D` | class | Biharmonic (spherical ∇⁴) diffusion on a 2-D spherical C-grid. |
+| `SphericalBiharmonicDiffusion3D` | class | Biharmonic spherical diffusion on a 3-D Arakawa C-grid. |
 | `SphericalDifference2D` | class | Spherical finite-difference operators on a 2-D Arakawa C-grid. |
 | `SphericalDifference3D` | class | Spherical finite-difference operators on a 3-D Arakawa C-grid. |
+| `SphericalDiffusion2D` | class | Horizontal tracer diffusion (flux form) on a 2-D spherical C-grid. |
+| `SphericalDiffusion3D` | class | Horizontal tracer diffusion on a 3-D spherical Arakawa C-grid. |
 | `SphericalDivergence2D` | class | Horizontal divergence on a 2-D spherical Arakawa C-grid. |
 | `SphericalDivergence3D` | class | 3-D spherical divergence (vmap over z-levels). |
 | `SphericalGrid2D` | class | 2-D Arakawa C-grid on a sphere. |
 | `SphericalGrid3D` | class | 3-D Arakawa C-grid on a sphere. |
 | `SphericalLaplacian2D` | class | Spherical Laplacian on a 2-D Arakawa C-grid. |
 | `SphericalLaplacian3D` | class | 3-D spherical Laplacian (vmap over z-levels). |
+| `SphericalMomentumAdvection2D` | class | Energy-conserving momentum advection on a 2-D spherical C-grid. |
+| `SphericalMomentumAdvection3D` | class | Energy-conserving momentum advection on a 3-D spherical C-grid. |
 | `SphericalVorticity2D` | class | Vorticity and PV-flux operators on a 2-D spherical Arakawa C-grid. |
 | `SphericalVorticity3D` | class | 3-D spherical vorticity (vmap over z-levels). |
 | `StencilCapability1D` | class | Directional count of contiguous wet neighbours for each 1-D grid cell. |
@@ -633,6 +625,7 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `diff_y_fwd_3d` | function | Forward difference in y, 3-D: T (or U) → V (or X) points. |
 | `diff_z_bwd_3d` | function | Backward difference in z, 3-D: W → T points. |
 | `diff_z_fwd_3d` | function | Forward difference in z, 3-D: T → W points. |
+| `diffusion_2d` | function | Horizontal tracer diffusion tendency at T-points (flux form). |
 | `dilate_mask` | function | Binary dilation by 1 cell with an n-D *cross* structuring element. |
 | `divergence_2d` | function | Compute ∇·(u, v) at T-points on the 2-D Arakawa C-grid. |
 | `enstrophy` | function | Enstrophy (pointwise). |

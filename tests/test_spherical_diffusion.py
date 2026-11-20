@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from gridax import CartesianGrid2D, Mask2D, Mask3D, SphericalGrid2D, SphericalGrid3D
-from gridax_jax._src.diffusion.diffusion import BiharmonicDiffusion2D, Diffusion2D
-from gridax_jax._src.diffusion.spherical_diffusion import (
+from gridax._src.diffusion.diffusion import BiharmonicDiffusion2D, Diffusion2D
+from gridax._src.diffusion.spherical_diffusion import (
     SphericalBiharmonicDiffusion2D,
     SphericalBiharmonicDiffusion3D,
     SphericalDiffusion2D,
