@@ -10,8 +10,8 @@
 site_name: finitevolX API reference
 site_description: API reference for finitevolX, finite volume operators for JAX on Arakawa C-grids, generated from NumPy-style docstrings.
 site_author: Juan Emmanuel Johnson, Takaya Uchida
-repo_url: https://github.com/jejjohnson/finitevolX
-repo_name: jejjohnson/finitevolX
+repo_url: https://github.com/jejjohnson/gridax
+repo_name: jejjohnson/gridax
 
 docs_dir: docs/api
 site_dir: site

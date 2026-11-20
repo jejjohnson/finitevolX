@@ -47,7 +47,7 @@ pipekit = [
 ]
 
 [project.urls]
-Repository = "https://github.com/jejjohnson/finitevolX"
+Repository = "https://github.com/jejjohnson/gridax"
 
 [build-system]
 requires = ["hatchling"]

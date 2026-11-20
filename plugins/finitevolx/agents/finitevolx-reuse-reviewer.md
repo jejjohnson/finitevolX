@@ -33,7 +33,7 @@ PY
 ```
 
 The capability index
-(<https://jejjohnson.github.io/finitevolX/capabilities/>) has the same
+(<https://jejjohnson.github.io/gridax/capabilities/>) has the same
 list grouped by module, plus spectraldiffx and gaussx.
 
 ## Procedure

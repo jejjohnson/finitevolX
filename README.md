@@ -6,17 +6,17 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/jejjohnson/finitevolX/actions/workflows/ci.yml"><img src="https://github.com/jejjohnson/finitevolX/actions/workflows/ci.yml/badge.svg" alt="CI Tests"></a>
-  <a href="https://github.com/jejjohnson/finitevolX/actions/workflows/lint.yml"><img src="https://github.com/jejjohnson/finitevolX/actions/workflows/lint.yml/badge.svg" alt="Lint & Format"></a>
-  <a href="https://github.com/jejjohnson/finitevolX/actions/workflows/typecheck.yml"><img src="https://github.com/jejjohnson/finitevolX/actions/workflows/typecheck.yml/badge.svg" alt="Type Check"></a>
-  <a href="https://www.codefactor.io/repository/github/jejjohnson/finitevolx"><img src="https://www.codefactor.io/repository/github/jejjohnson/finitevolx/badge" alt="CodeFactor"></a>
-  <a href="https://codecov.io/gh/jejjohnson/finitevolX"><img src="https://codecov.io/gh/jejjohnson/finitevolX/branch/main/graph/badge.svg?token=YGPQQEAK91" alt="codecov"></a>
+  <a href="https://github.com/jejjohnson/gridax/actions/workflows/ci.yml"><img src="https://github.com/jejjohnson/gridax/actions/workflows/ci.yml/badge.svg" alt="CI Tests"></a>
+  <a href="https://github.com/jejjohnson/gridax/actions/workflows/lint.yml"><img src="https://github.com/jejjohnson/gridax/actions/workflows/lint.yml/badge.svg" alt="Lint & Format"></a>
+  <a href="https://github.com/jejjohnson/gridax/actions/workflows/typecheck.yml"><img src="https://github.com/jejjohnson/gridax/actions/workflows/typecheck.yml/badge.svg" alt="Type Check"></a>
+  <a href="https://www.codefactor.io/repository/github/jejjohnson/gridax"><img src="https://www.codefactor.io/repository/github/jejjohnson/gridax/badge" alt="CodeFactor"></a>
+  <a href="https://codecov.io/gh/jejjohnson/gridax"><img src="https://codecov.io/gh/jejjohnson/gridax/branch/main/graph/badge.svg?token=YGPQQEAK91" alt="codecov"></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.12%2B-blue.svg" alt="Python 3.12+"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
 <p align="center">
-  <a href="https://jejjohnson.github.io/finitevolX/"><strong>Documentation</strong></a> &bull;
+  <a href="https://jejjohnson.github.io/gridax/"><strong>Documentation</strong></a> &bull;
   <a href="#installation"><strong>Installation</strong></a> &bull;
   <a href="#quick-start"><strong>Quick Start</strong></a> &bull;
   <a href="#examples"><strong>Examples</strong></a>
@@ -116,13 +116,13 @@ finitevolX keeps the semi-Lagrangian scheme (`semi_lagrangian_step`, `SemiLagran
 ### pip
 
 ```bash
-pip install git+https://github.com/jejjohnson/finitevolX
+pip install git+https://github.com/jejjohnson/gridax
 ```
 
 ### uv (recommended)
 
 ```bash
-git clone https://github.com/jejjohnson/finitevolX.git
+git clone https://github.com/jejjohnson/gridax.git
 cd finitevolX
 uv sync --all-extras
 ```
@@ -162,7 +162,7 @@ psi = fvx.streamfunction_from_vorticity(
 )
 ```
 
-See the [documentation](https://jejjohnson.github.io/finitevolX/) for the full API reference.
+See the [documentation](https://jejjohnson.github.io/gridax/) for the full API reference.
 
 ---
 
@@ -208,18 +208,18 @@ uv run python scripts/qg_1p5_layer.py       # 1.5-layer QG
 
 Full documentation with theory, usage guides, and API reference:
 
-**[jejjohnson.github.io/finitevolX](https://jejjohnson.github.io/finitevolX/)**
+**[jejjohnson.github.io/gridax](https://jejjohnson.github.io/gridax/)**
 
 | Section | Content |
 |---------|---------|
-| [C-Grid Discretization](https://jejjohnson.github.io/finitevolX/cgrid-discretization/) | Theory of Arakawa C-grid staggering |
-| [Operators](https://jejjohnson.github.io/finitevolX/spatial-operators/) | Divergence, vorticity, Coriolis, diffusion |
-| [Advection](https://jejjohnson.github.io/finitevolX/advection/) | TVD and WENO reconstruction theory |
-| [Boundary Conditions](https://jejjohnson.github.io/finitevolX/boundary-conditions/) | Per-face BC composition |
-| [Elliptic Solvers](https://jejjohnson.github.io/finitevolX/elliptic-solvers/) | Spectral, capacitance, CG, multigrid theory |
-| [Time Integration](https://jejjohnson.github.io/finitevolX/time-integration/) | Explicit, IMEX, and diffrax-based steppers |
-| [Solver Comparison](https://jejjohnson.github.io/finitevolX/solver-comparison/) | Visual benchmark across geometries |
-| [API Reference](https://jejjohnson.github.io/finitevolX/reference/grids/) | Auto-generated from docstrings |
+| [C-Grid Discretization](https://jejjohnson.github.io/gridax/cgrid-discretization/) | Theory of Arakawa C-grid staggering |
+| [Operators](https://jejjohnson.github.io/gridax/spatial-operators/) | Divergence, vorticity, Coriolis, diffusion |
+| [Advection](https://jejjohnson.github.io/gridax/advection/) | TVD and WENO reconstruction theory |
+| [Boundary Conditions](https://jejjohnson.github.io/gridax/boundary-conditions/) | Per-face BC composition |
+| [Elliptic Solvers](https://jejjohnson.github.io/gridax/elliptic-solvers/) | Spectral, capacitance, CG, multigrid theory |
+| [Time Integration](https://jejjohnson.github.io/gridax/time-integration/) | Explicit, IMEX, and diffrax-based steppers |
+| [Solver Comparison](https://jejjohnson.github.io/gridax/solver-comparison/) | Visual benchmark across geometries |
+| [API Reference](https://jejjohnson.github.io/gridax/reference/grids/) | Auto-generated from docstrings |
 
 ---
 

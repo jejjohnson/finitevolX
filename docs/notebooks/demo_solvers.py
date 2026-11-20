@@ -1099,9 +1099,9 @@ print("Saved inhomogeneous_bc.png")
 #
 # Measured timings, iteration counts and errors at 128² and 256² are in the
 # [Solver Comparison](../solver_comparison.md).
-# See the [Elliptic Solvers docs](https://jejjohnson.github.io/finitevolX/elliptic-solvers/)
+# See the [Elliptic Solvers docs](https://jejjohnson.github.io/gridax/elliptic-solvers/)
 # for full theory and the
-# [Preconditioner Guide](https://jejjohnson.github.io/finitevolX/elliptic-solvers/#preconditioners)
+# [Preconditioner Guide](https://jejjohnson.github.io/gridax/elliptic-solvers/#preconditioners)
 # for detailed comparisons.
 
 # %%

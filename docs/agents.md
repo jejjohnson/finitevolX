@@ -22,7 +22,7 @@ suite, so it never drifts.
 The repository is a Claude Code plugin marketplace. In any project:
 
 ```text
-/plugin marketplace add jejjohnson/finitevolX
+/plugin marketplace add jejjohnson/gridax
 /plugin install finitevolx@finitevolx
 ```
 
@@ -42,7 +42,7 @@ The plugin adds:
 ## llms.txt
 
 For other agents and tools, the docs site serves
-[`llms.txt`](https://jejjohnson.github.io/finitevolX/llms.txt): a curated
+[`llms.txt`](https://jejjohnson.github.io/gridax/llms.txt): a curated
 map of finitevolX and its key pages.
 
 ## Rules for your project's `AGENTS.md`
@@ -58,7 +58,7 @@ This project discretises its equations on Arakawa C-grids with finitevolX
 solvers, time steppers). Before writing a stencil, a ghost-cell fill, an
 advection scheme, a Poisson / Helmholtz solver or a time-stepping loop,
 search the capability index
-(https://jejjohnson.github.io/finitevolX/capabilities/) or
+(https://jejjohnson.github.io/gridax/capabilities/) or
 `gridax_jax.__all__`, and compose what exists:
 
 - Arrays are `[Ny, Nx]` with one ghost ring; `T[j, i]` is a cell centre,
@@ -81,7 +81,7 @@ search the capability index
 ## Working on finitevolX itself
 
 Contributors (and their agents) follow
-[`AGENTS.md`](https://github.com/jejjohnson/finitevolX/blob/main/AGENTS.md)
+[`AGENTS.md`](https://github.com/jejjohnson/gridax/blob/main/AGENTS.md)
 in the repository: the module map, the boundaries with spectraldiffx and
 gaussx, "reuse before you write", the C-grid, operator, mask,
 boundary-condition, solver and unit contracts and the tests that enforce

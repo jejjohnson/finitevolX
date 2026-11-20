@@ -5,7 +5,7 @@ that works across time-stepping, direct state application, and elliptic
 solvers — with first-class support for **known values** at any cell (outer
 boundaries, island coasts, and sparse interior observations).
 
-Responds to [jejjohnson/finitevolX#186](https://github.com/jejjohnson/finitevolX/issues/186).
+Responds to [jejjohnson/gridax#186](https://github.com/jejjohnson/gridax/issues/186).
 
 **Companion document:** [inhomogeneous_bcs_current.md](./inhomogeneous_bcs_current.md)
 describes the current state and the manual lifting-trick workaround.

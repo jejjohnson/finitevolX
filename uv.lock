@@ -303,7 +303,7 @@ wheels = [
 
 [[package]]
 name = "finitevolx"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "gridax" },
@@ -491,7 +491,7 @@ wheels = [
 
 [[package]]
 name = "gridax"
-version = "0.0.0"
+version = "0.1.0"
 source = { editable = "packages/gridax" }
 dependencies = [
     { name = "jaxtyping" },
@@ -508,7 +508,7 @@ requires-dist = [
 
 [[package]]
 name = "gridax-jax"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/gridax-jax" }
 dependencies = [
     { name = "beartype" },
