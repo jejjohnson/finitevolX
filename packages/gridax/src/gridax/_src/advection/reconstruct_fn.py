@@ -6,8 +6,9 @@ fluxes on Arakawa C-grids.  This is the functional counterpart of the
 :class:`~finitevolx.Reconstruction2D` class — it requires no grid object
 and works on raw arrays with ghost-cell convention.
 
-The top-level entry point is :func:`reconstruct`, which dispatches to
-lower-level ``upwind_*`` helpers based on ``method`` and ``num_pts``.
+The axis-generic entry point is :func:`gridax.advection.reconstruct` (#464),
+which also serves the old ``reconstruct(q, u, dim, method, num_pts)`` call
+with a deprecation warning.
 
 All arrays follow the finitevolX ghost-cell convention:
 
@@ -44,7 +45,6 @@ from gridax._src.advection.weno import (
     weno_5pts_improved_right,
     weno_5pts_right,
 )
-from gridax._src.operators._ghost import interior
 from gridax._src.pytree import array_namespace
 
 if TYPE_CHECKING:
@@ -202,154 +202,3 @@ def upwind_5pt(
     h_neg_last = right3(q[..., -3:-2], q[..., -2:-1], q[..., -1:])
     h_neg = xp.concatenate([h_neg_int, h_neg_last], axis=-1)
     return xp.where(u >= 0.0, h_pos, h_neg)
-
-
-# ── Top-level dispatcher ─────────────────────────────────────────────────────
-
-
-def reconstruct(
-    q: Float[Array, "Ny Nx"],
-    u: Float[Array, "Ny Nx"],
-    dim: int,
-    method: str = "weno",
-    num_pts: int = 5,
-) -> Float[Array, "Ny Nx"]:
-    """Compute upwind face flux along *dim* using the given reconstruction method.
-
-    This is a stateless, pure-function interface for upwind reconstruction.
-    It dispatches to :func:`upwind_1pt`, :func:`upwind_3pt`, or
-    :func:`upwind_5pt` based on ``num_pts``, with automatic boundary
-    fallbacks for higher-order stencils.
-
-    Parameters
-    ----------
-    q : Float[Array, "Ny Nx"]
-        Cell-centred scalar at T-points (includes ghost ring).
-    u : Float[Array, "Ny Nx"]
-        Face-centred transport velocity at U-points (``dim=1``) or
-        V-points (``dim=0``).  Includes ghost ring.
-    dim : {0, 1}
-        Spatial dimension: ``1`` for x (east-face flux), ``0`` for y
-        (north-face flux).
-    method : {'weno', 'wenoz', 'linear'}
-        Stencil flavour.  ``'weno'`` uses Jiang-Shu weights,
-        ``'wenoz'`` uses WENO-Z (Borges et al.), ``'linear'`` uses the
-        optimal polynomial weights (no nonlinear limiting).
-    num_pts : {1, 3, 5}
-        Stencil width (number of cells used per direction).
-
-    Returns
-    -------
-    Float[Array, "Ny Nx"]
-        Face flux ``h_face * u`` with zero ghost ring, same shape as *q*.
-        ``flux[j, i]`` represents the flux at the east face (``dim=1``)
-        or north face (``dim=0``) of cell ``[j, i]``.
-
-    Notes
-    -----
-    For ``num_pts >= 3``, boundary faces where the full stencil does not
-    fit are reconstructed with a lower-order fallback (3-point falls back
-    to 1st-order upwind; 5-point falls back to 3-point, then 1st-order).
-    Both flow signs reconstruct the same face, the east (north) face of
-    cell ``[j, i]`` at ``i+1/2`` (``j+1/2``); the right-biased stencil for
-    ``u < 0`` is shifted one cell east of the left-biased one, exactly as in
-    :class:`~finitevolx.Reconstruction2D`.
-
-    Examples
-    --------
-    >>> import jax.numpy as jnp
-    >>> from gridax import reconstruct
-    >>> Ny, Nx = 10, 10
-    >>> q = jnp.ones((Ny, Nx))
-    >>> u = jnp.ones((Ny, Nx))
-    >>> flux = reconstruct(q, u, dim=1, method="weno", num_pts=5)
-    >>> flux.shape
-    (10, 10)
-    """
-    xp = array_namespace(q, u)
-    _VALID_METHODS = ("weno", "wenoz", "linear")
-    if dim not in (0, 1):
-        raise ValueError(f"dim must be 0 (y) or 1 (x), got {dim!r}")
-    if num_pts not in (1, 3, 5):
-        raise ValueError(f"num_pts must be 1, 3, or 5, got {num_pts!r}")
-    if method not in _VALID_METHODS:
-        raise ValueError(f"method must be one of {_VALID_METHODS}, got {method!r}")
-
-    if dim == 1:
-        # x-direction: operate on interior rows along last axis
-        # q[1:-1, :] has shape (Ny-2, Nx); reconstruct returns face fluxes
-        # of shape (Ny-2, Nx-2) — interior values only
-        flux_vals = _reconstruct_last_axis(q[1:-1, :], u[1:-1, :], method, num_pts)
-        return interior(flux_vals, q)
-    else:
-        # y-direction: swap to operate along last axis, then swap back
-        flux_vals_swapped = _reconstruct_last_axis(
-            xp.swapaxes(q[:, 1:-1], 0, 1),
-            xp.swapaxes(u[:, 1:-1], 0, 1),
-            method,
-            num_pts,
-        )
-        flux_vals = xp.swapaxes(flux_vals_swapped, 0, 1)
-        return interior(flux_vals, q)
-
-
-def _reconstruct_last_axis(
-    q: Float[Array, "..."],
-    u: Float[Array, "..."],
-    method: str,
-    num_pts: int,
-) -> Float[Array, "..."]:
-    """Reconstruct face flux along the last axis.
-
-    Parameters
-    ----------
-    q : array, shape (..., N)
-        Scalar along reconstruction axis (includes ghost cells).
-    u : array, shape (..., N)
-        Velocity at faces (includes ghost cells).
-
-    Returns
-    -------
-    array, shape (..., N-2)
-        Interior face flux values (``h_face * u`` at each interior face).
-    """
-    xp = array_namespace(q, u)
-    vel = u[..., 1:-1]  # interior face velocities, shape (..., N-2)
-
-    if num_pts == 1:
-        h_face = upwind_1pt(q, vel)
-        return h_face * vel
-
-    if num_pts == 3:
-        h_face = upwind_3pt(q, vel, method)
-        return h_face * vel
-
-    # num_pts == 5: need boundary fallbacks
-    N = q.shape[-1]
-    if N < 5:
-        # Not enough cells for 5-point; fall back to 3-point
-        h_face = upwind_3pt(q, vel, method)
-        return h_face * vel
-
-    # Faces are indexed by the cell j to their west: face j+1/2, j = 1..N-2.
-    # 5-point interior (j = 2..N-3)
-    h5 = upwind_5pt(q, vel[..., 1:-1], method)
-
-    left3 = _stencil(_STENCILS_3PT, 3, method, 0)
-    right5 = _stencil(_STENCILS_5PT, 5, method, 1)
-
-    # First face (j = 1): positive flow 3pt left (q[0..2]); negative flow has
-    # the full right-biased 5pt stencil (q[0..4]).
-    h_first_pos = left3(q[..., 0:1], q[..., 1:2], q[..., 2:3])
-    h_first_neg = right5(
-        q[..., 0:1], q[..., 1:2], q[..., 2:3], q[..., 3:4], q[..., 4:5]
-    )
-    h3_first = xp.where(vel[..., :1] >= 0.0, h_first_pos, h_first_neg)
-
-    # Last face (j = N-2): positive flow 3pt left (q[N-3..N-1]); negative flow
-    # has no cell j+2, so 1st-order upwind q[N-1].
-    h_last_pos = left3(q[..., -3:-2], q[..., -2:-1], q[..., -1:])
-    h3_last = xp.where(vel[..., -1:] >= 0.0, h_last_pos, q[..., -1:])
-
-    h_face = xp.concatenate([h3_first, h5, h3_last], axis=-1)
-    return h_face * vel

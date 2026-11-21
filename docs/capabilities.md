@@ -236,7 +236,7 @@ if it is almost here, extend it where it lives. Regenerate with
 | `pv_flux_arakawa_lamb` | function | Deprecated alias of `pv_flux_blend` (not Arakawa-Lamb 1981). |
 | `pv_flux_blend` | function | Blend of the energy- and enstrophy-conserving PV fluxes (grid-free). |
 | `qg_potential_vorticity` | function | QG potential vorticity at T-points (single layer). |
-| `reconstruct` | function | Compute upwind face flux along *dim* using the given reconstruction method. |
+| `reconstruct` | function | The upwind advective flux ``q_face * u`` on the faces along ``axis``. |
 | `rusanov_flux` | function | Local Lax--Friedrichs (Rusanov) numerical flux at faces along ``axis``. |
 | `shear_strain` | function | Shear strain at X-points (corners) on an Arakawa C-grid. |
 | `smooth_abs` | function | Smooth approximation of ``\|x\|`` with a nonzero gradient at the origin. |
@@ -560,7 +560,7 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `pv_flux_arakawa_lamb` | function | Deprecated alias of `pv_flux_blend` (not Arakawa-Lamb 1981). |
 | `pv_flux_blend` | function | Blend of the energy- and enstrophy-conserving PV fluxes (grid-free). |
 | `qg_potential_vorticity` | function | QG potential vorticity at T-points (single layer). |
-| `reconstruct` | function | Compute upwind face flux along *dim* using the given reconstruction method. |
+| `reconstruct` | function | The upwind advective flux ``q_face * u`` on the faces along ``axis``. |
 | `rusanov_flux` | function | Local Lax--Friedrichs (Rusanov) numerical flux at faces along ``axis``. |
 | `shear_strain` | function | Shear strain at X-points (corners) on an Arakawa C-grid. |
 | `smooth_abs` | function | Smooth approximation of ``\|x\|`` with a nonzero gradient at the origin. |
@@ -659,6 +659,18 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `staggered_average` | function | The staggered average (point-value interpolation) of ``h`` along ``axis``. |
 | `staggered_difference` | function | The staggered first difference of ``h`` along ``axis``, no metric applied. |
 | `weno_stencils` | function | The full stencil of WENO of ``order`` and its sub-stencils, as offsets. |
+
+### `gridax.advection`
+
+| Name | Kind | What it does |
+|---|---|---|
+| `Centred` | class | Today's ``naive_*``: ``1/2 (q[i] + q[i+1])`` for either sign; one tier, always fits. |
+| `Scheme` | class | An upwind reconstruction: its tiers, widest first, ending with upwind. |
+| `TVD` | class | Second-order TVD: first-order upwind plus a limited anti-diffusive correction. |
+| `Tier` | class | One stencil width of a scheme. |
+| `Upwind` | class | Linear upwind-biased reconstruction of ``order`` 1, 2, 3 or 5. |
+| `WENO` | class | WENO of ``order`` 3, 5, 7 or 9, Jiang–Shu (``"js"``) or WENO-Z (``"z"``, 3 and 5). |
+| `reconstruct` | function | The upwind advective flux ``q_face * u`` on the faces along ``axis``. |
 
 ### `gridax.analysis`
 

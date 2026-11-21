@@ -84,7 +84,16 @@ RECONSTRUCT_CASES = [
 
 
 def _reconstruct(q, u, method, num_pts):
-    return gridax.reconstruct(q, u, dim=1, method=method, num_pts=num_pts)
+    # the old (method, num_pts) cases, as schemes of gridax.advection (#464)
+    import gridax.advection as gadv
+
+    if num_pts == 1:
+        scheme = gadv.Upwind(1)
+    elif method == "linear":
+        scheme = gadv.Upwind(num_pts)
+    else:
+        scheme = gadv.WENO(num_pts, "z" if method == "wenoz" else "js")
+    return gridax.reconstruct(q, u, axis=-1, scheme=scheme)
 
 
 @pytest.mark.parametrize(("method", "num_pts"), RECONSTRUCT_CASES)
