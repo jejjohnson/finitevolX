@@ -35,6 +35,8 @@ project:
     - file: index.md
     - title: Getting started
       children:
+        - file: quickstart.md
+          title: Quickstart
         - file: capabilities.md
           title: Capability index
         - file: agents.md
