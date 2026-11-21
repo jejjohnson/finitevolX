@@ -44,9 +44,10 @@ gridax-jax = { workspace = true }
 geophysix = { git = "https://github.com/jejjohnson/geophysix", tag = "v0.0.3" }
 spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "0.1.1" }
 gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.6.5" }
-# integrix owns the generic time steppers. Its own gaussx pin (v0.6.12) is
-# replaced by the override below; integrix does not import gaussx at run time.
-integrix = { git = "https://github.com/jejjohnson/integrix", tag = "v0.0.3" }
+# integrix owns the time steppers, semi-Lagrangian advection included (0.0.9).
+# Its own gaussx pin (v0.6.12) is replaced by the override below; integrix
+# does not import gaussx at run time.
+integrix = { git = "https://github.com/jejjohnson/integrix", tag = "v0.0.9" }
 # pipekit is a uv workspace: consume its packages from git subdirectories.
 # Every source is pinned to the one tag `pipekit-ops-v0.2.1` (ops 0.2.1,
 # cycle 0.1.0, jax 0.1.0); per-package tags make uv report conflicting URLs

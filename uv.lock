@@ -303,7 +303,7 @@ wheels = [
 
 [[package]]
 name = "finitevolx"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "gridax" },
@@ -429,8 +429,8 @@ wheels = [
 
 [[package]]
 name = "functax"
-version = "0.0.1"
-source = { git = "https://github.com/jejjohnson/functax?rev=e7eb8f9423666a0f32fcda1aa5ac88611d823fcc#e7eb8f9423666a0f32fcda1aa5ac88611d823fcc" }
+version = "0.0.11"
+source = { git = "https://github.com/jejjohnson/functax?rev=v0.0.11#4889ce196b4594839cf4bc472f6f731da641191b" }
 dependencies = [
     { name = "numpy" },
 ]
@@ -499,7 +499,7 @@ wheels = [
 
 [[package]]
 name = "gridax"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/gridax" }
 dependencies = [
     { name = "geophysix" },
@@ -518,7 +518,7 @@ requires-dist = [
 
 [[package]]
 name = "gridax-jax"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/gridax-jax" }
 dependencies = [
     { name = "beartype" },
@@ -550,7 +550,7 @@ requires-dist = [
     { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?tag=v0.6.5" },
     { name = "geophysix", git = "https://github.com/jejjohnson/geophysix?tag=v0.0.3" },
     { name = "gridax", editable = "packages/gridax" },
-    { name = "integrix", git = "https://github.com/jejjohnson/integrix?tag=v0.0.3" },
+    { name = "integrix", git = "https://github.com/jejjohnson/integrix?tag=v0.0.9" },
     { name = "jax", specifier = ">=0.4.38" },
     { name = "jaxlib", specifier = ">=0.4.38" },
     { name = "jaxtyping", specifier = ">=0.3.0" },
@@ -591,8 +591,8 @@ wheels = [
 
 [[package]]
 name = "integrix"
-version = "0.0.3"
-source = { git = "https://github.com/jejjohnson/integrix?tag=v0.0.3#4385392b90f70d4ab5c3436239286e32595e5bfe" }
+version = "0.0.9"
+source = { git = "https://github.com/jejjohnson/integrix?tag=v0.0.9#f971343ca17480e28177b904e7a2db4935458ced" }
 dependencies = [
     { name = "diffrax" },
     { name = "einx" },

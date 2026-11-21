@@ -43,15 +43,59 @@ def test_adapted_name_warns_and_names_the_new_interface(name: str) -> None:
     assert obj is getattr(_deprecated, name)
 
 
+@pytest.mark.parametrize("name", list(_deprecated.SEMI_LAGRANGIAN))
+def test_semi_lagrangian_name_warns_and_names_integrix(name: str) -> None:
+    # rewritten in integrix.march (#476); the old object stays for one release
+    with pytest.warns(DeprecationWarning, match=r"integrix\.march\.") as record:
+        obj = getattr(gridax_jax, name)
+    assert f"integrix.march.{name}" in str(record[0].message)
+    assert obj is getattr(_deprecated._semi_lagrangian, name)
+
+
+def test_semi_lagrangian_step_equals_integrix_with_euler_points() -> None:
+    """integrix's step, Euler departure points and a linear functax read-out,
+    is the old step (periodic) to 1e-13 relative (#476)."""
+    from functax.geometry import Axis, Points, RectilinearGrid
+    from functax.interp import Linear
+
+    grid = gridax_jax.CartesianGrid2D.from_interior(14, 10, 2.8, 1.0)
+    ny, nx = grid.Ny, grid.Nx
+    rows, cols = np.meshgrid(np.arange(ny), np.arange(nx), indexing="ij")
+    rng = np.random.default_rng(0)
+    q = jnp.asarray(rng.standard_normal((ny, nx)))
+    u = jnp.asarray(0.3 + 0.1 * np.sin(2 * np.pi * cols / nx))
+    v = jnp.asarray(-0.2 + 0.05 * np.cos(2 * np.pi * rows / ny))
+    dt = 0.37
+    with pytest.warns(DeprecationWarning):
+        old_step = gridax_jax.semi_lagrangian_step
+    expected = old_step(q, u, v, grid.dx, grid.dy, dt, bc="periodic")
+
+    nodes = jnp.asarray(gridax_jax.t_point_coordinates(grid))
+    # the old step wraps over the whole array, ghost ring included
+    periodic = RectilinearGrid(
+        (
+            Axis(jnp.arange(ny) * grid.dy, period=ny * grid.dy),
+            Axis(jnp.arange(nx) * grid.dx, period=nx * grid.dx),
+        )
+    )
+    speed = jnp.column_stack([v.ravel(), u.ravel()])
+    actual = ixm.semi_lagrangian_step(
+        q.ravel(),
+        nodes,
+        lambda t, x: speed,
+        lambda x_d: Linear().plan(periodic, Points(x_d)),
+        0.0,
+        dt,
+        iterations=0,
+    ).reshape(ny, nx)
+    scale = float(jnp.max(jnp.abs(expected)))
+    assert float(jnp.max(jnp.abs(actual - expected))) <= 1e-13 * scale
+
+
 def test_names_that_stay_do_not_warn() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        for name in (
-            "SemiLagrangianSolver",
-            "SemiLagrangianTerm",
-            "semi_lagrangian_step",
-            "solve_ocean_pde",
-        ):
+        for name in ("solve_ocean_pde", "t_point_coordinates"):
             getattr(gridax_jax, name)
 
 

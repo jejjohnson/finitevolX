@@ -3,7 +3,7 @@
 This page covers practical usage of time integration with finitevolX,
 from quick-start examples to building custom diffrax solvers.
 
-The generic time steppers (the pure step functions, the diffrax solvers and the multistep / split-explicit steppers) live in [integrix](https://github.com/jejjohnson/integrix) and are imported from `integrix.march`. Their `finitevolx.*` names still work for one release and emit a `DeprecationWarning`. finitevolX keeps the semi-Lagrangian scheme and `solve_ocean_pde`.
+The generic time steppers (the pure step functions, the diffrax solvers and the multistep / split-explicit steppers) live in [integrix](https://github.com/jejjohnson/integrix) and are imported from `integrix.march`. Their `finitevolx.*` names still work for one release and emit a `DeprecationWarning`. The semi-Lagrangian scheme moved to `integrix.march` as well (#476); finitevolX keeps `solve_ocean_pde`.
 
 ---
 
@@ -210,18 +210,35 @@ over the cycle, and the returned `state_2d` is the end-of-cycle state.
 
 ### Semi-Lagrangian Advection
 
-Advects a 2D field by backtracking along characteristic curves.
+Advects a 2D field by backtracking along characteristic curves. The scheme is `integrix.march.semi_lagrangian_step`; gridax supplies the T-point coordinates, and the read-out is a functax plan on the same points.
 
 ```python
-from gridax_jax import semi_lagrangian_step
+import functax.geometry as fg
+import functax.interp as fi
+import gridax
+import integrix.march as im
+import jax.numpy as jnp
 
-# field: [Ny, Nx], u/v: velocity in m/s, dx/dy: grid spacing in m
-new_field = semi_lagrangian_step(
-    field, u, v, dx, dy, dt,
-    interp_order=1,  # 1 = linear (monotone), 0 = nearest
-    bc="periodic",   # or "edge" for clamped boundaries
-)
+# field, u_T, v_T: [Ny, Nx] T-point fields, velocity in m/s
+nodes = jnp.asarray(gridax.t_point_coordinates(grid))  # [Ny * Nx, 2], (y, x)
+y = jnp.arange(grid.Ny) * grid.dy
+x = jnp.arange(grid.Nx) * grid.dx
+points = fg.RectilinearGrid((fg.Axis(y, period=grid.Ny * grid.dy), fg.Axis(x, period=grid.Nx * grid.dx)))
+
+
+def readout(x_d):
+    return fi.BSpline(3).plan(points, fg.Points(x_d))  # or fi.Linear(), fi.Pchip()
+
+
+def velocity(t, p):
+    plan = readout(p)
+    return jnp.column_stack([plan(v_T.ravel()), plan(u_T.ravel())])
+
+
+new_field = im.semi_lagrangian_step(field.ravel(), nodes, velocity, readout, t, dt).reshape(field.shape)
 ```
+
+The old `gridax_jax.semi_lagrangian_step(field, u, v, dx, dy, dt)` still works for one release and warns; with `iterations=0`, a linear read-out and the velocity at the nodes, the integrix call reproduces it to rounding.
 
 ---
 
@@ -268,7 +285,7 @@ sol = dfx.diffeqsolve(
 | `SSP_RK104` | 4 | ERK (10 stages) | no (raises) | Large CFL + 4th order |
 | `IMEX_SSP2` | 2 | IMEX (MultiTerm) | yes (embedded 1st order) | Stiff/non-stiff split |
 | `AB3Solver` | 3 | multistep (RK3 start) | no (raises) | One RHS per step, uniform `dt` |
-| `SemiLagrangianSolver` | 1 | semi-Lagrangian (`SemiLagrangianTerm`) | no (raises) | Advection at CFL > 1 |
+| `SemiLagrangianSolver` (integrix) | 2 | semi-Lagrangian (`SemiLagrangianTerm`) | no (raises) | Advection at CFL > 1 |
 
 "Adaptive steps" means `stepsize_controller=dfx.PIDController(...)` works;
 the solvers marked "no" have no embedded error estimate and raise under an
@@ -288,11 +305,12 @@ terms = dfx.MultiTerm(dfx.ODETerm(rhs_explicit), dfx.ODETerm(rhs_implicit))
 solver = IMEX_SSP2(root_finder=dfx.VeryChord(rtol=1e-8, atol=1e-8))
 sol = dfx.diffeqsolve(terms, solver, t0=0.0, t1=1.0, dt0=0.01, y0=y0)
 
-# semi-Lagrangian: the term returns the velocity (u, v) in grid units / time
-term = SemiLagrangianTerm(lambda t, q, args: (u_grid, v_grid))
+# semi-Lagrangian: the term is the velocity at N points, the solver holds the
+# nodes and the read-out (see "Semi-Lagrangian Advection" above)
+term = SemiLagrangianTerm(velocity)
 sol = dfx.diffeqsolve(
-    term, SemiLagrangianSolver(), t0=0.0, t1=10.0, dt0=0.5, y0=q0,
-    saveat=dfx.SaveAt(ts=jnp.linspace(0.0, 10.0, 11)),
+    term, SemiLagrangianSolver(nodes, readout), t0=0.0, t1=10.0, dt0=0.5,
+    y0=q0.ravel(), saveat=dfx.SaveAt(ts=jnp.linspace(0.0, 10.0, 11)),
 )
 ```
 

@@ -1,6 +1,6 @@
 # Time Integration
 
-The generic time steppers live in [integrix](https://github.com/jejjohnson/integrix) (`integrix.march`); finitevolX keeps the semi-Lagrangian scheme and the `solve_ocean_pde` wrapper.
+The generic time steppers live in [integrix](https://github.com/jejjohnson/integrix) (`integrix.march`); the semi-Lagrangian scheme moved there too (#476), and finitevolX keeps the `solve_ocean_pde` wrapper.
 
 !!! warning "Deprecated finitevolX names"
     `finitevolx.RK3SSP`, `finitevolx.rk3_ssp_step` and the other generic steppers below still work for one release and emit a `DeprecationWarning`. The diffrax solvers and the pure step functions are the integrix objects themselves, so import them from `integrix.march`. `finitevolx.AB2Solver`, `finitevolx.LeapfrogRAFSolver` and `finitevolx.SplitExplicitRKSolver` are adapters that keep the old `init` / `step` call shapes; their integrix replacements are `integrix.march.AbstractStepper`s run by `integrix.march.run(stepper, rhs, t0, y0, dt, n_steps)` with `rhs(t, y, args)`.
@@ -51,7 +51,17 @@ The generic time steppers live in [integrix](https://github.com/jejjohnson/integ
 
 ## Semi-Lagrangian (Pure Functional)
 
-::: gridax_jax.semi_lagrangian_step
+::: integrix.march.departure_points
+    options:
+      docstring_style: google
+
+::: integrix.march.semi_lagrangian_step
+    options:
+      docstring_style: google
+
+The T-point coordinates it takes as nodes come from gridax:
+
+::: gridax_jax.t_point_coordinates
 
 ## Diffrax Solvers
 
@@ -115,9 +125,23 @@ The generic time steppers live in [integrix](https://github.com/jejjohnson/integ
 
 ## Semi-Lagrangian Solver
 
-::: gridax_jax.SemiLagrangianSolver
+::: integrix.march.SemiLagrangianSolver
+    options:
+      docstring_style: google
 
-::: gridax_jax.SemiLagrangianTerm
+::: integrix.march.SemiLagrangianTerm
+    options:
+      docstring_style: google
+
+## Deprecated Semi-Lagrangian Names
+
+The objects behind `gridax_jax.semi_lagrangian_step`, `gridax_jax.SemiLagrangianSolver` and `gridax_jax.SemiLagrangianTerm` for one release (#476).
+
+::: gridax_jax._src.timestepping.semi_lagrangian.semi_lagrangian_step
+
+::: gridax_jax._src.timestepping.semi_lagrangian.SemiLagrangianSolver
+
+::: gridax_jax._src.timestepping.semi_lagrangian.SemiLagrangianTerm
 
 ## Deprecated Adapters
 

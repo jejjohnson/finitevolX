@@ -80,6 +80,20 @@ UPSTREAM_BLURB = {
 # Names finitevolX shares with an upstream library for a different object,
 # and why.
 ALLOWED_SHARED_NAMES: dict[str, str] = {
+    # Deprecated for one release (#476): the old objects keep their old
+    # interface while integrix.march holds the rewritten scheme.
+    "SemiLagrangianSolver": (
+        "the deprecated finitevolX solver (index-space velocity, linear"
+        " read-out), kept for one release beside integrix's rewrite (#476)"
+    ),
+    "SemiLagrangianTerm": (
+        "the deprecated finitevolX term, whose velocity returns (u, v) shaped"
+        " like the field, kept for one release (#476)"
+    ),
+    "semi_lagrangian_step": (
+        "the deprecated finitevolX step on [Ny, Nx] fields, kept for one"
+        " release beside integrix's point-based step (#476)"
+    ),
     "SphericalGrid2D": (
         "finitevolX's is a lat-lon Arakawa C-grid container with a ghost ring;"
         " spectraldiffx's is the spectral (spherical-harmonic) grid"

@@ -143,6 +143,7 @@ from gridax._src.grid import (
     CurvilinearGrid3D,
     SphericalGrid2D,
     SphericalGrid3D,
+    t_point_coordinates,
 )
 from gridax._src.mask import (
     Mask1D,
@@ -297,6 +298,7 @@ __all__ = [
     "CartesianGrid3D",
     "SphericalGrid2D",
     "SphericalGrid3D",
+    "t_point_coordinates",
     # Masks
     "Mask1D",
     "Mask2D",
