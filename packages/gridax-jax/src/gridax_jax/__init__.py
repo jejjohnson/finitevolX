@@ -769,26 +769,6 @@ _MOVED_TO_SESMAX = {
         "gridax_jax._src.forcing.functional",
         "sesmax_core.forcing",
     ),
-    # The elliptic inversions are model-level recipes (#475,
-    # jejjohnson/geostack#291 rule 3); sesmax's copies are keyword-only after dy.
-    "pressure_from_divergence": (
-        "gridax_jax._src.solvers.elliptic",
-        "sesmax_core.gfd",
-    ),
-    "pv_inversion": ("gridax_jax._src.solvers.elliptic", "sesmax_core.gfd"),
-    "streamfunction_from_vorticity": (
-        "gridax_jax._src.solvers.elliptic",
-        "sesmax_core.gfd",
-    ),
-}
-
-# Moved to sesmax-core under a new name (#475): the PDE driver, whose bc_fn=
-# is tendency_bc= there and which also takes a state correction state_bc=.
-_RENAMED_IN_SESMAX: dict[str, tuple[str, str]] = {
-    "solve_ocean_pde": (
-        "gridax_jax._src.timestepping._solve",
-        "sesmax_core.solve_pde (pass bc_fn= as tendency_bc=)",
-    ),
 }
 
 
@@ -865,18 +845,6 @@ def __getattr__(name: str) -> object:
         warnings.warn(
             f"gridax_jax.{name} is deprecated and will be removed in the next"
             f" release: it moved to {home}.{name} (pip install sesmax-core).",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return getattr(importlib.import_module(module), name)
-    if name in _RENAMED_IN_SESMAX:
-        import importlib
-        import warnings
-
-        module, replacement = _RENAMED_IN_SESMAX[name]
-        warnings.warn(
-            f"gridax_jax.{name} is deprecated and will be removed in the next"
-            f" release: use {replacement} (pip install sesmax-core).",
             DeprecationWarning,
             stacklevel=2,
         )

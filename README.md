@@ -100,13 +100,13 @@ Per-face composable BCs with ghost-cell enforcement:
 | **Multigrid** | Variable coefficients, any mask | O(N) per V-cycle |
 | **MG + CG** | Variable coefficients, tight tolerance | Controllable |
 
-The one-call inversions `streamfunction_from_vorticity`, `pressure_from_divergence` and `pv_inversion`, with their known-value lifting and `method="multigrid"`, live in sesmax-core as `sesmax_core.gfd` ([guide](https://jejjohnson.github.io/sesmax/elliptic-inversions/), [API](https://jejjohnson.github.io/sesmax/reference/gfd/)); the old `gridax_jax` names warn for one release.
+The one-call inversions `streamfunction_from_vorticity`, `pressure_from_divergence` and `pv_inversion`, with their known-value lifting and `method="multigrid"`, live in sesmax-core as `sesmax_core.gfd` ([guide](https://jejjohnson.github.io/sesmax/elliptic-inversions/), [API](https://jejjohnson.github.io/sesmax/reference/gfd/)); gridax no longer has them.
 
 ### Time Integration
 
 The generic time steppers live in [integrix](https://github.com/jejjohnson/integrix) (`integrix.march`): the pure step functions `euler_step`, `heun_step`, `rk4_step`, `rk3_ssp_step`, `ab2_step`, `ab3_step`, `leapfrog_raf_step`, `imex_ssp2_step` and `split_explicit_step`, the [diffrax](https://docs.kidger.site/diffrax/) solvers `ForwardEulerDfx`, `RK2Heun`, `RK3SSP`, `RK4Classic`, `SSP_RK104`, `IMEX_SSP2` and more, and the `AB2Solver`, `LeapfrogRAFSolver` and `SplitExplicitRKSolver` steppers. Their `finitevolx.*` names are deprecated aliases for one release.
 
-finitevolX keeps the semi-Lagrangian scheme (`semi_lagrangian_step`, `SemiLagrangianSolver`). `solve_ocean_pde`, the `diffeqsolve` wrapper that applies boundary conditions to the tendency, moved to `sesmax_core.solve_pde` ([API](https://jejjohnson.github.io/sesmax/reference/core/)), where `bc_fn=` is `tendency_bc=`; the old name warns for one release.
+The semi-Lagrangian scheme moved to `integrix.march` too (#476), with `gridax.t_point_coordinates` for its nodes. `solve_ocean_pde`, the `diffeqsolve` wrapper that applies boundary conditions to the tendency, moved to `sesmax_core.solve_pde` ([API](https://jejjohnson.github.io/sesmax/reference/core/)), where `bc_fn=` is `tendency_bc=`; gridax no longer has it.
 
 ### Vertical Structure
 
@@ -178,7 +178,6 @@ The `docs/notebooks/` directory contains pedagogical Jupytext notebooks that bui
 | Notebook | Description | Key APIs |
 |----------|-------------|----------|
 | [Masks](docs/notebooks/demo_masks.py) | C-grid mask construction, staggered derivation, boundary classification | `Mask2D` |
-| [Elliptic Solvers](docs/notebooks/demo_solvers.py) | Spectral, capacitance, CG, multigrid on 4 geometries | `solve_helmholtz_dst`, `build_capacitance_solver`, `solve_cg`, `build_multigrid_solver` |
 | [Pressure Poisson](https://jejjohnson.github.io/sesmax/pressure-poisson/) (sesmax) | Divergence-free projection on the C-grid, DST-I vs DST-II | `pressure_from_divergence` |
 | [Streamfunction Inversion](https://jejjohnson.github.io/sesmax/streamfunction-inversion/) (sesmax) | X-point vs T-point placement, velocity recovery, convergence | `streamfunction_from_vorticity` |
 | [Helmholtz Screening](https://jejjohnson.github.io/sesmax/helmholtz-screening/) (sesmax) | QG PV inversion with screening, JIT/vmap/grad | `pv_inversion` |

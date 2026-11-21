@@ -3,7 +3,7 @@
 This page covers practical usage of time integration with finitevolX,
 from quick-start examples to building custom diffrax solvers.
 
-The generic time steppers (the pure step functions, the diffrax solvers and the multistep / split-explicit steppers) live in [integrix](https://github.com/jejjohnson/integrix) and are imported from `integrix.march`. Their `finitevolx.*` names still work for one release and emit a `DeprecationWarning`. The semi-Lagrangian scheme moved to `integrix.march` as well (#476); `solve_ocean_pde` moved to `sesmax_core.solve_pde` and its `gridax_jax` name warns for one release.
+The generic time steppers (the pure step functions, the diffrax solvers and the multistep / split-explicit steppers) live in [integrix](https://github.com/jejjohnson/integrix) and are imported from `integrix.march`. Their `finitevolx.*` names still work for one release and emit a `DeprecationWarning`. The semi-Lagrangian scheme moved to `integrix.march` as well (#476); `solve_ocean_pde` moved to `sesmax_core.solve_pde` (#475).
 
 ---
 

@@ -9,7 +9,7 @@ Solves the streamfunction Helmholtz problem
 on two basins, a rectangle and a circular basin with an island, at
 128² and 256² interior cells and λ ∈ {4, 0}, with:
 
-* spectral DST (``streamfunction_from_vorticity(bc="dst")``, rectangle only),
+* spectral DST (``solve_helmholtz_dst1`` on the wet X nodes, rectangle only),
 * capacitance (``build_capacitance_solver``, DST base),
 * CG (``solve_cg`` on ``masked_laplacian``) with a DST, FFT or multigrid
   preconditioner or none, to ``max|f − Aψ| <= 2e-8 max|f|``,
@@ -45,7 +45,6 @@ import matplotlib
 
 matplotlib.use("Agg")
 import gridax_jax as fvx
-from gridax_jax._src.solvers.elliptic import streamfunction_from_vorticity
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.sparse as sp
@@ -232,8 +231,11 @@ def run_case(geometry: str, n: int, lam: float, repeats: int) -> tuple[list, dic
         record(
             "spectral DST",
             0.0,
-            lambda p, r: streamfunction_from_vorticity(
-                r, dx, dy, bc="dst", lambda_=lam
+            # DST-I on the wet X nodes [1:-2, 1:-2], psi = 0 on the walls
+            lambda p, r: (
+                jnp.zeros_like(r)
+                .at[1:-2, 1:-2]
+                .set(fvx.solve_helmholtz_dst1(r[1:-2, 1:-2], dx, dy, lam))
             ),
             "direct",
             0,

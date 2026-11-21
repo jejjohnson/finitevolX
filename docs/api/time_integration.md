@@ -155,5 +155,5 @@ The objects behind `finitevolx.AB2Solver`, `finitevolx.LeapfrogRAFSolver` and `f
 
 ## Convenience Wrapper
 
-`solve_ocean_pde` moved to `sesmax_core.solve_pde`, where `bc_fn=` is `tendency_bc=`, and its `gridax_jax` name warns for one release.
+`solve_ocean_pde` moved to `sesmax_core.solve_pde`, where `bc_fn=` is `tendency_bc=`, and gridax no longer has it (#475).
 See the [`sesmax_core.solve_pde` API](https://jejjohnson.github.io/sesmax/reference/core/).

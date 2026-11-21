@@ -1,6 +1,6 @@
 # Elliptic Inversions
 
-The one-call wrappers `streamfunction_from_vorticity`, `pressure_from_divergence` and `pv_inversion` moved to sesmax-core as `sesmax_core.gfd`, and their `gridax_jax` names warn for one release.
+The one-call wrappers `streamfunction_from_vorticity`, `pressure_from_divergence` and `pv_inversion` moved to sesmax-core as `sesmax_core.gfd` (#475); gridax no longer has them.
 See the [elliptic inversions guide](https://jejjohnson.github.io/sesmax/elliptic-inversions/) and the [`sesmax_core.gfd` API](https://jejjohnson.github.io/sesmax/reference/gfd/).
 
 ## Known Values (Inhomogeneous Dirichlet)

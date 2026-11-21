@@ -58,7 +58,7 @@ import numpy as np
 from scipy import linalg, sparse
 from scipy.sparse import csgraph
 
-from gridax_jax._src.solvers.iterative import _project_zero_mean, _wet_components
+from gridax_jax._src.solvers.iterative import project_zero_mean, wet_components
 
 # Stencil offsets (dj, di): the finest operator is 5-point, the Galerkin
 # coarse operators are 9-point.
@@ -1000,7 +1000,7 @@ class MultigridSolver(eqx.Module):
     def _project(self, u: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """Zero-mean projection on each wet component (Neumann, lambda = 0)."""
         assert self.null_labels is not None and self.null_counts is not None
-        return _project_zero_mean(
+        return project_zero_mean(
             u, self.levels[0].mask, self.null_labels, self.null_counts
         )
 
@@ -1221,7 +1221,7 @@ def build_multigrid_solver(
     # --- Neumann at lambda = 0: constants per wet component are the null space
     null_labels = null_counts = None
     if bc == "neumann" and lambda_ == 0.0:
-        null_labels, null_counts = _wet_components(mask_np)
+        null_labels, null_counts = wet_components(mask_np)
 
     return MultigridSolver(
         levels=tuple(levels),

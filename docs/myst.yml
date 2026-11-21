@@ -93,7 +93,6 @@ project:
               title: Masks
         - title: Elliptic problems
           children:
-            - file: notebooks/demo_solvers.ipynb
               title: Elliptic solvers
             - file: notebooks/spde_prior.ipynb
               title: SPDE priors with gaussx

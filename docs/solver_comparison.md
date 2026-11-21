@@ -31,7 +31,7 @@ matrix-free methods.
 
 For a visual walk-through of the solvers on four geometries (including a
 variable-coefficient one), see the
-[Elliptic Solvers notebook](notebooks/demo_solvers.ipynb).
+[inversion methods notebook in sesmax](https://jejjohnson.github.io/sesmax/inversion-methods/).
 
 ---
 

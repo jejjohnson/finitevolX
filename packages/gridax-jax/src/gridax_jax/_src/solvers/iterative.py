@@ -480,10 +480,3 @@ def project_zero_mean(
     sums = jax.ops.segment_sum(u_m.ravel(), labels.ravel(), counts.shape[0])
     mean = (sums / counts.astype(u.dtype))[labels]  # [Ny, Nx]
     return (u_m - mean) * mask
-
-
-# The private names gridax's own modules (and sesmax 0.1's inversions) import.
-_masked_neumann_laplacian = masked_neumann_laplacian
-_masked_face_dirichlet_laplacian = masked_face_dirichlet_laplacian
-_wet_components = wet_components
-_project_zero_mean = project_zero_mean

@@ -52,7 +52,7 @@ Claude Code users can install the `finitevolx` plugin: `/plugin marketplace add 
 - [2-D rotating advection](https://jejjohnson.github.io/gridax/advection-2d-rotation/)
 - [2-D masked advection](https://jejjohnson.github.io/gridax/advection-2d-masked/)
 - [Masks](https://jejjohnson.github.io/gridax/demo-masks/)
-- [Elliptic solvers](https://jejjohnson.github.io/gridax/demo-solvers/)
+- [Elliptic inversion methods on four geometries (sesmax)](https://jejjohnson.github.io/sesmax/inversion-methods/)
 - [Known boundary values](https://jejjohnson.github.io/sesmax/inhomogeneous-bcs-tutorial/) (moved to sesmax)
 - [Pressure Poisson](https://jejjohnson.github.io/sesmax/pressure-poisson/) (moved to sesmax)
 - [Streamfunction inversion](https://jejjohnson.github.io/sesmax/streamfunction-inversion/) (moved to sesmax)
