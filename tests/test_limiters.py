@@ -111,7 +111,7 @@ class TestLimitersPublicAPI:
     """Verify the limiters are exported from the top-level package."""
 
     def test_import_from_package(self):
-        from gridax_jax import (
+        from gridax import (
             mc as _mc,
             minmod as _minmod,
             superbee as _superbee,

@@ -45,7 +45,8 @@ import jax.numpy as jnp
 import matplotlib
 
 matplotlib.use("Agg")
-import gridax_jax as fvx
+import gridax as fvx
+import gridax.solvers as gs
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.sparse as sp
@@ -178,7 +179,7 @@ def run_case(geometry: str, n: int, lam: float, repeats: int) -> tuple[list, dic
     psi_ref = np.zeros_like(f_np)
     psi_ref[jw, iw] = sol
     # The reference must solve the masked_laplacian problem (residual at round-off).
-    res = f - fvx.masked_laplacian(jnp.asarray(psi_ref), wet_j, dx, dy, lambda_=lam)
+    res = f - gs.masked_laplacian(jnp.asarray(psi_ref), wet_j, dx, dy, lambda_=lam)
     assert float(jnp.max(jnp.abs(res * wet_j))) < 1e-9 * float(jnp.max(jnp.abs(f)))
     scale = np.max(np.abs(psi_ref))
     lu_bytes = lu.L.data.nbytes + lu.U.data.nbytes
@@ -236,7 +237,7 @@ def run_case(geometry: str, n: int, lam: float, repeats: int) -> tuple[list, dic
             lambda p, r: (
                 jnp.zeros_like(r)
                 .at[1:-2, 1:-2]
-                .set(fvx.solve_helmholtz_dst1(r[1:-2, 1:-2], dx, dy, lam))
+                .set(gs.solve_helmholtz_dst1(r[1:-2, 1:-2], dx, dy, lam))
             ),
             "direct",
             0,
@@ -244,7 +245,7 @@ def run_case(geometry: str, n: int, lam: float, repeats: int) -> tuple[list, dic
 
     # Capacitance (DST base, the default).
     cap, t_cap = min_build(
-        lambda: fvx.build_capacitance_solver(mask, dx, dy, lambda_=lam)
+        lambda: gs.build_capacitance_solver(mask, dx, dy, lambda_=lam)
     )
     record(
         "capacitance",
@@ -256,7 +257,7 @@ def run_case(geometry: str, n: int, lam: float, repeats: int) -> tuple[list, dic
     )
 
     # Multigrid hierarchy (Dirichlet, the default), shared by MG and CG + MG.
-    mg, t_mg = min_build(lambda: fvx.build_multigrid_solver(mask, dx, dy, lambda_=lam))
+    mg, t_mg = min_build(lambda: gs.build_multigrid_solver(mask, dx, dy, lambda_=lam))
     mg_bytes = array_bytes(mg)
 
     atol = RTOL * float(jnp.max(jnp.abs(f)))
@@ -266,7 +267,7 @@ def run_case(geometry: str, n: int, lam: float, repeats: int) -> tuple[list, dic
         solver, w = p
 
         def matvec(x):
-            return fvx.masked_laplacian(x, w, dx, dy, lambda_=lam)
+            return gs.masked_laplacian(x, w, dx, dy, lambda_=lam)
 
         if kind == "multigrid":
             # one V-cycle from a zero guess approximates A^-1 r
@@ -274,7 +275,7 @@ def run_case(geometry: str, n: int, lam: float, repeats: int) -> tuple[list, dic
                 return -solver.v_cycle(jnp.zeros_like(v), v)
 
         elif kind in ("dst", "fft"):
-            spectral = fvx.make_spectral_preconditioner(dx, dy, lam, bc=kind)
+            spectral = gs.make_spectral_preconditioner(dx, dy, lam, bc=kind)
 
             def pc(v):
                 return -spectral(v)
@@ -349,7 +350,7 @@ def plot_geometries(cases: dict, path: Path) -> None:
     fig, axes = plt.subplots(1, len(cases), figsize=(4.2 * len(cases), 4))
     for ax, (name, case) in zip(np.atleast_1d(axes), cases.items(), strict=True):
         wet = case["wet"]
-        ring = np.asarray(fvx.coast_ring(jnp.asarray(wet, dtype=float)))
+        ring = np.asarray(gs.coast_ring(jnp.asarray(wet, dtype=float)))
         img = np.where(wet, 1.0, np.where(ring, 0.5, 0.0))
         ax.imshow(
             img, origin="lower", cmap="Blues", vmin=0, vmax=1, interpolation="nearest"

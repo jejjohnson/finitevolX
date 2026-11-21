@@ -1,10 +1,12 @@
-"""Generate, or check, the capability index: every public name in finitevolX.
+"""Generate, or check, the capability index: every public name in gridax.
 
-``docs/capabilities.md`` lists each name in ``finitevolx.__all__`` once,
-grouped by the private module that defines it, with the first sentence of
-its docstring; names finitevolX re-exports from gridax, spectraldiffx, gaussx
-or integrix are grouped by the library they come from. It then lists the public
-API of those libraries, which finitevolX builds on. Agents and people search it before
+``docs/capabilities.md`` lists the ``__all__`` of each public gridax module
+(``gridax``, its ``stencils`` / ``advection`` / ``analysis`` namespaces,
+``gridax.solvers`` and ``gridax.pipekit``), grouped by the private module
+that defines each name, with the first sentence of its docstring; names
+gridax re-exports from spectraldiffx, gaussx or integrix are grouped by the
+library they come from. It then lists the public API of those libraries,
+which gridax builds on. Agents and people search it before
 writing a helper ("Reuse before you write" in ``AGENTS.md``).
 
 Usage::
@@ -14,9 +16,9 @@ Usage::
 
 ``tests/test_capabilities.py`` runs the check. The upstream sections depend
 on the installed versions, which the index records; when they differ from
-the installed ones, only the finitevolX part is compared.
+the installed ones, only the gridax part is compared.
 
-``--check`` also fails when finitevolX exports a name that an upstream
+``--check`` also fails when gridax exports a name that an upstream
 library exports for a different object, unless ``ALLOWED_SHARED_NAMES`` gives
 the reason.
 """
@@ -38,33 +40,32 @@ INDEX = ROOT / "docs" / "capabilities.md"
 
 # Public homes, in order: (distribution, [public modules]).
 PACKAGES: dict[str, list[str]] = {
-    "gridax_jax": ["gridax_jax"],
+    "gridax": [
+        "gridax",
+        "gridax.stencils",
+        "gridax.advection",
+        "gridax.analysis",
+        "gridax.solvers",
+        "gridax.pipekit",
+    ],
 }
 
-# GeoML-stack libraries finitevolX builds on.
+# GeoML-stack libraries gridax builds on.
 UPSTREAM: dict[str, list[str]] = {
-    "gridax": ["gridax", "gridax.stencils", "gridax.advection", "gridax.analysis"],
     "spectraldiffx": ["spectraldiffx"],
     "gaussx": ["gaussx"],
     "integrix": ["integrix.march"],
 }
 UPSTREAM_BLURB = {
-    "gridax": (
-        "Grids and land / ocean masks as NumPy data (packages/gridax in this"
-        " repository): the Arakawa C-grid containers, the staggered masks, the"
-        " stencil capability and the mask construction helpers. finitevolX"
-        " re-exports all of them (listed above); build a grid or a mask here,"
-        " not by hand."
-    ),
     "spectraldiffx": (
         "Spectral transforms (DCT / DST / FFT), the rectangular spectral"
         " Poisson / Helmholtz solvers and their eigenvalues, and the spectral"
-        " capacitance solver. finitevolX re-exports most of the solver API"
+        " capacitance solver. gridax.solvers re-exports most of the solver API"
         " (listed above); the rest — spectral derivatives, spherical-harmonic"
         " and Chebyshev machinery — is used from here, never re-implemented."
     ),
     "gaussx": (
-        "Structured linear algebra and solver strategies. finitevolX delegates"
+        "Structured linear algebra and solver strategies. gridax delegates"
         " the tridiagonal solve, CG and the Nyström and multigrid preconditioners to it; use it"
         " for any other structured solve, preconditioner or low-rank"
         " approximation instead of writing one here."
@@ -76,34 +77,34 @@ UPSTREAM_BLURB = {
     ),
 }
 
-# Names finitevolX shares with an upstream library for a different object,
+# Names gridax shares with an upstream library for a different object,
 # and why.
 ALLOWED_SHARED_NAMES: dict[str, str] = {
     "MultigridSolver": (
-        "finitevolX's runs n_cycles fixed V-cycles over the C-grid hierarchy"
+        "gridax's runs n_cycles fixed V-cycles over the C-grid hierarchy"
         " (implicit, one-step and unrolled gradients) and hands its levels to"
         " gaussx through as_preconditioner(); gaussx's is CG preconditioned by"
         " one V-cycle over caller-built levels (#474)"
     ),
     "SphericalGrid2D": (
-        "finitevolX's is a lat-lon Arakawa C-grid container with a ghost ring;"
+        "gridax's is a lat-lon Arakawa C-grid container with a ghost ring;"
         " spectraldiffx's is the spectral (spherical-harmonic) grid"
     ),
     "build_capacitance_solver": (
-        "finitevolX's solves every wet cell with psi = 0 on the coast (the"
+        "gridax's solves every wet cell with psi = 0 on the coast (the"
         " problem masked_laplacian / method='cg' define, and C-grid wall"
         " placement for a Mask2D), while spectraldiffx's solves the wet cells"
         " off the inner ring with psi = 0 on that ring; both return a"
         " spectraldiffx CapacitanceSolver built on gaussx.MaskedOperator"
     ),
     "CapacitanceSolver": (
-        "finitevolX re-exports spectraldiffx's spectral capacitance solver for"
+        "gridax.solvers re-exports spectraldiffx's spectral capacitance solver for"
         " masked domains; gaussx's is an operator-level point-constraint solve"
     ),
 }
 
 _AUTOREF = re.compile(r"\[([^\]]+)\]\[[^\]]*\]")
-# Sphinx-style roles in docstrings (:class:`~finitevolx.Mask2D` -> `Mask2D`).
+# Sphinx-style roles in docstrings (:class:`~gridax.Mask2D` -> `Mask2D`).
 _ROLE = re.compile(r":\w+:`~?(?:[\w.]+\.)?([^`]+)`")
 # A full stop that ends a sentence (not "e.g." / "i.e." / "etc.").
 _SENTENCE_END = re.compile(r"(?<!e\.g)(?<!i\.e)(?<!etc)\.\s+(?=[A-Z])")
@@ -174,7 +175,8 @@ def _upstream_source(name: str, obj: object) -> str | None:
 
 def _summary(obj: object) -> str:
     if _is_alias(obj) or not callable(obj):
-        value = repr(obj)
+        # Drop memory addresses (a dict of functions), so the index is stable.
+        value = re.sub(r" at 0x[0-9a-f]+", "", repr(obj))
         return f"`{value if len(value) <= 60 else value[:57] + '...'}`".replace(
             "|", "\\|"
         )
@@ -236,7 +238,7 @@ def _group_title(group: str) -> str:
     return f"{_module_title(group).rstrip('.')} (`{group}`)"
 
 
-def _finitevolx_part() -> tuple[list[str], int]:
+def _gridax_part() -> tuple[list[str], int]:
     index, _ = collect()
     out: list[str] = []
     total = 0
@@ -292,24 +294,31 @@ def _versions() -> str:
 
 
 def render() -> str:
-    finitevolx_part, total = _finitevolx_part()
+    gridax_part, total = _gridax_part()
     out = [
         "# Capability index",
         "",
         "<!-- Generated by scripts/capabilities.py — do not edit by hand. -->",
         "",
-        f"Every public name in finitevolX ({total} of them), each listed once,",
-        "grouped by the module that defines it (names re-exported from",
-        "gridax, spectraldiffx, gaussx and integrix are grouped by library),",
-        "with the first sentence of its docstring; then the public API of",
-        "gridax, spectraldiffx, gaussx and integrix.march, which finitevolX",
-        "builds on. Search this",
-        "page before writing a helper: if what you need is here, compose it;",
-        "if it is almost here, extend it where it lives. Regenerate with",
-        "`make capabilities` after changing a public API",
-        "(`tests/test_capabilities.py` checks it is current).",
+        # One line per paragraph: the index is Markdown.
+        " ".join(
+            [
+                f"Every public name in gridax ({total} entries), listed per public",
+                "module (`gridax`, its `stencils`, `advection` and `analysis`",
+                "namespaces, `gridax.solvers` behind the `jax` extra and",
+                "`gridax.pipekit` behind the `pipekit` extra) and grouped by the",
+                "module that defines it (names re-exported from spectraldiffx,",
+                "gaussx and integrix are grouped by library), with the first",
+                "sentence of its docstring; then the public API of spectraldiffx,",
+                "gaussx and integrix.march, which gridax builds on. Search this",
+                "page before writing a helper: if what you need is here, compose",
+                "it; if it is almost here, extend it where it lives. Regenerate",
+                "with `make capabilities` after changing a public API",
+                "(`tests/test_capabilities.py` checks it is current).",
+            ]
+        ),
         "",
-        *finitevolx_part,
+        *gridax_part,
         UPSTREAM_MARKER,
         "",
         f"Listed at {_versions()}.",
@@ -323,7 +332,7 @@ def stale(current: str, text: str) -> bool:
     """Whether ``current`` differs from ``text`` where it is comparable.
 
     The upstream sections are compared only when the recorded versions match
-    the installed ones; the finitevolX part always is.
+    the installed ones; the gridax part always is.
     """
     if current == text:
         return False

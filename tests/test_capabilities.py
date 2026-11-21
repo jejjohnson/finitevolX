@@ -36,7 +36,7 @@ def test_capability_index_is_current() -> None:
 def test_no_name_is_bound_to_two_objects() -> None:
     _, clashes = capabilities.collect()
     assert not clashes, (
-        "finitevolx exports a name that spectraldiffx or gaussx exports for a "
+        "gridax exports a name that spectraldiffx or gaussx exports for a "
         f"different object: {clashes}. Rename it, or add it to "
         "ALLOWED_SHARED_NAMES in scripts/capabilities.py with a reason."
     )

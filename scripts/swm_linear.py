@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Linear shallow-water double-gyre example.
 
-This example uses the current :mod:`finitevolx` Arakawa C-grid API to integrate a
+This example uses the current :mod:`gridax` Arakawa C-grid API to integrate a
 wind-driven linear shallow-water model on a beta-plane with closed-basin BCs. The
 script uses ``xarray`` for coordinate-aware preprocessing and postprocessing,
 writes sampled fields to a Zarr store, and saves a static before/after figure.
@@ -42,7 +42,7 @@ from jaxtyping import Array, Float
 import matplotlib
 
 matplotlib.use("Agg")
-from gridax_jax import (
+from gridax import (
     CartesianGrid2D,
     Difference2D,
     Interpolation2D,
@@ -220,7 +220,7 @@ def to_wall_field(field: xr.DataArray) -> Float[Array, "Ny Nx"]:
 
     Examples
     --------
-    Convert an interior forcing field to the finitevolx storage layout::
+    Convert an interior forcing field to the gridax storage layout::
 
         wind_u = to_wall_field(forcing["wind_u"])
 

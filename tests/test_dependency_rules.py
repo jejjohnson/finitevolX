@@ -27,14 +27,6 @@ ROOT = Path(__file__).resolve().parents[1]
 
 #: this repository's packages: distribution -> (pyproject, import roots)
 PACKAGES: dict[str, tuple[str, tuple[str, ...]]] = {
-    "finitevolx": (
-        "pyproject.toml",
-        ("finitevolx",),
-    ),
-    "gridax-jax": (
-        "packages/gridax-jax/pyproject.toml",
-        ("packages/gridax-jax/src/gridax_jax",),
-    ),
     "gridax": (
         "packages/gridax/pyproject.toml",
         ("packages/gridax/src/gridax",),
@@ -61,9 +53,7 @@ FORBIDDEN: dict[str, str] = {
 
 #: stack libraries finitevolX may use: import name -> distribution
 ALLOWED: dict[str, str] = {
-    "finitevolx": "finitevolx",
     "gridax": "gridax",
-    "gridax_jax": "gridax-jax",
     "gaussx": "gaussx",
     "geocatalog": "geotoolz-catalog",
     "geocloud": "geotoolz-cloud",

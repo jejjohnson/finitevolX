@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import equinox as eqx
 import gaussx
-from gridax_jax import Mask2D, masked_laplacian, masked_neumann_laplacian
-from gridax_jax._src.solvers.multigrid import (
+from gridax import Mask2D
+from gridax._src.solvers.multigrid import (
     MultigridSolver,
     _apply_operator,
     _compute_n_levels,
@@ -15,6 +15,7 @@ from gridax_jax._src.solvers.multigrid import (
     _transfer_operators,
     build_multigrid_solver,
 )
+from gridax.solvers import masked_laplacian, masked_neumann_laplacian
 import jax
 import jax.numpy as jnp
 import numpy as np

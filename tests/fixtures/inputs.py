@@ -1,8 +1,8 @@
 """Canonical input fixtures for finitevolX golden-output regression tests.
 
 This module exposes deterministic 1-D, 2-D, and 3-D test domains plus
-matching :class:`~finitevolx.Mask1D` / :class:`~finitevolx.Mask2D` /
-:class:`~finitevolx.Mask3D` masks.  All "operator-attribute mask"
+matching :class:`~gridax.Mask1D` / :class:`~gridax.Mask2D` /
+:class:`~gridax.Mask3D` masks.  All "operator-attribute mask"
 regression tests share these inputs so that:
 
 * Every method under test sees the same field values, making it easy to

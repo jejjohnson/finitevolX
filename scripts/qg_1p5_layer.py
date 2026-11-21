@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Wind-driven 1.5-layer quasi-geostrophic closed-basin double-gyre example.
 
-This example shows how to combine the current :mod:`finitevolx` advection,
+This example shows how to combine the current :mod:`gridax` advection,
 interpolation, and spectral elliptic solvers to build a compact 1.5-layer QG
 model.  The potential-vorticity (PV) *anomaly* is advected in a closed
 rectangular basin with no-normal-flow solid walls, the streamfunction is
@@ -76,15 +76,15 @@ import jax.numpy as jnp
 import matplotlib
 
 matplotlib.use("Agg")
-from gridax_jax import (
+from gridax import (
     Advection2D,
     CartesianGrid2D,
     Difference2D,
     Interpolation2D,
     Vorticity2D,
     pad_interior,
-    solve_helmholtz_dst,
 )
+from gridax.solvers import solve_helmholtz_dst
 from integrix.march import heun_step
 import matplotlib.pyplot as plt
 import numpy as np

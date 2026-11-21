@@ -15,7 +15,7 @@ import inspect
 import itertools
 
 import equinox as eqx
-import gridax_jax as fvx
+import gridax as fvx
 import jax
 import jax.numpy as jnp
 import numpy as np

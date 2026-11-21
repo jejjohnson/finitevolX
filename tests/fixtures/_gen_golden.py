@@ -47,7 +47,7 @@ while _REPO_ROOT in sys.path:
     sys.path.remove(_REPO_ROOT)
 sys.path.insert(0, _REPO_ROOT)
 
-# Enable float64 *before* any finitevolx/JAX import.  The goldens must
+# Enable float64 *before* any gridax/JAX import.  The goldens must
 # be saved in the same dtype regime that the test suite runs under; the
 # test-side sibling ``tests/fixtures/__init__.py`` does the same thing.
 import jax

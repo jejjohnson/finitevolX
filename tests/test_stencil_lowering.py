@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import warnings
 
+import gridax as fvx
 from gridax._src.diffusion.diffusion import _diffusion_2d_fluxes_impl
 from gridax._src.operators._ghost import interior, zero_z_ghosts
 from gridax._src.operators.stencils import (
@@ -38,7 +39,6 @@ from gridax._src.operators.stencils import (
     diff_y_fwd_2d,
     diff_y_fwd_3d,
 )
-import gridax_jax as fvx
 import jax
 import jax.numpy as jnp
 import numpy as np

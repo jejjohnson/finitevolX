@@ -2,9 +2,9 @@
 
 Every golden entry is rebuilt with the canonical input fields as NumPy
 arrays instead of JAX arrays and compared with its committed ``.npz``. For
-an operator that lives in gridax (array-API code), the result must also stay
-NumPy; an operator still in gridax-jax may convert to JAX, and only its
-numbers are checked.
+an operator in gridax's array-API code, the result must also stay NumPy; a
+solver in ``gridax.solvers`` may convert to JAX, and only its numbers are
+checked.
 """
 
 from __future__ import annotations

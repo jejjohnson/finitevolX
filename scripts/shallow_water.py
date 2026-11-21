@@ -3,7 +3,7 @@ from __future__ import annotations
 """Nonlinear shallow-water double-gyre example.
 
 This script modernises the old nonlinear shallow-water example so that it uses the
-current :mod:`finitevolx` API throughout. The model is driven by the same
+current :mod:`gridax` API throughout. The model is driven by the same
 double-gyre wind stress pattern as the linear case, but the mass equation uses the
 full layer thickness and the momentum equation includes the nonlinear advection
 term. ``xarray`` handles the coordinate-aware forcing and saved diagnostics, and
@@ -44,7 +44,7 @@ import jax.numpy as jnp
 import matplotlib
 
 matplotlib.use("Agg")
-from gridax_jax import (
+from gridax import (
     Advection2D,
     CartesianGrid2D,
     Difference2D,

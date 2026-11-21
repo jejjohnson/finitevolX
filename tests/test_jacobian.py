@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from gridax_jax import arakawa_jacobian
+from gridax import arakawa_jacobian
 import jax.numpy as jnp
 import numpy as np
 import pytest

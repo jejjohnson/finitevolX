@@ -19,7 +19,7 @@ inversions (#475, jejjohnson/sesmax#126).
 
 from __future__ import annotations
 
-import gridax_jax as fvx
+import gridax.solvers as gs
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -48,25 +48,23 @@ def test_interior_residual(base_bc, lambda_):
     """5-point residual on every wet cell < 1e-10; psi = 0 on every dry cell."""
     mask = _island_basin()
     f = _rhs()
-    solver = fvx.build_capacitance_solver(
-        mask, DX, DY, lambda_=lambda_, base_bc=base_bc
-    )
+    solver = gs.build_capacitance_solver(mask, DX, DY, lambda_=lambda_, base_bc=base_bc)
     psi = solver(f)
     mask_f = jnp.asarray(mask, dtype=float)
-    res = fvx.masked_laplacian(psi, mask_f, DX, DY, lambda_=lambda_) - f * mask_f
+    res = gs.masked_laplacian(psi, mask_f, DX, DY, lambda_=lambda_) - f * mask_f
     # A direct solve: round-off of |f| ~ 1 times the O(1/dx^2) stencil, ~1e-13.
     assert float(jnp.max(jnp.abs(res))) < 1e-10
     np.testing.assert_array_equal(np.asarray(psi)[~mask], 0.0)
 
 
 def test_default_base_is_dst():
-    solver = fvx.build_capacitance_solver(_island_basin(), DX, DY)
+    solver = gs.build_capacitance_solver(_island_basin(), DX, DY)
     assert solver.base_bc == "dst"
 
 
 def test_unknown_base_raises():
     with pytest.raises(ValueError, match="base_bc must be"):
-        fvx.build_capacitance_solver(_island_basin(), DX, DY, base_bc="dct1")
+        gs.build_capacitance_solver(_island_basin(), DX, DY, base_bc="dct1")
 
 
 @pytest.mark.parametrize("base_bc", ["fft", "dct"])
@@ -75,7 +73,7 @@ def test_non_dst_base_rejects_wet_array_edge(base_bc):
     mask = np.ones((NY, NX), dtype=bool)
     mask[NY // 2, :] = False  # dry somewhere, but wet on every array edge
     with pytest.raises(ValueError, match="wet cells on the edge"):
-        fvx.build_capacitance_solver(mask, DX, DY, lambda_=4.0, base_bc=base_bc)
+        gs.build_capacitance_solver(mask, DX, DY, lambda_=4.0, base_bc=base_bc)
 
 
 @pytest.mark.slow
@@ -84,8 +82,8 @@ def test_dst_base_matches_cg_with_wet_array_edge():
     mask = np.ones((NY, NX), dtype=bool)
     mask[NY // 2, 5:-5] = False
     f = _rhs()
-    psi = fvx.build_capacitance_solver(mask, DX, DY, lambda_=4.0, base_bc="dst")(f)
+    psi = gs.build_capacitance_solver(mask, DX, DY, lambda_=4.0, base_bc="dst")(f)
     mask_f = jnp.asarray(mask, dtype=float)
-    res = fvx.masked_laplacian(psi, mask_f, DX, DY, lambda_=4.0) - f * mask_f
+    res = gs.masked_laplacian(psi, mask_f, DX, DY, lambda_=4.0) - f * mask_f
     # direct solve: round-off of |f| ~ 1 times the O(1/dx^2) stencil
     assert float(jnp.max(jnp.abs(res))) < 1e-10
