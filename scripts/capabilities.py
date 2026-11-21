@@ -43,7 +43,7 @@ PACKAGES: dict[str, list[str]] = {
 
 # GeoML-stack libraries finitevolX builds on.
 UPSTREAM: dict[str, list[str]] = {
-    "gridax": ["gridax", "gridax.stencils", "gridax.analysis"],
+    "gridax": ["gridax", "gridax.stencils", "gridax.advection", "gridax.analysis"],
     "spectraldiffx": ["spectraldiffx"],
     "gaussx": ["gaussx"],
     "integrix": ["integrix.march"],

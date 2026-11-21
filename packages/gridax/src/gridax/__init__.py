@@ -42,9 +42,9 @@ from gridax._src.advection.linear import (
     linear_5pts_right,
     linear_6pts,
 )
+from gridax._src.advection.reconstruct import reconstruct
 from gridax._src.advection.reconstruct_fn import (
     plusminus,
-    reconstruct,
     upwind_1pt,
     upwind_3pt,
     upwind_5pt,
