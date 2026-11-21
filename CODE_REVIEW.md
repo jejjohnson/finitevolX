@@ -101,8 +101,7 @@ order); review what they cannot see.
 
 - Step functions are pure on pytrees; diffrax solvers declare their tableau
   / order.
-- No physical constant (the geophysix records `SPHERE`, `WGS84`, `STANDARD`,
-  or the deprecated `GRAVITY`, `R_EARTH`, `OMEGA`, `RHO`, `DEG2M`)
+- No physical constant (the geophysix records `SPHERE`, `WGS84`, `STANDARD`)
   inside an expression in `operators/`, `advection/`, `diffusion/` or
   `solvers/`; no absolute epsilon guarding a ratio of dimensional
   quantities. A new spatial operator gets a `Case` in
@@ -197,11 +196,11 @@ def apply_mask(out, mask=None):
 ```python
 # ❌ Bakes SI units into the operator (fails TestConstantsAudit)
 def geostrophic_u(dh_dy, f):
-    return -GRAVITY / f * dh_dy
+    return -STANDARD.standard_gravity / f * dh_dy
 
 
 # ✅ Overridable, so a nondimensional model can pass gravity=1
-def geostrophic_u(dh_dy, f, gravity: float = GRAVITY):
+def geostrophic_u(dh_dy, f, gravity: float = STANDARD.standard_gravity):
     return -gravity / f * dh_dy
 ```
 

@@ -2,9 +2,6 @@
 
 The generic time steppers live in [integrix](https://github.com/jejjohnson/integrix) (`integrix.march`); the semi-Lagrangian scheme moved there too (#476), and the `solve_ocean_pde` wrapper moved to `sesmax_core.solve_pde`.
 
-!!! warning "Deprecated finitevolX names"
-    `finitevolx.RK3SSP`, `finitevolx.rk3_ssp_step` and the other generic steppers below still work for one release and emit a `DeprecationWarning`. The diffrax solvers and the pure step functions are the integrix objects themselves, so import them from `integrix.march`. `finitevolx.AB2Solver`, `finitevolx.LeapfrogRAFSolver` and `finitevolx.SplitExplicitRKSolver` are adapters that keep the old `init` / `step` call shapes; their integrix replacements are `integrix.march.AbstractStepper`s run by `integrix.march.run(stepper, rhs, t0, y0, dt, n_steps)` with `rhs(t, y, args)`.
-
 ## Explicit Runge-Kutta (Pure Functional)
 
 ::: integrix.march.euler_step
@@ -132,16 +129,6 @@ The T-point coordinates it takes as nodes come from gridax:
 ::: integrix.march.SemiLagrangianTerm
     options:
       docstring_style: google
-
-## Deprecated Adapters
-
-The objects behind `finitevolx.AB2Solver`, `finitevolx.LeapfrogRAFSolver` and `finitevolx.SplitExplicitRKSolver` for one release.
-
-::: gridax_jax._src.timestepping._deprecated.AB2Solver
-
-::: gridax_jax._src.timestepping._deprecated.LeapfrogRAFSolver
-
-::: gridax_jax._src.timestepping._deprecated.SplitExplicitRKSolver
 
 ## Convenience Wrapper
 

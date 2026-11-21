@@ -1,15 +1,12 @@
 """Tests for QG/SWM convenience utilities (Issue #153).
 
-Covers: coriolis_param, beta_param, coriolis_fn,
-        streamfn_to_ssh, ssh_to_streamfn,
+Covers: streamfn_to_ssh, ssh_to_streamfn,
         potential_vorticity_multilayer.
 """
 
+from geophysix.constants import STANDARD
 from gridax import CartesianGrid2D
 from gridax._src.operators.diagnostics import (
-    beta_param,
-    coriolis_fn,
-    coriolis_param,
     potential_vorticity_multilayer,
     qg_potential_vorticity,
     ssh_to_streamfn,
@@ -19,7 +16,6 @@ from gridax._src.operators.diagnostics import (
     sw_potential_vorticity_multilayer,
 )
 from gridax._src.operators.difference import Difference2D
-from gridax_jax._src.utils.constants import GRAVITY, OMEGA, R_EARTH
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -29,100 +25,6 @@ import pytest
 @pytest.fixture
 def grid2d():
     return CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
-
-
-# ======================================================================
-# Coriolis / beta-plane constructors
-# ======================================================================
-
-
-class TestCoriolisParam:
-    def test_equator(self):
-        """f0 = 0 at the equator."""
-        result = coriolis_param(0.0)
-        np.testing.assert_allclose(result, 0.0, atol=1e-10)
-
-    def test_north_pole(self):
-        """f0 = 2*Omega at the north pole."""
-        result = coriolis_param(90.0)
-        np.testing.assert_allclose(result, 2.0 * OMEGA, rtol=1e-10)
-
-    def test_45_degrees(self):
-        """f0 = 2*Omega*sin(45°) at 45°N."""
-        result = coriolis_param(45.0)
-        expected = 2.0 * OMEGA * jnp.sin(jnp.deg2rad(45.0))
-        np.testing.assert_allclose(result, expected, rtol=1e-10)
-
-    def test_array_input_uses_mean(self):
-        """Array input uses the mean latitude."""
-        lats = jnp.array([40.0, 50.0])
-        result = coriolis_param(lats)
-        expected = coriolis_param(45.0)
-        np.testing.assert_allclose(result, expected, rtol=1e-10)
-
-    def test_custom_omega(self):
-        result = coriolis_param(30.0, omega=1.0)
-        expected = 2.0 * 1.0 * jnp.sin(jnp.deg2rad(30.0))
-        np.testing.assert_allclose(result, expected, rtol=1e-10)
-
-
-class TestBetaParam:
-    def test_equator(self):
-        """beta is maximal at the equator (cos(0) = 1)."""
-        result = beta_param(0.0)
-        expected = 2.0 * OMEGA / R_EARTH
-        np.testing.assert_allclose(result, expected, rtol=1e-10)
-
-    def test_north_pole(self):
-        """beta = 0 at the pole (cos(90°) = 0)."""
-        result = beta_param(90.0)
-        np.testing.assert_allclose(result, 0.0, atol=1e-20)
-
-    def test_45_degrees(self):
-        result = beta_param(45.0)
-        expected = (2.0 * OMEGA / R_EARTH) * jnp.cos(jnp.deg2rad(45.0))
-        np.testing.assert_allclose(result, expected, rtol=1e-10)
-
-    def test_array_input_uses_mean(self):
-        lats = jnp.array([40.0, 50.0])
-        result = beta_param(lats)
-        expected = beta_param(45.0)
-        np.testing.assert_allclose(result, expected, rtol=1e-10)
-
-
-class TestCoriolisFn:
-    def test_f_plane(self):
-        """With beta=0, f(y) = f0 everywhere."""
-        Y = jnp.linspace(0, 1e6, 10)
-        result = coriolis_fn(Y, f0=1e-4, beta=0.0)
-        np.testing.assert_allclose(result, 1e-4, atol=1e-15)
-
-    def test_beta_plane(self):
-        """f(y) = f0 + beta*(y - y0)."""
-        f0, beta = 1e-4, 2e-11
-        Y = jnp.array([0.0, 1e6, 2e6])
-        y0 = 1e6
-        result = coriolis_fn(Y, f0=f0, beta=beta, y0=y0)
-        expected = f0 + beta * (Y - y0)
-        np.testing.assert_allclose(result, expected, rtol=1e-10)
-
-    def test_y0_defaults_to_mean(self):
-        """When y0 is None, uses mean(Y)."""
-        f0, beta = 1e-4, 2e-11
-        Y = jnp.array([0.0, 1e6, 2e6])
-        result = coriolis_fn(Y, f0=f0, beta=beta)
-        expected = f0 + beta * (Y - jnp.mean(Y))
-        np.testing.assert_allclose(result, expected, rtol=1e-10)
-
-    def test_2d_array(self):
-        """Works with 2D Y arrays (e.g., meshgrid output)."""
-        y1d = jnp.linspace(0, 1e6, 5)
-        Y = jnp.broadcast_to(y1d[:, None], (5, 5))
-        f0, beta, y0 = 1e-4, 2e-11, 5e5
-        result = coriolis_fn(Y, f0=f0, beta=beta, y0=y0)
-        assert result.shape == (5, 5)
-        expected = f0 + beta * (Y - y0)
-        np.testing.assert_allclose(result, expected, rtol=1e-10)
 
 
 # ======================================================================
@@ -156,11 +58,11 @@ class TestStreamfnToSsh:
         np.testing.assert_allclose(result, expected, rtol=1e-12)
 
     def test_default_gravity(self):
-        """Default g uses GRAVITY constant."""
+        """Default g uses STANDARD.standard_gravity constant."""
         psi = jnp.ones((2, 2))
         f0 = 1e-4
         result = streamfn_to_ssh(psi, f0=f0)
-        expected = (f0 / GRAVITY) * psi
+        expected = (f0 / STANDARD.standard_gravity) * psi
         np.testing.assert_allclose(result, expected, rtol=1e-12)
 
     def test_shape_preserved(self):
@@ -372,12 +274,6 @@ class TestSWPotentialVorticityMultilayer:
 
 
 class TestJITCompatibility:
-    def test_coriolis_fn_jit(self):
-        Y = jnp.linspace(0, 1e6, 10)
-        result = coriolis_fn(Y, f0=1e-4, beta=2e-11, y0=5e5)
-        result_jit = jax.jit(lambda y: coriolis_fn(y, f0=1e-4, beta=2e-11, y0=5e5))(Y)
-        np.testing.assert_allclose(result_jit, result, atol=1e-15)
-
     def test_streamfn_to_ssh_jit(self):
         psi = jnp.ones((5, 5))
         fn = lambda p: streamfn_to_ssh(p, f0=1e-4)

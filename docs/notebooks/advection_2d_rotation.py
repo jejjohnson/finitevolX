@@ -105,6 +105,7 @@ import numpy as np
 jax.config.update("jax_enable_x64", True)
 
 import gridax_jax as fvx
+from integrix.march import rk3_ssp_step
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "advection_2d_rotation"
 IMG_DIR.mkdir(parents=True, exist_ok=True)
@@ -330,7 +331,7 @@ for method in methods_2d:
     snapshots[method][0.0] = np.asarray(q[ng:-ng, ng:-ng])
 
     for step in range(1, nsteps + 1):
-        q = fvx.rk3_ssp_step(q, rhs_fn, dt)
+        q = rk3_ssp_step(q, rhs_fn, dt)
         q = enforce_periodic_2d(q, ng)
 
         t_frac = step / nsteps

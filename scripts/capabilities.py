@@ -71,9 +71,8 @@ UPSTREAM_BLURB = {
     ),
     "integrix": (
         "Time steppers: the diffrax solvers, the pure step functions and the"
-        " history-carrying AbstractSteppers run by integrix.march.run. The"
-        " finitevolX names of these are deprecated aliases (listed above) for"
-        " one release; new code imports them from integrix.march."
+        " history-carrying AbstractSteppers run by integrix.march.run; import"
+        " them from integrix.march."
     ),
 }
 
@@ -96,21 +95,6 @@ ALLOWED_SHARED_NAMES: dict[str, str] = {
         " placement for a Mask2D), while spectraldiffx's solves the wet cells"
         " off the inner ring with psi = 0 on that ring; both return a"
         " spectraldiffx CapacitanceSolver built on gaussx.MaskedOperator"
-    ),
-    "AB2Solver": (
-        "deprecated finitevolX adapter keeping the old init / step call shape"
-        " with f_prev held in the module; integrix's is an AbstractStepper run"
-        " by integrix.march.run"
-    ),
-    "LeapfrogRAFSolver": (
-        "deprecated finitevolX adapter keeping the old init / step call shape"
-        " with y_prev held in the module; integrix's is an AbstractStepper run"
-        " by integrix.march.run"
-    ),
-    "SplitExplicitRKSolver": (
-        "deprecated finitevolX adapter keeping the old step(rhs_slow, rhs_fast,"
-        " ...) call shape; integrix's is an AbstractStepper run by"
-        " integrix.march.run on SplitExplicitTerms"
     ),
     "CapacitanceSolver": (
         "finitevolX re-exports spectraldiffx's spectral capacitance solver for"

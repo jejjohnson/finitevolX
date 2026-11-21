@@ -790,13 +790,8 @@ class TestReconstructionAmplitudeCovariance:
 # Constants audit
 # ----------------------------------------------------------------------
 
-# gridax's deprecated names, and the geophysix records that replace them (#446)
+# The geophysix records that hold the physical constants (#446)
 PHYSICAL_CONSTANTS = {
-    "R_EARTH",
-    "GRAVITY",
-    "OMEGA",
-    "RHO",
-    "DEG2M",
     "SPHERE",
     "STANDARD",
     "WGS84",
@@ -819,8 +814,6 @@ def _audited_modules():
 
 #: Dotted paths of the modules the constants live in.
 CONSTANTS_MODULES = {
-    "gridax._src.constants",
-    "gridax_jax._src.utils.constants",
     "geophysix.constants",
     "geophysix.earth",
 }
@@ -829,7 +822,7 @@ CONSTANTS_MODULES = {
 def _constant_aliases(tree):
     """Local names that resolve to a physical constant, and to its module.
 
-    ``from ...constants import GRAVITY as g`` binds the constant to
+    ``from ...constants import STANDARD as g`` binds the constant to
     ``g``, so matching the original name alone would miss every later
     use of it. Returns ``(constant_aliases, module_aliases)``: the
     first maps a local name to the constant it came from (including
@@ -861,13 +854,13 @@ def _referenced_constant(node, aliases, modules):
 
     Covers the three spellings a module can reach one by: the bare
     imported name, a local alias of it, and an attribute access such
-    as ``constants.GRAVITY`` on the imported module.
+    as ``constants.STANDARD`` on the imported module.
 
     The attribute form is only accepted when its base name is bound to
     the constants module. Matching on the attribute name alone would
-    fail the audit on innocent code such as ``state.RHO`` or
-    ``config.GRAVITY``, which have nothing to do with
-    :mod:`gridax_jax._src.utils.constants`.
+    fail the audit on innocent code such as ``state.STANDARD`` or
+    ``config.WGS84``, which have nothing to do with
+    :mod:`geophysix.constants`.
     """
     if isinstance(node, ast.Name):
         return aliases.get(node.id) or (
@@ -887,12 +880,12 @@ def _constants_outside_defaults(path):
     """Names of physical constants used anywhere but as a parameter default.
 
     A constant reached through an explicit, overridable parameter
-    default (``gravity: float = GRAVITY``) keeps the operator
+    default (``gravity: float = STANDARD.standard_gravity``) keeps the operator
     unit-agnostic — the caller can pass 1. A constant referenced inside
     an expression bakes SI units into the numerics.
 
-    Qualified (``constants.GRAVITY``) and aliased
-    (``GRAVITY as g``) references count: otherwise a routine change of
+    Qualified (``constants.STANDARD``) and aliased
+    (``STANDARD as g``) references count: otherwise a routine change of
     import style would quietly switch the contract off.
     """
     tree = ast.parse(path.read_text())
@@ -940,30 +933,30 @@ class TestConstantsAudit:
         assert "spherical_diffusion.py" in names
 
     def test_audit_detects_an_aliased_constant(self, tmp_path):
-        """``GRAVITY as g`` is the same constant under another name."""
+        """``STANDARD as g`` is the same constant under another name."""
         offending = tmp_path / "aliased.py"
         offending.write_text(
-            "from gridax_jax._src.utils.constants import GRAVITY as g\n"
+            "from geophysix.constants import STANDARD as g\n"
             "def f(h):\n"
             "    return g * h\n"
         )
-        assert _constants_outside_defaults(offending) == ["GRAVITY (line 3)"]
+        assert _constants_outside_defaults(offending) == ["STANDARD (line 3)"]
 
     def test_audit_detects_a_qualified_constant(self, tmp_path):
-        """``constants.GRAVITY`` bakes in SI just as surely."""
+        """``constants.STANDARD`` bakes in SI just as surely."""
         offending = tmp_path / "qualified.py"
         offending.write_text(
-            "from gridax_jax._src.utils import constants\n"
+            "from geophysix import constants\n"
             "def f(h):\n"
-            "    return constants.GRAVITY * h\n"
+            "    return constants.STANDARD * h\n"
         )
-        assert _constants_outside_defaults(offending) == ["GRAVITY (line 3)"]
+        assert _constants_outside_defaults(offending) == ["STANDARD (line 3)"]
 
     def test_audit_allows_an_aliased_default(self, tmp_path):
         """The alias is still overridable when it is only a default."""
         fine = tmp_path / "aliased_default.py"
         fine.write_text(
-            "from gridax_jax._src.utils.constants import GRAVITY as g\n"
+            "from geophysix.constants import STANDARD as g\n"
             "def f(h, gravity=g):\n"
             "    return gravity * h\n"
         )
@@ -972,47 +965,47 @@ class TestConstantsAudit:
     def test_audit_allows_a_qualified_default(self, tmp_path):
         fine = tmp_path / "qualified_default.py"
         fine.write_text(
-            "from gridax_jax._src.utils import constants\n"
-            "def f(h, gravity=constants.GRAVITY):\n"
+            "from geophysix import constants\n"
+            "def f(h, gravity=constants.STANDARD):\n"
             "    return gravity * h\n"
         )
         assert not _constants_outside_defaults(fine)
 
     def test_audit_ignores_an_unrelated_attribute_of_the_same_name(self, tmp_path):
-        """``state.RHO`` is not the constants module's ``RHO``.
+        """``state.STANDARD`` is not the constants module's ``STANDARD``.
 
         Matching on the attribute name alone would fail the audit on
         any object that happens to carry one of these names.
         """
         fine = tmp_path / "unrelated_attribute.py"
-        fine.write_text("def f(state, h):\n    return state.RHO * h\n")
+        fine.write_text("def f(state, h):\n    return state.STANDARD * h\n")
         assert not _constants_outside_defaults(fine)
 
     def test_audit_still_catches_it_through_a_module_alias(self, tmp_path):
         """Renaming the module on import must not switch the audit off."""
         offending = tmp_path / "module_alias.py"
         offending.write_text(
-            "from gridax_jax._src.utils import constants as c\n"
+            "from geophysix import constants as c\n"
             "def f(h):\n"
-            "    return c.RHO * h\n"
+            "    return c.STANDARD * h\n"
         )
-        assert _constants_outside_defaults(offending) == ["RHO (line 3)"]
+        assert _constants_outside_defaults(offending) == ["STANDARD (line 3)"]
 
     def test_audit_detects_a_hard_coded_constant(self, tmp_path):
         """The audit must fail on the pattern it exists to catch."""
         offending = tmp_path / "bad_operator.py"
         offending.write_text(
-            "from gridax_jax._src.utils.constants import GRAVITY\n"
+            "from geophysix.constants import STANDARD\n"
             "def tendency(h, dx):\n"
-            "    return GRAVITY * h / dx\n"
+            "    return STANDARD * h / dx\n"
         )
         assert _constants_outside_defaults(offending)
 
     def test_audit_allows_an_overridable_default(self, tmp_path):
         fine = tmp_path / "good_operator.py"
         fine.write_text(
-            "from gridax_jax._src.utils.constants import GRAVITY\n"
-            "def tendency(h, dx, g: float = GRAVITY):\n"
+            "from geophysix.constants import STANDARD\n"
+            "def tendency(h, dx, g: float = STANDARD):\n"
             "    return g * h / dx\n"
         )
         assert not _constants_outside_defaults(fine)

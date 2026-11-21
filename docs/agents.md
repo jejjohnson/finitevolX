@@ -73,7 +73,7 @@ search the capability index
   operators; don't multiply by a mask afterwards or keep `NaN` on land.
 - Advect with `Advection2D(...)(q, u, v, method="weno5")`; invert with
   `sesmax_core.gfd`'s `streamfunction_from_vorticity` / `pv_inversion`
-  (or the spectral solvers here); step with `rk3_ssp_step` or a
+  (or the spectral solvers here); step with `integrix.march.rk3_ssp_step` or a
   finitevolX diffrax solver.
 - Pass physical constants explicitly; never hard-code them in a model
   meant to run nondimensionally.

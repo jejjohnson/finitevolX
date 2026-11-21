@@ -108,7 +108,7 @@ averages of row $j$ (column $i$) by one of the 1-D schemes described below.
 ### Formal Order
 
 The 2-D (and 3-D) operators are **unsplit**: both directions' fluxes are
-computed from the same state, and the time integrator (e.g. `rk3_ssp_step`)
+computed from the same state, and the time integrator (e.g. `integrix.march.rk3_ssp_step`)
 advances their sum, so there is no splitting error and the temporal order
 is the integrator's.  In space, each face value is a **1-D reconstruction
 along the face normal**, and each face flux is the face-midpoint velocity

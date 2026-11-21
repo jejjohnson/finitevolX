@@ -74,6 +74,7 @@ import numpy as np
 jax.config.update("jax_enable_x64", True)
 
 import gridax_jax as fvx
+from integrix.march import heun_step
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "qg_1p5_layer"
 IMG_DIR.mkdir(parents=True, exist_ok=True)
@@ -468,14 +469,14 @@ def pv_tendency(q_field):
 # ## 8. Time Stepping
 #
 # We use the **Heun method** (explicit RK2 predictor-corrector) from
-# `finitevolx.heun_step`.  This is second-order accurate and stable for
+# `integrix.march.heun_step`.  This is second-order accurate and stable for
 # advection-dominated problems with a suitable CFL constraint.
 
 # %%
 @jax.jit
 def step(q_field):
     """Advance one Heun time step and diagnose the balanced state."""
-    q_next = apply_bc(fvx.heun_step(q_field, pv_tendency, dt))
+    q_next = apply_bc(heun_step(q_field, pv_tendency, dt))
     psi_next = invert_streamfunction(q_next)
     u_next, v_next = geostrophic_velocity(psi_next)
     return q_next, psi_next, u_next, v_next

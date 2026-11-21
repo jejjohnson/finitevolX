@@ -51,7 +51,7 @@ Poisson solver or an RK loop, look it up:
 | Poisson / Helmholtz | `fvx.solve_helmholtz_dst` / `_dct` / `_fft` on a rectangle (slice the unknowns, embed the result in zeros); the one-call wrappers `streamfunction_from_vorticity`, `pressure_from_divergence` and `pv_inversion` moved to `sesmax_core.gfd`; `gaussx.linear_solve_with_info` with `gaussx.CGSolver` (CG is gaussx's, with `gaussx.NystromPreconditioner` for a low-rank preconditioner and `fvx.make_spectral_preconditioner` for a spectral one), `fvx.build_capacitance_solver`, `fvx.build_multigrid_solver(...).as_preconditioner()` or `fvx.multigrid_levels` for gaussx's multigrid |
 | The Laplacian as a linear operator (GP / DA priors, log-determinants, sampling) | `fvx.helmholtz_operator(shape, dx, dy, lambda_, bc)` (a `gaussx.DiagonalizedOperator`: `gaussx.solve` / `logdet` / `sqrt` / `inv`), `fvx.masked_helmholtz_operator(mask, dx, dy, lambda_)` (a `gaussx.MaskedOperator`, capacitance solve); an SPDE / Matérn precision `τ²(κ² − ∇²)^α` from its eigenvalues; `fvx.build_multigrid_solver(...).as_preconditioner()` for `gaussx.CGSolver` |
 | Forcing | moved to `sesmax_core.forcing` (#422): `WindStress2D`, `LinearDrag2D`, `QuadraticDrag2D`, `RayleighDamping2D`, combined with `ForcingSum` / `ForcingProduct` / `TimeVaryingForcing` |
-| Time stepping | `fvx.rk3_ssp_step(state, rhs_fn, dt)`, `fvx.rk4_step`, `fvx.ab2_step`, `fvx.leapfrog_raf_step`, `fvx.imex_ssp2_step`; diffrax solvers `fvx.RK3SSP`, `fvx.SSP_RK104`, `fvx.IMEX_SSP2` with `sesmax_core.solve_pde` (the former `solve_ocean_pde`, moved from finitevolX) |
+| Time stepping | `integrix.march.rk3_ssp_step(state, rhs_fn, dt)`, `integrix.march.rk4_step`, `integrix.march.ab2_step`, `integrix.march.leapfrog_raf_step`, `integrix.march.imex_ssp2_step`; diffrax solvers `integrix.march.RK3SSP`, `integrix.march.SSP_RK104`, `integrix.march.IMEX_SSP2` with `sesmax_core.solve_pde` (the former `solve_ocean_pde`, moved from finitevolX) |
 | Several layers | `sesmax_core.vertical.multilayer(op.method)` over `[nl, Ny, Nx]`; vertical modes `sesmax_core.vertical.decompose_vertical_modes`, `layer_to_mode` (moved from finitevolX, #422) |
 
 Spectral transforms and solvers come from spectraldiffx (finitevolX
@@ -97,6 +97,7 @@ import jax.numpy as jnp
 import numpy as np
 
 import gridax_jax as fvx
+from integrix.march import rk3_ssp_step
 
 jax.config.update("jax_enable_x64", True)
 
@@ -131,7 +132,7 @@ def rhs(q):
 
 q0 = jnp.exp(-((X - 0.3) ** 2 + (Y - 0.5) ** 2) / 0.005)  # [Ny, Nx]
 dt = 0.4 * grid.dx / jnp.max(jnp.abs(u))  # CFL number 0.4
-step = jax.jit(lambda q: fvx.rk3_ssp_step(q, rhs, dt))
+step = jax.jit(lambda q: rk3_ssp_step(q, rhs, dt))
 q = q0
 for _ in range(100):
     q = step(q)
@@ -165,7 +166,7 @@ tendency is exactly zero on every land cell.
 | A conjugate-gradient loop on a masked basin | `gaussx.linear_solve_with_info(gaussx.as_linear_operator(matvec, shape=(n, n), negative_definite=True), rhs.ravel(), solver=gaussx.CGSolver(), preconditioner=fvx.build_multigrid_solver(...).as_preconditioner())` |
 | A dense `(N, N)` Laplacian matrix for a prior covariance, its Cholesky or log-determinant | `fvx.helmholtz_operator` / `fvx.masked_helmholtz_operator` with `gaussx.solve`, `gaussx.logdet`, `gaussx.sqrt` |
 | A Thomas algorithm for vertical diffusion | `fvx.solve_tridiagonal` |
-| A hand-written RK3 / AB2 / leapfrog loop | `fvx.rk3_ssp_step`, `fvx.ab2_step`, `fvx.leapfrog_raf_step`, or `fvx.RK3SSP` with `sesmax_core.solve_pde.solve_ocean_pde` |
+| A hand-written RK3 / AB2 / leapfrog loop | `integrix.march.rk3_ssp_step`, `integrix.march.ab2_step`, `integrix.march.leapfrog_raf_step`, or `integrix.march.RK3SSP` with `sesmax_core.solve_pde.solve_ocean_pde` |
 | `jnp.sum(q * dx * dy)` | `fvx.area_sum(q, grid)` (excludes the ghost ring; `mask=` drops land) |
 | Kinetic energy / PV / Okubo–Weiss by hand | `fvx.Energetics2D`, `fvx.Vorticity2D`, `fvx.Strain2D` |
 | A `vmap` over layers | `sesmax_core.vertical.multilayer(diff.laplacian)(psi_layers)` |

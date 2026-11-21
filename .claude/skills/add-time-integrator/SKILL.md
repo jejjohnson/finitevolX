@@ -12,18 +12,18 @@ Read contract 6 (time integration) in `AGENTS.md`, then
 
 ## 1. Make sure it does not exist yet
 
-Search `docs/capabilities.md`: the steps `euler_step`, `heun_step`,
+The time steppers live in `integrix.march`, not in gridax: the steps `euler_step`, `heun_step`,
 `rk3_ssp_step`, `rk4_step`, `ab2_step`, `ab3_step`, `leapfrog_raf_step`,
 `imex_ssp2_step`, `split_explicit_step`; the
 diffrax solvers `ForwardEulerDfx`, `RK2Heun`, `RK3SSP`, `RK4Classic`,
 `SSP_RK2`, `SSP_RK104`, `IMEX_SSP2`; the
-`eqx.Module` solvers `AB2Solver`, `LeapfrogRAFSolver`,
-`SplitExplicitRKSolver`. `solve_ocean_pde` moved to `sesmax_core.solve_pde`. diffrax itself ships many
+steppers `AB2Solver`, `LeapfrogRAFSolver`,
+`SplitExplicitRKSolver`, run by `integrix.march.run`. `solve_ocean_pde` moved to `sesmax_core.solve_pde`. diffrax itself ships many
 more (`dfx.Tsit5`, `dfx.Dopri5`, `dfx.Kvaerno5`, …): a generic ODE scheme
 belongs there, not here. finitevolX adds the schemes ocean models need
 (SSP, multistep with filters, IMEX, split-explicit).
 
-## 2. Write it (`gridax_jax/_src/timestepping/`)
+## 2. Write it (in integrix, `integrix.march`)
 
 - **The pure step** in the matching module (`explicit_rk.py`,
   `multistep.py`, `imex.py`, `split_explicit.py`):

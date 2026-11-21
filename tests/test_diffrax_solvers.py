@@ -6,18 +6,15 @@ import itertools
 import math
 
 import diffrax as dfx
-from gridax_jax import (
+from integrix.march import (
     IMEX_SSP2,
     RK3SSP,
     SSP_RK2,
     SSP_RK104,
-    AB2Solver,
     AB3Solver,
     ForwardEulerDfx,
-    LeapfrogRAFSolver,
     RK2Heun,
     RK4Classic,
-    SplitExplicitRKSolver,
 )
 import jax
 import jax.numpy as jnp
@@ -236,179 +233,6 @@ class TestSaveAt:
 
 
 # ---------------------------------------------------------------------------
-# AB2 solver (manual interface)
-# ---------------------------------------------------------------------------
-
-
-class TestAB2Solver:
-    def test_exponential_decay(self):
-        def rhs(t, y):
-            return -y
-
-        solver = AB2Solver()
-        solver, y = solver.init(rhs, 0.0, jnp.array(1.0), 0.01)
-
-        for n in range(1, 100):
-            y, solver = solver.step(rhs, n * 0.01, y, 0.01)
-
-        exact = math.exp(-1.0)
-        np.testing.assert_allclose(float(y), exact, rtol=5e-3)
-
-    def test_convergence_rate(self):
-        """AB2 should converge at order ~2."""
-
-        def rhs(t, y):
-            return -y
-
-        exact = math.exp(-1.0)
-        errors = []
-        for dt in [0.05, 0.025, 0.0125]:
-            n_steps = int(round(1.0 / dt))
-            solver = AB2Solver()
-            solver, y = solver.init(rhs, 0.0, jnp.array(1.0), dt)
-            for n in range(1, n_steps):
-                y, solver = solver.step(rhs, n * dt, y, dt)
-            errors.append(abs(float(y) - exact))
-
-        rate = np.log2(errors[-2] / errors[-1])
-        assert rate > 1.8, f"AB2Solver expected order ~2, got {rate:.2f}"
-
-
-# ---------------------------------------------------------------------------
-# LeapfrogRAF solver (manual interface)
-# ---------------------------------------------------------------------------
-
-
-class TestLeapfrogRAFSolver:
-    def test_exponential_decay(self):
-        def rhs(t, y):
-            return -y
-
-        solver = LeapfrogRAFSolver(alpha=0.05)
-        solver, y = solver.init(rhs, 0.0, jnp.array(1.0), 0.01)
-
-        for n in range(1, 100):
-            y, solver = solver.step(rhs, n * 0.01, y, 0.01)
-
-        exact = math.exp(-1.0)
-        np.testing.assert_allclose(float(y), exact, rtol=5e-2)
-
-    def test_different_alpha_values(self):
-        """Various alpha values should all produce stable, reasonable results."""
-
-        def rhs(t, y):
-            return -y
-
-        exact = math.exp(-1.0)
-        for alpha in [0.01, 0.05, 0.1]:
-            solver = LeapfrogRAFSolver(alpha=alpha)
-            solver, y = solver.init(rhs, 0.0, jnp.array(1.0), 0.01)
-            for n in range(1, 100):
-                y, solver = solver.step(rhs, n * 0.01, y, 0.01)
-            assert jnp.isfinite(y)
-            assert abs(float(y) - exact) < 0.1, (
-                f"alpha={alpha}: error={abs(float(y) - exact):.3f}"
-            )
-
-
-# ---------------------------------------------------------------------------
-# SplitExplicitRK solver
-# ---------------------------------------------------------------------------
-
-
-class TestSplitExplicitRKSolver:
-    def test_oscillatory_fast_mode(self):
-        """Fast rotation w_f = 20 stays on the unit circle to 1e-6 over t = 10 (#312)."""
-        wf, dt = 20.0, 0.05
-        solver = SplitExplicitRKSolver(n_substeps=50)
-
-        def rhs_slow(_t, y_3d, y_2d_avg):
-            return jnp.array([y_3d[1], -y_3d[0]]) + 1e-3 * y_2d_avg
-
-        def rhs_fast(_t, y_2d, _y_3d):
-            return jnp.array([wf * y_2d[1], -wf * y_2d[0]])
-
-        step = jax.jit(lambda t, a, b: solver.step(rhs_slow, rhs_fast, t, a, b, dt))
-        y3 = y2 = jnp.array([1.0, 0.0])
-        for n in range(200):
-            y3, y2 = step(n * dt, y3, y2)
-        assert abs(float(jnp.linalg.norm(y2)) - 1.0) < 1e-6
-
-    def test_matches_split_explicit_step(self):
-        """The solver equals the functional step, slow forcing and coupling included."""
-        from gridax_jax import split_explicit_step
-
-        solver = SplitExplicitRKSolver(n_substeps=7)
-        y3, y2 = jnp.array([1.0, -0.5]), jnp.array([0.3, 0.2])
-        args = dict(
-            slow_forcing=lambda a: 0.1 * a,
-            couple_2d_to_3d=lambda a, avg: a + 0.01 * avg,
-        )
-        out_s = solver.step(
-            lambda _t, a, avg: -a + avg,
-            lambda _t, b, a: -3.0 * b + a,
-            0.0,
-            y3,
-            y2,
-            0.2,
-            **args,
-        )
-        out_f = split_explicit_step(
-            y3,
-            y2,
-            lambda a, avg: -a + avg,
-            lambda _t, b, a: -3.0 * b + a,
-            args["couple_2d_to_3d"],
-            0.2,
-            7,
-            slow_forcing=args["slow_forcing"],
-        )
-        np.testing.assert_array_equal(out_s[0], out_f[0])
-        np.testing.assert_array_equal(out_s[1], out_f[1])
-
-    def test_basic(self):
-        solver = SplitExplicitRKSolver(n_substeps=10)
-
-        def rhs_slow(t, y_3d, y_2d_avg):
-            return -y_3d
-
-        def rhs_fast(t_sub, y_2d, y_3d):
-            return -y_2d
-
-        y_3d_new, y_2d_new = solver.step(
-            rhs_slow,
-            rhs_fast,
-            0.0,
-            jnp.array(1.0),
-            jnp.array(1.0),
-            0.1,
-        )
-        assert jnp.isfinite(y_3d_new)
-        assert jnp.isfinite(y_2d_new)
-
-    def test_more_substeps_improves_accuracy(self):
-        """More substeps should give better fast-mode accuracy."""
-        exact = math.exp(-1.0)
-
-        def rhs_slow(t, y_3d, y_2d_avg):
-            return jnp.array(0.0)
-
-        def rhs_fast(t_sub, y_2d, y_3d):
-            return -y_2d
-
-        errors = []
-        for n_sub in [10, 100, 1000]:
-            solver = SplitExplicitRKSolver(n_substeps=n_sub)
-            _, y_2d_new = solver.step(
-                rhs_slow, rhs_fast, 0.0, jnp.array(0.0), jnp.array(1.0), 1.0
-            )
-            errors.append(abs(float(y_2d_new) - exact))
-
-        assert errors[1] < errors[0]
-        assert errors[2] < errors[1]
-
-
-# ---------------------------------------------------------------------------
 # Butcher tableau consistency checks
 # ---------------------------------------------------------------------------
 
@@ -546,7 +370,7 @@ class TestDiffeqsolveProtocol:
     @pytest.mark.slow
     def test_imex_stepto_matches_functional_step(self):
         """IMEX_SSP2 in diffeqsolve equals imex_ssp2_step (exact implicit solve)."""
-        from gridax_jax import imex_ssp2_step
+        from integrix.march import imex_ssp2_step
 
         dt, n = 0.01, 100
         sol = dfx.diffeqsolve(
@@ -589,13 +413,12 @@ class TestDiffeqsolveProtocol:
         """Static int fields: the solver objects can be jax.jit arguments."""
 
         @jax.jit
-        def run_split(solver, y3, y2):
-            return solver.step(lambda t, a, b: -a, lambda t, b, a: -b, 0.0, y3, y2, 0.1)
+        def run(solver, y0):
+            sol = dfx.diffeqsolve(dfx.ODETerm(_decay_rhs), solver, 0.0, 0.1, 0.05, y0)
+            return sol.ys[0]
 
-        out = run_split(
-            SplitExplicitRKSolver(n_substeps=5), jnp.array(1.0), jnp.array(1.0)
-        )
-        assert bool(jnp.isfinite(out[1]))
+        out = run(RK3SSP(), jnp.array(1.0))
+        assert bool(jnp.isfinite(out))
         # (IMEX_SSP2 holds an optimistix root finder with a function field, so it
         # goes through eqx.filter_jit, as every diffrax implicit solver does.)
 
@@ -625,7 +448,7 @@ class TestAB3Solver:
         assert all(r >= 2.9 for r in rates), rates
 
     def test_matches_rk3_bootstrap_then_ab3_step(self):
-        from gridax_jax import ab3_step, rk3_ssp_step
+        from integrix.march import ab3_step, rk3_ssp_step
 
         f = lambda y: -1.5 * y
         dt = 0.1

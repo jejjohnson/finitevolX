@@ -4,7 +4,7 @@ This page covers the theory behind the time integration schemes used with finite
 explains why certain methods are preferred for ocean and atmosphere modelling,
 and provides practical guidance for choosing a scheme.
 
-The generic schemes below live in [integrix](https://github.com/jejjohnson/integrix) (`integrix.march`); their `finitevolx.*` names are deprecated aliases for one release. The semi-Lagrangian scheme moved there too (#476): integrix's step takes any nodes and any functax read-out, and gridax supplies the T-point coordinates.
+The generic schemes below live in [integrix](https://github.com/jejjohnson/integrix) (`integrix.march`), and gridax has no alias for them. The semi-Lagrangian scheme moved there too (#476): integrix's step takes any nodes and any functax read-out, and gridax supplies the T-point coordinates.
 
 ---
 

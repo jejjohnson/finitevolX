@@ -1,8 +1,8 @@
-"""The solver names that moved to gaussx and sesmax-core are gone.
+"""The solver, stepper and constant names that moved to other repos are gone.
 
 CG, its report and the multigrid and Nyström preconditioners are gaussx's
 (#474); the forcing operators, the vertical modes, ``multilayer`` and the
-barotropic filter are sesmax-core's (#422). The deprecation window is over:
+barotropic filter are sesmax-core's (#422); the time steppers are integrix.march's; the constants, the Coriolis helpers and the linear equation of state are geophysix's (#446). The deprecation window is over:
 ``gridax_jax.<name>`` raises ``AttributeError``.
 """
 
@@ -111,7 +111,59 @@ REMOVED_NAMES = [
     "semi_lagrangian_step",
     "SemiLagrangianSolver",
     "SemiLagrangianTerm",
+    # integrix.march (the time steppers)
+    "ForwardEulerDfx",
+    "RK2Heun",
+    "SSP_RK2",
+    "RK3SSP",
+    "RK4Classic",
+    "SSP_RK104",
+    "IMEX_SSP2",
+    "AB2Solver",
+    "AB3Solver",
+    "LeapfrogRAFSolver",
+    "SplitExplicitRKSolver",
+    "euler_step",
+    "heun_step",
+    "rk3_ssp_step",
+    "rk4_step",
+    "imex_ssp2_step",
+    "ab2_step",
+    "ab3_step",
+    "leapfrog_raf_step",
+    "split_explicit_step",
+    # geophysix (#446): the linear equation of state and the Coriolis helpers
+    "linear_density",
+    "linear_density_anomaly",
+    "linear_drho_dT",
+    "linear_drho_dS",
+    "buoyancy",
+    "reduced_gravity",
+    "coriolis_param",
+    "beta_param",
+    "coriolis_fn",
 ]
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "R_EARTH",
+        "GRAVITY",
+        "OMEGA",
+        "RHO",
+        "DEG2M",
+        "coriolis_param",
+        "beta_param",
+        "coriolis_fn",
+    ],
+)
+def test_names_moved_to_geophysix_are_gone_from_gridax(name: str) -> None:
+    import gridax
+
+    assert name not in gridax.__all__
+    with pytest.raises(AttributeError):
+        getattr(gridax, name)
 
 
 @pytest.mark.parametrize("name", REMOVED_NAMES)

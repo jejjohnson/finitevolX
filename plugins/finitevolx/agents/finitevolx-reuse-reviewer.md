@@ -77,9 +77,9 @@ list grouped by module, plus spectraldiffx and gaussx.
      primitives;
    - a Thomas algorithm → `finitevolx.solve_tridiagonal`;
    - an RK3 / RK4 / Adams–Bashforth / leapfrog loop →
-     `finitevolx.rk3_ssp_step`, `finitevolx.rk4_step`,
-     `finitevolx.ab2_step`, `finitevolx.leapfrog_raf_step`, or a diffrax
-     solver such as `finitevolx.RK3SSP` with `sesmax_core.solve_pde.solve_ocean_pde`;
+     `integrix.march.rk3_ssp_step`, `integrix.march.rk4_step`,
+     `integrix.march.ab2_step`, `integrix.march.leapfrog_raf_step`, or a diffrax
+     solver such as `integrix.march.RK3SSP` with `sesmax_core.solve_pde.solve_ocean_pde`;
    - wind stress, bottom drag, sponge damping → `sesmax_core.forcing`
      (`WindStress2D`, `LinearDrag2D`, `QuadraticDrag2D`, `RayleighDamping2D`),
      which took them over from finitevolX (#422).

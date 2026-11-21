@@ -66,6 +66,7 @@ import numpy as np
 jax.config.update("jax_enable_x64", True)
 
 import gridax_jax as fvx
+from integrix.march import rk3_ssp_step
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "advection_2d_masked"
 IMG_DIR.mkdir(parents=True, exist_ok=True)
@@ -350,7 +351,7 @@ for name, cfg in experiments.items():
     q = q0.copy()
 
     for _step in range(nsteps):
-        q = fvx.rk3_ssp_step(q, rhs_fn, dt)
+        q = rk3_ssp_step(q, rhs_fn, dt)
         q = q * ocean_jnp  # enforce land = 0
 
     peak = float(jnp.max(q))
@@ -415,7 +416,7 @@ fig.savefig(IMG_DIR / "comparison.png", dpi=150, bbox_inches="tight")
 #     return advect_masked(q, u, v, method='weno5')
 #
 # for _ in range(nsteps):
-#     q = fvx.rk3_ssp_step(q, rhs, dt)
+#     q = rk3_ssp_step(q, rhs, dt)
 #     q = q * ocean_jnp       # ← clean up land after the full step
 # ```
 #

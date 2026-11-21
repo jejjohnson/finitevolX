@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING
 import warnings
 
 from geophysix.constants import STANDARD
-from geophysix.earth import SPHERE, WGS84
 from jaxtyping import Float
 import numpy as np
 
@@ -662,94 +661,6 @@ def vertical_velocity(
     if isinstance(mask, Mask3D):
         w = xp.where(mask.w, w, 0.0)
     return w
-
-
-# ======================================================================
-# Coriolis / beta-plane field constructors  (Issue #153)
-# ======================================================================
-
-
-def coriolis_param(
-    lat: float | Float[Array, "..."], omega: float = WGS84.rotation_rate
-) -> float | Float[Array, ""]:
-    """Reference Coriolis parameter from latitude.
-
-    f0 = 2 * Omega * sin(lat0)
-
-    Parameters
-    ----------
-    lat : float or array
-        Latitude(s) in degrees.  If an array, the mean is used.
-    omega : float
-        Earth's angular velocity (rad/s).  Default: WGS84's, 7.292115e-5.
-
-    Returns
-    -------
-    float or scalar Array
-        Reference Coriolis parameter f0 (1/s).
-    """
-    xp = array_namespace(lat)
-    lat_rad = xp.deg2rad(xp.mean(xp.asarray(lat)))
-    return 2.0 * omega * xp.sin(lat_rad)
-
-
-def beta_param(
-    lat: float | Float[Array, "..."],
-    omega: float = WGS84.rotation_rate,
-    radius: float = SPHERE.semi_major,
-) -> float | Float[Array, ""]:
-    """Meridional gradient of the Coriolis parameter from latitude.
-
-    beta = (2 * Omega / R) * cos(lat0)
-
-    Parameters
-    ----------
-    lat : float or array
-        Latitude(s) in degrees.  If an array, the mean is used.
-    omega : float
-        Earth's angular velocity (rad/s).  Default: WGS84's, 7.292115e-5.
-    radius : float
-        Earth's radius (m).  Default: the IUGG mean radius, 6,371,008.77 m.
-
-    Returns
-    -------
-    float or scalar Array
-        Meridional Coriolis gradient beta (1/(m·s)).
-    """
-    xp = array_namespace(lat)
-    lat_rad = xp.deg2rad(xp.mean(xp.asarray(lat)))
-    return (2.0 * omega / radius) * xp.cos(lat_rad)
-
-
-def coriolis_fn(
-    Y: Float[Array, "..."],
-    f0: float | Float[Array, ""] = 9.375e-5,
-    beta: float | Float[Array, ""] = 1.754e-11,
-    y0: float | Float[Array, ""] | None = None,
-) -> Float[Array, "..."]:
-    """Beta-plane Coriolis field.
-
-    f(y) = f0 + beta * (y - y0)
-
-    Parameters
-    ----------
-    Y : Float[Array, "..."]
-        Meridional coordinate array (m).
-    f0 : float
-        Reference Coriolis parameter (1/s).
-    beta : float
-        Meridional Coriolis gradient (1/(m·s)).
-    y0 : float, scalar Array, or None
-        Reference meridional coordinate (m).  If ``None``, uses ``mean(Y)``.
-
-    Returns
-    -------
-    Float[Array, "..."]
-        Coriolis parameter field, same shape as *Y*.
-    """
-    xp = array_namespace(Y, f0, beta, y0)
-    y0_val: float | Float[Array, ""] = xp.mean(Y) if y0 is None else y0
-    return f0 + beta * (Y - y0_val)
 
 
 # ======================================================================

@@ -60,7 +60,7 @@ lambda_ = 1 / Rd**2  # (∇² − λ) is negative definite for λ ≥ 0
 ## One-Call Inversions (in sesmax-core)
 
 The one-call wrappers `streamfunction_from_vorticity`, `pressure_from_divergence` and `pv_inversion`, their known-value lifting and `solve_ocean_pde` moved to sesmax-core (`sesmax_core.gfd` and `sesmax_core.solve_pde`).
-The `gridax_jax` names still work for one release and warn.
+gridax no longer has them.
 In sesmax every argument after `dy` is keyword-only (after `lambda_` for `pv_inversion`), and `method="multigrid"` is new.
 See the [elliptic inversions guide](https://jejjohnson.github.io/sesmax/elliptic-inversions/) and the [`sesmax_core.gfd` API](https://jejjohnson.github.io/sesmax/reference/gfd/).
 

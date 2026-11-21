@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from gridax_jax import imex_ssp2_step, split_explicit_step
+from integrix.march import imex_ssp2_step, split_explicit_step
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -381,16 +381,9 @@ class TestSplitExplicitFastMode:
 
 def test_split_explicit_float32_with_time_dependent_rhs():
     """float32 states stay float32 (x64 on) even when rhs_2d uses the stage time."""
-    from gridax_jax import SplitExplicitRKSolver
-
     y3 = jnp.ones(3, jnp.float32)
     y2 = jnp.ones(3, jnp.float32)
     a3, a2 = split_explicit_step(
         y3, y2, lambda a, b: -a, lambda t, b, a: -b * jnp.cos(t), lambda a, b: a, 0.1, 5
     )
     assert a3.dtype == jnp.float32 and a2.dtype == jnp.float32
-    b3, b2 = SplitExplicitRKSolver(n_substeps=5).step(
-        lambda t, a, b: -a, lambda t, b, a: -b * jnp.cos(t), 0.0, y3, y2, 0.1
-    )
-    assert b3.dtype == jnp.float32 and b2.dtype == jnp.float32
-    np.testing.assert_allclose(b2, a2, rtol=1e-6)

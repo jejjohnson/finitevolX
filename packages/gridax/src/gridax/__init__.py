@@ -523,17 +523,6 @@ __all__ = [
 ]
 
 
-# Moved to geophysix (#446): the physical constants, and the Coriolis helpers,
-# which evaluate at the mean latitude where geophysix.rotation is pointwise.
-# The old names stay for one release and warn on access.
-_MOVED_TO_GEOPHYSIX = {
-    "R_EARTH": "geophysix.earth.SPHERE.semi_major",
-    "coriolis_param": "geophysix.rotation.coriolis (pointwise; pass the mean latitude)",
-    "beta_param": "geophysix.rotation.beta (pointwise; pass the mean latitude)",
-    "coriolis_fn": "geophysix.rotation.beta_plane (y0 is required there)",
-}
-
-
 # One route per C-grid calculus operation (#456): these two free functions are
 # one line of the Layer 1 stencils and repeat a Difference2D method, so they
 # warn for one release. gridax.analysis.divergence_2d is the collocated one.
@@ -563,17 +552,4 @@ def __getattr__(name: str) -> object:
             stacklevel=2,
         )
         return getattr(divergence if name == "divergence_2d" else diagnostics, name)
-    if name in _MOVED_TO_GEOPHYSIX:
-        import warnings
-
-        from gridax._src import constants
-        from gridax._src.operators import diagnostics
-
-        warnings.warn(
-            f"gridax.{name} is deprecated and will be removed in the next release:"
-            f" use {_MOVED_TO_GEOPHYSIX[name]}.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return getattr(constants if name == "R_EARTH" else diagnostics, name)
     raise AttributeError(f"module 'gridax' has no attribute {name!r}")

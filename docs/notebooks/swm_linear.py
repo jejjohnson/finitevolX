@@ -67,6 +67,7 @@ import numpy as np
 jax.config.update("jax_enable_x64", True)
 
 import gridax_jax as fvx
+from integrix.march import heun_step
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "swm_linear"
 IMG_DIR.mkdir(parents=True, exist_ok=True)
@@ -351,7 +352,7 @@ def rhs(state):
 @jax.jit
 def step(eta_field, u_field, v_field):
     """Advance one Heun step and re-apply wall BCs."""
-    state = fvx.heun_step((eta_field, u_field, v_field), rhs, dt)
+    state = heun_step((eta_field, u_field, v_field), rhs, dt)
     return apply_bc(state)
 
 

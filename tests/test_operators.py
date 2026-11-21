@@ -7,12 +7,12 @@ side.  U-points live at east faces (j, i+1/2), V-points at north faces
 
 from __future__ import annotations
 
+from geophysix.constants import STANDARD
 from gridax import CartesianGrid2D
 from gridax._src.operators.diagnostics import (
     bernoulli_potential,
     kinetic_energy,
 )
-from gridax_jax._src.utils.constants import GRAVITY
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -145,7 +145,9 @@ class TestBernoulliPotential2D:
         p = bernoulli_potential(h=h, u=u, v=v)
 
         assert p.shape == (grid2d.Ny, grid2d.Nx)
-        np.testing.assert_allclose(p[1:-1, 1:-1], 1.0 + GRAVITY * 1.0, rtol=1e-6)
+        np.testing.assert_allclose(
+            p[1:-1, 1:-1], 1.0 + STANDARD.standard_gravity * 1.0, rtol=1e-6
+        )
 
     def test_ghost_ring_is_zero(self, grid2d):
         """Ghost cells must remain zero (interior-point idiom)."""
@@ -179,7 +181,7 @@ class TestBernoulliPotential2D:
         p = bernoulli_potential(h=h, u=u, v=v)
         ke = kinetic_energy(u=u, v=v)
 
-        expected = ke[1:-1, 1:-1] + GRAVITY * h[1:-1, 1:-1]
+        expected = ke[1:-1, 1:-1] + STANDARD.standard_gravity * h[1:-1, 1:-1]
         np.testing.assert_allclose(p[1:-1, 1:-1], expected, rtol=1e-6)
 
     def test_zero_velocity_gives_gravity_term_only(self, grid2d):
@@ -191,7 +193,9 @@ class TestBernoulliPotential2D:
         h = ix[None, :] + jy[:, None]
 
         p = bernoulli_potential(h=h, u=u, v=v)
-        np.testing.assert_allclose(p[1:-1, 1:-1], GRAVITY * h[1:-1, 1:-1], rtol=1e-6)
+        np.testing.assert_allclose(
+            p[1:-1, 1:-1], STANDARD.standard_gravity * h[1:-1, 1:-1], rtol=1e-6
+        )
 
     def test_integer_inputs_preserve_fractional_output(self, grid2d):
         """Integer h/u/v should still produce floating Bernoulli potential."""
@@ -202,7 +206,9 @@ class TestBernoulliPotential2D:
         p = bernoulli_potential(h=h, u=u, v=v)
 
         assert jnp.issubdtype(p.dtype, jnp.floating)
-        np.testing.assert_allclose(p[1:-1, 1:-1], GRAVITY + 0.5, rtol=1e-6)
+        np.testing.assert_allclose(
+            p[1:-1, 1:-1], STANDARD.standard_gravity + 0.5, rtol=1e-6
+        )
 
 
 # ---------------------------------------------------------------------------

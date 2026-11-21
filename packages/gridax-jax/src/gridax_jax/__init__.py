@@ -315,11 +315,6 @@ from gridax_jax._src.solvers.tridiagonal import (
     solve_tridiagonal,
     solve_tridiagonal_batched,
 )
-from gridax_jax._src.timestepping._deprecated import (
-    ADAPTED as _ADAPTED_STEPPERS,
-    MOVED as _MOVED_STEPPERS,
-    deprecated_stepper as _deprecated_stepper,
-)
 from gridax_jax._src.utils.dtype import check_dtype
 
 __all__ = [
@@ -665,65 +660,10 @@ __all__ = [
     # Tridiagonal (TDMA) solver
     "solve_tridiagonal",
     "solve_tridiagonal_batched",
-    # Time integration — pure functional (deprecated aliases of
-    # integrix.march, served by __getattr__ below)
-    "euler_step",
-    "heun_step",
-    "rk3_ssp_step",
-    "rk4_step",
-    "ab2_step",
-    "ab3_step",
-    "leapfrog_raf_step",
-    "imex_ssp2_step",
-    "split_explicit_step",
-    # Time integration — diffrax solvers (deprecated aliases of integrix.march,
-    # served by __getattr__ below)
-    "ForwardEulerDfx",
-    "RK2Heun",
-    "RK3SSP",
-    "RK4Classic",
-    "SSP_RK2",
-    "SSP_RK104",
-    "IMEX_SSP2",
-    "AB2Solver",
-    "AB3Solver",
-    "LeapfrogRAFSolver",
-    "SplitExplicitRKSolver",
 ]
 
 
-# Moved to geophysix (#446): the linear equation of state (geophysix.seawater,
-# whose parameters are one LinearEOS record) and gridax's mean-latitude
-# Coriolis helpers (geophysix.rotation is pointwise). The old names stay for
-# one release and warn on access.
-_MOVED_TO_GEOPHYSIX = {
-    "linear_density": "geophysix.seawater.linear_density",
-    "linear_density_anomaly": "geophysix.seawater.linear_density_anomaly",
-    "linear_drho_dT": "geophysix.seawater.linear_drho_dT",
-    "linear_drho_dS": "geophysix.seawater.linear_drho_dS",
-    "buoyancy": "geophysix.seawater.buoyancy",
-    "reduced_gravity": "geophysix.seawater.reduced_gravity",
-    "coriolis_param": "geophysix.rotation.coriolis (pointwise; pass the mean latitude)",
-    "beta_param": "geophysix.rotation.beta (pointwise; pass the mean latitude)",
-    "coriolis_fn": "geophysix.rotation.beta_plane (y0 is required there)",
-}
-
-
 def __getattr__(name: str) -> object:
-    if name in _MOVED_TO_GEOPHYSIX:
-        import warnings
-
-        from gridax._src.operators import diagnostics
-
-        from gridax_jax._src.operators import eos
-
-        warnings.warn(
-            f"gridax_jax.{name} is deprecated and will be removed in the next"
-            f" release: use {_MOVED_TO_GEOPHYSIX[name]}.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return getattr(eos if hasattr(eos, name) else diagnostics, name)
     # The C-grid calculus free functions repeat a Difference2D method (#456).
     if name in _gridax._DEPRECATED_CALCULUS:
         import warnings
@@ -737,10 +677,6 @@ def __getattr__(name: str) -> object:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
             return getattr(_gridax, name)
-    # The time steppers moved to integrix.march; their old names stay for one
-    # release and warn on access.
-    if name in _MOVED_STEPPERS or name in _ADAPTED_STEPPERS:
-        return _deprecated_stepper(name)
     # The raw stencils were renamed in gridax (#435): every name carries its
     # rank and the corner averages use one scheme. The old names stay for
     # one release and warn on access.
