@@ -1,11 +1,18 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import functools
+from typing import TYPE_CHECKING, Literal, NamedTuple
 
 import numpy as np
 
 from gridax._src.backend import stop_gradient
 from gridax._src.pytree import array_namespace
+from gridax._src.stencils.coefficients import (
+    difference_coeffs,
+    optimal_weights,
+    smoothness_matrix,
+    weno_stencils,
+)
 
 if TYPE_CHECKING:
     from jaxtyping import Array
@@ -37,253 +44,30 @@ def _normalised(betas: tuple[Array, ...], *extra: Array) -> list[Array]:
     return [v * inv for v in (*betas, *extra)]
 
 
-_WENO7_COEFFS = (
-    (-1.0 / 4.0, 13.0 / 12.0, -23.0 / 12.0, 25.0 / 12.0),
-    (1.0 / 12.0, -5.0 / 12.0, 13.0 / 12.0, 1.0 / 4.0),
-    (-1.0 / 12.0, 7.0 / 12.0, 7.0 / 12.0, -1.0 / 12.0),
-    (1.0 / 4.0, 13.0 / 12.0, -5.0 / 12.0, 1.0 / 12.0),
-)
-_WENO7_WEIGHTS = (1.0 / 35.0, 12.0 / 35.0, 18.0 / 35.0, 4.0 / 35.0)
-_WENO7_BETA_MATRICES = (
-    np.array(
-        [
-            [547.0 / 240.0, -647.0 / 80.0, 2321.0 / 240.0, -309.0 / 80.0],
-            [-647.0 / 80.0, 7043.0 / 240.0, -8623.0 / 240.0, 3521.0 / 240.0],
-            [2321.0 / 240.0, -8623.0 / 240.0, 11003.0 / 240.0, -1567.0 / 80.0],
-            [-309.0 / 80.0, 3521.0 / 240.0, -1567.0 / 80.0, 2107.0 / 240.0],
-        ]
-    ),
-    np.array(
-        [
-            [89.0 / 80.0, -821.0 / 240.0, 267.0 / 80.0, -247.0 / 240.0],
-            [-821.0 / 240.0, 2843.0 / 240.0, -2983.0 / 240.0, 961.0 / 240.0],
-            [267.0 / 80.0, -2983.0 / 240.0, 3443.0 / 240.0, -1261.0 / 240.0],
-            [-247.0 / 240.0, 961.0 / 240.0, -1261.0 / 240.0, 547.0 / 240.0],
-        ]
-    ),
-    np.array(
-        [
-            [547.0 / 240.0, -1261.0 / 240.0, 961.0 / 240.0, -247.0 / 240.0],
-            [-1261.0 / 240.0, 3443.0 / 240.0, -2983.0 / 240.0, 267.0 / 80.0],
-            [961.0 / 240.0, -2983.0 / 240.0, 2843.0 / 240.0, -821.0 / 240.0],
-            [-247.0 / 240.0, 267.0 / 80.0, -821.0 / 240.0, 89.0 / 80.0],
-        ]
-    ),
-    np.array(
-        [
-            [2107.0 / 240.0, -1567.0 / 80.0, 3521.0 / 240.0, -309.0 / 80.0],
-            [-1567.0 / 80.0, 11003.0 / 240.0, -8623.0 / 240.0, 2321.0 / 240.0],
-            [3521.0 / 240.0, -8623.0 / 240.0, 7043.0 / 240.0, -647.0 / 80.0],
-            [-309.0 / 80.0, 2321.0 / 240.0, -647.0 / 80.0, 547.0 / 240.0],
-        ]
-    ),
-)
+class _WenoTables(NamedTuple):
+    """The linear parts of one WENO scheme, from Layer 0 (``gridax.stencils``)."""
 
-_WENO9_COEFFS = (
-    (1.0 / 5.0, -21.0 / 20.0, 137.0 / 60.0, -163.0 / 60.0, 137.0 / 60.0),
-    (-1.0 / 20.0, 17.0 / 60.0, -43.0 / 60.0, 77.0 / 60.0, 1.0 / 5.0),
-    (1.0 / 30.0, -13.0 / 60.0, 47.0 / 60.0, 9.0 / 20.0, -1.0 / 20.0),
-    (-1.0 / 20.0, 9.0 / 20.0, 47.0 / 60.0, -13.0 / 60.0, 1.0 / 30.0),
-    (1.0 / 5.0, 77.0 / 60.0, -43.0 / 60.0, 17.0 / 60.0, -1.0 / 20.0),
-)
-_WENO9_WEIGHTS = (1.0 / 126.0, 10.0 / 63.0, 10.0 / 21.0, 20.0 / 63.0, 5.0 / 126.0)
-_WENO9_BETA_MATRICES = (
-    np.array(
-        [
-            [
-                11329.0 / 2520.0,
-                -208501.0 / 10080.0,
-                121621.0 / 3360.0,
-                -288007.0 / 10080.0,
-                86329.0 / 10080.0,
-            ],
-            [
-                -208501.0 / 10080.0,
-                482963.0 / 5040.0,
-                -142033.0 / 840.0,
-                679229.0 / 5040.0,
-                -411487.0 / 10080.0,
-            ],
-            [
-                121621.0 / 3360.0,
-                -142033.0 / 840.0,
-                507131.0 / 1680.0,
-                -68391.0 / 280.0,
-                252941.0 / 3360.0,
-            ],
-            [
-                -288007.0 / 10080.0,
-                679229.0 / 5040.0,
-                -68391.0 / 280.0,
-                1020563.0 / 5040.0,
-                -649501.0 / 10080.0,
-            ],
-            [
-                86329.0 / 10080.0,
-                -411487.0 / 10080.0,
-                252941.0 / 3360.0,
-                -649501.0 / 10080.0,
-                53959.0 / 2520.0,
-            ],
-        ]
-    ),
-    np.array(
-        [
-            [
-                1727.0 / 1260.0,
-                -60871.0 / 10080.0,
-                33071.0 / 3360.0,
-                -70237.0 / 10080.0,
-                18079.0 / 10080.0,
-            ],
-            [
-                -60871.0 / 10080.0,
-                138563.0 / 5040.0,
-                -3229.0 / 70.0,
-                168509.0 / 5040.0,
-                -88297.0 / 10080.0,
-            ],
-            [
-                33071.0 / 3360.0,
-                -3229.0 / 70.0,
-                135431.0 / 1680.0,
-                -25499.0 / 420.0,
-                55051.0 / 3360.0,
-            ],
-            [
-                -70237.0 / 10080.0,
-                168509.0 / 5040.0,
-                -25499.0 / 420.0,
-                242723.0 / 5040.0,
-                -140251.0 / 10080.0,
-            ],
-            [
-                18079.0 / 10080.0,
-                -88297.0 / 10080.0,
-                55051.0 / 3360.0,
-                -140251.0 / 10080.0,
-                11329.0 / 2520.0,
-            ],
-        ]
-    ),
-    np.array(
-        [
-            [
-                1727.0 / 1260.0,
-                -51001.0 / 10080.0,
-                7547.0 / 1120.0,
-                -38947.0 / 10080.0,
-                8209.0 / 10080.0,
-            ],
-            [
-                -51001.0 / 10080.0,
-                104963.0 / 5040.0,
-                -24923.0 / 840.0,
-                89549.0 / 5040.0,
-                -38947.0 / 10080.0,
-            ],
-            [
-                7547.0 / 1120.0,
-                -24923.0 / 840.0,
-                77051.0 / 1680.0,
-                -24923.0 / 840.0,
-                7547.0 / 1120.0,
-            ],
-            [
-                -38947.0 / 10080.0,
-                89549.0 / 5040.0,
-                -24923.0 / 840.0,
-                104963.0 / 5040.0,
-                -51001.0 / 10080.0,
-            ],
-            [
-                8209.0 / 10080.0,
-                -38947.0 / 10080.0,
-                7547.0 / 1120.0,
-                -51001.0 / 10080.0,
-                1727.0 / 1260.0,
-            ],
-        ]
-    ),
-    np.array(
-        [
-            [
-                11329.0 / 2520.0,
-                -140251.0 / 10080.0,
-                55051.0 / 3360.0,
-                -88297.0 / 10080.0,
-                18079.0 / 10080.0,
-            ],
-            [
-                -140251.0 / 10080.0,
-                242723.0 / 5040.0,
-                -25499.0 / 420.0,
-                168509.0 / 5040.0,
-                -70237.0 / 10080.0,
-            ],
-            [
-                55051.0 / 3360.0,
-                -25499.0 / 420.0,
-                135431.0 / 1680.0,
-                -3229.0 / 70.0,
-                33071.0 / 3360.0,
-            ],
-            [
-                -88297.0 / 10080.0,
-                168509.0 / 5040.0,
-                -3229.0 / 70.0,
-                138563.0 / 5040.0,
-                -60871.0 / 10080.0,
-            ],
-            [
-                18079.0 / 10080.0,
-                -70237.0 / 10080.0,
-                33071.0 / 3360.0,
-                -60871.0 / 10080.0,
-                1727.0 / 1260.0,
-            ],
-        ]
-    ),
-    np.array(
-        [
-            [
-                53959.0 / 2520.0,
-                -649501.0 / 10080.0,
-                252941.0 / 3360.0,
-                -411487.0 / 10080.0,
-                86329.0 / 10080.0,
-            ],
-            [
-                -649501.0 / 10080.0,
-                1020563.0 / 5040.0,
-                -68391.0 / 280.0,
-                679229.0 / 5040.0,
-                -288007.0 / 10080.0,
-            ],
-            [
-                252941.0 / 3360.0,
-                -68391.0 / 280.0,
-                507131.0 / 1680.0,
-                -142033.0 / 840.0,
-                121621.0 / 3360.0,
-            ],
-            [
-                -411487.0 / 10080.0,
-                679229.0 / 5040.0,
-                -142033.0 / 840.0,
-                482963.0 / 5040.0,
-                -208501.0 / 10080.0,
-            ],
-            [
-                86329.0 / 10080.0,
-                -288007.0 / 10080.0,
-                121621.0 / 3360.0,
-                -208501.0 / 10080.0,
-                11329.0 / 2520.0,
-            ],
-        ]
-    ),
-)
+    coeffs: tuple[tuple[float, ...], ...]  # one cell-average stencil per sub-stencil
+    betas: tuple[np.ndarray, ...]  # Jiang-Shu matrices, beta_k = q^T B_k q
+    weights: tuple[float, ...]  # the optimal (linear) weights g_k
+
+
+@functools.cache
+def _weno_tables(order: int, bias: Literal["left", "right"]) -> _WenoTables:
+    """Sub-stencil coefficients, smoothness matrices and optimal weights, exact.
+
+    Built on first use from the Layer 0 solver and cached for the process, so
+    ``import gridax`` computes none of them. Every entry is the float nearest
+    the exact rational, bitwise equal to the tables typed here before #463.
+    """
+    full, subs = weno_stencils(order, bias=bias)
+    # the reconstructed (upwind) cell: left of the face for left bias
+    cell = -0.5 if bias == "left" else 0.5
+    return _WenoTables(
+        coeffs=tuple(difference_coeffs(sub, 0, data="cell") for sub in subs),
+        betas=tuple(np.asarray(smoothness_matrix(sub, cell=cell)) for sub in subs),
+        weights=optimal_weights(full, subs),
+    )
 
 
 def _linear_combo(coeffs: tuple[float, ...], stencil: tuple[Array, ...]) -> Array:
@@ -567,19 +351,6 @@ def weno_5pts_improved_right(
     return (w1 * qi1 + w2 * qi2 + w3 * qi3) / (w1 + w2 + w3)
 
 
-_WENO7_COEFFS_RIGHT = tuple(tuple(reversed(c)) for c in reversed(_WENO7_COEFFS))
-_WENO7_WEIGHTS_RIGHT = tuple(reversed(_WENO7_WEIGHTS))
-_WENO7_BETA_MATRICES_RIGHT = tuple(
-    m[::-1, ::-1] for m in reversed(_WENO7_BETA_MATRICES)
-)
-
-_WENO9_COEFFS_RIGHT = tuple(tuple(reversed(c)) for c in reversed(_WENO9_COEFFS))
-_WENO9_WEIGHTS_RIGHT = tuple(reversed(_WENO9_WEIGHTS))
-_WENO9_BETA_MATRICES_RIGHT = tuple(
-    m[::-1, ::-1] for m in reversed(_WENO9_BETA_MATRICES)
-)
-
-
 def weno_7pts(
     qmmm: Array,
     qmm: Array,
@@ -603,9 +374,7 @@ def weno_7pts(
         (qm, q0, qp, qpp),
         (q0, qp, qpp, qppp),
     )
-    return _weno_reconstruct(
-        stencils, _WENO7_COEFFS, _WENO7_BETA_MATRICES, _WENO7_WEIGHTS
-    )
+    return _weno_reconstruct(stencils, *_weno_tables(7, "left"))
 
 
 def weno_9pts(
@@ -634,9 +403,7 @@ def weno_9pts(
         (qm, q0, qp, qpp, qppp),
         (q0, qp, qpp, qppp, qpppp),
     )
-    return _weno_reconstruct(
-        stencils, _WENO9_COEFFS, _WENO9_BETA_MATRICES, _WENO9_WEIGHTS
-    )
+    return _weno_reconstruct(stencils, *_weno_tables(9, "left"))
 
 
 def weno_7pts_right(
@@ -665,12 +432,7 @@ def weno_7pts_right(
         (q0, qp, qpp, qppp),
         (qp, qpp, qppp, qpppp),
     )
-    return _weno_reconstruct(
-        stencils,
-        _WENO7_COEFFS_RIGHT,
-        _WENO7_BETA_MATRICES_RIGHT,
-        _WENO7_WEIGHTS_RIGHT,
-    )
+    return _weno_reconstruct(stencils, *_weno_tables(7, "right"))
 
 
 def weno_9pts_right(
@@ -702,9 +464,4 @@ def weno_9pts_right(
         (q0, qp, qpp, qppp, qpppp),
         (qp, qpp, qppp, qpppp, qppppp),
     )
-    return _weno_reconstruct(
-        stencils,
-        _WENO9_COEFFS_RIGHT,
-        _WENO9_BETA_MATRICES_RIGHT,
-        _WENO9_WEIGHTS_RIGHT,
-    )
+    return _weno_reconstruct(stencils, *_weno_tables(9, "right"))

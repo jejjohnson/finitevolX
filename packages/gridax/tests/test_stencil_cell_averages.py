@@ -10,8 +10,9 @@ weights and Jiang–Shu smoothness matrices) and compare them bit for bit.
 from __future__ import annotations
 
 from fractions import Fraction
+from pathlib import Path
 
-from gridax._src.advection import linear, weno
+from gridax._src.advection import linear
 from gridax._src.stencils.coefficients import _exact_coeffs
 import gridax.stencils as gs
 import numpy as np
@@ -103,35 +104,27 @@ def test_bias_applies_to_the_staggered_method_only() -> None:
         gs.difference_coeffs((-0.5, 0.5), 0, data="volume")  # type: ignore[arg-type]
 
 
-def _table(order: int):
-    tables = {
-        7: (weno._WENO7_COEFFS, weno._WENO7_WEIGHTS, weno._WENO7_BETA_MATRICES),
-        9: (weno._WENO9_COEFFS, weno._WENO9_WEIGHTS, weno._WENO9_BETA_MATRICES),
-    }
-    right = {
-        7: (
-            weno._WENO7_COEFFS_RIGHT,
-            weno._WENO7_WEIGHTS_RIGHT,
-            weno._WENO7_BETA_MATRICES_RIGHT,
-        ),
-        9: (
-            weno._WENO9_COEFFS_RIGHT,
-            weno._WENO9_WEIGHTS_RIGHT,
-            weno._WENO9_BETA_MATRICES_RIGHT,
-        ),
-    }
-    return tables[order], right[order]
+HAND_TYPED = np.load(Path(__file__).parent / "data" / "weno_tables_hand_typed.npz")
+
+
+def _table(order: int, bias: str):
+    """The WENO tables as they were typed in weno.py before #463."""
+    return tuple(
+        HAND_TYPED[f"weno{order}_{bias}_{part}"]
+        for part in ("coeffs", "weights", "betas")
+    )
 
 
 @pytest.mark.parametrize("order", [7, 9])
 @pytest.mark.parametrize("bias", ["left", "right"])
 def test_weno_tables_are_layer0_bit_for_bit(order: int, bias: str) -> None:
-    left_tables, right_tables = _table(order)
-    coeffs, weights, betas = left_tables if bias == "left" else right_tables
+    coeffs, weights, betas = _table(order, bias)
     full, subs = gs.weno_stencils(order, bias=bias)
     cell = -0.5 if bias == "left" else 0.5
-    assert tuple(gs.difference_coeffs(s, 0, data="cell") for s in subs) == tuple(coeffs)
-    assert gs.optimal_weights(full, subs) == tuple(weights)
+    np.testing.assert_array_equal(
+        np.asarray([gs.difference_coeffs(s, 0, data="cell") for s in subs]), coeffs
+    )
+    np.testing.assert_array_equal(np.asarray(gs.optimal_weights(full, subs)), weights)
     for sub, table in zip(subs, betas, strict=True):
         np.testing.assert_array_equal(
             np.asarray(gs.smoothness_matrix(sub, cell=cell)), table
