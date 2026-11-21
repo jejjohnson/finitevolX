@@ -20,7 +20,9 @@ staggered.
   pads a result back to the full shape. They are the two-point staggered
   stencils of Layer 0, :math:`(-1, 1)` for ``diff_*`` and
   :math:`(\\frac12, \\frac12)` for ``avg_*``. The same names stay importable
-  from the top level of ``gridax``.
+  from the top level of ``gridax``. :func:`staggered_difference` and
+  :func:`staggered_average` apply the wider staggered stencils (fourth and
+  sixth order) the same way, shifting the stencil inwards at the walls.
 
 Everything here imports without JAX.
 
@@ -78,6 +80,7 @@ from gridax._src.stencils.coefficients import (
     smoothness_matrix,
     weno_stencils,
 )
+from gridax._src.stencils.staggered import staggered_average, staggered_difference
 
 __all__ = [
     # Layer 0: coefficients
@@ -127,6 +130,9 @@ __all__ = [
     "avg_xbwd_ybwd_3d",
     "avg_xbwd_yfwd_3d",
     "avg_xfwd_ybwd_3d",
+    # Layer 1: staggered stencils of any even width (fourth and sixth order)
+    "staggered_difference",
+    "staggered_average",
     # padding back to the full array
     "interior",
 ]

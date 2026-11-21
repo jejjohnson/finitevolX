@@ -16,6 +16,14 @@ Offsets and exact coefficients from the Taylor conditions, in `gridax.stencils`:
 
 With `data="cell"` the samples are cell averages, not point values: `difference_coeffs((-1.5, -0.5, 0.5, 1.5), 0, data="cell")` is the finite-volume reconstruction $(-1, 7, 7, -1)/12$ of `linear_4pts`, where point values give the interpolation $(-1, 9, 9, -1)/16$. `bias="left"` and `bias="right"` give the upwind offsets of advection.
 
+## Higher-order staggered stencils (Layer 1)
+
+Fourth- and sixth-order differences and averages of point values on the C-grid, centred where they fit and shifted inwards at the walls. `accuracy=1` is the named two-point stencil.
+
+::: gridax.stencils.staggered_difference
+
+::: gridax.stencils.staggered_average
+
 ## WENO weights and smoothness (Layer 0)
 
 ::: gridax.stencils.weno_stencils

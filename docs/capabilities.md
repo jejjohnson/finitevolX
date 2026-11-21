@@ -656,6 +656,8 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `nonuniform_coeffs` | function | Stencil coefficients for points at arbitrary distances, on any backend. |
 | `optimal_weights` | function | The linear (optimal) weights that blend sub-stencils into the full one. |
 | `smoothness_matrix` | function | The Jiang–Shu smoothness indicator of one sub-stencil, as a matrix. |
+| `staggered_average` | function | The staggered average (point-value interpolation) of ``h`` along ``axis``. |
+| `staggered_difference` | function | The staggered first difference of ``h`` along ``axis``, no metric applied. |
 | `weno_stencils` | function | The full stencil of WENO of ``order`` and its sub-stencils, as offsets. |
 
 ### `gridax.analysis`
