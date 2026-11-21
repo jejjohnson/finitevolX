@@ -14,6 +14,16 @@ Offsets and exact coefficients from the Taylor conditions, in `gridax.stencils`:
 
 ::: gridax.stencils.nonuniform_coeffs
 
+With `data="cell"` the samples are cell averages, not point values: `difference_coeffs((-1.5, -0.5, 0.5, 1.5), 0, data="cell")` is the finite-volume reconstruction $(-1, 7, 7, -1)/12$ of `linear_4pts`, where point values give the interpolation $(-1, 9, 9, -1)/16$. `bias="left"` and `bias="right"` give the upwind offsets of advection.
+
+## WENO weights and smoothness (Layer 0)
+
+::: gridax.stencils.weno_stencils
+
+::: gridax.stencils.optimal_weights
+
+::: gridax.stencils.smoothness_matrix
+
 ## 1-D Difference Stencils
 
 ::: gridax_jax.diff_x_fwd_1d
