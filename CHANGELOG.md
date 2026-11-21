@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.3.0](https://github.com/jejjohnson/gridax/compare/v0.2.0...v0.3.0) (2026-11-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **gridax-jax:** spherical results move by about 3e-5 relative with the new default radius; pass R=6_371_200.0 to keep the old numbers.
+* **gridax:** spherical results move by about 3e-5 relative with the new default radius; pass R=6_371_200.0 to keep the old numbers.
+
+### Features
+
+* **gridax:** fourth- and sixth-order staggered differences and averages, staggered_difference and staggered_average ([#469](https://github.com/jejjohnson/gridax/issues/469)) ([bf5ac89](https://github.com/jejjohnson/gridax/commit/bf5ac8991a8350e487867b884b7c23a76c7d0f83)), closes [#457](https://github.com/jejjohnson/gridax/issues/457)
+* **gridax:** gridax.stencils, one stencil module for collocated and staggered points, with exact coefficients ([#465](https://github.com/jejjohnson/gridax/issues/465)) ([87dce56](https://github.com/jejjohnson/gridax/commit/87dce5655fbb43b48a6745c3dd36e40322168792)), closes [#454](https://github.com/jejjohnson/gridax/issues/454)
+* **gridax:** the stencil module solves for cell averages and WENO, with data="cell", biased offsets, optimal weights and smoothness matrices ([#468](https://github.com/jejjohnson/gridax/issues/468)) ([76bc36f](https://github.com/jejjohnson/gridax/commit/76bc36f068b6f67834623b3bce6682fc3a7a1fc8)), closes [#462](https://github.com/jejjohnson/gridax/issues/462)
+
+
+### Code Refactoring
+
+* **gridax-jax:** deprecate the forcing, vertical modes, relaxation and the barotropic filter, now in sesmax-core ([#460](https://github.com/jejjohnson/gridax/issues/460)) ([dd5adcd](https://github.com/jejjohnson/gridax/commit/dd5adcd5ac10dbad576734b932a03722d818328e)), closes [#422](https://github.com/jejjohnson/gridax/issues/422)
+* **gridax:** the constants, the Coriolis helpers and the linear equation of state come from geophysix ([#459](https://github.com/jejjohnson/gridax/issues/459)) ([4d2253d](https://github.com/jejjohnson/gridax/commit/4d2253de3fbe32fc93ec272f6344a17312ba603e)), closes [#446](https://github.com/jejjohnson/gridax/issues/446)
+
 ## [0.2.0](https://github.com/jejjohnson/finitevolX/compare/v0.1.0...v0.2.0) (2026-11-20)
 
 
