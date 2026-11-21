@@ -54,7 +54,7 @@ The factory method derives everything else:
 
 ```python
 import numpy as np
-from gridax_jax import Mask2D
+from gridax import Mask2D
 
 # Rectangular basin with land boundaries
 n = 10
@@ -169,13 +169,13 @@ A complete demo is in the [masks notebook](notebooks/demo_masks.ipynb).
 (operator-api-how-operators-consume-masks)=
 ## Operator API: how operators consume masks
 
-Every class operator in `finitevolx` takes an optional `mask` class
+Every class operator in `gridax` takes an optional `mask` class
 attribute of the matching dimension.  The mask travels with the
 operator; once constructed, method calls don't need to pass the mask
 through per call.
 
 ```python
-import gridax_jax as fvx
+import gridax as fvx
 
 grid = fvx.CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 mask = fvx.Mask2D.from_mask(h_mask)
@@ -191,7 +191,7 @@ diff_noop = fvx.Difference2D(grid=grid)   # mask=None
 
 ### The three-layer rule
 
-`finitevolx` keeps masks out of the lowest two layers, so stencil and
+`gridax` keeps masks out of the lowest two layers, so stencil and
 functional code stays coordinate-and-mask agnostic:
 
 | Layer | Example | Mask-aware? |
@@ -342,7 +342,7 @@ tendency *= mask.h      # final output
 ```
 
 The shared kernel is `_diffusion_2d_impl(h, kappa, dx, dy, mh, mu, mv)`
-in `finitevolx._src.diffusion.diffusion`; `Diffusion3D` vmaps it
+in `gridax._src.diffusion.diffusion`; `Diffusion3D` vmaps it
 per-z-slice with sliced masks (**Pattern B** in #209's terminology).
 
 **Pattern 4 — The masked harmonic operator applied twice.**

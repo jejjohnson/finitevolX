@@ -11,41 +11,27 @@ grids and land / ocean masks, raw stencils, difference / interpolation /
 advection / diffusion operators, boundary conditions, diagnostics,
 elliptic and multigrid solvers, and time integrators built on
 diffrax, for 1-D, 2-D, 3-D and multilayer ocean and atmosphere models.
-Everything is a pytree (a `pytree_dataclass` in gridax, an `eqx.Module` in
-gridax-jax) or a pure function, so it runs under `jit`, `vmap` and `grad`;
-the gridax half also runs on NumPy. Ocean models are built on it, so **finitevolX is a
+Everything is a pytree (a `pytree_dataclass` in gridax's operators, an `eqx.Module` in `gridax.solvers` and `gridax.pipekit`) or a pure function, so it runs under `jit`, `vmap` and `grad`;
+the operators also run on NumPy. Ocean models are built on it, so **finitevolX is a
 library of primitives**: new code composes what is here, and anything
 genuinely new lands where the next person will find it.
 
-The repository is a uv workspace with two packages and a shim.
-`packages/gridax-jax/` (`src/gridax_jax/`, import `gridax_jax`; this
-library was called finitevolX) holds everything applied to a field and runs
-on JAX. `packages/gridax/` (`src/gridax/`, import `gridax`) holds the grids
-and masks as data and runs on NumPy alone: it depends on NumPy, SciPy and
-jaxtyping, never on JAX or Equinox, and CI installs it alone to check that
-(`gridax-numpy-only` in `ci.yml`). The root project is the deprecated
-`finitevolx` distribution: `finitevolx/__init__.py` warns and re-exports
-`gridax_jax` for one 0.X release; add nothing to it. Everything under
-`gridax_jax/_src/` and `gridax/_src/` is private; the public API is the flat
-`gridax_jax.__all__`, re-exported from `gridax_jax/__init__.py` (its order is
-a logical grouping, not alphabetical: ruff's `RUF022` is off), which includes
-the grid and mask classes of `gridax` (the mask construction helpers stay
-`gridax`-only).
+The repository is a uv workspace with one package, `packages/gridax/` (`src/gridax/`, import `gridax`; this library was called finitevolX, then gridax-jax on gridax, and #477 folded the two into one). The base install holds the grids, masks, stencils and operators and runs on NumPy alone: it depends on NumPy, SciPy, jaxtyping and geophysix, never on JAX or Equinox, and CI installs it alone to check that (`gridax-numpy-only` in `ci.yml`). `gridax.solvers` needs the `jax` extra (`pip install "gridax[jax]"`: jax, equinox, lineax, gaussx, spectraldiffx) and `gridax.pipekit` the `pipekit` extra (`pip install "gridax[pipekit]"`: pipekit-ops, pipekit-jax, integrix); `import gridax` imports neither, and `tests/test_import_isolation.py` checks it. The root project is `gridax-workspace`, the unpublished development environment (`Private :: Do Not Upload`): it installs `gridax[jax,pipekit]` with the test, dev, docs and example dependencies and holds the tool config. Everything under `gridax/_src/` is private. The public API is `gridax.__all__` (from `gridax/__init__.py`; its order is a logical grouping, not alphabetical: ruff's `RUF022` is off) with the `gridax.stencils`, `gridax.advection` and `gridax.analysis` namespaces, `gridax.solvers.__all__` (sorted) and `gridax.pipekit.__all__`.
 
-| Area | Path (`gridax_jax/_src/`, or `gridax/_src/`) | Owns |
+| Area | Path (under `gridax/_src/`) | Owns |
 |---|---|---|
 | Grids | `gridax/_src/grid/` | `ArakawaCGrid*` (topology) → `CurvilinearGrid*` (uniform metric) → `CartesianGrid1D/2D/3D`, `SphericalGrid2D/3D` (`base.py`, `cartesian.py`, `spherical.py`): frozen dataclasses built with NumPy, registered as JAX pytrees by `gridax/_src/pytree.py` when JAX is importable |
 | Masks | `gridax/_src/mask/` | `Mask1D/2D/3D` (`cartesian.py`), frozen NumPy dataclasses like the grids: staggered wet masks, coast classification, `StencilCapability*` (`base.py`), adaptive stencil hierarchies; numpy / scipy construction helpers (`utils.py`) |
 | Analysis kernels | `gridax/_src/analysis/` (public: `gridax.analysis`) | Finite differences on collocated grids (`difference`, `adaptive_difference`, 1-D / 2-D / 3-D gradient, divergence, curl, Laplacian) and axis remapping (`remap_axis`, `remap_axis_columns`), array-API code that runs on NumPy, JAX or any backend; the kernels behind geoops' and xrops' calculus and remap operators |
 | Layer 0: coefficients | `gridax/_src/stencils/coefficients.py` (public: `gridax.stencils`) | `difference_offsets` / `difference_coeffs`: offsets and exact coefficients from the Taylor conditions, for point values or cell averages (`data=`), collocated or staggered (`method="staggered"`, `bias=`); `weno_stencils`, `optimal_weights`, `smoothness_matrix` (the linear parts of WENO); `nonuniform_coeffs` |
-| Layer 1: raw stencils | `gridax/_src/operators/stencils.py`, `gridax/_src/stencils/staggered.py`, `gridax/_src/operators/_ghost.py` (public: `gridax.stencils`) | `<op>_<axis>_<side>_<d>d` index arithmetic with no metric and no padding, on any backend (the old unsuffixed 2-D names are deprecated aliases in `gridax_jax`); `staggered_difference` / `staggered_average` for fourth and sixth order; `interior` pads a result back to the full shape |
+| Layer 1: raw stencils | `gridax/_src/operators/stencils.py`, `gridax/_src/stencils/staggered.py`, `gridax/_src/operators/_ghost.py` (public: `gridax.stencils`) | `<op>_<axis>_<side>_<d>d` index arithmetic with no metric and no padding, on any backend; `staggered_difference` / `staggered_average` for fourth and sixth order; `interior` pads a result back to the full shape |
 | Layer 2: functional helpers | `gridax/_src/operators/{diagnostics,jacobian,reductions}.py`, `gridax/_src/advection/{weno,linear,limiters,reconstruct_fn,face_flux,flux}.py`; … | Pure functions on arrays (`kinetic_energy`, `arakawa_jacobian`, `area_mean`, `weno_5pts`, `upwind_flux`, …); they never take a `Mask2D`, except the reductions (`area_sum`, `masked_mean`, … accept `mask=`) |
 | Layer 3: class operators | `gridax/_src/operators/` (`difference.py`, `interpolation.py`, `divergence.py`, `vorticity.py`, `coriolis.py`, `diagnostic_operators.py`, `spherical_*.py`), `gridax/_src/advection/` (`advection.py`, `reconstruction.py`, `spherical_advection.py`), `gridax/_src/diffusion/` | `Difference*`, `Interpolation*`, `Advection*`, `Reconstruction*`, `Diffusion*`, `MomentumAdvection*`, `Vorticity*`, `Coriolis*`, `Energetics2D`, … and their `Spherical*` siblings; mask-aware through a `mask` field |
 | Boundary conditions | `gridax/_src/boundary/` | Per-face atoms `Dirichlet1D` … `Slip1D` (`bc_1d.py`), `BoundaryConditionSet` (`bc_set.py`), `FieldBCSet` (`bc_field.py`), functional ghost-ring fillers (`boundary.py`) |
-| Solvers | `solvers/` | Spectral solvers re-exported from spectraldiffx (`spectral.py`, `spectral_transforms.py`); capacitance wrapper (`elliptic.py`; the `streamfunction_from_vorticity` / `pressure_from_divergence` / `pv_inversion` wrappers moved to `sesmax_core.gfd`, #475); the T-point `masked_laplacian`, `masked_neumann_laplacian`, `masked_face_dirichlet_laplacian`, `wet_components`, `project_zero_mean` (`iterative.py`); `make_spectral_preconditioner` (`preconditioners.py`); CG itself is gaussx's (`gaussx.linear_solve_with_info` with `gaussx.CGSolver`); `MultigridSolver` (`multigrid.py`); known-value lifting (`inhomogeneous.py`); tridiagonal solve re-exported from gaussx (`tridiagonal.py`) |
-| Time integration | not here | `solve_ocean_pde` moved to `sesmax_core.solve_pde` (#475); the time steppers live in `integrix.march`, the semi-Lagrangian scheme included (#476, with `gridax.t_point_coordinates` for its nodes), and gridax has no alias for them; `gridax_jax/_src/pipekit/timestep.py` imports `integrix.march` directly |
+| Solvers | `solvers/` (public: `gridax.solvers`, the `jax` extra) | Spectral solvers re-exported from spectraldiffx (`spectral.py`, `spectral_transforms.py`); capacitance wrapper (`elliptic.py`; the `streamfunction_from_vorticity` / `pressure_from_divergence` / `pv_inversion` wrappers moved to `sesmax_core.gfd`, #475); the T-point `masked_laplacian`, `masked_neumann_laplacian`, `masked_face_dirichlet_laplacian`, `wet_components`, `project_zero_mean` (`iterative.py`); `make_spectral_preconditioner` (`preconditioners.py`); CG itself is gaussx's (`gaussx.linear_solve_with_info` with `gaussx.CGSolver`); `MultigridSolver` (`multigrid.py`); known-value lifting (`inhomogeneous.py`); tridiagonal solve re-exported from gaussx (`tridiagonal.py`); the dtype rule `check_dtype` (`dtype.py`) |
+| Time integration | not here | `solve_ocean_pde` moved to `sesmax_core.solve_pde` (#475); the time steppers live in `integrix.march`, the semi-Lagrangian scheme included (#476, with `gridax.t_point_coordinates` for its nodes), and gridax has no alias for them; `gridax/_src/pipekit/timestep.py` imports `integrix.march` directly |
 | Vertical, forcing | not here | forcing, vertical modes, `multilayer` and the barotropic filter are `sesmax_core.forcing` and `sesmax_core.vertical` (#422); new forcing goes to sesmax-core |
-| pipekit layer (Tier B) | `pipekit/` (public: `gridax_jax/pipekit/`) | `FVXOperator` / `GridOperator` on `pipekit_jax.JaxOperator`, `GridSpec`, `over_leading`, `check_operator` (`gridax_jax.pipekit.testing`); behind the `pipekit` extra, never imported by `import gridax_jax` |
+| pipekit layer (Tier B) | `pipekit/` (public: `gridax.pipekit`) | `FVXOperator` / `GridOperator` on `pipekit_jax.JaxOperator`, `GridSpec`, `over_leading`, `check_operator` (`gridax.pipekit.testing`); behind the `pipekit` extra, never imported by `import gridax` |
 | Shared | `gridax/_src/backend.py`, `gridax/_src/pytree.py`; constants from geophysix | the backend hooks and `pytree_dataclass` (see Boundaries); physical constants are geophysix records (`geophysix.earth.SPHERE`, `WGS84`, `geophysix.constants.STANDARD`), used as parameter defaults only (contract 6). The Coriolis helpers and the linear equation of state are `geophysix.rotation` and `geophysix.seawater` (#446), and gridax has no alias for them |
 
 The four layers of the derivative stack are the ones `docs/stencils.md` ("The derivative stack") and `docs/masks.md` describe: Layer 0 coefficients (numbers, no arrays), Layer 1 raw stencils, Layer 2 functional helpers (metric-scaled, mask-free; `gridax.analysis` is its collocated part, and `gridax.advection.reconstruct` its advection part, which also takes a mask), Layer 3 class operators (the layer that carries a mask as a field). A C-grid Layer 2 helper exists only when it is more than one line of Layer 1.
@@ -57,7 +43,7 @@ builds the capability index.
 
 ### Boundaries
 
-- **Backends.** Everything in `gridax` is written against the array API, so it runs on NumPy, JAX, CuPy or anything `array-api-compat` knows, and must import without JAX (the `gridax-numpy-only` CI job and `tests/test_numpy_parity.py` check it). A function takes `xp = array_namespace(<its array arguments>)` and calls `xp.*`, never `jnp.*`. The few operations the standard lacks go through `gridax/_src/backend.py`: `set_at` (for `.at[...].set`), `pad`, `vmap` (for `eqx.filter_vmap` over levels), `optimization_barrier` and `stop_gradient`. On JAX inputs each hook calls JAX's own primitive, so jitted code lowers as if written in `jax.numpy`. Code that needs JAX itself (solvers, diffrax and integrix glue, the pipekit layer) belongs in `gridax-jax`.
+- **Backends.** Everything in `gridax` is written against the array API, so it runs on NumPy, JAX, CuPy or anything `array-api-compat` knows, and must import without JAX (the `gridax-numpy-only` CI job and `tests/test_numpy_parity.py` check it). A function takes `xp = array_namespace(<its array arguments>)` and calls `xp.*`, never `jnp.*`. The few operations the standard lacks go through `gridax/_src/backend.py`: `set_at` (for `.at[...].set`), `pad`, `vmap` (for `eqx.filter_vmap` over levels), `optimization_barrier` and `stop_gradient`. On JAX inputs each hook calls JAX's own primitive, so jitted code lowers as if written in `jax.numpy`. Code that needs JAX itself (the solvers, the integrix glue, the pipekit layer) belongs in `gridax.solvers` or `gridax.pipekit`, behind their extras, and nothing outside them imports it. gridax never imports sesmax.
 - **Upstream: spectraldiffx and gaussx**, both pinned to a release tag in
   `[tool.uv.sources]` plus a `>=` floor in `dependencies` (neither is on
   PyPI). spectraldiffx owns the spectral transforms, the rectangular
@@ -86,7 +72,7 @@ model.
 | Library | finitevolX uses it for | The rule it brings |
 |---|---|---|
 | **jax** | Arrays, `jit`, `vmap`, `grad`, `lax.fori_loop` (multigrid V-cycles) | Pure functions; `.at[...].set` instead of mutation; no Python control flow on traced values; build outputs with the input's dtype (`interior` uses `jnp.result_type`). |
-| **equinox** | The solvers and pipekit operators in gridax-jax are `eqx.Module`s; `eqx.filter_vmap` (the layer `vmap`) | Never a plain dataclass or class for anything holding arrays. In gridax (grids, masks, operators, BCs) that is a `pytree_dataclass` (`gridax/_src/pytree.py`): settings that pick a code path or a shape are `static_field()` (e.g. `Dirichlet1D.face`, the grid sizes), a hand-written `__init__` may precompute, and `__check_init__` validates. In gridax-jax it is an `eqx.Module`, with `eqx.field(static=True)` for settings. An operator holds its grid, its mask and any precomputed hierarchy as fields, built once in `__init__`. |
+| **equinox** | The solvers and pipekit operators (`gridax.solvers`, `gridax.pipekit`) are `eqx.Module`s; `eqx.filter_vmap` (the layer `vmap`) | Never a plain dataclass or class for anything holding arrays. In gridax (grids, masks, operators, BCs) that is a `pytree_dataclass` (`gridax/_src/pytree.py`): settings that pick a code path or a shape are `static_field()` (e.g. `Dirichlet1D.face`, the grid sizes), a hand-written `__init__` may precompute, and `__check_init__` validates. In `gridax.solvers` and `gridax.pipekit` it is an `eqx.Module`, with `eqx.field(static=True)` for settings. An operator holds its grid, its mask and any precomputed hierarchy as fields, built once in `__init__`. |
 | **jaxtyping** | Shape annotations (`Float[Array, "Ny Nx"]`) | Annotate public array arguments and returns; shape strings stay quoted (`UP037` and `F722` are off for that reason). They are documentation: nothing checks them at run time (beartype is a declared dependency but is not imported). |
 | **lineax** | The operators the solvers build on (`helmholtz_operator`, the multigrid levels) | Elliptic operators here are negative (semi)definite: tag them `negative_semidefinite_tag`; a preconditioner approximates `A⁻¹`, and gaussx's CG solves `(−A) x = −b`, so it takes `−M⁻¹`. |
 | **diffrax** | Nothing directly; the steppers of `integrix.march` are diffrax solvers | gridax holds no solver of its own: the integrators are `integrix.march`'s, and a new one goes there; a forcing lives inside the vector field, not as an extra diffrax term. |
@@ -99,11 +85,7 @@ model.
 Before writing a stencil, an operator, a BC, a solver or a helper, find out
 whether it exists:
 
-1. **Search the capability index.** [`docs/capabilities.md`](docs/capabilities.md)
-   lists every name in `gridax_jax.__all__`, grouped by the module that
-   defines it (re-exports grouped by library), with a one-line summary; then
-   the public API of spectraldiffx and gaussx. It is generated
-   (`make capabilities`) and checked by `tests/test_capabilities.py`.
+1. **Search the capability index.** [`docs/capabilities.md`](docs/capabilities.md) lists every name in the `__all__` of `gridax`, its `stencils` / `advection` / `analysis` namespaces, `gridax.solvers` and `gridax.pipekit`, grouped by the module that defines it (re-exports grouped by library), with a one-line summary; then the public API of spectraldiffx, gaussx and integrix.march. It is generated (`make capabilities`) and checked by `tests/test_capabilities.py`.
 2. **Read the theory page for the area** (see "Documentation" below): most
    operator families document the stencil, the ghost cells they read and the
    mask semantics there.
@@ -374,10 +356,7 @@ apply BCs to intermediate fields before chaining operators.
 
 ### The public API
 
-- Export a new public name from `packages/gridax-jax/src/gridax_jax/__init__.py` (import plus an
-  entry in `__all__`, in its logical group), give it a `::: gridax_jax.Name`
-  entry on its page in `docs/api/` (no test checks this), and run
-  `make capabilities`.
+- Export a new public name from `packages/gridax/src/gridax/__init__.py` (import plus an entry in `__all__`, in its logical group), or, for a name that needs JAX, from `packages/gridax/src/gridax/solvers/__init__.py` (its `__all__` is sorted) or `gridax/pipekit/__init__.py`; give it a `::: gridax.Name` (or `::: gridax.solvers.Name`) entry on its page in `docs/api/` (no test checks this), and run `make capabilities`.
 - NumPy-style docstrings: the formula (half-index notation in ASCII or
   Unicode), parameters and returns with shapes, and an `Examples` section for
   new public names. Doctests are **not** collected (no `--doctest-modules`),
@@ -404,7 +383,7 @@ docstring before changing what it checks.
 | `tests/test_timestepping*.py`, `tests/test_diffrax_solvers.py` | Convergence order and accuracy of the `integrix.march` step functions and diffrax solvers as gridax's tests use them; the pure steps match their diffrax twins (`TestPureFunctionalVsDiffrax`) |
 | `tests/test_scripts.py` | The example models in `scripts/` run stably on small grids |
 | `tests/test_capabilities.py` | `docs/capabilities.md` is current; no name shadows a spectraldiffx / gaussx name with a different object |
-| `tests/test_plugin_skill.py` | The downstream plugin's worked example runs and its stated results hold; every `fvx.X` / `finitevolx.X` the plugin names exists |
+| `tests/test_plugin_skill.py` | The downstream plugin's worked example runs and its stated results hold; every `fvx.X` (`gridax`), `gs.X` (`gridax.solvers`) and `gridax.X` / `gridax.solvers.X` the plugin names exists |
 | `pyproject.toml` `filterwarnings = ["error", ...]`, `xfail_strict = true` | Any warning other than a `DeprecationWarning` fails a test; an `xfail` that starts passing fails too |
 
 ## Recipes
@@ -431,8 +410,7 @@ in `plugins/finitevolx/` (published by `.claude-plugin/marketplace.json`)
 and `docs/llms.txt` (`scripts/build_docs.py` copies it to the site root); see
 `docs/agents.md`. When the public API or the headline usage changes, update
 `plugins/finitevolx/skills/finite-volume-models-with-finitevolx/` too:
-`tests/test_plugin_skill.py` runs its worked example and checks that every
-`fvx.X` / `finitevolx.X` it and the plugin reviewer name still exists.
+`tests/test_plugin_skill.py` runs its worked example and checks that every `fvx.X` / `gs.X` / `gridax.X` / `gridax.solvers.X` it and the plugin reviewer name still exists.
 
 ## Working in the repo
 
@@ -447,7 +425,7 @@ make test-slow            # slow tier only;  make test-integration: integration 
 make test-cov             # the same with coverage (reports/coverage.xml)
 make uv-lint              # ruff check . + ruff format --check . + ty (mirrors CI)
 make uv-format            # ruff format . && ruff check --fix .
-make typecheck            # uv run ty check packages/gridax-jax/src packages/gridax/src finitevolx
+make typecheck            # uv run ty check packages/gridax/src
 make ci                   # lint, format check, ty, tests
 make capabilities         # regenerate docs/capabilities.md
 make docs                 # build the docs site into public/ and check every link
@@ -509,7 +487,7 @@ All of these must pass, from the repo root:
    `scripts/` (CI runs `ruff check .`; a subdirectory misses their import
    sorting). `docs/` and `notebooks/` are excluded by the ruff config.
 3. `uv run ruff format --check .`
-4. `uv run ty check packages/gridax-jax/src packages/gridax/src finitevolx` (`make typecheck`): no errors.
+4. `uv run ty check packages/gridax/src` (`make typecheck`): no errors.
 5. After changing a public API: `make capabilities`, and the `docs/api` page.
 6. After changing an operator's math on purpose: regenerate the goldens
    (`uv run python tests/fixtures/_gen_golden.py`) and explain the diff in
@@ -535,8 +513,7 @@ All of these must pass, from the repo root:
    each with its check.
 
 Also: type hints on every public function, NumPy-style docstrings,
-a `pytree_dataclass` in gridax and an `eqx.Module` in gridax-jax (never a plain
-dataclass) for anything that holds arrays, and
+a `pytree_dataclass` in gridax's operators and an `eqx.Module` in `gridax.solvers` and `gridax.pipekit` (never a plain dataclass) for anything that holds arrays, and
 `from __future__ import annotations` in new modules.
 
 ## Git, commits and pull requests
@@ -613,7 +590,7 @@ Writing style:
   half-index formula, in ASCII math (`dh_dx[j, i+1/2] = ...`), and array
   shapes are tracked in comments (`[Ny, Nx]`).
 - Theory pages are MyST: maths in `$…$` and `$$…$$` is rendered by KaTeX (write `1/2`, not `½`, inside maths), admonitions are `:::{note}` (MkDocs' `!!!` renders as plain text), and a link to a section uses an explicit `(label)=` above its heading.
-- Link from prose to an API object with `[name](xref:api#gridax_jax.Name)` and to an API page by its deployed URL (`https://jejjohnson.github.io/gridax/reference/masks/`). A relative link into `docs/api/` publishes the Markdown source as a download, and the build fails on it.
+- Link from prose to an API object with `[name](xref:api#gridax.Name)` (or `xref:api#gridax.solvers.Name`) and to an API page by its deployed URL (`https://jejjohnson.github.io/gridax/reference/masks/`). A relative link into `docs/api/` publishes the Markdown source as a download, and the build fails on it.
 
 Example notebooks live in `docs/notebooks/` as **jupytext percent-format `.py` files**. mystmd cannot read them, so `scripts/build_docs.py` writes an unexecuted `.ipynb` beside each one (gitignored) and mystmd renders that, so the rendered page shows no cell outputs. Figures are saved by the notebook itself (`matplotlib.use("Agg")`, `fig.savefig(IMG_DIR / "name.png")` into `docs/images/<notebook>/`) and embedded from a markdown cell (`![...](../images/<notebook>/name.png)`, relative to the notebook file); regenerate them by running the script (`uv run python docs/notebooks/<name>.py`) and commit the PNGs. Add each notebook to its topic under `Examples` in the `toc` of `docs/myst.yml`, as `notebooks/<name>.ipynb`, and link to it from prose as `notebooks/<name>.ipynb` too. The
 double-gyre models in `scripts/` write their GIFs and Zarr stores to

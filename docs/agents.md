@@ -11,7 +11,7 @@ the real thing instead.
 ## The capability index
 
 The [capability index](capabilities.md) lists every public name in
-`finitevolx`, grouped by the module that defines it, with a one-line
+`gridax`, `gridax.solvers` and `gridax.pipekit`, grouped by the module that defines it, with a one-line
 summary; then the public API of spectraldiffx and gaussx, which finitevolX
 builds on (its spectral solvers and transforms are re-exported from
 spectraldiffx). It is regenerated from the code and checked in the test
@@ -59,7 +59,7 @@ solvers, time steppers). Before writing a stencil, a ghost-cell fill, an
 advection scheme, a Poisson / Helmholtz solver or a time-stepping loop,
 search the capability index
 (https://jejjohnson.github.io/gridax/capabilities/) or
-`gridax_jax.__all__`, and compose what exists:
+`gridax.__all__`, and compose what exists:
 
 - Arrays are `[Ny, Nx]` with one ghost ring; `T[j, i]` is a cell centre,
   `U[j, i]` its east face, `V[j, i]` its north face, `X[j, i]` its NE

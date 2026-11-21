@@ -1,6 +1,6 @@
 ---
 name: add-elliptic-solver
-description: Add or extend an elliptic (Poisson / Helmholtz) solver path in finitevolX — a spectral or multigrid preconditioner for gaussx's CG, a multigrid option, or known-value / boundary-condition handling — while delegating spectral solves to spectraldiffx and structured linear algebra and CG to gaussx. Use when asked to add, port or fix a Poisson, Helmholtz, PV-inversion, pressure or streamfunction solve, a CG preconditioner or a multigrid feature in gridax_jax/_src/solvers.
+description: Add or extend an elliptic (Poisson / Helmholtz) solver path in finitevolX — a spectral or multigrid preconditioner for gaussx's CG, a multigrid option, or known-value / boundary-condition handling — while delegating spectral solves to spectraldiffx and structured linear algebra and CG to gaussx. Use when asked to add, port or fix a Poisson, Helmholtz, PV-inversion, pressure or streamfunction solve, a CG preconditioner or a multigrid feature in gridax/_src/solvers.
 ---
 
 # Add an elliptic solver path
@@ -14,8 +14,8 @@ Read contract 5 (solvers) in `AGENTS.md`, then `docs/elliptic_solvers.md`,
 |---|---|
 | A rectangular spectral solve, a new transform type, new eigenvalues, a capacitance-method change | **spectraldiffx** (finitevolX re-exports it from `solvers/spectral.py` / `spectral_transforms.py`): propose it upstream, then bump the pin (`bump-upstream-pins` skill) |
 | A tridiagonal / Kronecker / low-rank solve, a Nyström-style preconditioner | **gaussx** (finitevolX re-exports `solvers/tridiagonal.py`; CG is `gaussx.linear_solve_with_info` with `gaussx.CGSolver`, and the Nyström preconditioner is `gaussx.NystromPreconditioner`) |
-| A masked-domain solve on the C-grid, a preconditioner adapted to the finitevolX sign convention, multigrid | here, in `gridax_jax/_src/solvers/` |
-| A one-call inversion (`streamfunction_from_vorticity`, `pressure_from_divergence`, `pv_inversion`), a new `method=` option on them, known-value or `BoundaryConditionSet` handling for them | **sesmax-core** (`sesmax_core.gfd`; the `gridax_jax` names are deprecated, jejjohnson/sesmax#126): propose it there, built from the public pieces here |
+| A masked-domain solve on the C-grid, a preconditioner adapted to the finitevolX sign convention, multigrid | here, in `gridax/_src/solvers/` (public: `gridax.solvers`) |
+| A one-call inversion (`streamfunction_from_vorticity`, `pressure_from_divergence`, `pv_inversion`), a new `method=` option on them, known-value or `BoundaryConditionSet` handling for them | **sesmax-core** (`sesmax_core.gfd`, #475; gridax keeps no alias): propose it there, built from the public pieces here |
 
 Search `docs/capabilities.md` first: `masked_laplacian` (and the
 T-point `masked_neumann_laplacian`, `masked_face_dirichlet_laplacian`,
@@ -23,7 +23,7 @@ T-point `masked_neumann_laplacian`, `masked_face_dirichlet_laplacian`,
 `build_capacitance_solver`, `build_multigrid_solver` / `MultigridSolver`,
 the lifting tools `boundary_ring` / `SolveDomain` / `KnownValueLifting`.
 
-## 2. Write it (`gridax_jax/_src/solvers/`)
+## 2. Write it (`gridax/_src/solvers/`)
 
 - **Sign convention.** The operator is `(∇² − λ)` with `λ ≥ 0`: negative
   (semi)definite. A matvec for `gaussx.CGSolver` implements that operator; a
@@ -32,9 +32,7 @@ the lifting tools `boundary_ring` / `SolveDomain` / `KnownValueLifting`.
 - **A preconditioner** goes in `preconditioners.py` and returns
   `M_inv(r: [Ny, Nx]) -> [Ny, Nx]`. Randomised ones take a `key`; a generic
   one belongs in gaussx.
-- **The one-call wrappers** live in sesmax-core now; the private copies in
-  `elliptic.py` (`_solve_dispatch`, `_resolve_bc`) only back the deprecated
-  `gridax_jax` names for one release, so do not extend them.
+- **The one-call wrappers** live in sesmax-core now (#475); gridax keeps no copy of them.
 - **Masks**: accept a `Mask2D` or an array; a `Mask2D` contributes the
   mask of the field's staggering — `xy_corner_strict` for ψ (`"X"`),
   `h` for pressure (`"T"`) — cast to the rhs dtype (`_resolve_mask_arr`).
@@ -57,7 +55,7 @@ the lifting tools `boundary_ring` / `SolveDomain` / `KnownValueLifting`.
 
 ## 3. Export and document
 
-`packages/gridax-jax/src/gridax_jax/__init__.py` (import + `__all__` in the solver groups), the
+`packages/gridax/src/gridax/solvers/__init__.py` (import + the name in the sorted `__all__`), the
 `docs/api/` page (`elliptic.md`, `iterative.md`, `capacitance.md`,
 `multigrid.md`, `spectral_solvers.md`), the usage guide and, for a new
 solver type, a row in `docs/solver_comparison.md`; `make capabilities`.

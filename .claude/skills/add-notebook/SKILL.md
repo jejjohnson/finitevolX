@@ -14,8 +14,7 @@ and embedded as an image.
 - One question per notebook; read the existing ones (`docs/notebooks/*.py`
   and the `Examples` part of the `toc` in `docs/myst.yml`) so you extend rather than
   duplicate.
-- Use the public API the way a user would (`import finitevolx as fvx` or
-  `from finitevolx import ...`); no `finitevolx._src` imports.
+- Use the public API the way a user would (`import gridax as fvx`, `import gridax.solvers as gs`, or `from gridax import ...`); no `gridax._src` imports.
 - Keep it fast: small grids, short integrations; it is re-run by hand to
   refresh the figures.
 

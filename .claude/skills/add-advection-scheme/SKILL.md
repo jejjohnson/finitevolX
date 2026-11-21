@@ -50,7 +50,7 @@ Rules:
 
 ## 3. Export and document
 
-`packages/gridax-jax/src/gridax_jax/__init__.py` (import + `__all__` group, e.g. `# WENO stencil
+`packages/gridax/src/gridax/__init__.py` (import + `__all__` group, e.g. `# WENO stencil
 functions`, `# Flux limiters`), the `docs/api/advection.md` /
 `docs/api/reconstruction.md` page, the method list in the `Advection*`
 docstrings and in `docs/advection.md`, then `make capabilities`.

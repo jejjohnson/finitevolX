@@ -61,7 +61,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-import gridax_jax as fvx
+import gridax.solvers as gs
 
 jax.config.update("jax_enable_x64", True)
 
@@ -86,7 +86,7 @@ kappa = np.sqrt(8 * (alpha - 1)) / ell  # ν = α − d/2 = 1 in 2-D
 tau = 1.0
 
 # K = κ² − ∇²_h = −(∇²_h − κ²), a DiagonalizedOperator, never materialised
-K = -fvx.helmholtz_operator((ny, nx), dx, dy, lambda_=kappa**2, bc="dct")
+K = -gs.helmholtz_operator((ny, nx), dx, dy, lambda_=kappa**2, bc="dct")
 # Q = τ² K^α: same transform pair, eigenvalues τ² (κ² − Λ)^α
 Q = gaussx.DiagonalizedOperator(
     tau**2 * K.eigenvalues**alpha, K.forward, K.inverse, K.in_shape, normal=True
@@ -102,8 +102,8 @@ def marginal_variance(Q: gaussx.DiagonalizedOperator) -> jnp.ndarray:
     """
     ny, nx = Q.in_shape
     # 1-D orthonormal DCT-II matrices: column j is the transform of e_j
-    Vy = fvx.dctn(jnp.eye(ny), type=2, axes=[0], norm="ortho")  # [k, j]
-    Vx = fvx.dctn(jnp.eye(nx), type=2, axes=[0], norm="ortho")  # [l, i]
+    Vy = gs.dctn(jnp.eye(ny), type=2, axes=[0], norm="ortho")  # [k, j]
+    Vx = gs.dctn(jnp.eye(nx), type=2, axes=[0], norm="ortho")  # [l, i]
     return (Vy**2).T @ (1.0 / Q.eigenvalues) @ (Vx**2)  # [Ny, Nx]
 
 
@@ -170,8 +170,8 @@ wet[3:-3, 3:-3] = True  # basin with closed walls
 wet[3:62, 44:52] = False  # a peninsula from the south wall
 wet_flat = wet.ravel()
 
-K_m = -fvx.masked_helmholtz_operator(wet, dx, dy, lambda_=kappa**2)
-K_rect = -fvx.helmholtz_operator((ny, nx), dx, dy, lambda_=kappa**2, bc="dct")
+K_m = -gs.masked_helmholtz_operator(wet, dx, dy, lambda_=kappa**2)
+K_rect = -gs.helmholtz_operator((ny, nx), dx, dy, lambda_=kappa**2, bc="dct")
 
 
 def b_column_masked(j: int, i: int) -> np.ndarray:

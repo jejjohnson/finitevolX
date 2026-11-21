@@ -1,6 +1,6 @@
 # Raw Stencil Primitives
 
-This page explains the theory behind the raw stencil functions in `finitevolx`,
+This page explains the theory behind the raw stencil functions in `gridax`,
 walking from the continuous equations through the Gauss divergence theorem to
 the discrete stencils that the library implements.
 
@@ -189,7 +189,7 @@ C-grid layout and is preserved by the raw stencils.
 
 ### Ghost cells and the `interior()` helper
 
-In `finitevolx`, every array has the same total shape `[Ny, Nx]` with a
+In `gridax`, every array has the same total shape `[Ny, Nx]` with a
 one-cell ghost ring on each side.  The physical interior occupies
 `[1:-1, 1:-1]`.  Raw stencils return arrays of shape `(Ny-2, Nx-2)` —
 the interior only.  The `interior(values, like)` helper pads the result
@@ -466,7 +466,7 @@ $$
 $$
 
 ```python
-from gridax_jax import diff_x_fwd_2d, interior
+from gridax import diff_x_fwd_2d, interior
 
 # Pure index arithmetic — same for any coordinate system
 raw = diff_x_fwd_2d(h)
@@ -481,7 +481,7 @@ result = interior(scaled, h)
 ### Example: Strain from raw stencils
 
 ```python
-from gridax_jax import diff_x_fwd_2d, diff_y_fwd_2d, diff_x_bwd_2d, diff_y_bwd_2d, interior
+from gridax import diff_x_fwd_2d, diff_y_fwd_2d, diff_x_bwd_2d, diff_y_bwd_2d, interior
 
 # Shear strain at X-points: dv/dx + du/dy
 shear = interior(

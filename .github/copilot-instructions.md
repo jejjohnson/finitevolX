@@ -8,14 +8,7 @@ the docs, git and PR rules).
 
 The essentials, in case you only read this file:
 
-- Two packages: `packages/gridax-jax` (import `gridax_jax`, formerly
-  finitevolx; implementation in `gridax_jax/_src/`, public API in
-  `gridax_jax.__all__`) and `packages/gridax` (grids and masks on NumPy).
-  `finitevolx/` at the root is a deprecated shim. Search
-  [`docs/capabilities.md`](../docs/capabilities.md) before writing a helper:
-  spectral solves and transforms come from spectraldiffx, tridiagonal solves
-  and Nyström preconditioning from gaussx, CG from lineax, time stepping
-  from diffrax.
+- One package, `packages/gridax` (import `gridax`; this library was called finitevolX): the grids, masks, stencils and operators run on NumPy or any array-API backend, `gridax.solvers` needs the `jax` extra and `gridax.pipekit` the `pipekit` extra; implementation in `gridax/_src/`. Search [`docs/capabilities.md`](../docs/capabilities.md) before writing a helper: spectral solves and transforms come from spectraldiffx, tridiagonal solves, CG and Nyström preconditioning from gaussx, time stepping from integrix.march.
 - Keep the contracts in `AGENTS.md`:
   - **the C-grid**: every array is `[Ny, Nx]` with one ghost ring;
     `T[j, i]` centre, `U[j, i]` east face, `V[j, i]` north face, `X[j, i]`
@@ -29,11 +22,11 @@ The essentials, in case you only read this file:
     bit-identical to before; `if mask is not None:`, never `if mask:`;
   - **units**: physical constants only as parameter defaults, so operators
     stay scale-covariant (`tests/test_scale_covariance.py`);
-  - gridax code is array-API slicing in the input's namespace (no `finitediffx` / `kernex`, no `jnp`, no `.at[]`: use `gridax/_src/backend.py`); a `pytree_dataclass` in gridax, an `eqx.Module` in gridax-jax; dtype follows the input.
+  - gridax code is array-API slicing in the input's namespace (no `finitediffx` / `kernex`, no `jnp`, no `.at[]`: use `gridax/_src/backend.py`); a `pytree_dataclass` in gridax's operators, an `eqx.Module` in `gridax.solvers` and `gridax.pipekit`; dtype follows the input.
 - NumPy-style docstrings; every stencil commented with its half-index
   formula (`dh_dx[j, i+1/2] = ...`) and array shapes (`[Ny, Nx]`).
 - Before committing, from the repo root: `make test`, `uv run ruff check .`,
-  `uv run ruff format --check .`, `uv run ty check packages/gridax-jax/src packages/gridax/src finitevolx`;
+  `uv run ruff format --check .`, `uv run ty check packages/gridax/src`;
   `make capabilities` after a public API change; regenerate the golden
   fixtures (`uv run python tests/fixtures/_gen_golden.py`) only when an
   operator's output changes on purpose.

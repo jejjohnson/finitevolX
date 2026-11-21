@@ -47,11 +47,11 @@ averages `h` to X-points.
 
 ## Class operators
 
-::: gridax_jax.Energetics2D
+::: gridax.Energetics2D
 
-::: gridax_jax.Strain2D
+::: gridax.Strain2D
 
-::: gridax_jax.QGPotentialVorticity2D
+::: gridax.QGPotentialVorticity2D
 
 Enstrophy and potential enstrophy are methods of
 [`Vorticity2D`](vorticity.md) (`enstrophy`, `potential_enstrophy`), next to
@@ -61,11 +61,11 @@ the vorticity they are built from.
 
 ### Kinetic Energy
 
-::: gridax_jax.kinetic_energy
+::: gridax.kinetic_energy
 
 ### Bernoulli Potential
 
-::: gridax_jax.bernoulli_potential
+::: gridax.bernoulli_potential
 
 ### Potential Vorticity
 
@@ -74,46 +74,46 @@ the vorticity they are built from.
 included); `potential_vorticity` is the pointwise `(omega + f) / h` for
 inputs that already share a grid point.
 
-::: gridax_jax.sw_potential_vorticity
+::: gridax.sw_potential_vorticity
 
-::: gridax_jax.potential_vorticity
+::: gridax.potential_vorticity
 
 ### QG Potential Vorticity
 
-::: gridax_jax.qg_potential_vorticity
+::: gridax.qg_potential_vorticity
 
 ### Stretching Term (Multi-Layer QG)
 
-::: gridax_jax.stretching_term
+::: gridax.stretching_term
 
 ### Strain
 
-::: gridax_jax.shear_strain
+::: gridax.shear_strain
 
-::: gridax_jax.tensor_strain
+::: gridax.tensor_strain
 
-::: gridax_jax.strain_magnitude_squared
+::: gridax.strain_magnitude_squared
 
 ### Okubo-Weiss Parameter
 
-::: gridax_jax.okubo_weiss
+::: gridax.okubo_weiss
 
 ### Enstrophy
 
-::: gridax_jax.enstrophy
+::: gridax.enstrophy
 
-::: gridax_jax.potential_enstrophy
+::: gridax.potential_enstrophy
 
 ### Available Potential Energy
 
-::: gridax_jax.available_potential_energy
+::: gridax.available_potential_energy
 
 ### Domain-Integrated Quantities
 
-::: gridax_jax.total_energy
+::: gridax.total_energy
 
-::: gridax_jax.total_enstrophy
+::: gridax.total_enstrophy
 
 ### Vertical Velocity
 
-::: gridax_jax.vertical_velocity
+::: gridax.vertical_velocity

@@ -28,7 +28,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install dependencies
-        run: uv sync --extra dev --extra pipekit
+        run: uv sync --extra dev
 
       - name: Run ruff lint
         run: uv run ruff check .
@@ -37,4 +37,4 @@ jobs:
         run: uv run ruff format --check .
 
       - name: Run ty
-        run: uv run ty check packages/gridax-jax/src packages/gridax/src finitevolx
+        run: uv run ty check packages/gridax/src

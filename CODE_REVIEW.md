@@ -121,8 +121,8 @@ order); review what they cannot see.
 
 ### 7. Public API and documentation
 
-- New names: imported and listed in `gridax_jax.__all__` in their logical
-  group, a `::: finitevolx.<Name>` entry on the `docs/api/` page,
+- New names: imported and listed in `gridax.__all__` in their logical
+  group (or in the sorted `gridax.solvers.__all__`), a `::: gridax.<Name>` entry on the `docs/api/` page,
   `docs/capabilities.md` regenerated.
 - NumPy-style docstrings with the formula, shapes and an `Examples` section
   that actually runs (doctests are not collected, so run it).
@@ -143,7 +143,7 @@ order); review what they cannot see.
 
 - Type hints on every public function; `X | None`; specific exceptions with
   `raise ... from ...`; guard clauses over deep nesting.
-- A `pytree_dataclass` in gridax, an `eqx.Module` in gridax-jax (never a plain dataclass) for anything holding arrays; gridax code uses `xp = array_namespace(...)` and the backend hooks, never `jnp` or `.at[]`.
+- A `pytree_dataclass` in gridax's operators, an `eqx.Module` in `gridax.solvers` and `gridax.pipekit` (never a plain dataclass) for anything holding arrays; gridax code uses `xp = array_namespace(...)` and the backend hooks, never `jnp` or `.at[]`.
 - No new runtime dependency without discussion; `uv.lock` updated.
 
 ---

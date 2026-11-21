@@ -20,18 +20,18 @@ High-order flux reconstruction methods (upwind, WENO) for advection terms.
 
 ## The class forms
 
-::: gridax_jax.Reconstruction1D
+::: gridax.Reconstruction1D
 
-::: gridax_jax.Reconstruction2D
+::: gridax.Reconstruction2D
 
-::: gridax_jax.Reconstruction3D
+::: gridax.Reconstruction3D
 
 ## Flux Limiters
 
-::: gridax_jax.minmod
+::: gridax.minmod
 
-::: gridax_jax.mc
+::: gridax.mc
 
-::: gridax_jax.superbee
+::: gridax.superbee
 
-::: gridax_jax.van_leer
+::: gridax.van_leer

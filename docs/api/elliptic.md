@@ -9,10 +9,10 @@ Building blocks behind the ``known_values`` / ``known_mask``
 arguments of the sesmax inversions, for use with your own solver.  The known values sit on the coast
 ring (the dry cells adjacent to the wet mask: the C-grid wall nodes for ψ).
 
-::: gridax_jax.coast_ring
+::: gridax.solvers.coast_ring
 
-::: gridax_jax.boundary_ring
+::: gridax.solvers.boundary_ring
 
-::: gridax_jax.SolveDomain
+::: gridax.solvers.SolveDomain
 
-::: gridax_jax.KnownValueLifting
+::: gridax.solvers.KnownValueLifting

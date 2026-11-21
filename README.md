@@ -85,9 +85,15 @@ for $`m = 0, 1, \dots, K - 1`$, where $`\delta_{mn}`$ is 1 when $`m = n`$ and 0 
 
 ## 📥 Install
 
-gridax is not on PyPI yet ([#426](https://github.com/jejjohnson/gridax/issues/426)), so install it from this repository with [uv](https://docs.astral.sh/uv/). It needs Python 3.12 or 3.13 and brings in NumPy, SciPy, jaxtyping and geophysix. It has no extras and never imports JAX itself: install JAX beside it, and the same calls take JAX arrays.
+gridax needs Python 3.12 or 3.13. The base install brings in NumPy, SciPy, jaxtyping and geophysix and never imports JAX itself: install JAX beside it, and the same calls take JAX arrays. Two extras add the parts that are built on JAX, and `import gridax` imports neither of them:
 
-geophysix is not on PyPI either, and uv reads `[tool.uv.sources]` only from the project it installs, not from that project's dependencies, so a project that uses gridax names both sources in its own `pyproject.toml`:
+```bash
+pip install gridax              # grids, masks, stencils, operators, analysis, advection
+pip install "gridax[jax]"       # + jax, equinox, lineax, gaussx, spectraldiffx: import gridax.solvers
+pip install "gridax[pipekit]"   # + pipekit-ops, pipekit-jax, integrix: import gridax.pipekit
+```
+
+gridax is not on PyPI yet ([#426](https://github.com/jejjohnson/gridax/issues/426)), so for now install it from this repository with [uv](https://docs.astral.sh/uv/). geophysix is not on PyPI either, and uv reads `[tool.uv.sources]` only from the project it installs, not from that project's dependencies, so a project that uses gridax names both sources in its own `pyproject.toml` (for an extra, add the sources that `packages/gridax/pyproject.toml` lists for spectraldiffx, gaussx, integrix and pipekit, and the gaussx override in the root `pyproject.toml`):
 
 ```toml
 [project]
@@ -208,8 +214,10 @@ gridax owns the C-grid, its masks and the operators on it, and composes the rest
 | Physical constants, used as parameter defaults | [`geophysix`](https://github.com/jejjohnson/geophysix) |
 | Shape annotations | [`jaxtyping`](https://github.com/patrick-kidger/jaxtyping) |
 | Pytrees, `jit`, `vmap` and `grad`, when it is installed | [`jax`](https://github.com/jax-ml/jax) |
+| Spectral solves and structured linear algebra in `gridax.solvers` (the `jax` extra) | [`spectraldiffx`](https://github.com/jejjohnson/spectraldiffx), [`gaussx`](https://github.com/jejjohnson/gaussx), [`lineax`](https://github.com/patrick-kidger/lineax), [`equinox`](https://github.com/patrick-kidger/equinox) |
+| Operators as pipekit `Operator`s in `gridax.pipekit` (the `pipekit` extra) | [`pipekit`](https://github.com/jejjohnson/pipekit), [`integrix`](https://github.com/jejjohnson/integrix) for `ExplicitStep` |
 
-Dependencies point one way: gridax imports geophysix and no other [GeoStack](https://github.com/jejjohnson/geostack) library, and the libraries built on it import gridax, never the reverse. sesmax-core imports gridax today, while plumax and somax still import the deprecated `finitevolx` names; moving them to gridax is open in [#416](https://github.com/jejjohnson/gridax/issues/416). Time stepping belongs to integrix (`integrix.march`), which takes a gridax tendency as its right-hand side.
+Dependencies point one way: the base install imports geophysix and no other [GeoStack](https://github.com/jejjohnson/geostack) library (`gridax.solvers` adds spectraldiffx and gaussx, and `gridax.pipekit` adds pipekit and integrix), and the libraries built on it import gridax, never the reverse. sesmax-core imports gridax today, while plumax and somax still import `finitevolx`, which is removed with gridax-jax (#477); moving them to gridax is open in [#416](https://github.com/jejjohnson/gridax/issues/416). Time stepping belongs to integrix (`integrix.march`), which takes a gridax tendency as its right-hand side.
 
 ## 🌳 Repository layout
 
@@ -220,12 +228,12 @@ packages/gridax/
     stencils.py    ← Layer 0 coefficients and Layer 1 raw stencils
     analysis.py    ← collocated differences and axis remapping
     advection.py   ← reconstruction along one axis, and its schemes
+    solvers/       ← spectral, capacitance, masked-operator and multigrid solvers (the jax extra)
+    pipekit/       ← the operators as pipekit Operators (the pipekit extra)
     _src/          ← the implementations behind the public modules
   tests/           ← the suite that runs with NumPy alone
-packages/gridax-jax/  ← the solvers and the pipekit layer, folding into gridax (#477)
-finitevolx/        ← the deprecated finitevolx shim
 docs/              ← MyST guides, notebooks and the API reference
-tests/             ← the suite for both packages
+tests/             ← the suite that needs JAX: operators under jit, the solvers, the pipekit layer
 scripts/           ← example models, the capability index and the docs build
 ```
 

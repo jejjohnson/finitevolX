@@ -16,7 +16,7 @@
 # # Linear Shallow-Water Model: Double-Gyre Wind Forcing on a Beta-Plane
 #
 # This notebook builds a **linear shallow-water model** step by step on the
-# Arakawa C-grid using `finitevolx`.  The model simulates wind-driven
+# Arakawa C-grid using `gridax`.  The model simulates wind-driven
 # ocean gyres in a closed rectangular basin -- the simplest configuration
 # that produces the classic double-gyre circulation (an anticyclonic
 # subtropical gyre in the south and a cyclonic subpolar gyre in the north).
@@ -66,7 +66,7 @@ import numpy as np
 
 jax.config.update("jax_enable_x64", True)
 
-import gridax_jax as fvx
+import gridax as fvx
 from integrix.march import heun_step
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "swm_linear"
@@ -227,7 +227,7 @@ print(f"Saved: {IMG_DIR / 'wind_forcing.png'}")
 # %% [markdown]
 # ## 5. Operator Construction
 #
-# finitevolx provides stateless operator modules that know about the grid
+# gridax provides stateless operator modules that know about the grid
 # spacing and stencil layout.  We need three operators:
 #
 # - **`Difference2D`** -- finite differences: `diff_x_T_to_U`, `diff_y_T_to_V`,
@@ -521,7 +521,7 @@ print(f"Saved: {IMG_DIR / 'demo_results.png'}")
 # %% [markdown]
 # ## 10. Summary
 #
-# | Concept | finitevolx API | Detail |
+# | Concept | gridax API | Detail |
 # |---------|---------------|--------|
 # | **Grid** | `CartesianGrid2D.from_interior(nx, ny, Lx, Ly)` | Creates the C-grid with 2-cell ghost ring |
 # | **Differences** | `Difference2D(grid)` | `diff_x_T_to_U`, `diff_y_T_to_V`, `divergence`, `laplacian` |

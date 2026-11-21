@@ -13,7 +13,7 @@ honestly: what ran, what passed, what was skipped and why.
 ```bash
 uv run ruff check .                 # entire repo: tests/ and scripts/ too (docs/ is excluded)
 uv run ruff format --check .
-uv run ty check packages/gridax-jax/src packages/gridax/src finitevolx          # what CI's lint and typecheck workflows run
+uv run ty check packages/gridax/src  # what CI's lint and typecheck workflows run
 uv run pytest tests -n 2            # every tier; -n 2, not auto (~2 GB per worker)
 ```
 
@@ -41,8 +41,8 @@ make capabilities
 uv run pytest tests/test_capabilities.py
 ```
 
-…plus the `::: finitevolx.Name` entry on its `docs/api/*.md` page and the
-name in `gridax_jax.__all__`, in its logical group.
+…plus the `::: gridax.Name` (or `::: gridax.solvers.Name`) entry on its `docs/api/*.md` page and the
+name in `gridax.__all__`, in its logical group (or in the sorted `gridax.solvers.__all__`).
 
 ## When dependencies changed
 

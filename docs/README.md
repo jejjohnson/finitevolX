@@ -63,8 +63,8 @@ Note that the rendered pages still load KaTeX, Font Awesome, and jupyter-matplot
 In any MyST page, link to an API object with the `xref:` protocol and the name as exported from the top-level package:
 
 ```markdown
-[`Mask2D`](xref:api#gridax_jax.Mask2D)
-[`Advection2D`](xref:api#gridax_jax.Advection2D)
+[`Mask2D`](xref:api#gridax.Mask2D)
+[`Advection2D`](xref:api#gridax.Advection2D)
 ```
 
 A target that does not exist in the inventory fails `myst build --strict`, so broken API links are caught on the pull request rather than in production.
@@ -87,7 +87,7 @@ The failure is silent: the link resolves, the page loads, and the browser simply
 **In practice this does not bite** when you link to a name as its package exports it: mkdocstrings gives every name an API page lists with `::: package.Name` an *explicit* anchor. So the natural way to write a link is also the safe one:
 
 ```markdown
-[`Mask2D`](xref:api#gridax_jax.Mask2D)      <!-- safe: explicit anchor -->
+[`Mask2D`](xref:api#gridax.Mask2D)      <!-- safe: explicit anchor -->
 [`Name`](xref:api#pkg.mod.Name)          <!-- risky if its anchor is `$` -->
 ```
 

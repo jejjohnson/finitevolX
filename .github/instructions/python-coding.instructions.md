@@ -1,5 +1,5 @@
 ---
-applyTo: "packages/**/*.py,finitevolx/**/*.py,tests/**/*.py,scripts/**/*.py"
+applyTo: "packages/**/*.py,tests/**/*.py,scripts/**/*.py"
 ---
 
 # Python Coding Standards

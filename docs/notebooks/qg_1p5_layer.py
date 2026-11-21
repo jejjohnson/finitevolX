@@ -16,7 +16,7 @@
 # # 1.5-Layer Quasi-Geostrophic Double-Gyre Model
 #
 # This notebook builds a **1.5-layer quasi-geostrophic (QG) model** step by
-# step using finitevolx operators on the Arakawa C-grid.  The physical setup
+# step using gridax operators on the Arakawa C-grid.  The physical setup
 # is an active upper layer of depth $H$ over an infinitely deep, resting
 # abyssal layer.  The density difference between the two layers defines a
 # **reduced gravity** $g'$, which sets the internal Rossby deformation
@@ -73,7 +73,8 @@ import numpy as np
 
 jax.config.update("jax_enable_x64", True)
 
-import gridax_jax as fvx
+import gridax as fvx
+import gridax.solvers as gs
 from integrix.march import heun_step
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "qg_1p5_layer"
@@ -280,7 +281,7 @@ plt.show()
 # with homogeneous Dirichlet boundary conditions $\psi = 0$ on all four
 # basin walls (no-normal-flow).
 #
-# finitevolx provides `solve_helmholtz_dst` for this problem.  In this
+# gridax provides `solve_helmholtz_dst` for this problem.  In this
 # model $\psi$ is a **T-point** field whose ghost ring is zero (the inversion
 # below pads the interior solution with zeros), and DST-I applied to the T interior `[1:-1, 1:-1]`
 # is the exact inverse of the 5-point Laplacian with that zero ghost ring:
@@ -303,7 +304,7 @@ interp_op = fvx.Interpolation2D(grid)
 def invert_streamfunction(q_field):
     """Solve (nabla^2 - 1/Ld^2) psi = q_a with psi=0 on walls."""
     rhs = q_field[1:-1, 1:-1]
-    psi_interior = fvx.solve_helmholtz_dst(rhs, dx, dy, lambda_=lambda_helmholtz)
+    psi_interior = gs.solve_helmholtz_dst(rhs, dx, dy, lambda_=lambda_helmholtz)
     psi_full = jnp.zeros_like(q_field)
     return psi_full.at[1:-1, 1:-1].set(psi_interior)
 
@@ -397,7 +398,7 @@ print(f"max |v| = {float(jnp.abs(v_test).max()):.4e} m/s")
 # ## 7. PV Tendency Function
 #
 # We now assemble the full PV tendency, line by line.  Each physical
-# process maps onto a specific finitevolx operation.
+# process maps onto a specific gridax operation.
 
 # %%
 adv_op = fvx.Advection2D(grid=grid)
@@ -645,7 +646,7 @@ plt.show()
 # %% [markdown]
 # ## 11. Summary
 #
-# | Component | finitevolx API | Purpose |
+# | Component | gridax API | Purpose |
 # |-----------|---------------|---------|
 # | **Grid** | `CartesianGrid2D.from_interior(nx, ny, Lx, Ly)` | C-grid with ghost ring |
 # | **Helmholtz inversion** | `solve_helmholtz_dst(rhs, dx, dy, lambda_)` | $(\\nabla^2 - \\lambda)\\psi = q_a$ |
@@ -664,5 +665,5 @@ plt.show()
 #    as a source term rather than absorbed into $q_a$.
 # 3. **Drag on vorticity** ($-r\zeta$, not $-r q_a$): avoids spurious anti-damping
 #    of the interface displacement.
-# 4. **DST-I solver**: matches finitevolx's ghost-cell convention where $\psi = 0$
+# 4. **DST-I solver**: matches gridax's ghost-cell convention where $\psi = 0$
 #    at the array boundary (vertex Dirichlet).

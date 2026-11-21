@@ -255,7 +255,7 @@ slabs.)
 ## Creating a Grid
 
 ```python
-from gridax_jax import CartesianGrid2D
+from gridax import CartesianGrid2D
 
 # 64 physical cells in each direction; 66×66 total array shape
 grid = CartesianGrid2D.from_interior(nx_interior=64, ny_interior=64,
@@ -363,7 +363,7 @@ for interior column indices `i = 1 … Nx-2`.
 
 ## Kinetic Energy and Bernoulli Potential
 
-These operators live in `finitevolx._src.operators.diagnostics` and
+These operators live in `gridax._src.operators.diagnostics` and
 follow the same conventions.
 
 ### Kinetic energy at T-points
@@ -471,7 +471,7 @@ apply boundary conditions to intermediate fields before chaining operators.
 A typical shallow-water advection step uses all four co-location points:
 
 ```python
-from gridax_jax import (
+from gridax import (
     CartesianGrid2D, Difference2D, Interpolation2D, Vorticity2D,
     enforce_periodic,
 )
