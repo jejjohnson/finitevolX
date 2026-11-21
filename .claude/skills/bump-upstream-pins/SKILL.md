@@ -43,8 +43,8 @@ new tag), or the lock fails to resolve.
 ## 3. Fix and verify
 
 ```bash
-uv run pytest -n 2 tests/test_elliptic.py tests/test_elliptic_bcset.py \
-  tests/test_elliptic_known_values.py tests/test_solver_wrappers.py \
+uv run pytest -n 2 tests/test_elliptic.py tests/test_pressure_cg.py \
+  tests/test_capacitance_residual.py tests/test_solver_deprecations.py \
   tests/test_multigrid.py tests/test_tridiagonal.py tests/test_scripts.py \
   tests/test_capabilities.py
 make test

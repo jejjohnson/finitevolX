@@ -235,9 +235,6 @@ from gridax_jax._src.solvers.elliptic import (
     modify_rhs_1d,
     modify_rhs_2d,
     modify_rhs_3d,
-    # Convenience wrappers
-    pressure_from_divergence,
-    pv_inversion,
     # Generic per-axis BC solvers
     solve_helmholtz_2d,
     solve_helmholtz_3d,
@@ -283,13 +280,18 @@ from gridax_jax._src.solvers.elliptic import (
     solve_poisson_fft,
     solve_poisson_fft_1d,
     solve_poisson_fft_3d,
-    streamfunction_from_vorticity,
 )
 from gridax_jax._src.solvers.inhomogeneous import (
     KnownValueLifting,
     SolveDomain,
     boundary_ring,
     coast_ring,
+)
+from gridax_jax._src.solvers.iterative import (
+    masked_face_dirichlet_laplacian,
+    masked_neumann_laplacian,
+    project_zero_mean,
+    wet_components,
 )
 from gridax_jax._src.solvers.linear_operators import (
     helmholtz_operator,
@@ -320,7 +322,6 @@ from gridax_jax._src.timestepping._deprecated import (
     SEMI_LAGRANGIAN as _SEMI_LAGRANGIAN,
     deprecated_stepper as _deprecated_stepper,
 )
-from gridax_jax._src.timestepping._solve import solve_ocean_pde
 from gridax_jax._src.utils.dtype import check_dtype
 
 __all__ = [
@@ -661,10 +662,11 @@ __all__ = [
     "CGInfo",
     "masked_laplacian",
     "solve_cg",
-    # Convenience solver wrappers
-    "streamfunction_from_vorticity",
-    "pressure_from_divergence",
-    "pv_inversion",
+    # Masked T-point operators and the Neumann gauge (pressure solves)
+    "masked_neumann_laplacian",
+    "masked_face_dirichlet_laplacian",
+    "wet_components",
+    "project_zero_mean",
     # Known-value lifting (inhomogeneous BCs)
     "coast_ring",
     "boundary_ring",
@@ -707,7 +709,6 @@ __all__ = [
     "SplitExplicitRKSolver",
     "SemiLagrangianSolver",
     "SemiLagrangianTerm",
-    "solve_ocean_pde",
 ]
 
 

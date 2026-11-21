@@ -1,6 +1,6 @@
 # Time Integration
 
-The generic time steppers live in [integrix](https://github.com/jejjohnson/integrix) (`integrix.march`); the semi-Lagrangian scheme moved there too (#476), and finitevolX keeps the `solve_ocean_pde` wrapper.
+The generic time steppers live in [integrix](https://github.com/jejjohnson/integrix) (`integrix.march`); the semi-Lagrangian scheme moved there too (#476), and the `solve_ocean_pde` wrapper moved to `sesmax_core.solve_pde`.
 
 !!! warning "Deprecated finitevolX names"
     `finitevolx.RK3SSP`, `finitevolx.rk3_ssp_step` and the other generic steppers below still work for one release and emit a `DeprecationWarning`. The diffrax solvers and the pure step functions are the integrix objects themselves, so import them from `integrix.march`. `finitevolx.AB2Solver`, `finitevolx.LeapfrogRAFSolver` and `finitevolx.SplitExplicitRKSolver` are adapters that keep the old `init` / `step` call shapes; their integrix replacements are `integrix.march.AbstractStepper`s run by `integrix.march.run(stepper, rhs, t0, y0, dt, n_steps)` with `rhs(t, y, args)`.
@@ -155,4 +155,5 @@ The objects behind `finitevolx.AB2Solver`, `finitevolx.LeapfrogRAFSolver` and `f
 
 ## Convenience Wrapper
 
-::: gridax_jax.solve_ocean_pde
+`solve_ocean_pde` moved to `sesmax_core.solve_pde`, where `bc_fn=` is `tendency_bc=`, and gridax no longer has it (#475).
+See the [`sesmax_core.solve_pde` API](https://jejjohnson.github.io/sesmax/reference/core/).

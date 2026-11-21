@@ -242,31 +242,14 @@ bc_set = BoundaryConditionSet(
 psi = bc_set(psi, dx=grid.dx, dy=grid.dy)
 ```
 
-The same set can describe the boundary of an **elliptic solve**: pass it as
-`bc=` to `streamfunction_from_vorticity`, `pressure_from_divergence` or
-`pv_inversion`.  All-`Dirichlet1D` faces select the DST, all zero
-`Neumann1D` faces the DCT and all `Periodic1D` faces the FFT; a set's
-`mask` is used by the mask-based methods (`method="spectral"` raises on a
-`bc.mask`); and non-zero `Dirichlet1D` values are imposed on each face's
-wall nodes:
-
-```python
-bc_set = BoundaryConditionSet(
-    mask=mask,
-    south=Dirichlet1D(face="south", value=0.0),
-    north=Dirichlet1D(face="north", value=0.1),
-    west=Dirichlet1D(face="west",  value=0.0),
-    east=Dirichlet1D(face="east",  value=0.0),
-)
-psi = fvx.streamfunction_from_vorticity(zeta, dx, dy, bc=bc_set, method="cg")
-```
+The same set can describe the boundary of an **elliptic solve**: the one-call inversions `streamfunction_from_vorticity`, `pressure_from_divergence` and `pv_inversion` take it as `bc=`.  Those wrappers moved to sesmax-core (`sesmax_core.gfd`); see the [elliptic inversions guide](https://jejjohnson.github.io/sesmax/elliptic-inversions/) for how a set selects the transform and imposes non-zero `Dirichlet1D` values on the wall nodes.
 
 When time-stepping, a `Dirichlet1D` value sits on the wall face, half a
 cell outside the first wet T cell.  ψ lives at X points, and the X nodes
 `0` and `N-2` lie **on** the walls, so a solve pins those wall nodes (the
-coast ring of the ψ mask) to the face value: the same wall.  For the
-T-point `pressure_from_divergence` the face is half a cell from any cell
-centre, so non-zero `Dirichlet1D` faces raise there.  See
+coast ring of the ψ mask) to the face value: the same wall.  For a
+T-point pressure solve the face is half a cell from any cell
+centre, so non-zero `Dirichlet1D` faces are not supported there.  See
 [Known Boundary Values](elliptic_solvers_usage.md#known-boundary-values-inhomogeneous-dirichlet)
 for arbitrary per-cell values and interior observations.
 

@@ -41,15 +41,17 @@ The choice of boundary condition determines which spectral transform is used:
 | **Periodic** | $\psi$ wraps in both directions | FFT | `solve_poisson_fft` / `solve_helmholtz_fft` |
 
 The direct solvers treat **every** input node as an unknown, so where the
-wall ends up depends on what you pass them.  The convenience wrappers
-(`streamfunction_from_vorticity`, `pv_inversion`, `pressure_from_divergence`)
+wall ends up depends on what you pass them.  The one-call wrappers
+(`streamfunction_from_vorticity`, `pv_inversion`, `pressure_from_divergence`,
+now in [sesmax-core](https://jejjohnson.github.io/sesmax/elliptic-inversions/))
 slice the unknowns of their C-grid staggering out of the `[Ny, Nx]` array,
-solve, and embed the result in zeros, so the wall is the C-grid wall.  On a
+solve, and embed the result in zeros, so the wall is the C-grid wall; to get the
+same result here, slice and embed with the table below.  On a
 `from_interior` grid the T cells are `[1:-1]` and the walls are the faces at
 $x = 0$ and $x = L$; X node $i$ sits at $x = i\,\Delta x$, so the walls are
 the X nodes `0` and `N-2` (index `N-1` is outside the domain):
 
-| Wrapper (staggering) | `bc` | Unknowns | Transform | Wall |
+| Field (staggering) | `bc` | Unknowns | Transform | Wall |
 |---|---|---|---|---|
 | ψ (X) | `"dst"` | `[1:-2, 1:-2]` | DST-I | $\psi = 0$ on the wall nodes `0`, `N-2` |
 | ψ (X) | `"dct"` | `[0:-1, 0:-1]` | DCT-I | $\partial\psi/\partial n = 0$ about the wall nodes `0`, `N-2` |
@@ -112,13 +114,10 @@ runs on the **effective** mask.  Accuracy is set by the stencil alone
 | Spectral (DST) | ψ rectangle only: $E$ is the X basin `[1:-2, 1:-2]` and $K$ its wall nodes (rows / columns `0` and `N-2`) |
 | Capacitance | solver built on the **wet** mask (its unknowns are every wet cell, $\psi = 0$ on the coast); no observed cells |
 
-In finitevolX, pass `known_values=` (and optionally `known_mask=`) to
-`streamfunction_from_vorticity` or `pv_inversion`, or a
-`BoundaryConditionSet` as `bc=` (the T-point `pressure_from_divergence`
-refuses known values: its Dirichlet wall is on the cell faces); see the
+In finitevolX, the building blocks are `SolveDomain` and `KnownValueLifting`; the one-call inversions that take `known_values=` moved to sesmax-core, see the
 [usage guide](elliptic_solvers_usage.md#known-boundary-values-inhomogeneous-dirichlet).
-The [Known Boundary Values tutorial](notebooks/inhomogeneous_bcs_tutorial.ipynb)
-derives all of this from scratch — notation, block structure, pseudocode, a
+The [Known Boundary Values tutorial](https://jejjohnson.github.io/sesmax/inhomogeneous-bcs-tutorial/)
+in sesmax derives all of this from scratch — notation, block structure, pseudocode, a
 NumPy implementation, a convergence study, and gradients with respect to
 the boundary data.
 

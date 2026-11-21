@@ -95,8 +95,7 @@ def test_semi_lagrangian_step_equals_integrix_with_euler_points() -> None:
 def test_names_that_stay_do_not_warn() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        for name in ("solve_ocean_pde", "t_point_coordinates"):
-            getattr(gridax_jax, name)
+        gridax_jax.t_point_coordinates  # noqa: B018
 
 
 def test_unknown_name_raises() -> None:

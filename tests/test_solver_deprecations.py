@@ -46,3 +46,36 @@ def test_as_preconditioner_is_a_gaussx_multigrid_preconditioner() -> None:
         pre.v_cycle(rhs.ravel()).reshape(rhs.shape),
         solver.v_cycle(jnp.zeros_like(rhs), rhs),
     )
+
+
+# --- the T-point pieces the pressure solve is built from (#475) --------------
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "masked_neumann_laplacian",
+        "masked_face_dirichlet_laplacian",
+        "wet_components",
+        "project_zero_mean",
+    ],
+)
+def test_t_point_pieces_are_public(name: str) -> None:
+    assert name in gridax_jax.__all__
+    assert callable(getattr(gridax_jax, name))
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "streamfunction_from_vorticity",
+        "pressure_from_divergence",
+        "pv_inversion",
+        "solve_ocean_pde",
+    ],
+)
+def test_moved_to_sesmax_core_and_gone(name: str) -> None:
+    # sesmax_core.gfd and sesmax_core.solve_pde own them; gridax keeps no alias
+    assert name not in gridax_jax.__all__
+    with pytest.raises(AttributeError):
+        getattr(gridax_jax, name)

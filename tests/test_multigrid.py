@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import equinox as eqx
 import gaussx
-from gridax_jax import Mask2D, masked_laplacian, solve_cg
-from gridax_jax._src.solvers.iterative import _masked_neumann_laplacian
+from gridax_jax import Mask2D, masked_laplacian, masked_neumann_laplacian, solve_cg
 from gridax_jax._src.solvers.multigrid import (
     MultigridSolver,
     _apply_operator,
@@ -202,7 +201,7 @@ class TestBoundaryCondition:
         solver = build_multigrid_solver(h, dx, dy, lambda_=4.0, bc="neumann")
         psi = jnp.asarray(np.random.default_rng(0).standard_normal(h.shape))
         out = np.asarray(_apply_operator(psi, solver.levels[0]))
-        ref = np.asarray(_masked_neumann_laplacian(psi, jnp.asarray(h), dx, dy, 4.0))
+        ref = np.asarray(masked_neumann_laplacian(psi, jnp.asarray(h), dx, dy, 4.0))
         np.testing.assert_allclose(out, ref, rtol=0, atol=1e-12 * np.abs(ref).max())
 
     def test_mask2d_uses_psi_mask(self):

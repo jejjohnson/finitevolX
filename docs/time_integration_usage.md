@@ -3,7 +3,7 @@
 This page covers practical usage of time integration with finitevolX,
 from quick-start examples to building custom diffrax solvers.
 
-The generic time steppers (the pure step functions, the diffrax solvers and the multistep / split-explicit steppers) live in [integrix](https://github.com/jejjohnson/integrix) and are imported from `integrix.march`. Their `finitevolx.*` names still work for one release and emit a `DeprecationWarning`. The semi-Lagrangian scheme moved to `integrix.march` as well (#476); finitevolX keeps `solve_ocean_pde`.
+The generic time steppers (the pure step functions, the diffrax solvers and the multistep / split-explicit steppers) live in [integrix](https://github.com/jejjohnson/integrix) and are imported from `integrix.march`. Their `finitevolx.*` names still work for one release and emit a `DeprecationWarning`. The semi-Lagrangian scheme moved to `integrix.march` as well (#476); `solve_ocean_pde` moved to `sesmax_core.solve_pde` (#475).
 
 ---
 
@@ -316,37 +316,9 @@ sol = dfx.diffeqsolve(
 
 ### The `solve_ocean_pde` Convenience Wrapper
 
-A thin wrapper around `diffeqsolve` that optionally applies boundary
-conditions to the tendency at each stage evaluation.
-
-```python
-from integrix.march import RK3SSP
-
-from gridax_jax import solve_ocean_pde
-
-def rhs(t, y, args):
-    return compute_tendency(y)
-
-def apply_bc(dydt):
-    """Zero out tendency in ghost cells."""
-    return dydt.at[0, :].set(0).at[-1, :].set(0)
-
-sol = solve_ocean_pde(
-    rhs,
-    RK3SSP(),
-    y0=initial_state,
-    t0=0.0,
-    t1=1000.0,
-    dt0=1.0,
-    bc_fn=apply_bc,
-    saveat=dfx.SaveAt(t1=True),
-)
-```
-
-Any other keyword goes straight to `diffeqsolve` (`stepsize_controller=`,
-`adjoint=`, `max_steps=`, `throw=`, ...).  A fixed-step run gets
-`max_steps = ceil((t1 - t0) / dt0) + 16` by default, so long runs are not
-cut off by diffrax's default of 4096 steps.
+`solve_ocean_pde`, the thin `diffeqsolve` wrapper that applies boundary conditions to the tendency at each stage evaluation, moved to `sesmax_core.solve_pde`, where `bc_fn=` is `tendency_bc=`.
+The `gridax_jax` name still works for one release and warns.
+See the [`sesmax_core.solve_pde` API](https://jejjohnson.github.io/sesmax/reference/core/).
 
 ### Saving Trajectories
 

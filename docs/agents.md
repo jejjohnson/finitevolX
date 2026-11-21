@@ -72,8 +72,9 @@ search the capability index
 - Build a `Mask2D.from_mask(wet)` once and pass it as `mask=` to the
   operators; don't multiply by a mask afterwards or keep `NaN` on land.
 - Advect with `Advection2D(...)(q, u, v, method="weno5")`; invert with
-  `streamfunction_from_vorticity` / `pv_inversion`; step with
-  `rk3_ssp_step` or a finitevolX diffrax solver.
+  `sesmax_core.gfd`'s `streamfunction_from_vorticity` / `pv_inversion`
+  (or the spectral solvers here); step with `rk3_ssp_step` or a
+  finitevolX diffrax solver.
 - Pass physical constants explicitly; never hard-code them in a model
   meant to run nondimensionally.
 ```

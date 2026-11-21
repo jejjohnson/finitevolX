@@ -31,7 +31,7 @@ matrix-free methods.
 
 For a visual walk-through of the solvers on four geometries (including a
 variable-coefficient one), see the
-[Elliptic Solvers notebook](notebooks/demo_solvers.ipynb).
+[inversion methods notebook in sesmax](https://jejjohnson.github.io/sesmax/inversion-methods/).
 
 ---
 
@@ -53,7 +53,7 @@ The methods:
 
 | Row | Call |
 |---|---|
-| spectral DST | `streamfunction_from_vorticity(f, dx, dy, bc="dst", lambda_=λ)` (rectangle only) |
+| spectral DST | `solve_helmholtz_dst1(f[1:-2, 1:-2], dx, dy, λ)` embedded in zeros at `[1:-2, 1:-2]` (rectangle only) |
 | capacitance | `build_capacitance_solver(mask, dx, dy, lambda_=λ)` (DST base), then `solver(f)` |
 | CG + DST / FFT | `solve_cg(masked_laplacian, f, preconditioner=make_spectral_preconditioner(dx, dy, λ, bc=...))` |
 | CG + multigrid | the same with `make_multigrid_preconditioner(build_multigrid_solver(mask, dx, dy, lambda_=λ))` |

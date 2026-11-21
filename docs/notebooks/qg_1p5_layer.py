@@ -284,9 +284,9 @@ plt.show()
 # it places $\psi = 0$ at the ghost-cell centres, half a cell outside the
 # wall faces.  That is a first-order wall position; a face Dirichlet wall
 # for a T-point field is DST-II (`solve_helmholtz_dst2`, ghost = -interior).
-# The convenience wrappers `streamfunction_from_vorticity` / `pv_inversion`
-# solve for an **X-point** $\psi$ (wall nodes `0` and `N-2`), so they are not
-# a drop-in replacement for this T-point formulation.
+# The PV-inversion wrappers (now in sesmax-core) solve for an **X-point**
+# $\psi$ (wall nodes `0` and `N-2`), so they are not a drop-in replacement for
+# this T-point formulation; the spectral solver is called directly instead.
 #
 # The `lambda_` parameter is $1/L_d^2$, which enters the Helmholtz
 # equation as the screening term that couples the streamfunction to the

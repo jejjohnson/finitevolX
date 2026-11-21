@@ -310,7 +310,7 @@ def masked_laplacian(
     return (lap - lambda_ * psi_m) * mask_arr  # [Ny, Nx]
 
 
-def _masked_neumann_laplacian(
+def masked_neumann_laplacian(
     p: Float[Array, "Ny Nx"],
     mask: Float[Array, "Ny Nx"],
     dx: float,
@@ -326,11 +326,21 @@ def _masked_neumann_laplacian(
     DCT-II (Neumann-on-the-faces) operator.  Symmetric and negative
     semidefinite; at λ = 0 its null space is the constants on each connected
     wet component.  The output is zeroed outside the mask.
+
+    Examples
+    --------
+    A constant has no flux through any face, so the operator annihilates it:
+
+    >>> import jax.numpy as jnp
+    >>> mask = jnp.zeros((6, 6)).at[1:-1, 1:-1].set(1.0)
+    >>> out = masked_neumann_laplacian(jnp.ones((6, 6)), mask, 1.0, 1.0)
+    >>> float(jnp.max(jnp.abs(out)))
+    0.0
     """
     return _masked_t_laplacian(p, mask, dx, dy, lambda_, face_dirichlet=False)
 
 
-def _masked_face_dirichlet_laplacian(
+def masked_face_dirichlet_laplacian(
     p: Float[Array, "Ny Nx"],
     mask: Float[Array, "Ny Nx"],
     dx: float,
@@ -346,6 +356,16 @@ def _masked_face_dirichlet_laplacian(
     (:func:`masked_laplacian` instead holds p = 0 at the dry cell *centre*,
     a full cell away: right for ψ at X points, first order for T points.)
     Symmetric and negative definite.  The output is zeroed outside the mask.
+
+    Examples
+    --------
+    A single wet cell has four coast faces, each with flux ``(0 - p) / (h/2)``:
+
+    >>> import jax.numpy as jnp
+    >>> mask = jnp.zeros((3, 3)).at[1, 1].set(1.0)
+    >>> out = masked_face_dirichlet_laplacian(jnp.ones((3, 3)), mask, 1.0, 1.0)
+    >>> float(out[1, 1])
+    -8.0
     """
     return _masked_t_laplacian(p, mask, dx, dy, lambda_, face_dirichlet=True)
 
@@ -388,12 +408,20 @@ def _masked_t_laplacian(
     return (lap - lambda_ * p_m) * mask  # [Ny, Nx]
 
 
-def _wet_components(mask: np.ndarray) -> tuple[Array, Array]:
+def wet_components(mask: np.ndarray) -> tuple[Array, Array]:
     """Label the 4-connected wet components of a concrete mask (construction time).
 
-    Returns ``(labels, counts)`` for :func:`_project_zero_mean`: ``labels``
+    Returns ``(labels, counts)`` for :func:`project_zero_mean`: ``labels``
     is 0 on dry cells and 1..n on the wet components, ``counts[k]`` the wet
     cells of component ``k`` (``counts[0]`` set to 1, never used).
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> mask = np.array([[1, 1, 0, 1]])
+    >>> labels, counts = wet_components(mask)
+    >>> labels.tolist(), counts.tolist()
+    ([[1, 1, 0, 2]], [1.0, 2.0, 1.0])
     """
     labels, n_comp = ndimage.label(np.asarray(mask) > 0.5)  # 4-connectivity
     counts = np.bincount(labels.ravel(), minlength=n_comp + 1).astype(np.float64)
@@ -401,7 +429,7 @@ def _wet_components(mask: np.ndarray) -> tuple[Array, Array]:
     return jnp.asarray(labels), jnp.asarray(counts)
 
 
-def _project_zero_mean(
+def project_zero_mean(
     u: Float[Array, "Ny Nx"],
     mask: Float[Array, "Ny Nx"],
     labels: Int[Array, "Ny Nx"],
@@ -425,7 +453,7 @@ def _project_zero_mean(
         Wet mask.
     labels : Int[Array, "Ny Nx"]
         Component label of each cell (0 = dry, 1..n wet components), from
-        :func:`_wet_components`.
+        :func:`wet_components`.
     counts : Float[Array, " n"]
         Wet-cell count per label (``counts[0]`` is unused, set to 1).
 
@@ -433,6 +461,18 @@ def _project_zero_mean(
     -------
     Float[Array, "Ny Nx"]
         Projected field, zero on dry cells.
+
+    Examples
+    --------
+    Each of the two wet components loses its own mean:
+
+    >>> import jax.numpy as jnp
+    >>> import numpy as np
+    >>> mask = np.array([[1.0, 1.0, 0.0, 1.0]])
+    >>> labels, counts = wet_components(mask)
+    >>> u = jnp.array([[1.0, 3.0, 5.0, 7.0]])
+    >>> project_zero_mean(u, jnp.asarray(mask), labels, counts).tolist()
+    [[-1.0, 1.0, 0.0, 0.0]]
     """
     mask = mask.astype(u.dtype)
     u_m = u * mask
