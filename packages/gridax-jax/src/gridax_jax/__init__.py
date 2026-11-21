@@ -156,6 +156,7 @@ from gridax import (
     superbee,
     sw_potential_vorticity,
     sw_potential_vorticity_multilayer,
+    t_point_coordinates,
     tensor_strain,
     total_energy,
     total_enstrophy,
@@ -320,14 +321,10 @@ from gridax_jax._src.solvers.tridiagonal import (
 from gridax_jax._src.timestepping._deprecated import (
     ADAPTED as _ADAPTED_STEPPERS,
     MOVED as _MOVED_STEPPERS,
+    SEMI_LAGRANGIAN as _SEMI_LAGRANGIAN,
     deprecated_stepper as _deprecated_stepper,
 )
 from gridax_jax._src.timestepping._solve import solve_ocean_pde
-from gridax_jax._src.timestepping.semi_lagrangian import (
-    SemiLagrangianSolver,
-    SemiLagrangianTerm,
-    semi_lagrangian_step,
-)
 from gridax_jax._src.utils.dtype import check_dtype
 
 __all__ = [
@@ -419,6 +416,8 @@ __all__ = [
     # Grid — Spherical concrete
     "SphericalGrid2D",
     "SphericalGrid3D",
+    # Grid — point coordinates
+    "t_point_coordinates",
     # Mask
     "Mask1D",
     "Mask2D",
@@ -685,7 +684,7 @@ __all__ = [
     "solve_tridiagonal",
     "solve_tridiagonal_batched",
     # Time integration — pure functional (deprecated aliases of
-    # integrix.march, served by __getattr__ below, except semi_lagrangian_step)
+    # integrix.march, served by __getattr__ below)
     "euler_step",
     "heun_step",
     "rk3_ssp_step",
@@ -697,7 +696,7 @@ __all__ = [
     "split_explicit_step",
     "semi_lagrangian_step",
     # Time integration — diffrax solvers (deprecated aliases of integrix.march,
-    # served by __getattr__ below, except the semi-Lagrangian pair)
+    # served by __getattr__ below)
     "ForwardEulerDfx",
     "RK2Heun",
     "RK3SSP",
@@ -832,9 +831,9 @@ def __getattr__(name: str) -> object:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
             return getattr(_gridax, name)
-    # The generic time steppers moved to integrix.march; their old
-    # names stay for one release and warn on access.
-    if name in _MOVED_STEPPERS or name in _ADAPTED_STEPPERS:
+    # The time steppers moved to integrix.march, the semi-Lagrangian scheme
+    # included (#476); their old names stay for one release and warn on access.
+    if name in _MOVED_STEPPERS or name in _ADAPTED_STEPPERS or name in _SEMI_LAGRANGIAN:
         return _deprecated_stepper(name)
     # The raw stencils were renamed in gridax (#435): every name carries its
     # rank and the corner averages use one scheme. The old names stay for

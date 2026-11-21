@@ -13,6 +13,7 @@ from gridax._src.grid.cartesian import (
     CartesianGrid2D,
     CartesianGrid3D,
 )
+from gridax._src.grid.coordinates import t_point_coordinates
 from gridax._src.grid.spherical import SphericalGrid2D, SphericalGrid3D
 
 __all__ = [
@@ -31,4 +32,6 @@ __all__ = [
     # Spherical concrete
     "SphericalGrid2D",
     "SphericalGrid3D",
+    # Point coordinates
+    "t_point_coordinates",
 ]

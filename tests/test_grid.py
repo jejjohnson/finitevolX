@@ -165,3 +165,32 @@ class TestGridStaggerPositions1D:
         L = 2.0
         g = CartesianGrid1D.from_interior(n, L)
         assert g.dx == pytest.approx(L / n)
+
+
+class TestTPointCoordinates:
+    """T[j, i] at (j dy, i dx), rows in ravel order (#476)."""
+
+    def test_2d_points_follow_the_raveled_field(self):
+        from gridax import t_point_coordinates
+
+        grid = CartesianGrid2D.from_interior(3, 2, 6.0, 1.0)
+        points = t_point_coordinates(grid)
+        assert points.shape == (grid.Ny * grid.Nx, 2)
+        rows, cols = np.meshgrid(np.arange(grid.Ny), np.arange(grid.Nx), indexing="ij")
+        np.testing.assert_array_equal(points[:, 0], rows.ravel() * grid.dy)
+        np.testing.assert_array_equal(points[:, 1], cols.ravel() * grid.dx)
+
+    def test_1d_points(self):
+        from gridax import CartesianGrid1D, t_point_coordinates
+
+        grid = CartesianGrid1D.from_interior(4, 2.0)
+        np.testing.assert_array_equal(
+            t_point_coordinates(grid)[:, 0], np.arange(grid.Nx) * grid.dx
+        )
+
+    def test_spherical_grid_raises(self):
+        from gridax import SphericalGrid2D, t_point_coordinates
+
+        grid = SphericalGrid2D.from_interior(4, 4, (0.0, 1.0), (0.0, 1.0))
+        with pytest.raises(TypeError, match="lat_T"):
+            t_point_coordinates(grid)
