@@ -6,8 +6,10 @@ knows, and returns the input's dtype. They are the kernels behind geoops'
 and xrops' ``Gradient``, ``Divergence``, ``Curl``, ``Laplacian`` and
 vertical-remap operators (#423).
 
-- Stencils (L0): :func:`difference_offsets`, :func:`difference_coeffs`,
-  :func:`nonuniform_coeffs`, from integers alone.
+- The stencil coefficients (Layer 0) live in :mod:`gridax.stencils`; their
+  old names here (``difference_offsets``, ``difference_coeffs``,
+  ``nonuniform_coeffs``, ``METHODS``, ``Method``) warn and resolve there for
+  one release.
 - Differences (L1): :func:`difference` (a NaN propagates) and
   :func:`adaptive_difference` (the widest stencil that fits on valid data),
   and the 1-D / 2-D / 3-D gradient, divergence, curl and Laplacian built on
@@ -43,21 +45,8 @@ from gridax._src.analysis.differences import (
     laplacian_3d,
 )
 from gridax._src.analysis.remap import Extrapolate, remap_axis, remap_axis_columns
-from gridax._src.analysis.stencils import (
-    METHODS,
-    Method,
-    difference_coeffs,
-    difference_offsets,
-    nonuniform_coeffs,
-)
 
 __all__ = [
-    # Stencils (L0)
-    "METHODS",
-    "Method",
-    "difference_coeffs",
-    "difference_offsets",
-    "nonuniform_coeffs",
     # Differences along one axis (L1)
     "difference",
     "adaptive_difference",
@@ -91,3 +80,31 @@ __all__ = [
     "remap_axis",
     "remap_axis_columns",
 ]
+
+# The stencil coefficients moved to gridax.stencils (#454); the old names warn
+# for one release.
+_MOVED_TO_STENCILS = frozenset(
+    {
+        "METHODS",
+        "Method",
+        "difference_coeffs",
+        "difference_offsets",
+        "nonuniform_coeffs",
+    }
+)
+
+
+def __getattr__(name: str) -> object:
+    if name in _MOVED_TO_STENCILS:
+        import warnings
+
+        from gridax import stencils
+
+        warnings.warn(
+            f"gridax.analysis.{name} is deprecated and will be removed in the next"
+            f" release: it is gridax.stencils.{name}.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return getattr(stencils, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

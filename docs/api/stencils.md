@@ -4,6 +4,16 @@ Pure index-arithmetic stencils for Arakawa C-grids.  No metric scaling,
 no ghost-ring padding.  See the [theory page](../stencils/) for the
 mathematical background.
 
+## Coefficients (Layer 0)
+
+Offsets and exact coefficients from the Taylor conditions, in `gridax.stencils`: integer offsets for collocated stencils (as `gridax.analysis` uses them), half-integer offsets (`method="staggered"`) for the faces of a C-grid. The two-point staggered stencils are the raw stencils below.
+
+::: gridax.stencils.difference_offsets
+
+::: gridax.stencils.difference_coeffs
+
+::: gridax.stencils.nonuniform_coeffs
+
 ## 1-D Difference Stencils
 
 ::: gridax_jax.diff_x_fwd_1d
