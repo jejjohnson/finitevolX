@@ -19,7 +19,6 @@ from gridax_jax import (
     RK4Classic,
     SemiLagrangianSolver,
     SplitExplicitRKSolver,
-    solve_ocean_pde,
 )
 import jax
 import jax.numpy as jnp
@@ -235,77 +234,6 @@ class TestSaveAt:
         )
         exact = jnp.exp(-ts)
         np.testing.assert_allclose(sol.ys, exact, rtol=1e-7)
-
-
-# ---------------------------------------------------------------------------
-# solve_ocean_pde wrapper
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.integration
-class TestSolveOceanPDE:
-    def test_basic_usage(self):
-        sol = solve_ocean_pde(
-            _decay_rhs,
-            RK3SSP(),
-            y0=1.0,
-            t0=0.0,
-            t1=1.0,
-            dt0=0.01,
-        )
-        exact = math.exp(-1.0)
-        np.testing.assert_allclose(float(sol.ys[0]), exact, rtol=1e-4)
-
-    def test_with_bc_fn(self):
-        """BC function is applied to tendency."""
-        call_count = {"n": 0}
-
-        def bc_fn(dydt):
-            call_count["n"] += 1
-            return dydt
-
-        sol = solve_ocean_pde(
-            _decay_rhs,
-            RK3SSP(),
-            y0=1.0,
-            t0=0.0,
-            t1=0.1,
-            dt0=0.01,
-            bc_fn=bc_fn,
-        )
-        assert jnp.isfinite(sol.ys[0])
-
-    def test_bc_fn_modifies_tendency(self):
-        """BC function that zeroes tendency should freeze the state."""
-
-        def zero_bc(_dydt):
-            return 0.0 * _dydt
-
-        sol = solve_ocean_pde(
-            _decay_rhs,
-            RK3SSP(),
-            y0=1.0,
-            t0=0.0,
-            t1=1.0,
-            dt0=0.01,
-            bc_fn=zero_bc,
-        )
-        # Tendency is zeroed out, so state should not change
-        np.testing.assert_allclose(float(sol.ys[0]), 1.0, atol=1e-10)
-
-    def test_with_saveat(self):
-        """solve_ocean_pde should pass saveat through to diffeqsolve."""
-        ts = jnp.linspace(0.0, 1.0, 6)
-        sol = solve_ocean_pde(
-            _decay_rhs,
-            RK4Classic(),
-            y0=1.0,
-            t0=0.0,
-            t1=1.0,
-            dt0=0.01,
-            saveat=dfx.SaveAt(ts=ts),
-        )
-        assert sol.ys.shape == (6,)
 
 
 # ---------------------------------------------------------------------------
@@ -758,31 +686,6 @@ class TestDiffeqsolveProtocol:
         assert bool(jnp.isfinite(out[1]))
         # (IMEX_SSP2 holds an optimistix root finder with a function field, so it
         # goes through eqx.filter_jit, as every diffrax implicit solver does.)
-
-
-class TestSolveOceanPDEKwargs:
-    def test_long_fixed_step_run(self):
-        """t1 = 10, dt0 = 1e-3 is 10^4 steps: more than diffrax's default 4096."""
-        sol = solve_ocean_pde(_decay_rhs, RK3SSP(), jnp.array(1.0), 0.0, 10.0, 1e-3)
-        np.testing.assert_allclose(sol.ys[0], math.exp(-10.0), rtol=1e-8)
-
-    def test_kwargs_reach_diffeqsolve(self):
-        sol = solve_ocean_pde(
-            _decay_rhs,
-            RK3SSP(),
-            jnp.array(1.0),
-            0.0,
-            1.0,
-            0.1,
-            stepsize_controller=dfx.PIDController(rtol=1e-8, atol=1e-10),
-            adjoint=dfx.DirectAdjoint(),
-        )
-        assert int(sol.stats["num_steps"]) != 10  # the controller chose the steps
-        np.testing.assert_allclose(sol.ys[0], math.exp(-1.0), rtol=1e-6)
-        with pytest.raises(Exception, match="maximum number of solver steps"):
-            solve_ocean_pde(
-                _decay_rhs, RK3SSP(), jnp.array(1.0), 0.0, 1.0, 0.01, max_steps=5
-            )
 
 
 class TestAB3Solver:

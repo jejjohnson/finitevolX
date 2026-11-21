@@ -12,7 +12,9 @@ null vector) no longer shows it, so no base is refused; the test keeps the
 singular combinations in the parametrisation to catch a regression.
 
 #306: the solver used to constrain psi = 0 on the mask's inner *wet* ring,
-one cell inside the coast where CG puts the wall.
+one cell inside the coast where CG puts the wall.  The two tests of it
+through ``streamfunction_from_vorticity`` moved to sesmax with the
+inversions (#475, jejjohnson/sesmax#126).
 """
 
 from __future__ import annotations
@@ -65,53 +67,6 @@ def test_default_base_is_dst():
 def test_unknown_base_raises():
     with pytest.raises(ValueError, match="base_bc must be"):
         fvx.build_capacitance_solver(_island_basin(), DX, DY, base_bc="dct1")
-
-
-@pytest.mark.slow
-def test_matches_cg_on_island_basin():
-    """#306: capacitance and cg solve the same problem on the same Mask2D."""
-    mask = fvx.Mask2D.from_mask(_island_basin())
-    f = _rhs()
-    lam = 4.0
-    solver = fvx.build_capacitance_solver(mask, DX, DY, lambda_=lam)
-    psi_cap = fvx.streamfunction_from_vorticity(
-        f, DX, DY, lambda_=lam, method="capacitance", capacitance_solver=solver
-    )
-    psi_cg = fvx.streamfunction_from_vorticity(
-        f, DX, DY, lambda_=lam, method="cg", mask=mask
-    )
-    # CG runs at rtol = atol = 1e-6 (float64 defaults); capacitance is exact.
-    rel = float(jnp.max(jnp.abs(psi_cap - psi_cg)) / jnp.max(jnp.abs(psi_cg)))
-    assert rel < 1e-5  # was 0.285 before the fix
-    np.testing.assert_array_equal(
-        np.asarray(psi_cap)[~np.asarray(mask.xy_corner_strict)], 0.0
-    )
-
-
-@pytest.mark.slow
-def test_known_values_on_mask2d_faces():
-    """#303 with capacitance: all four Dirichlet faces on the Mask2D wall, exact."""
-    mask = fvx.Mask2D.from_mask(_island_basin())
-    wet = jnp.asarray(mask.xy_corner_strict)
-    lam = 4.0
-    faces = {"south": -0.2, "north": 1.0, "west": 0.5, "east": 2.0}
-    bc = fvx.BoundaryConditionSet(
-        **{k: fvx.Dirichlet1D(k, value=v) for k, v in faces.items()}, mask=mask
-    )
-    f = _rhs()
-    solver = fvx.build_capacitance_solver(mask, DX, DY, lambda_=lam)
-    psi = fvx.streamfunction_from_vorticity(
-        f, DX, DY, bc=bc, lambda_=lam, method="capacitance", capacitance_solver=solver
-    )
-    np.testing.assert_allclose(psi[0, 1:-2], faces["south"], atol=1e-12)
-    np.testing.assert_allclose(psi[-2, 1:-2], faces["north"], atol=1e-12)
-    np.testing.assert_allclose(psi[1:-2, 0], faces["west"], atol=1e-12)
-    np.testing.assert_allclose(psi[1:-2, -2], faces["east"], atol=1e-12)
-    # Residual on the solve domain (every wet node), stencil reading the wall
-    # values; the island coast stays at zero.
-    full = fvx.masked_laplacian(psi, jnp.ones_like(psi), DX, DY, lambda_=lam)
-    res = jnp.where(wet, full - f, 0.0)
-    assert float(jnp.max(jnp.abs(res))) < 1e-10
 
 
 @pytest.mark.parametrize("base_bc", ["fft", "dct"])

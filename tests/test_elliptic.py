@@ -24,7 +24,6 @@ from gridax_jax._src.solvers.elliptic import (
     solve_poisson_dct,
     solve_poisson_dst,
     solve_poisson_fft,
-    streamfunction_from_vorticity,
 )
 import jax
 import jax.numpy as jnp
@@ -505,35 +504,6 @@ class TestSolveCGDiagnostics:
 
         loss, p0 = self._loss(wrt, solve)
         self._assert_grad_matches_fd(loss, loss, p0)
-
-    @pytest.mark.slow
-    @pytest.mark.parametrize("wrt", ["lambda_", "dx"])
-    def test_grad_through_streamfunction_cg(self, wrt):
-        # Default FFT preconditioner, built inside the wrapper from lambda_/dx.
-        _A, psi, mask, _dx = self._basin()
-        wet = np.asarray(mask, bool).ravel()  # [Ny*Nx]
-        n = mask.shape[0]
-
-        def solve_cg_wrapper(lam, dx):
-            return streamfunction_from_vorticity(
-                psi, dx, dx, lambda_=lam, method="cg", mask=mask
-            )
-
-        def solve_dense(lam, dx):
-            # The same masked operator as a dense wet block, solved exactly.
-            def A(x):  # [Ny*Nx] -> [Ny*Nx]
-                return masked_laplacian(x.reshape(n, n), mask, dx, dx, lam).ravel()
-
-            A_ww = jax.jacfwd(A)(jnp.zeros(n * n))[wet][:, wet]  # [n_wet, n_wet]
-            return jnp.linalg.solve(A_ww, psi.ravel()[wet])
-
-        # The wrapper's CG stops at rtol = atol = 1e-6, so an FD of the
-        # wrapper itself carries ~5e-6 relative truncation noise (measured);
-        # its implicit gradient does not (~1e-8 from the exact derivative).
-        # Difference the exact dense solve instead.
-        grad_loss, p0 = self._loss(wrt, solve_cg_wrapper)
-        fd_loss, _ = self._loss(wrt, solve_dense)
-        self._assert_grad_matches_fd(grad_loss, fd_loss, p0)
 
 
 # ---------------------------------------------------------------------------

@@ -46,3 +46,52 @@ def test_as_preconditioner_is_a_gaussx_multigrid_preconditioner() -> None:
         pre.v_cycle(rhs.ravel()).reshape(rhs.shape),
         solver.v_cycle(jnp.zeros_like(rhs), rhs),
     )
+
+
+# --- the inversions and the PDE driver moved to sesmax-core (#475) ----------
+
+_INVERSIONS = (
+    "pressure_from_divergence",
+    "pv_inversion",
+    "streamfunction_from_vorticity",
+)
+
+
+@pytest.mark.parametrize("name", _INVERSIONS)
+def test_inversion_warns_and_names_sesmax_core_gfd(name: str) -> None:
+    from gridax_jax._src.solvers import elliptic
+
+    with pytest.warns(DeprecationWarning, match=rf"sesmax_core\.gfd\.{name}"):
+        obj = getattr(gridax_jax, name)
+    assert obj is getattr(elliptic, name)
+    assert name not in gridax_jax.__all__
+
+
+def test_solve_ocean_pde_warns_and_names_solve_pde() -> None:
+    from gridax_jax._src.timestepping import _solve
+
+    with pytest.warns(DeprecationWarning, match=r"sesmax_core\.solve_pde") as record:
+        obj = gridax_jax.solve_ocean_pde
+    assert "tendency_bc=" in str(record[0].message)
+    assert obj is _solve.solve_ocean_pde
+    assert "solve_ocean_pde" not in gridax_jax.__all__
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "masked_neumann_laplacian",
+        "masked_face_dirichlet_laplacian",
+        "wet_components",
+        "project_zero_mean",
+    ],
+)
+def test_t_point_pieces_are_public_and_keep_their_private_names(name: str) -> None:
+    from gridax_jax._src.solvers import iterative
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        obj = getattr(gridax_jax, name)
+    assert name in gridax_jax.__all__
+    # sesmax-core 0.1 imports the private names
+    assert obj is getattr(iterative, f"_{name}")
