@@ -224,7 +224,7 @@ make uv-lint     # ruff check, ruff format --check and ty, as CI runs them
 make docs        # the MyST site and the API reference, with every link checked
 ```
 
-[`AGENTS.md`](AGENTS.md) holds the rules for contributors and coding agents, from the module map and the C-grid contracts to the tests that enforce them, and [`docs/capabilities.md`](docs/capabilities.md) lists every public name before you write a new one.
+[`AGENTS.md`](AGENTS.md) holds the rules for contributors and coding agents, from the module map and the C-grid contracts to the tests that enforce them, and [`docs/capabilities.md`](docs/capabilities.md) lists every public name before you write a new one. The icon and the logos come from [`docs/assets/render.py`](docs/assets/render.py), and the schematics are drawn in [geostack](https://github.com/jejjohnson/geostack/tree/main/docs/images/libraries) with the stack's other library figures.
 
 ## 🎓 References
 
