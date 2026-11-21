@@ -36,9 +36,8 @@ Public API
 ``MultigridSolver``
     Stateless ``equinox.Module`` with three solve modes
     (implicit / one-step / unrolled differentiation).
-See also :func:`~gridax_jax._src.solvers.preconditioners.make_multigrid_preconditioner`
-which wraps a single V-cycle as a preconditioner closure compatible with
-:func:`~gridax_jax._src.solvers.iterative.solve_cg`.
+See also :meth:`MultigridSolver.as_preconditioner`, which wraps a single
+V-cycle as a ``gaussx.MultigridPreconditioner`` for ``gaussx.CGSolver``.
 """
 
 from __future__ import annotations

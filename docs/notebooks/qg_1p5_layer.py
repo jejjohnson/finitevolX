@@ -74,6 +74,7 @@ import numpy as np
 jax.config.update("jax_enable_x64", True)
 
 import gridax_jax as fvx
+from integrix.march import heun_step
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "qg_1p5_layer"
 IMG_DIR.mkdir(parents=True, exist_ok=True)
@@ -202,7 +203,7 @@ print(f"dt = {dt:.0f} s = {dt/3600:.1f} hours")
 # share a boundary at the mid-basin latitude, where the Gulf-Stream-like
 # western boundary current separates from the coast.
 #
-# `fvx.WindCurl2D` computes this forcing from the wind stress itself: the
+# The forcing is computed from the wind stress itself with gridax's raw stencils: the
 # C-grid curl of the stress, divided by $\rho_0 H$, at X-points.  A zonal
 # stress $\tau_x = -\tau_0 \cos(2\pi y / L_y)$ has
 # $\mathrm{curl}\,\tau / (\rho_0 H) = -\tau_0 (2\pi/L_y) \sin(2\pi y/L_y) / (\rho_0 H)$,
@@ -221,12 +222,14 @@ H = 500.0  # upper-layer thickness [m]
 tau0 = wind_amp * rho0 * H * Ly / (2.0 * jnp.pi)  # stress amplitude [N m^-2]
 y_t = (jnp.arange(Ny) - 0.5) * dy
 tau_x = -tau0 * jnp.cos(2.0 * jnp.pi * y_t / Ly)[:, None] * jnp.ones(Nx)
-tau_y = jnp.zeros((Ny, Nx))
 
-# curl(tau) / (rho0 H) at X-points, then averaged to the T-points of q_a
-wind_curl_x = fvx.WindCurl2D(grid=grid, rho0=rho0)(tau_x, tau_y, H)
+# tau_x on the U faces: tau_x_u[j, i+1/2] = 1/2 (tau_x[j, i] + tau_x[j, i+1])
+tau_x_u = jnp.zeros_like(tau_x).at[:, :-1].set(0.5 * (tau_x[:, :-1] + tau_x[:, 1:]))
+# With tau_y = 0, curl(tau) / (rho0 H) at the X-points is
+#   F[j+1/2, i+1/2] = -(tau_x_u[j+1, i+1/2] - tau_x_u[j, i+1/2]) / (dy rho0 H)
+wind_curl_x = fvx.interior(-fvx.diff_y_fwd_2d(tau_x_u) / (dy * rho0 * H), tau_x)
 # X_to_T on the first interior row / column also reads the south / west wall
-# nodes (X row / column 0), which WindCurl2D leaves at zero like every
+# nodes (X row / column 0), which the stencil leaves at zero like every
 # operator's ghost ring.  Fill them: the curl does not depend on x, so the
 # west wall column equals its neighbour; on the south wall (y = 0) the curl
 # -F0 sin(0) is zero already.
@@ -466,14 +469,14 @@ def pv_tendency(q_field):
 # ## 8. Time Stepping
 #
 # We use the **Heun method** (explicit RK2 predictor-corrector) from
-# `finitevolx.heun_step`.  This is second-order accurate and stable for
+# `integrix.march.heun_step`.  This is second-order accurate and stable for
 # advection-dominated problems with a suitable CFL constraint.
 
 # %%
 @jax.jit
 def step(q_field):
     """Advance one Heun time step and diagnose the balanced state."""
-    q_next = apply_bc(fvx.heun_step(q_field, pv_tendency, dt))
+    q_next = apply_bc(heun_step(q_field, pv_tendency, dt))
     psi_next = invert_streamfunction(q_next)
     u_next, v_next = geostrophic_velocity(psi_next)
     return q_next, psi_next, u_next, v_next

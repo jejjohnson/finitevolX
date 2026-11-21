@@ -65,15 +65,14 @@ UPSTREAM_BLURB = {
     ),
     "gaussx": (
         "Structured linear algebra and solver strategies. finitevolX delegates"
-        " the tridiagonal solve and the Nyström preconditioner to it; use it"
+        " the tridiagonal solve, CG and the Nyström and multigrid preconditioners to it; use it"
         " for any other structured solve, preconditioner or low-rank"
         " approximation instead of writing one here."
     ),
     "integrix": (
         "Time steppers: the diffrax solvers, the pure step functions and the"
-        " history-carrying AbstractSteppers run by integrix.march.run. The"
-        " finitevolX names of these are deprecated aliases (listed above) for"
-        " one release; new code imports them from integrix.march."
+        " history-carrying AbstractSteppers run by integrix.march.run; import"
+        " them from integrix.march."
     ),
 }
 
@@ -86,20 +85,6 @@ ALLOWED_SHARED_NAMES: dict[str, str] = {
         " gaussx through as_preconditioner(); gaussx's is CG preconditioned by"
         " one V-cycle over caller-built levels (#474)"
     ),
-    # Deprecated for one release (#476): the old objects keep their old
-    # interface while integrix.march holds the rewritten scheme.
-    "SemiLagrangianSolver": (
-        "the deprecated finitevolX solver (index-space velocity, linear"
-        " read-out), kept for one release beside integrix's rewrite (#476)"
-    ),
-    "SemiLagrangianTerm": (
-        "the deprecated finitevolX term, whose velocity returns (u, v) shaped"
-        " like the field, kept for one release (#476)"
-    ),
-    "semi_lagrangian_step": (
-        "the deprecated finitevolX step on [Ny, Nx] fields, kept for one"
-        " release beside integrix's point-based step (#476)"
-    ),
     "SphericalGrid2D": (
         "finitevolX's is a lat-lon Arakawa C-grid container with a ghost ring;"
         " spectraldiffx's is the spectral (spherical-harmonic) grid"
@@ -110,21 +95,6 @@ ALLOWED_SHARED_NAMES: dict[str, str] = {
         " placement for a Mask2D), while spectraldiffx's solves the wet cells"
         " off the inner ring with psi = 0 on that ring; both return a"
         " spectraldiffx CapacitanceSolver built on gaussx.MaskedOperator"
-    ),
-    "AB2Solver": (
-        "deprecated finitevolX adapter keeping the old init / step call shape"
-        " with f_prev held in the module; integrix's is an AbstractStepper run"
-        " by integrix.march.run"
-    ),
-    "LeapfrogRAFSolver": (
-        "deprecated finitevolX adapter keeping the old init / step call shape"
-        " with y_prev held in the module; integrix's is an AbstractStepper run"
-        " by integrix.march.run"
-    ),
-    "SplitExplicitRKSolver": (
-        "deprecated finitevolX adapter keeping the old step(rhs_slow, rhs_fast,"
-        " ...) call shape; integrix's is an AbstractStepper run by"
-        " integrix.march.run on SplitExplicitTerms"
     ),
     "CapacitanceSolver": (
         "finitevolX re-exports spectraldiffx's spectral capacitance solver for"

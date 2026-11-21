@@ -7,8 +7,8 @@ east-west / north-south extents of a lat-lon cell, and the reductions
 interior, never the ghost ring.
 """
 
+from geophysix.earth import SPHERE
 from gridax import SphericalGrid2D, SphericalGrid3D
-from gridax_jax._src.utils.constants import R_EARTH
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -34,7 +34,7 @@ def grid2d_earth():
         ny_interior=6,
         lon_range=(-40.0, 20.0),
         lat_range=(20.0, 60.0),
-        R=R_EARTH,
+        R=SPHERE.semi_major,
     )
 
 
@@ -100,7 +100,7 @@ class TestCellWidths2D:
             ny_interior=5,
             lon_range=(0.0, 80.0),
             lat_range=(-20.0, 20.0),
-            R=R_EARTH,
+            R=SPHERE.semi_major,
         )
         lat = np.asarray(grid.lat_T)
         # Rows are cell centres: the equator is a row for a symmetric range

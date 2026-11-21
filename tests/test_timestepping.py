@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import itertools
 
-from gridax_jax import (
+from integrix.march import (
     ab2_step,
     ab3_step,
     euler_step,
@@ -233,7 +233,7 @@ class TestPureFunctionalVsDiffrax:
     def test_heun_matches_rk2heun(self):
         """Pure heun_step should agree with RK2Heun diffrax solver."""
         import diffrax as dfx
-        from gridax_jax import RK2Heun
+        from integrix.march import RK2Heun
 
         y0 = jnp.array(1.0)
         dt = 0.1
@@ -258,7 +258,7 @@ class TestPureFunctionalVsDiffrax:
     def test_rk4_matches_rk4classic(self):
         """Pure rk4_step should agree with RK4Classic diffrax solver."""
         import diffrax as dfx
-        from gridax_jax import RK4Classic
+        from integrix.march import RK4Classic
 
         y0 = jnp.array(1.0)
         dt = 0.1

@@ -35,6 +35,7 @@ import jax
 jax.config.update("jax_enable_x64", True)
 
 import gridax_jax as fvx
+from integrix.march import rk3_ssp_step
 import jax.numpy as jnp
 import numpy as np
 from scipy.special import erf
@@ -336,7 +337,7 @@ def benchmark(n: int = 64, cfl: float = 0.25, sigma: float = 0.05) -> None:
         @jax.jit
         def run(q):
             return jax.lax.fori_loop(
-                0, nsteps, lambda _, s: fvx.rk3_ssp_step(s, rhs, dt), q
+                0, nsteps, lambda _, s: rk3_ssp_step(s, rhs, dt), q
             )
 
         q1 = np.asarray(run(q0j))

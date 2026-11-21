@@ -20,8 +20,8 @@ description: Review a change or pull request in finitevolX against the repo's ow
    convergence.
 4. **Contracts** — for each area touched, the rules in `AGENTS.md`: the
    interior idiom, the three layers, `mask=None` bit-identical, BC atoms in
-   the `BoundaryCondition1D` union, the Helmholtz sign convention, forcings
-   as `AbstractForcing`, constants only as defaults.
+   the `BoundaryCondition1D` union, the Helmholtz sign convention,
+   constants only as defaults.
 5. **Tests and fixtures** — new operators have analytic tests, golden
    entries (unmasked and masked), a scale-covariance `Case`; a changed
    golden `.npz` is explained in the PR; tolerances say where they come

@@ -56,7 +56,7 @@
 #   $-(\mathbf{u} \cdot \nabla) v$ are absent in the linear model.
 #
 # We integrate these on a closed-basin Arakawa C-grid driven by a
-# double-gyre wind stress, using `finitevolx.heun_step` (Heun/RK2).
+# double-gyre wind stress, using `integrix.march.heun_step` (Heun/RK2).
 
 # %%
 from pathlib import Path
@@ -72,6 +72,7 @@ import numpy as np
 jax.config.update("jax_enable_x64", True)
 
 import gridax_jax as fvx
+from integrix.march import heun_step
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "shallow_water"
 IMG_DIR.mkdir(parents=True, exist_ok=True)
@@ -401,7 +402,7 @@ print(f"d_v   max: {float(jnp.abs(d_v[1:-1, 1:-1]).max()):.4e}")
 # %% [markdown]
 # ## 8. Time Stepping
 #
-# We use `finitevolx.heun_step` (Heun/RK2 predictor-corrector) and
+# We use `integrix.march.heun_step` (Heun/RK2 predictor-corrector) and
 # run a short integration of 500 steps.  After each step, we re-apply
 # wall boundary conditions (zero ghost cells) using `fvx.pad_interior`.
 
@@ -421,7 +422,7 @@ def rhs(state):
 @jax.jit
 def step(eta_f, u_f, v_f):
     """One Heun step + boundary condition reset."""
-    state = fvx.heun_step((eta_f, u_f, v_f), rhs, dt)
+    state = heun_step((eta_f, u_f, v_f), rhs, dt)
     return apply_bc(state)
 
 

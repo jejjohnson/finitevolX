@@ -9,7 +9,7 @@ full layer thickness and the momentum equation includes the nonlinear advection
 term. ``xarray`` handles the coordinate-aware forcing and saved diagnostics, and
 the sampled fields are written to Zarr instead of being shown in a live plot.
 
-Time integration uses ``finitevolx.heun_step`` (Heun/RK2 predictor-corrector).
+Time integration uses ``integrix.march.heun_step`` (Heun/RK2 predictor-corrector).
 
 The nonlinear model integrates
 
@@ -50,9 +50,9 @@ from gridax_jax import (
     Difference2D,
     Interpolation2D,
     Vorticity2D,
-    heun_step,
     pad_interior,
 )
+from integrix.march import heun_step
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr

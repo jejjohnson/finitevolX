@@ -27,19 +27,11 @@ import numpy as np
 from spectraldiffx import CapacitanceSolver
 
 # Re-export from iterative module
-from gridax_jax._src.solvers.iterative import (  # noqa: F401
-    CGInfo,
-    masked_laplacian,
-    solve_cg,
-)
+from gridax_jax._src.solvers.iterative import masked_laplacian  # noqa: F401
 from gridax_jax._src.solvers.linear_operators import masked_helmholtz_operator
 
 # Re-export from preconditioners module
 from gridax_jax._src.solvers.preconditioners import (  # noqa: F401
-    make_gaussx_multigrid_preconditioner,
-    make_multigrid_preconditioner,
-    make_nystrom_preconditioner,
-    make_preconditioner,
     make_spectral_preconditioner,
 )
 

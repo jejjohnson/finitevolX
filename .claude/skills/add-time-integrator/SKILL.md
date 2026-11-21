@@ -5,28 +5,28 @@ description: Add a time-integration scheme to finitevolX — a pure functional s
 
 # Add a time integrator
 
-The generic time steppers (explicit RK, multistep, IMEX, split-explicit, their diffrax solvers and the `AbstractStepper`s) now live in integrix (`integrix.march`), and their `finitevolx.*` names are deprecated aliases for one release. Add a generic scheme to integrix, not here; this recipe applies only to schemes tied to the C-grid, such as the semi-Lagrangian step and solver in `gridax_jax/_src/timestepping/semi_lagrangian.py`.
+The generic time steppers (explicit RK, multistep, IMEX, split-explicit, their diffrax solvers and the `AbstractStepper`s) now live in integrix (`integrix.march`), and their `finitevolx.*` names are deprecated aliases for one release. Add a generic scheme to integrix, not here; this recipe applies only to schemes tied to the C-grid. The semi-Lagrangian scheme is `integrix.march.semi_lagrangian_step` (with `gridax.t_point_coordinates` for its nodes).
 
 Read contract 6 (time integration) in `AGENTS.md`, then
 `docs/time_integration.md` and `docs/time_integration_usage.md`.
 
 ## 1. Make sure it does not exist yet
 
-Search `docs/capabilities.md`: the steps `euler_step`, `heun_step`,
+The time steppers live in `integrix.march`, not in gridax: the steps `euler_step`, `heun_step`,
 `rk3_ssp_step`, `rk4_step`, `ab2_step`, `ab3_step`, `leapfrog_raf_step`,
-`imex_ssp2_step`, `split_explicit_step`, `semi_lagrangian_step`; the
+`imex_ssp2_step`, `split_explicit_step`; the
 diffrax solvers `ForwardEulerDfx`, `RK2Heun`, `RK3SSP`, `RK4Classic`,
-`SSP_RK2`, `SSP_RK104`, `IMEX_SSP2`, `SemiLagrangianSolver`; the
-`eqx.Module` solvers `AB2Solver`, `LeapfrogRAFSolver`,
-`SplitExplicitRKSolver`. `solve_ocean_pde` moved to `sesmax_core.solve_pde`. diffrax itself ships many
+`SSP_RK2`, `SSP_RK104`, `IMEX_SSP2`; the
+steppers `AB2Solver`, `LeapfrogRAFSolver`,
+`SplitExplicitRKSolver`, run by `integrix.march.run`. `solve_ocean_pde` moved to `sesmax_core.solve_pde`. diffrax itself ships many
 more (`dfx.Tsit5`, `dfx.Dopri5`, `dfx.Kvaerno5`, …): a generic ODE scheme
 belongs there, not here. finitevolX adds the schemes ocean models need
 (SSP, multistep with filters, IMEX, split-explicit).
 
-## 2. Write it (`gridax_jax/_src/timestepping/`)
+## 2. Write it (in integrix, `integrix.march`)
 
 - **The pure step** in the matching module (`explicit_rk.py`,
-  `multistep.py`, `imex.py`, `split_explicit.py`, `semi_lagrangian.py`):
+  `multistep.py`, `imex.py`, `split_explicit.py`):
   works on any pytree state through `jax.tree.map`; `rhs_fn(state) ->
   tendency`; returns the new state (plus whatever history the next step
   needs). No Python control flow on traced values; no state outside the
@@ -65,8 +65,7 @@ pure functional` or `# Time integration — diffrax solvers`),
   `TestDiffraxExplicitRK` / `TestDiffraxConvergence` /
   `TestDiffraxAbsoluteAccuracy` parametrisations, or a class of its own
   (as `TestAB2Solver`); `SaveAt` if relevant.
-- IMEX / split-explicit / semi-Lagrangian: `tests/test_timestepping_imex.py`,
-  `tests/test_semi_lagrangian.py`.
+- IMEX / split-explicit: `tests/test_timestepping_imex.py`.
 - State the expected order and the tolerance's origin in a comment (e.g.
   "observed order above expected − 0.15 between the two finest steps", as
   `TestExplicitRKConvergence` asserts).
@@ -75,7 +74,7 @@ pure functional` or `# Time integration — diffrax solvers`),
 
 ```bash
 uv run pytest -n 2 tests/test_timestepping.py tests/test_timestepping_imex.py \
-  tests/test_diffrax_solvers.py tests/test_semi_lagrangian.py tests/test_capabilities.py
+  tests/test_diffrax_solvers.py tests/test_capabilities.py
 ```
 
 Then the `pre-pr-check` skill.

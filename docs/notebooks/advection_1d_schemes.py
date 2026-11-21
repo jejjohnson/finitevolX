@@ -127,6 +127,7 @@ import numpy as np
 jax.config.update("jax_enable_x64", True)
 
 import gridax_jax as fvx
+from integrix.march import rk3_ssp_step
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "advection_1d_schemes"
 IMG_DIR.mkdir(parents=True, exist_ok=True)
@@ -308,7 +309,7 @@ for method in methods:
     q = q0.copy()
 
     for _ in range(nsteps):
-        q = fvx.rk3_ssp_step(q, rhs_fn, dt)
+        q = rk3_ssp_step(q, rhs_fn, dt)
         q = enforce_periodic_1d(q, ng)
 
     results[method] = np.asarray(q[ng:-ng])
@@ -469,7 +470,7 @@ for nx_test in resolutions:
         rhs_fn = jax.jit(make_rhs_conv(method, advect_test, u_test))
         q = q0_test.copy()
         for _ in range(nsteps_test):
-            q = fvx.rk3_ssp_step(q, rhs_fn, dt_test)
+            q = rk3_ssp_step(q, rhs_fn, dt_test)
             q = enforce_periodic_1d(q, ng)
 
         err = np.asarray(q[ng:-ng]) - exact_test

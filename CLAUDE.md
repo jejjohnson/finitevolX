@@ -18,7 +18,7 @@ specific to Claude Code.
 - **Skills** in `.claude/skills/` load on their own when a task matches
   their description (or run them as `/<name>`):
   - building: `add-stencil-operator`, `add-advection-scheme`,
-    `add-boundary-condition`, `add-forcing`, `add-elliptic-solver`,
+    `add-boundary-condition`, `add-elliptic-solver`,
     `add-time-integrator`, `add-notebook`, `bump-upstream-pins`;
   - shipping: `pre-pr-check`, `finitevolx-review`, `squash-commit`.
 - **Subagents** (`.claude/agents/`), both read-only, both used by

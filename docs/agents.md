@@ -73,7 +73,7 @@ search the capability index
   operators; don't multiply by a mask afterwards or keep `NaN` on land.
 - Advect with `Advection2D(...)(q, u, v, method="weno5")`; invert with
   `sesmax_core.gfd`'s `streamfunction_from_vorticity` / `pv_inversion`
-  (or the spectral solvers here); step with `rk3_ssp_step` or a
+  (or the spectral solvers here); step with `integrix.march.rk3_ssp_step` or a
   finitevolX diffrax solver.
 - Pass physical constants explicitly; never hard-code them in a model
   meant to run nondimensionally.
@@ -87,5 +87,5 @@ in the repository: the module map, the boundaries with spectraldiffx and
 gaussx, "reuse before you write", the C-grid, operator, mask,
 boundary-condition, solver and unit contracts and the tests that enforce
 them, and recipe skills for adding stencil operators, advection schemes,
-boundary conditions, forcing terms, elliptic solvers, time integrators and
+boundary conditions, elliptic solvers, time integrators and
 notebooks.

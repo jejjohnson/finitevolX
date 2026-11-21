@@ -10,7 +10,7 @@ recovered from a Helmholtz inversion with homogeneous Dirichlet (psi = 0) wall
 boundary conditions using ``solve_helmholtz_dst``, and the output is saved
 through ``xarray``/Zarr together with a static before/after figure.
 
-Time integration uses ``finitevolx.heun_step`` (Heun/RK2 predictor-corrector).
+Time integration uses ``integrix.march.heun_step`` (Heun/RK2 predictor-corrector).
 
 **Formulation B -- PV anomaly without the beta background**
 
@@ -82,10 +82,10 @@ from gridax_jax import (
     Difference2D,
     Interpolation2D,
     Vorticity2D,
-    heun_step,
     pad_interior,
     solve_helmholtz_dst,
 )
+from integrix.march import heun_step
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr

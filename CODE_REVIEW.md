@@ -68,7 +68,7 @@ order); review what they cannot see.
   chained operator that reads a west / south ghost no forward operator sets
   is documented, or the BC is applied.
 - 3-D operators leave the `k = 0` / `k = Nz-1` slabs alone; multilayer code
-  uses `multilayer`, not a `3D` operator.
+  uses `jax.vmap` over a 2-D operator, not a `3D` operator.
 - Spherical operators use the `SphericalGrid*` metric and guard `cos(lat)`
   near the poles.
 
@@ -91,19 +91,17 @@ order); review what they cannot see.
 - A BC atom has a static `face`, sets one ghost row / column so the
   condition holds at the face, and joins the `BoundaryCondition1D` union.
 - Elliptic solves: the Helmholtz sign convention (negative semidefinite);
-  convergence reported (`CGInfo.converged`) and checked in tests;
+  convergence reported (`info.converged` from `gaussx.linear_solve_with_info`) and checked in tests;
   geometry-only precomputation built once; randomised construction takes a
   `key`.
 - Spectral solves and transforms come from spectraldiffx; nothing
   re-derives their eigenvalues.
 
-### 5. Time stepping, forcing and units
+### 5. Time stepping and units
 
 - Step functions are pure on pytrees; diffrax solvers declare their tableau
-  / order; forcings subclass `AbstractForcing`, stay time-agnostic and
-  compose inside the RHS.
-- No physical constant (the geophysix records `SPHERE`, `WGS84`, `STANDARD`,
-  or the deprecated `GRAVITY`, `R_EARTH`, `OMEGA`, `RHO`, `DEG2M`)
+  / order.
+- No physical constant (the geophysix records `SPHERE`, `WGS84`, `STANDARD`)
   inside an expression in `operators/`, `advection/`, `diffusion/` or
   `solvers/`; no absolute epsilon guarding a ratio of dimensional
   quantities. A new spatial operator gets a `Case` in
@@ -198,11 +196,11 @@ def apply_mask(out, mask=None):
 ```python
 # ❌ Bakes SI units into the operator (fails TestConstantsAudit)
 def geostrophic_u(dh_dy, f):
-    return -GRAVITY / f * dh_dy
+    return -STANDARD.standard_gravity / f * dh_dy
 
 
 # ✅ Overridable, so a nondimensional model can pass gravity=1
-def geostrophic_u(dh_dy, f, gravity: float = GRAVITY):
+def geostrophic_u(dh_dy, f, gravity: float = STANDARD.standard_gravity):
     return -gravity / f * dh_dy
 ```
 

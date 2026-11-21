@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import equinox as eqx
 import gaussx
-from gridax_jax import Mask2D, masked_laplacian, masked_neumann_laplacian, solve_cg
+from gridax_jax import Mask2D, masked_laplacian, masked_neumann_laplacian
 from gridax_jax._src.solvers.multigrid import (
     MultigridSolver,
     _apply_operator,
@@ -15,15 +15,18 @@ from gridax_jax._src.solvers.multigrid import (
     _transfer_operators,
     build_multigrid_solver,
 )
-from gridax_jax._src.solvers.preconditioners import (
-    make_gaussx_multigrid_preconditioner,
-    make_multigrid_preconditioner,
-)
 import jax
 import jax.numpy as jnp
-import lineax as lx
 import numpy as np
 import pytest
+
+from tests.fixtures._helpers import cg_solve
+
+
+def _v_cycle_pc(solver):
+    """One V-cycle from a zero guess as a closure ``r -> approx A^-1 r``."""
+    return lambda r: solver.v_cycle(jnp.zeros_like(r), r)
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -241,7 +244,7 @@ class TestBoundaryCondition:
         mask = _basin_mask2d(n)
         m = jnp.asarray(mask.xy_corner_strict, dtype=float)
         rhs = jnp.asarray(np.random.default_rng(1).standard_normal(m.shape)) * m
-        x_cg, info = solve_cg(
+        x_cg, info = cg_solve(
             lambda p: masked_laplacian(p, m, dx, dy, lambda_),
             rhs,
             rtol=1e-12,
@@ -325,14 +328,9 @@ class TestConvergence:
         m = solver.levels[0].mask
         rng = np.random.default_rng(4)
         r1, r2 = (jnp.asarray(rng.standard_normal(m.shape)) * m for _ in range(2))
-        pc = make_multigrid_preconditioner(solver)
+        pc = _v_cycle_pc(solver)
         a, b = float(jnp.sum(pc(r1) * r2)), float(jnp.sum(r1 * pc(r2)))
         assert abs(a - b) <= 1e-12 * abs(a)
-
-    def test_unequal_smoothing_rejected_as_preconditioner(self):
-        solver = build_multigrid_solver(np.ones((16, 16)), 1.0, 1.0, n_pre=2, n_post=1)
-        with pytest.raises(ValueError, match="n_pre == n_post"):
-            make_multigrid_preconditioner(solver)
 
     def test_single_level_is_exact(self):
         """n_levels=1 is the exact bottom solve: one cycle solves A u = f."""
@@ -355,10 +353,10 @@ class TestConvergence:
         m = jnp.asarray(mask.xy_corner_strict, dtype=float)
         solver = build_multigrid_solver(mask, dx, dx, lambda_=4.0)
         rhs = jnp.asarray(np.random.default_rng(1).standard_normal(m.shape)) * m
-        _, info = solve_cg(
+        _, info = cg_solve(
             lambda p: masked_laplacian(p, m, dx, dx, 4.0),
             rhs,
-            preconditioner=make_multigrid_preconditioner(solver),
+            preconditioner=_v_cycle_pc(solver),
             rtol=1e-8,
             atol=1e-8,
         )
@@ -466,10 +464,10 @@ class TestNarrowFeatures:
         rates = TestConvergence._contraction(solver, rhs=rhs)
         bound = 0.3 if (bc == "dirichlet" or lambda_ > 0) else 0.6
         assert rates[4:8].max() <= bound
-        _, info = solve_cg(
+        _, info = cg_solve(
             lambda x: _apply_operator(x, level),
             rhs,
-            preconditioner=make_multigrid_preconditioner(solver),
+            preconditioner=_v_cycle_pc(solver),
             rtol=1e-8,
             atol=1e-8 * float(jnp.abs(rhs).max()),
         )
@@ -707,7 +705,7 @@ class TestMultigridPreconditioner:
     def test_preconditioner_output_shape(self, mg_grid_16):
         ny, nx, dx, dy = mg_grid_16
         solver = _all_ones_solver(ny, nx, dx, dy)
-        pc = make_multigrid_preconditioner(solver)
+        pc = _v_cycle_pc(solver)
         r = jnp.ones((ny, nx))
         out = pc(r)
         assert out.shape == (ny, nx)
@@ -715,12 +713,11 @@ class TestMultigridPreconditioner:
     @pytest.mark.slow
     def test_preconditioner_with_cg(self, mg_grid_16):
         """Multigrid-preconditioned CG converges for Helmholtz (lambda > 0)."""
-        from gridax_jax._src.solvers.iterative import solve_cg
 
         ny, nx, dx, dy = mg_grid_16
         lam = 10.0
         solver = _all_ones_solver(ny, nx, dx, dy, lambda_=lam)
-        pc = make_multigrid_preconditioner(solver)
+        pc = _v_cycle_pc(solver)
 
         rng = np.random.default_rng(13)
         rhs = jnp.array(rng.standard_normal((ny, nx)))
@@ -728,172 +725,47 @@ class TestMultigridPreconditioner:
         def matvec(u):
             return _apply_operator(u, solver.levels[0])
 
-        _x, info = solve_cg(matvec, rhs, preconditioner=pc, max_steps=100)
+        _x, info = cg_solve(matvec, rhs, preconditioner=pc, max_steps=100)
         assert info.converged
 
     @pytest.mark.slow
-    def test_is_gaussx_preconditioner(self, mg_grid_16):
-        ny, nx, dx, dy = mg_grid_16
-        pc = make_gaussx_multigrid_preconditioner(_all_ones_solver(ny, nx, dx, dy))
-        assert isinstance(pc, gaussx.OperatorPreconditioner)
-
-    @staticmethod
-    def _dense(pc, n, dtype=jnp.float64):
-        """Dense M^-1 of the preconditioner through its lineax operator."""
-        system = lx.FunctionLinearOperator(
-            lambda v: v, jax.ShapeDtypeStruct((n,), dtype), tags=[lx.symmetric_tag]
-        )
-        op = pc.as_operator(system)
-        return np.asarray(jax.vmap(op.mv)(jnp.eye(n, dtype=dtype)).T)
-
-    @staticmethod
-    def _dense_raw_and_k(solver, ny, nx):
-        """Dense V = -Vcycle(0, .) and K = -A on the full [Ny*Nx] grid."""
-        level0 = solver.levels[0]
-        fvx_pc = make_multigrid_preconditioner(solver)
-        eye = jnp.eye(ny * nx)
-        V = -np.asarray(jax.vmap(lambda e: fvx_pc(e.reshape(ny, nx)).ravel())(eye)).T
-        K = -np.asarray(
-            jax.vmap(lambda e: _apply_operator(e.reshape(ny, nx), level0).ravel())(eye)
-        ).T
-        return V, K
-
-    @pytest.mark.slow
-    @pytest.mark.parametrize("masked", [False, True])
-    def test_symmetric_positive_definite(self, masked):
-        """CG needs a symmetric positive definite M^-1. The raw V-cycle V is
-        symmetric (R = P^T / 4, equal pre/post smoothing, #344) and positive
-        definite; the gaussx preconditioner is the two-step iteration
-        M^-1 = V + V^T - V^T K V, symmetric to round-off and, for a
-        convergent multigrid (default settings), positive definite on the
-        wet points."""
-        ny, nx = 16, 16
-        dx, dy = 1.0 / nx, 1.0 / ny
-        mask = _circular_mask(ny, nx) if masked else np.ones((ny, nx))
-        solver = build_multigrid_solver(mask, dx, dy, lambda_=1.0)
-        wet = np.asarray(solver.levels[0].mask).ravel().astype(bool)
-        V, K = self._dense_raw_and_k(solver, ny, nx)
-        Vw = V[np.ix_(wet, wet)]
-        # the raw V-cycle is symmetric positive definite on its own
-        np.testing.assert_allclose(Vw, Vw.T, rtol=0, atol=1e-12 * np.abs(Vw).max())
-        assert np.linalg.eigvalsh(Vw).min() > 0.0
-
-        M = self._dense(make_gaussx_multigrid_preconditioner(solver), ny * nx)
-        np.testing.assert_allclose(
-            M, V + V.T - V.T @ K @ V, rtol=1e-9, atol=1e-12 * np.abs(M).max()
-        )
-        M = M[np.ix_(wet, wet)]
-        np.testing.assert_allclose(M, M.T, rtol=0, atol=1e-12 * np.abs(M).max())
-        assert np.linalg.eigvalsh(M).min() > 0.0
-
-    @pytest.mark.slow
-    def test_gaussx_cg_matches_solve_cg(self):
-        """gaussx.CGSolver with the multigrid preconditioner solves the
-        positive system (−A) x = −b on a masked basin to the same answer as
-        finitevolX's solve_cg."""
-        from gridax_jax._src.solvers.iterative import solve_cg
-
+    def test_as_preconditioner_cuts_gaussx_cg_steps(self):
+        """The gaussx multigrid preconditioner cuts CG steps on a masked basin
+        relative to no preconditioner, and reaches the same solution."""
         ny, nx = 32, 32
         dx, dy = 1.0 / nx, 1.0 / ny
-        lam = 10.0
-        mask = _circular_mask(ny, nx)
-        solver = build_multigrid_solver(mask, dx, dy, lambda_=lam)
-        pc = make_gaussx_multigrid_preconditioner(solver)
+        solver = build_multigrid_solver(_circular_mask(ny, nx), dx, dy, lambda_=10.0)
         level0 = solver.levels[0]
-
-        def matvec(u):
-            return _apply_operator(u, level0)
-
-        rng = np.random.default_rng(13)
-        rhs = jnp.array(rng.standard_normal((ny, nx))) * level0.mask
-
-        x_fvx, info = solve_cg(
-            matvec,
-            rhs,
-            preconditioner=make_multigrid_preconditioner(solver),
-            rtol=1e-10,
-            atol=1e-10,
-        )
-        assert info.converged
-
+        rhs = jnp.array(np.random.default_rng(13).standard_normal((ny, nx)))
+        rhs = rhs * level0.mask
+        # gaussx.CGSolver acts on flat vectors: solve (-A) x = -b
         neg_A = gaussx.as_linear_operator(
-            lambda v: -matvec(v.reshape(ny, nx)).ravel(),
+            lambda v: -_apply_operator(v.reshape(ny, nx), level0).ravel(),
             shape=(ny * nx, ny * nx),
             positive_semidefinite=True,
         )
-        cg = gaussx.CGSolver(rtol=1e-10, atol=1e-10, max_steps=200, preconditioner=pc)
-        x_gx = cg.solve(neg_A, -rhs.ravel()).reshape(ny, nx)
+        pc = solver.as_preconditioner()
+
+        def solve(preconditioner):
+            return gaussx.linear_solve_with_info(
+                neg_A,
+                -rhs.ravel(),
+                solver=gaussx.CGSolver(
+                    rtol=1e-10, atol=1e-10, max_steps=500, throw=False
+                ),
+                preconditioner=preconditioner,
+            )
+
+        x_pc, info_pc = solve(pc)
+        x_plain, info_plain = solve(None)
+        assert bool(info_pc.converged)
+        assert int(info_pc.iterations) < int(info_plain.iterations) // 2
         np.testing.assert_allclose(
-            np.asarray(x_gx * level0.mask),
-            np.asarray(x_fvx * level0.mask),
-            rtol=1e-7,
-            atol=1e-9,
+            np.asarray(x_pc * level0.mask.ravel()),
+            np.asarray(x_plain * level0.mask.ravel()),
+            rtol=1e-6,
+            atol=1e-8,
         )
-
-    @pytest.mark.slow
-    def test_preconditioner_reduces_gaussx_cg_steps(self):
-        """The symmetrised V-cycle cuts lineax CG steps on the positive system,
-        relative to no preconditioner and to the raw (non-symmetric) V-cycle."""
-        ny, nx = 32, 32
-        dx, dy = 1.0 / nx, 1.0 / ny
-        solver = _all_ones_solver(ny, nx, dx, dy, lambda_=1.0)
-        pc = make_gaussx_multigrid_preconditioner(solver)
-        level0 = solver.levels[0]
-        structure = jax.ShapeDtypeStruct((ny * nx,), jnp.float64)
-        neg_A = lx.FunctionLinearOperator(
-            lambda v: -_apply_operator(v.reshape(ny, nx), level0).ravel(),
-            structure,
-            tags=[lx.positive_semidefinite_tag],
-        )
-        fvx_pc = make_multigrid_preconditioner(solver)
-        raw = lx.FunctionLinearOperator(
-            lambda v: -fvx_pc(v.reshape(ny, nx)).ravel(),
-            structure,
-            tags=[lx.positive_semidefinite_tag],
-        )
-        b = jnp.array(np.random.default_rng(5).standard_normal(ny * nx))
-        cg = lx.CG(rtol=1e-8, atol=1e-8, max_steps=2000)
-
-        def steps(precond):
-            opts = {} if precond is None else {"preconditioner": precond}
-            sol = lx.linear_solve(neg_A, b, cg, options=opts)
-            return int(sol.stats["num_steps"])
-
-        n_plain, n_raw, n_sym = steps(None), steps(raw), steps(pc.as_operator(neg_A))
-        assert n_sym < n_plain // 4
-        assert n_sym < n_raw
-
-    @pytest.mark.slow
-    def test_follows_vector_dtype(self):
-        """The V-cycle runs in the float64 hierarchy, but a float32 system gets
-        a float32 operator and a float32 solve, and a direct call returns the
-        vector's dtype (codex review on #340)."""
-        ny, nx = 32, 32
-        dx, dy = 1.0 / nx, 1.0 / ny
-        solver = _all_ones_solver(ny, nx, dx, dy, lambda_=1.0)
-        level0 = solver.levels[0]
-        neg_A = lx.FunctionLinearOperator(
-            lambda v: (
-                -_apply_operator(v.reshape(ny, nx), level0).ravel().astype(jnp.float32)
-            ),
-            jax.ShapeDtypeStruct((ny * nx,), jnp.float32),
-            tags=[lx.positive_semidefinite_tag],
-        )
-        pc = make_gaussx_multigrid_preconditioner(solver)
-        pc_op = pc.as_operator(neg_A)
-        assert pc_op.in_structure() == neg_A.in_structure()
-        b = jnp.asarray(
-            np.random.default_rng(7).standard_normal(ny * nx), dtype=jnp.float32
-        )
-        assert pc(b, neg_A).dtype == jnp.float32
-        sol = lx.linear_solve(
-            neg_A,
-            b,
-            lx.CG(rtol=1e-4, atol=1e-4, max_steps=200),
-            options={"preconditioner": pc_op},
-        )
-        assert sol.value.dtype == jnp.float32
-        assert sol.result == lx.RESULTS.successful
 
 
 class TestFloat32:
@@ -925,9 +797,9 @@ class TestFloat32:
         m32 = jnp.asarray(w, dtype=jnp.float32)
         rhs = jnp.asarray(np.random.default_rng(1).standard_normal(w.shape) * w)
         rhs = rhs.astype(jnp.float32)
-        pc = make_multigrid_preconditioner(solver)
+        pc = _v_cycle_pc(solver)
         assert pc(rhs).dtype == jnp.float32
-        x, info = solve_cg(
+        x, info = cg_solve(
             lambda p: masked_laplacian(p, m32, dx, dx, 4.0), rhs, preconditioner=pc
         )
         assert x.dtype == jnp.float32 and info.converged

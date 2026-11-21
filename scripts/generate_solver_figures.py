@@ -11,7 +11,7 @@ on two basins, a rectangle and a circular basin with an island, at
 
 * spectral DST (``solve_helmholtz_dst1`` on the wet X nodes, rectangle only),
 * capacitance (``build_capacitance_solver``, DST base),
-* CG (``solve_cg`` on ``masked_laplacian``) with a DST, FFT or multigrid
+* CG (``gaussx.CGSolver`` on ``masked_laplacian``) with a DST, FFT or multigrid
   preconditioner or none, to ``max|f − Aψ| <= 2e-8 max|f|``,
 * standalone multigrid (5 V-cycles, the default, and 8 V-cycles),
 * SciPy sparse LU (SuperLU) as the reference and as the "sparse direct"
@@ -39,6 +39,7 @@ from pathlib import Path
 import time
 
 import equinox as eqx
+import gaussx
 import jax
 import jax.numpy as jnp
 import matplotlib
@@ -268,13 +269,32 @@ def run_case(geometry: str, n: int, lam: float, repeats: int) -> tuple[list, dic
             return fvx.masked_laplacian(x, w, dx, dy, lambda_=lam)
 
         if kind == "multigrid":
-            pc = fvx.make_multigrid_preconditioner(solver)
+            # one V-cycle from a zero guess approximates A^-1 r
+            def pc(v):
+                return -solver.v_cycle(jnp.zeros_like(v), v)
+
         elif kind in ("dst", "fft"):
-            pc = fvx.make_spectral_preconditioner(dx, dy, lam, bc=kind)
+            spectral = fvx.make_spectral_preconditioner(dx, dy, lam, bc=kind)
+
+            def pc(v):
+                return -spectral(v)
+
         else:
             pc = None
-        return fvx.solve_cg(
-            matvec, r * w, preconditioner=pc, rtol=RTOL, atol=atol, max_steps=MAX_STEPS
+        rhs = r * w
+        # gaussx solves (-A) x = -b, so its preconditioner approximates -A^-1
+        operator = gaussx.as_linear_operator(
+            matvec,
+            in_structure=jax.ShapeDtypeStruct(rhs.shape, rhs.dtype),
+            negative_definite=True,
+        )
+        return gaussx.linear_solve_with_info(
+            operator,
+            rhs,
+            solver=gaussx.CGSolver(
+                rtol=RTOL, atol=atol, max_steps=MAX_STEPS, throw=False
+            ),
+            preconditioner=pc,
         )
 
     variants = {

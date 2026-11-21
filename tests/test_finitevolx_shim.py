@@ -1,8 +1,7 @@
 """``import finitevolx`` is a deprecated shim over gridax_jax for one 0.X release.
 
 It warns once, re-exports every public name as the same object (the grid and
-mask classes come from gridax), keeps ``finitevolx.pipekit`` working, and
-leaves the deprecated stepper names lazy so they warn only when used.
+mask classes come from gridax) and keeps ``finitevolx.pipekit`` working.
 """
 
 from __future__ import annotations
@@ -38,7 +37,7 @@ def finitevolx():
 def test_every_name_is_the_gridax_jax_object(finitevolx):
     assert finitevolx.__all__ == gridax_jax.__all__
     for name in gridax_jax.__all__:
-        if name in gridax_jax.__dict__:  # the deprecated steppers are lazy
+        if name in gridax_jax.__dict__:
             assert getattr(finitevolx, name) is getattr(gridax_jax, name), name
 
 
@@ -47,12 +46,6 @@ def test_grid_and_mask_classes_come_from_gridax(finitevolx):
     assert {"CartesianGrid2D", "SphericalGrid2D", "Mask2D"} <= shared
     for name in shared:
         assert getattr(finitevolx, name) is getattr(gridax, name), name
-
-
-def test_deprecated_steppers_stay_lazy(finitevolx):
-    with pytest.warns(DeprecationWarning, match=r"integrix\.march\.RK3SSP"):
-        rk3 = finitevolx.RK3SSP
-    assert rk3 is importlib.import_module("integrix.march").RK3SSP
 
 
 def test_pipekit_submodules(finitevolx):

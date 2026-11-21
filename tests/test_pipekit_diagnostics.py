@@ -10,6 +10,7 @@ import equinox as eqx
 import gridax_jax as fvx
 from gridax_jax import pipekit as fp
 from gridax_jax.pipekit.testing import check_operator
+from integrix.march import rk4_step
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -180,7 +181,7 @@ def test_explicit_step_equals_rk4_step():
     s0 = _initial_state()
     rhs = sw_tendency()
     got = fp.ExplicitStep(rhs=rhs, dt=DT)(s0)
-    want = fvx.rk4_step(s0, lambda s: rhs(**s), DT)
+    want = rk4_step(s0, lambda s: rhs(**s), DT)
     for k in "huv":
         np.testing.assert_array_equal(got[k], want[k])
 

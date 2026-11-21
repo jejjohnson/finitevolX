@@ -165,7 +165,7 @@ mg_solver = fvx.build_multigrid_solver(
 pre = mg_solver.as_preconditioner()   # gaussx.MultigridPreconditioner
 A = pre.levels[0].operator            # the finest operator, [Ny*Nx], negative definite
 
-# CG preconditioned by one V-cycle; the report replaces solve_cg's CGInfo
+# CG preconditioned by one V-cycle
 mask_jnp = jnp.array(mask)
 x, info = gaussx.linear_solve_with_info(
     A, (rhs * mask_jnp).ravel(),
@@ -176,7 +176,7 @@ u = x.reshape(mask.shape) * mask_jnp
 print(f"Converged in {int(info.iterations)} iterations")  # 5 on a 34² basin, 124 without
 ```
 
-`fvx.multigrid_levels(mask, dx, dy, ...)` returns the same levels as a tuple of `gaussx.MultigridLevel`, for `gaussx.MultigridSolver(levels)` or a hierarchy of your own; it leaves the coarsest solve to gaussx's dense default. The old `fvx.make_multigrid_preconditioner` and `fvx.solve_cg` still work for one release and warn.
+`fvx.multigrid_levels(mask, dx, dy, ...)` returns the same levels as a tuple of `gaussx.MultigridLevel`, for `gaussx.MultigridSolver(levels)` or a hierarchy of your own; it leaves the coarsest solve to gaussx's dense default.
 
 ---
 

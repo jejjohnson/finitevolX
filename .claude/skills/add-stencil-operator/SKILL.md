@@ -37,13 +37,13 @@ step-by-step.
   reads in the docstring; a backward operator reads the BC-owned west /
   south ghost, and the caller must fill it.
 - Inputs that may hold `NaN` on land: zero them with `jnp.where` before the
-  stencil (as `Energetics2D` and `LinearDrag2D` do), then mask the output
+  stencil (as `Energetics2D` does), then mask the output
   with `jnp.where`.
 - Spherical: take the metric from `SphericalGrid2D/3D` (`cos_lat_*`,
   `dx_T`, …) and divide by `cos(lat)` through
   `operators/_utils._safe_div_cos`.
 - 3-D: leave the `k = 0` / `k = Nz-1` ghost slabs zero; a multilayer use
-  needs no new code (`multilayer(op.method)`).
+  needs no new code (`jax.vmap(op.method)`).
 - NumPy-style docstring: formula, parameters and returns with shapes, an
   `Examples` section (doctests are not collected: run it by hand).
 

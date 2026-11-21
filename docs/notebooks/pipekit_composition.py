@@ -60,6 +60,7 @@ from pipekit_ops import Graph, Input, Operator
 from pipekit_jax import Rollout
 
 import gridax_jax as fvx
+from integrix.march import rk4_step
 from gridax_jax import pipekit as fp
 
 jax.config.update("jax_enable_x64", True)
@@ -112,7 +113,7 @@ rhs = sw_tendency()
 print(rhs.describe())
 
 # %% [markdown]
-# A step is `ExplicitStep` (finitevolX's `rk4_step` over the graph), and a
+# A step is `ExplicitStep` (integrix's `rk4_step` over the graph), and a
 # trajectory is `pipekit_jax.Rollout`: one `jax.lax.scan`, so compile time
 # does not grow with the number of steps.
 
@@ -157,7 +158,7 @@ def rhs_tier_a(s):
 
 
 def step_tier_a(s):
-    return fvx.rk4_step(s, rhs_tier_a, DT)
+    return rk4_step(s, rhs_tier_a, DT)
 
 
 step_jit = jax.jit(step_tier_a)

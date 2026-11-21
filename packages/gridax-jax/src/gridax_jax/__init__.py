@@ -227,7 +227,6 @@ from gridax_jax._src.solvers.elliptic import (
     dst4_eigenvalues_ps,
     fft_eigenvalues,
     fft_eigenvalues_ps,
-    make_preconditioner,
     make_spectral_preconditioner,
     # CG solver
     masked_laplacian,
@@ -316,12 +315,6 @@ from gridax_jax._src.solvers.tridiagonal import (
     solve_tridiagonal,
     solve_tridiagonal_batched,
 )
-from gridax_jax._src.timestepping._deprecated import (
-    ADAPTED as _ADAPTED_STEPPERS,
-    MOVED as _MOVED_STEPPERS,
-    SEMI_LAGRANGIAN as _SEMI_LAGRANGIAN,
-    deprecated_stepper as _deprecated_stepper,
-)
 from gridax_jax._src.utils.dtype import check_dtype
 
 __all__ = [
@@ -397,7 +390,6 @@ __all__ = [
     "spherical_volume_weights",
     "spherical_volume_sum",
     "spherical_volume_mean",
-    # Multilayer vmap helper
     # Grid — abstract topology
     "ArakawaCGrid1D",
     "ArakawaCGrid2D",
@@ -546,19 +538,12 @@ __all__ = [
     "pv_flux_arakawa_lamb",
     "pv_flux_blend",
     "vorticity_flux_upwind",
-    # Barotropic-mode filter
-    # Linear drag / Rayleigh relaxation
-    # Forcing — Layer 0 functional primitives
-    # Forcing — base class and composition
-    # Forcing — 2D operators
-    # Forcing — 3D operators
     # Differentiable surrogates
     "smooth_abs",
     "smooth_clamp",
     "smooth_max",
     # The dtype rule: the caller decides, a silent downcast is an error
     "check_dtype",
-    # Vertical coupling and mode transforms
     # Spectral transforms
     "dct",
     "dctn",
@@ -652,16 +637,9 @@ __all__ = [
     # Capacitance matrix method
     "CapacitanceSolver",
     "build_capacitance_solver",
-    # Preconditioners
-    "make_multigrid_preconditioner",
-    "make_gaussx_multigrid_preconditioner",
-    "make_nystrom_preconditioner",
-    "make_preconditioner",
+    # Preconditioner and masked Helmholtz operator
     "make_spectral_preconditioner",
-    # Preconditioned Conjugate Gradient
-    "CGInfo",
     "masked_laplacian",
-    "solve_cg",
     # Masked T-point operators and the Neumann gauge (pressure solves)
     "masked_neumann_laplacian",
     "masked_face_dirichlet_laplacian",
@@ -682,187 +660,10 @@ __all__ = [
     # Tridiagonal (TDMA) solver
     "solve_tridiagonal",
     "solve_tridiagonal_batched",
-    # Time integration — pure functional (deprecated aliases of
-    # integrix.march, served by __getattr__ below)
-    "euler_step",
-    "heun_step",
-    "rk3_ssp_step",
-    "rk4_step",
-    "ab2_step",
-    "ab3_step",
-    "leapfrog_raf_step",
-    "imex_ssp2_step",
-    "split_explicit_step",
-    "semi_lagrangian_step",
-    # Time integration — diffrax solvers (deprecated aliases of integrix.march,
-    # served by __getattr__ below)
-    "ForwardEulerDfx",
-    "RK2Heun",
-    "RK3SSP",
-    "RK4Classic",
-    "SSP_RK2",
-    "SSP_RK104",
-    "IMEX_SSP2",
-    "AB2Solver",
-    "AB3Solver",
-    "LeapfrogRAFSolver",
-    "SplitExplicitRKSolver",
-    "SemiLagrangianSolver",
-    "SemiLagrangianTerm",
 ]
 
 
-# Moved to sesmax-core (#422, jejjohnson/sesmax#121): forcing, vertical modes,
-# relaxation and the barotropic filter are physics next to the model state,
-# not grid operations. The old names stay for one release and warn on access;
-# gridax-jax imports nothing from sesmax (edges point down).
-_MOVED_TO_SESMAX = {
-    "AbstractForcing": ("gridax_jax._src.forcing._base", "sesmax_core.forcing"),
-    "ForcingProduct": ("gridax_jax._src.forcing._base", "sesmax_core.forcing"),
-    "ForcingSum": ("gridax_jax._src.forcing._base", "sesmax_core.forcing"),
-    "LinearDrag2D": ("gridax_jax._src.forcing.drag", "sesmax_core.forcing"),
-    "LinearDrag3D": ("gridax_jax._src.forcing.drag", "sesmax_core.forcing"),
-    "QuadraticDrag2D": ("gridax_jax._src.forcing.drag", "sesmax_core.forcing"),
-    "QuadraticDrag3D": ("gridax_jax._src.forcing.drag", "sesmax_core.forcing"),
-    "RayleighDamping2D": ("gridax_jax._src.forcing.rayleigh", "sesmax_core.forcing"),
-    "RayleighDamping3D": ("gridax_jax._src.forcing.rayleigh", "sesmax_core.forcing"),
-    "TimeVaryingForcing": ("gridax_jax._src.forcing._base", "sesmax_core.forcing"),
-    "WindCurl2D": ("gridax_jax._src.forcing.wind", "sesmax_core.forcing"),
-    "WindStress2D": ("gridax_jax._src.forcing.wind", "sesmax_core.forcing"),
-    "WindStress3D": ("gridax_jax._src.forcing.wind", "sesmax_core.forcing"),
-    "barotropic_filter": (
-        "gridax_jax._src.operators.barotropic",
-        "sesmax_core.vertical",
-    ),
-    "build_coupling_matrix": (
-        "gridax_jax._src.vertical.vertical_modes",
-        "sesmax_core.vertical",
-    ),
-    "decompose_vertical_modes": (
-        "gridax_jax._src.vertical.vertical_modes",
-        "sesmax_core.vertical",
-    ),
-    "layer_to_mode": (
-        "gridax_jax._src.vertical.vertical_modes",
-        "sesmax_core.vertical",
-    ),
-    "linear_drag": ("gridax_jax._src.operators.relaxation", "sesmax_core.forcing"),
-    "linear_drag_tendency": (
-        "gridax_jax._src.forcing.functional",
-        "sesmax_core.forcing",
-    ),
-    "mode_to_layer": (
-        "gridax_jax._src.vertical.vertical_modes",
-        "sesmax_core.vertical",
-    ),
-    "multilayer": ("gridax_jax._src.vertical.multilayer", "sesmax_core.vertical"),
-    "quadratic_drag_tendency": (
-        "gridax_jax._src.forcing.functional",
-        "sesmax_core.forcing",
-    ),
-    "rayleigh_relaxation": (
-        "gridax_jax._src.operators.relaxation",
-        "sesmax_core.forcing",
-    ),
-    "rayleigh_tendency": ("gridax_jax._src.forcing.functional", "sesmax_core.forcing"),
-    "wind_stress_tendency": (
-        "gridax_jax._src.forcing.functional",
-        "sesmax_core.forcing",
-    ),
-}
-
-
-# Moved to geophysix (#446): the linear equation of state (geophysix.seawater,
-# whose parameters are one LinearEOS record) and gridax's mean-latitude
-# Coriolis helpers (geophysix.rotation is pointwise). The old names stay for
-# one release and warn on access.
-_MOVED_TO_GEOPHYSIX = {
-    "linear_density": "geophysix.seawater.linear_density",
-    "linear_density_anomaly": "geophysix.seawater.linear_density_anomaly",
-    "linear_drho_dT": "geophysix.seawater.linear_drho_dT",
-    "linear_drho_dS": "geophysix.seawater.linear_drho_dS",
-    "buoyancy": "geophysix.seawater.buoyancy",
-    "reduced_gravity": "geophysix.seawater.reduced_gravity",
-    "coriolis_param": "geophysix.rotation.coriolis (pointwise; pass the mean latitude)",
-    "beta_param": "geophysix.rotation.beta (pointwise; pass the mean latitude)",
-    "coriolis_fn": "geophysix.rotation.beta_plane (y0 is required there)",
-}
-
-
-# The generic CG solve, its report and the multigrid and Nyström
-# preconditioner factories are gaussx's (#474, jejjohnson/geostack#291 rule 1).
-# The old names stay for one release and warn on access; gridax's own modules
-# import them from their private homes and do not warn.
-_GAUSSX_SOLVES: dict[str, tuple[str, str]] = {
-    "solve_cg": (
-        "gridax_jax._src.solvers.iterative",
-        "gaussx.linear_solve_with_info(gaussx.as_linear_operator(matvec,"
-        " shape=(n, n), negative_definite=True), rhs.ravel(),"
-        " solver=gaussx.CGSolver(rtol=..., atol=...), preconditioner=...), which"
-        " returns (x, gaussx.SolveInfo)",
-    ),
-    "CGInfo": (
-        "gridax_jax._src.solvers.iterative",
-        "gaussx.SolveInfo (iterations, residual_norm, converged), returned by"
-        " gaussx.linear_solve_with_info",
-    ),
-    "make_multigrid_preconditioner": (
-        "gridax_jax._src.solvers.preconditioners",
-        "build_multigrid_solver(...).as_preconditioner(), a"
-        " gaussx.MultigridPreconditioner for gaussx.CGSolver(preconditioner=...)",
-    ),
-    "make_gaussx_multigrid_preconditioner": (
-        "gridax_jax._src.solvers.preconditioners",
-        "build_multigrid_solver(...).as_preconditioner(), a"
-        " gaussx.MultigridPreconditioner",
-    ),
-    "make_nystrom_preconditioner": (
-        "gridax_jax._src.solvers.preconditioners",
-        "gaussx.NystromPreconditioner on gaussx.randomized_nystrom(operator,"
-        " rank, key=key)",
-    ),
-}
-
-
 def __getattr__(name: str) -> object:
-    if name in _GAUSSX_SOLVES:
-        import importlib
-        import warnings
-
-        module, replacement = _GAUSSX_SOLVES[name]
-        warnings.warn(
-            f"gridax_jax.{name} is deprecated and will be removed in the next"
-            f" release: use {replacement}.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return getattr(importlib.import_module(module), name)
-    if name in _MOVED_TO_SESMAX:
-        import importlib
-        import warnings
-
-        module, home = _MOVED_TO_SESMAX[name]
-        warnings.warn(
-            f"gridax_jax.{name} is deprecated and will be removed in the next"
-            f" release: it moved to {home}.{name} (pip install sesmax-core).",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return getattr(importlib.import_module(module), name)
-    if name in _MOVED_TO_GEOPHYSIX:
-        import warnings
-
-        from gridax._src.operators import diagnostics
-
-        from gridax_jax._src.operators import eos
-
-        warnings.warn(
-            f"gridax_jax.{name} is deprecated and will be removed in the next"
-            f" release: use {_MOVED_TO_GEOPHYSIX[name]}.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return getattr(eos if hasattr(eos, name) else diagnostics, name)
     # The C-grid calculus free functions repeat a Difference2D method (#456).
     if name in _gridax._DEPRECATED_CALCULUS:
         import warnings
@@ -876,10 +677,6 @@ def __getattr__(name: str) -> object:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
             return getattr(_gridax, name)
-    # The time steppers moved to integrix.march, the semi-Lagrangian scheme
-    # included (#476); their old names stay for one release and warn on access.
-    if name in _MOVED_STEPPERS or name in _ADAPTED_STEPPERS or name in _SEMI_LAGRANGIAN:
-        return _deprecated_stepper(name)
     # The raw stencils were renamed in gridax (#435): every name carries its
     # rank and the corner averages use one scheme. The old names stay for
     # one release and warn on access.

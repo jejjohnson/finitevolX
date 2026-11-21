@@ -31,7 +31,7 @@ def _field(seed: int) -> jax.Array:
 def _f_beta(f0: float, beta: float) -> jax.Array:
     y = jnp.arange(GRID.Ny) * GRID.dy
     Y = jnp.broadcast_to(y[:, None], (GRID.Ny, GRID.Nx))
-    return fvx.coriolis_fn(Y, f0=f0, beta=beta)
+    return f0 + beta * (Y - jnp.mean(Y))
 
 
 # (id, operator, Tier-A reference, number of input fields)

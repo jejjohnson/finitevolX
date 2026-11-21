@@ -29,7 +29,7 @@ call on `[*batch, Ny, Nx]` fields. Requires the `pipekit` extra:
 | `OkuboWeiss` | `Strain2D.okubo_weiss` | (U, V) → T |
 | `TotalEnergy` | `total_energy` | (T, T) → `[*batch]` |
 | `DomainIntegral` / `DomainMean` | `area_sum` / `area_mean` | T → `[*batch]` |
-| `ExplicitStep(rhs, dt, scheme)` | `euler_step` / `heun_step` / `rk3_ssp_step` / `rk4_step` | state → state |
+| `ExplicitStep(rhs, dt, scheme)` | `integrix.march.euler_step` / `heun_step` / `rk3_ssp_step` / `rk4_step` | state → state |
 | `Pick(index)`, `LinComb(coeffs)` | — (graph plumbing) | |
 
 ## Base classes and helpers

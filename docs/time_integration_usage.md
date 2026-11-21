@@ -3,7 +3,7 @@
 This page covers practical usage of time integration with finitevolX,
 from quick-start examples to building custom diffrax solvers.
 
-The generic time steppers (the pure step functions, the diffrax solvers and the multistep / split-explicit steppers) live in [integrix](https://github.com/jejjohnson/integrix) and are imported from `integrix.march`. Their `finitevolx.*` names still work for one release and emit a `DeprecationWarning`. The semi-Lagrangian scheme moved to `integrix.march` as well (#476); `solve_ocean_pde` moved to `sesmax_core.solve_pde` (#475).
+The generic time steppers (the pure step functions, the diffrax solvers and the multistep / split-explicit steppers) live in [integrix](https://github.com/jejjohnson/integrix) and are imported from `integrix.march`. The semi-Lagrangian scheme moved to `integrix.march` as well (#476); `solve_ocean_pde` moved to `sesmax_core.solve_pde` (#475).
 
 ---
 
@@ -238,8 +238,6 @@ def velocity(t, p):
 new_field = im.semi_lagrangian_step(field.ravel(), nodes, velocity, readout, t, dt).reshape(field.shape)
 ```
 
-The old `gridax_jax.semi_lagrangian_step(field, u, v, dx, dy, dt)` still works for one release and warns; with `iterations=0`, a linear read-out and the velocity at the nodes, the integrix call reproduces it to rounding.
-
 ---
 
 ## Diffrax Integration (Advanced)
@@ -317,7 +315,7 @@ sol = dfx.diffeqsolve(
 ### The `solve_ocean_pde` Convenience Wrapper
 
 `solve_ocean_pde`, the thin `diffeqsolve` wrapper that applies boundary conditions to the tendency at each stage evaluation, moved to `sesmax_core.solve_pde`, where `bc_fn=` is `tendency_bc=`.
-The `gridax_jax` name still works for one release and warns.
+gridax no longer has it.
 See the [`sesmax_core.solve_pde` API](https://jejjohnson.github.io/sesmax/reference/core/).
 
 ### Saving Trajectories
@@ -389,10 +387,6 @@ y_3d, y_2d = run(
     n_steps,
 )
 ```
-
-:::{warning} Deprecated finitevolX adapters
-`finitevolx.AB2Solver`, `finitevolx.LeapfrogRAFSolver` and `finitevolx.SplitExplicitRKSolver` keep their old call shapes for one release: `rhs(t, y)` without `args`, `solver.init(rhs, t0, y0, dt) -> (solver, y1)`, `solver.step(rhs, t, y, dt) -> (y, solver)` with the history held in the module, and `SplitExplicitRKSolver.step(rhs_slow, rhs_fast, t, y_3d, y_2d, dt_slow, slow_forcing=None, couple_2d_to_3d=None)`. Their arithmetic is the integrix steppers'.
-:::
 
 ---
 

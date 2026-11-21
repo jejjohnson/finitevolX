@@ -7,7 +7,7 @@ wind-driven linear shallow-water model on a beta-plane with closed-basin BCs. Th
 script uses ``xarray`` for coordinate-aware preprocessing and postprocessing,
 writes sampled fields to a Zarr store, and saves a static before/after figure.
 
-Time integration uses ``finitevolx.heun_step`` (Heun/RK2 predictor-corrector).
+Time integration uses ``integrix.march.heun_step`` (Heun/RK2 predictor-corrector).
 
 The prognostic variables are the free-surface anomaly ``eta`` at T-points and the
 velocity components ``u`` and ``v`` on the C-grid faces. The linearised equations
@@ -47,9 +47,9 @@ from gridax_jax import (
     Difference2D,
     Interpolation2D,
     Vorticity2D,
-    heun_step,
     pad_interior,
 )
+from integrix.march import heun_step
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr

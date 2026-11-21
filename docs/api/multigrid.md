@@ -17,10 +17,6 @@ The V-cycle runs in gaussx (`gaussx.MultigridPreconditioner`, `gaussx.MultigridS
 
 ::: gridax_jax.multigrid_levels
 
-## Deprecated preconditioner factories
+## Preconditioner
 
-`make_multigrid_preconditioner` and `make_gaussx_multigrid_preconditioner` warn for one release: use `build_multigrid_solver(...).as_preconditioner()`, a `gaussx.MultigridPreconditioner`.
-
-::: gridax_jax._src.solvers.preconditioners.make_multigrid_preconditioner
-
-::: gridax_jax._src.solvers.preconditioners.make_gaussx_multigrid_preconditioner
+`build_multigrid_solver(...).as_preconditioner()` is a `gaussx.MultigridPreconditioner`, for `gaussx.CGSolver(preconditioner=...)`.

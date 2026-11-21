@@ -55,8 +55,8 @@ The methods:
 |---|---|
 | spectral DST | `solve_helmholtz_dst1(f[1:-2, 1:-2], dx, dy, λ)` embedded in zeros at `[1:-2, 1:-2]` (rectangle only) |
 | capacitance | `build_capacitance_solver(mask, dx, dy, lambda_=λ)` (DST base), then `solver(f)` |
-| CG + DST / FFT | `solve_cg(masked_laplacian, f, preconditioner=make_spectral_preconditioner(dx, dy, λ, bc=...))` |
-| CG + multigrid | the same with `make_multigrid_preconditioner(build_multigrid_solver(mask, dx, dy, lambda_=λ))` |
+| CG + DST / FFT | `gaussx.CGSolver` on `masked_laplacian`, with `preconditioner=make_spectral_preconditioner(dx, dy, λ, bc=...)` (negated for gaussx) |
+| CG + multigrid | the same with the V-cycle of `build_multigrid_solver(mask, dx, dy, lambda_=λ)` as the preconditioner |
 | CG (none) | no preconditioner |
 | multigrid (5 V / 8 V) | the multigrid solver on its own, 5 V-cycles (the default) or 8 |
 | sparse LU (SciPy) | the reference; NumPy on the CPU — no `jit`, `vmap` or `grad` |
