@@ -1,6 +1,9 @@
 <div align="center">
 
-# gridax
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
+  <img alt="gridax" src="docs/assets/logo-light.svg" width="340">
+</picture>
 
 **Arakawa C-grids, land and ocean masks and the finite-volume operators on them, on the array API: NumPy, SciPy and geophysix, with JAX when it is installed.**
 
