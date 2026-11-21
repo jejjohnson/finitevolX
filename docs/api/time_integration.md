@@ -133,16 +133,6 @@ The T-point coordinates it takes as nodes come from gridax:
     options:
       docstring_style: google
 
-## Deprecated Semi-Lagrangian Names
-
-The objects behind `gridax_jax.semi_lagrangian_step`, `gridax_jax.SemiLagrangianSolver` and `gridax_jax.SemiLagrangianTerm` for one release (#476).
-
-::: gridax_jax._src.timestepping.semi_lagrangian.semi_lagrangian_step
-
-::: gridax_jax._src.timestepping.semi_lagrangian.SemiLagrangianSolver
-
-::: gridax_jax._src.timestepping.semi_lagrangian.SemiLagrangianTerm
-
 ## Deprecated Adapters
 
 The objects behind `finitevolx.AB2Solver`, `finitevolx.LeapfrogRAFSolver` and `finitevolx.SplitExplicitRKSolver` for one release.

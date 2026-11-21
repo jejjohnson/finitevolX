@@ -14,6 +14,8 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
+from tests.fixtures._helpers import cg_solve
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -290,7 +292,7 @@ class TestKnownValueLifting:
         def matvec(x):
             return fvx.masked_laplacian(x, eff_mask_f, dx, dy, lambda_=lambda_)
 
-        psi_hom, _info = fvx.solve_cg(
+        psi_hom, _info = cg_solve(
             matvec, rhs_corrected, rtol=1e-10, atol=1e-10, max_steps=2000
         )
         psi_hom = psi_hom * eff_mask_f
@@ -337,7 +339,7 @@ class TestKnownValueLifting:
         def matvec(x):
             return fvx.masked_laplacian(x, eff_mask_f, dx, dy, lambda_=0.0)
 
-        psi_hom, _ = fvx.solve_cg(matvec, rhs_corrected, rtol=1e-10, atol=1e-10)
+        psi_hom, _ = cg_solve(matvec, rhs_corrected, rtol=1e-10, atol=1e-10)
         psi_hom = psi_hom * eff_mask_f
 
         psi = lifter.postprocess(psi_hom, value_lift)

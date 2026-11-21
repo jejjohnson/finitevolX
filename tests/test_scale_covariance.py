@@ -91,7 +91,6 @@ from gridax_jax._src.solvers.spectral import (
     solve_poisson_dst,
     solve_poisson_fft,
 )
-from gridax_jax._src.vertical.vertical_modes import build_coupling_matrix
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -1055,7 +1054,7 @@ class TestTheContractsHoldOnAnotherGrid:
 class TestMultilayerQGStretching:
     """``q_k = lap(psi_k)/f0 + beta (y - y0)/f0 - f0 (A psi)_k`` (#282).
 
-    ``A = build_coupling_matrix(H, g')`` is in s^2/m^2, so the stretching
+    The two-layer coupling matrix ``A`` is in s^2/m^2, so the stretching
     term needs one factor of ``f0`` to be dimensionless like the other two.
     """
 
@@ -1074,7 +1073,16 @@ class TestMultilayerQGStretching:
             2 * jnp.pi * y1[:, None] / length
         )
         psi = 1e4 * jnp.stack([wave, 0.5 * wave**2 + 0.3 * wave])
-        return grid, yy, psi, build_coupling_matrix(self.H, self.GP)
+        H, gp = self.H, self.GP
+        # Two-layer stratification matrix: rows are 1/H_k times the interface
+        # coupling (free surface g above layer 0, g' between the layers).
+        A = jnp.array(
+            [
+                [1 / (H[0] * gp[0]) + 1 / (H[0] * gp[1]), -1 / (H[0] * gp[1])],
+                [-1 / (H[1] * gp[1]), 1 / (H[1] * gp[1])],
+            ]
+        )
+        return grid, yy, psi, A
 
     @pytest.mark.slow
     def test_matches_mqgeometry_divided_by_f0(self):

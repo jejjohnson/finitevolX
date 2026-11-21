@@ -65,7 +65,7 @@ UPSTREAM_BLURB = {
     ),
     "gaussx": (
         "Structured linear algebra and solver strategies. finitevolX delegates"
-        " the tridiagonal solve and the Nyström preconditioner to it; use it"
+        " the tridiagonal solve, CG and the Nyström and multigrid preconditioners to it; use it"
         " for any other structured solve, preconditioner or low-rank"
         " approximation instead of writing one here."
     ),
@@ -85,20 +85,6 @@ ALLOWED_SHARED_NAMES: dict[str, str] = {
         " (implicit, one-step and unrolled gradients) and hands its levels to"
         " gaussx through as_preconditioner(); gaussx's is CG preconditioned by"
         " one V-cycle over caller-built levels (#474)"
-    ),
-    # Deprecated for one release (#476): the old objects keep their old
-    # interface while integrix.march holds the rewritten scheme.
-    "SemiLagrangianSolver": (
-        "the deprecated finitevolX solver (index-space velocity, linear"
-        " read-out), kept for one release beside integrix's rewrite (#476)"
-    ),
-    "SemiLagrangianTerm": (
-        "the deprecated finitevolX term, whose velocity returns (u, v) shaped"
-        " like the field, kept for one release (#476)"
-    ),
-    "semi_lagrangian_step": (
-        "the deprecated finitevolX step on [Ny, Nx] fields, kept for one"
-        " release beside integrix's point-based step (#476)"
     ),
     "SphericalGrid2D": (
         "finitevolX's is a lat-lon Arakawa C-grid container with a ghost ring;"

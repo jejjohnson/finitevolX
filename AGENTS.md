@@ -8,8 +8,8 @@ Standing instructions for **every** coding agent working in this repository
 
 finitevolX is finite-volume operators on staggered Arakawa C-grids in JAX:
 grids and land / ocean masks, raw stencils, difference / interpolation /
-advection / diffusion operators, boundary conditions, diagnostics and
-forcing, elliptic and multigrid solvers, and time integrators built on
+advection / diffusion operators, boundary conditions, diagnostics,
+elliptic and multigrid solvers, and time integrators built on
 diffrax, for 1-D, 2-D, 3-D and multilayer ocean and atmosphere models.
 Everything is a pytree (a `pytree_dataclass` in gridax, an `eqx.Module` in
 gridax-jax) or a pure function, so it runs under `jit`, `vmap` and `grad`;
@@ -39,18 +39,16 @@ the grid and mask classes of `gridax` (the mask construction helpers stay
 | Analysis kernels | `gridax/_src/analysis/` (public: `gridax.analysis`) | Finite differences on collocated grids (`difference`, `adaptive_difference`, 1-D / 2-D / 3-D gradient, divergence, curl, Laplacian) and axis remapping (`remap_axis`, `remap_axis_columns`), array-API code that runs on NumPy, JAX or any backend; the kernels behind geoops' and xrops' calculus and remap operators |
 | Layer 0: coefficients | `gridax/_src/stencils/coefficients.py` (public: `gridax.stencils`) | `difference_offsets` / `difference_coeffs`: offsets and exact coefficients from the Taylor conditions, for point values or cell averages (`data=`), collocated or staggered (`method="staggered"`, `bias=`); `weno_stencils`, `optimal_weights`, `smoothness_matrix` (the linear parts of WENO); `nonuniform_coeffs` |
 | Layer 1: raw stencils | `gridax/_src/operators/stencils.py`, `gridax/_src/stencils/staggered.py`, `gridax/_src/operators/_ghost.py` (public: `gridax.stencils`) | `<op>_<axis>_<side>_<d>d` index arithmetic with no metric and no padding, on any backend (the old unsuffixed 2-D names are deprecated aliases in `gridax_jax`); `staggered_difference` / `staggered_average` for fourth and sixth order; `interior` pads a result back to the full shape |
-| Layer 2: functional helpers | `gridax/_src/operators/{diagnostics,jacobian,reductions}.py`, `gridax/_src/advection/{weno,linear,limiters,reconstruct_fn,face_flux,flux}.py`; in gridax-jax `operators/eos.py`, `forcing/functional.py`, … | Pure functions on arrays (`kinetic_energy`, `arakawa_jacobian`, `area_mean`, `weno_5pts`, `upwind_flux`, `linear_drag_tendency`, …); they never take a `Mask2D`, except the reductions (`area_sum`, `masked_mean`, … accept `mask=`) |
+| Layer 2: functional helpers | `gridax/_src/operators/{diagnostics,jacobian,reductions}.py`, `gridax/_src/advection/{weno,linear,limiters,reconstruct_fn,face_flux,flux}.py`; in gridax-jax `operators/eos.py`, … | Pure functions on arrays (`kinetic_energy`, `arakawa_jacobian`, `area_mean`, `weno_5pts`, `upwind_flux`, …); they never take a `Mask2D`, except the reductions (`area_sum`, `masked_mean`, … accept `mask=`) |
 | Layer 3: class operators | `gridax/_src/operators/` (`difference.py`, `interpolation.py`, `divergence.py`, `vorticity.py`, `coriolis.py`, `diagnostic_operators.py`, `spherical_*.py`), `gridax/_src/advection/` (`advection.py`, `reconstruction.py`, `spherical_advection.py`), `gridax/_src/diffusion/` | `Difference*`, `Interpolation*`, `Advection*`, `Reconstruction*`, `Diffusion*`, `MomentumAdvection*`, `Vorticity*`, `Coriolis*`, `Energetics2D`, … and their `Spherical*` siblings; mask-aware through a `mask` field |
 | Boundary conditions | `gridax/_src/boundary/` | Per-face atoms `Dirichlet1D` … `Slip1D` (`bc_1d.py`), `BoundaryConditionSet` (`bc_set.py`), `FieldBCSet` (`bc_field.py`), functional ghost-ring fillers (`boundary.py`) |
-| Forcing (deprecated) | `forcing/`, `operators/relaxation.py` | `AbstractForcing`, `ForcingSum` / `ForcingProduct` / `TimeVaryingForcing` (`_base.py`); wind, drag, Rayleigh operators; `linear_drag`, `rayleigh_relaxation`. Moved to `sesmax_core.forcing` (#422); the `gridax_jax` names warn for one release, and new forcing goes to sesmax-core |
-| Solvers | `solvers/` | Spectral solvers re-exported from spectraldiffx (`spectral.py`, `spectral_transforms.py`); capacitance wrapper (`elliptic.py`; the `streamfunction_from_vorticity` / `pressure_from_divergence` / `pv_inversion` wrappers moved to `sesmax_core.gfd`, #475); `solve_cg` on lineax and the T-point `masked_laplacian`, `masked_neumann_laplacian`, `masked_face_dirichlet_laplacian`, `wet_components`, `project_zero_mean` (`iterative.py`); preconditioners (`preconditioners.py`); `MultigridSolver` (`multigrid.py`); known-value lifting (`inhomogeneous.py`); tridiagonal solve re-exported from gaussx (`tridiagonal.py`) |
-| Time integration | `timestepping/` | `solve_ocean_pde` moved to `sesmax_core.solve_pde` (#475); the time steppers live in `integrix.march`, the semi-Lagrangian scheme included (#476, with `gridax.t_point_coordinates` for its nodes; `semi_lagrangian.py` is the deprecated old scheme), and their `gridax_jax.*` (formerly `finitevolx.*`) names are deprecated aliases (`_deprecated.py`, served by `__getattr__` in `gridax_jax/__init__.py`) |
-| Vertical (deprecated) | `vertical/`, `operators/barotropic.py` | `multilayer` (vmap a 2-D operator over layers), vertical modes (`build_coupling_matrix`, `layer_to_mode`, …), `barotropic_filter`. Moved to `sesmax_core.vertical` (#422); the `gridax_jax` names warn for one release |
+| Solvers | `solvers/` | Spectral solvers re-exported from spectraldiffx (`spectral.py`, `spectral_transforms.py`); capacitance wrapper (`elliptic.py`; the `streamfunction_from_vorticity` / `pressure_from_divergence` / `pv_inversion` wrappers moved to `sesmax_core.gfd`, #475); the T-point `masked_laplacian`, `masked_neumann_laplacian`, `masked_face_dirichlet_laplacian`, `wet_components`, `project_zero_mean` (`iterative.py`); `make_spectral_preconditioner` (`preconditioners.py`); CG itself is gaussx's (`gaussx.linear_solve_with_info` with `gaussx.CGSolver`); `MultigridSolver` (`multigrid.py`); known-value lifting (`inhomogeneous.py`); tridiagonal solve re-exported from gaussx (`tridiagonal.py`) |
+| Time integration | `timestepping/` | `solve_ocean_pde` moved to `sesmax_core.solve_pde` (#475); the time steppers live in `integrix.march`, the semi-Lagrangian scheme included (#476, with `gridax.t_point_coordinates` for its nodes), and their `gridax_jax.*` (formerly `finitevolx.*`) names are deprecated aliases (`_deprecated.py`, served by `__getattr__` in `gridax_jax/__init__.py`) |
+| Vertical, forcing | not here | forcing, vertical modes, `multilayer` and the barotropic filter are `sesmax_core.forcing` and `sesmax_core.vertical` (#422); new forcing goes to sesmax-core |
 | pipekit layer (Tier B) | `pipekit/` (public: `gridax_jax/pipekit/`) | `FVXOperator` / `GridOperator` on `pipekit_jax.JaxOperator`, `GridSpec`, `over_leading`, `check_operator` (`gridax_jax.pipekit.testing`); behind the `pipekit` extra, never imported by `import gridax_jax` |
 | Shared | `gridax/_src/backend.py`, `gridax/_src/pytree.py`; constants from geophysix | the backend hooks and `pytree_dataclass` (see Boundaries); physical constants are geophysix records (`geophysix.earth.SPHERE`, `WGS84`, `geophysix.constants.STANDARD`), used as parameter defaults only (contract 6). `gridax/_src/constants.py` (`R_EARTH`, `GRAVITY`, `OMEGA`, `RHO`, `DEG2M`) is a deprecated shim of geophysix's values, and the Coriolis helpers and the linear EOS are deprecated in favour of `geophysix.rotation` and `geophysix.seawater` (#446) |
 
-The four layers of the derivative stack are the ones `docs/stencils.md` ("The derivative stack") and `docs/masks.md` describe: Layer 0 coefficients (numbers, no arrays), Layer 1 raw stencils, Layer 2 functional helpers (metric-scaled, mask-free; `gridax.analysis` is its collocated part, and `gridax.advection.reconstruct` its advection part, which also takes a mask), Layer 3 class operators (the layer that carries a mask as a field). A C-grid Layer 2 helper exists only when it is more than one line of Layer 1. The forcing modules number their functional primitives
-"Layer 0"; they are the same tier as Layer 2.
+The four layers of the derivative stack are the ones `docs/stencils.md` ("The derivative stack") and `docs/masks.md` describe: Layer 0 coefficients (numbers, no arrays), Layer 1 raw stencils, Layer 2 functional helpers (metric-scaled, mask-free; `gridax.analysis` is its collocated part, and `gridax.advection.reconstruct` its advection part, which also takes a mask), Layer 3 class operators (the layer that carries a mask as a field). A C-grid Layer 2 helper exists only when it is more than one line of Layer 1.
 
 `scripts/` holds example models (`swm_linear.py`, `shallow_water.py`,
 `qg_1p5_layer.py`, smoke-tested by `tests/test_scripts.py`) and the docs
@@ -65,11 +63,11 @@ builds the capability index.
   PyPI). spectraldiffx owns the spectral transforms, the rectangular
   Poisson / Helmholtz solvers, their eigenvalues and the capacitance solver;
   finitevolX re-exports 78 of its names unchanged. gaussx owns structured
-  linear algebra; finitevolX re-exports its tridiagonal solves and builds
-  `make_nystrom_preconditioner` on `gaussx.NystromPreconditioner`;
-  `make_gaussx_multigrid_preconditioner` wraps the symmetrised V-cycle in
-  `gaussx.OperatorPreconditioner` for gaussx's CG strategies. Use their
-  public APIs only; neither imports finitevolX.
+  linear algebra, CG included (`gaussx.linear_solve_with_info` with
+  `gaussx.CGSolver`, `gaussx.NystromPreconditioner`); finitevolX re-exports
+  its tridiagonal solves, and `MultigridSolver.as_preconditioner()` hands its
+  levels to `gaussx.MultigridPreconditioner`. Use their public APIs only;
+  neither imports finitevolX.
 - **Downstream**: ocean models (e.g. somax) build on the operators and
   rebuild them in nondimensional units, which is why operators must stay
   unit-agnostic (contract 6, `tests/test_scale_covariance.py`).
@@ -88,12 +86,12 @@ model.
 | Library | finitevolX uses it for | The rule it brings |
 |---|---|---|
 | **jax** | Arrays, `jit`, `vmap`, `grad`, `lax.fori_loop` (multigrid V-cycles) | Pure functions; `.at[...].set` instead of mutation; no Python control flow on traced values; build outputs with the input's dtype (`interior` uses `jnp.result_type`). |
-| **equinox** | The forcing operators, solvers and pipekit operators in gridax-jax are `eqx.Module`s; `eqx.filter_vmap` (`multilayer`) | Never a plain dataclass or class for anything holding arrays. In gridax (grids, masks, operators, BCs) that is a `pytree_dataclass` (`gridax/_src/pytree.py`): settings that pick a code path or a shape are `static_field()` (e.g. `Dirichlet1D.face`, the grid sizes), a hand-written `__init__` may precompute, and `__check_init__` validates. In gridax-jax it is an `eqx.Module`, with `eqx.field(static=True)` for settings. An operator holds its grid, its mask and any precomputed hierarchy as fields, built once in `__init__`. |
+| **equinox** | The solvers and pipekit operators in gridax-jax are `eqx.Module`s; `eqx.filter_vmap` (the layer `vmap`) | Never a plain dataclass or class for anything holding arrays. In gridax (grids, masks, operators, BCs) that is a `pytree_dataclass` (`gridax/_src/pytree.py`): settings that pick a code path or a shape are `static_field()` (e.g. `Dirichlet1D.face`, the grid sizes), a hand-written `__init__` may precompute, and `__check_init__` validates. In gridax-jax it is an `eqx.Module`, with `eqx.field(static=True)` for settings. An operator holds its grid, its mask and any precomputed hierarchy as fields, built once in `__init__`. |
 | **jaxtyping** | Shape annotations (`Float[Array, "Ny Nx"]`) | Annotate public array arguments and returns; shape strings stay quoted (`UP037` and `F722` are off for that reason). They are documentation: nothing checks them at run time (beartype is a declared dependency but is not imported). |
-| **lineax** | `solve_cg` (`lx.CG` on a `FunctionLinearOperator`) | Elliptic operators here are negative (semi)definite: tag them `negative_semidefinite_tag`; a preconditioner approximates `A⁻¹` and `solve_cg` flips its sign for lineax. |
-| **diffrax** | Butcher-tableau solvers (`dfx.AbstractERK`), custom `dfx.AbstractSolver`s | A new integrator is a diffrax solver (or a pure step function); forcings live inside the vector field, not as extra diffrax terms. |
+| **lineax** | The operators the solvers build on (`helmholtz_operator`, the multigrid levels) | Elliptic operators here are negative (semi)definite: tag them `negative_semidefinite_tag`; a preconditioner approximates `A⁻¹`, and gaussx's CG solves `(−A) x = −b`, so it takes `−M⁻¹`. |
+| **diffrax** | Butcher-tableau solvers (`dfx.AbstractERK`), custom `dfx.AbstractSolver`s | A new integrator is a diffrax solver (or a pure step function); a forcing lives inside the vector field, not as an extra diffrax term. |
 | **spectraldiffx** | DCT / DST / FFT, spectral Poisson / Helmholtz solvers, eigenvalues, capacitance solver | Re-export or call; never re-implement a spectral solve or its eigenvalues. |
-| **gaussx** | Tridiagonal solves, Nyström preconditioning | Structured solves and low-rank preconditioners come from gaussx, not a hand-written `jnp.linalg` routine. |
+| **gaussx** | Tridiagonal solves, CG (`linear_solve_with_info`, `CGSolver`), Nyström and multigrid preconditioning | Structured solves, CG and low-rank preconditioners come from gaussx, not a hand-written `jnp.linalg` routine. |
 | **numpy / scipy** | Construction-time mask and multigrid precomputation | Concrete values only (see Boundaries). |
 
 ## Reuse before you write
@@ -113,7 +111,7 @@ whether it exists:
    concept: a raw index pattern in `operators/stencils.py`, a metric-scaled
    function next to its family, a mask-aware class over both. A helper two
    modules need goes into the owning module (or `operators/_ghost.py`,
-   `forcing/_utils.py`, `operators/_utils.py`), not inline in one caller.
+   `operators/_utils.py`), not inline in one caller.
 4. **One object, one name.** A finitevolX name never means something
    different from the same name in spectraldiffx or gaussx; the deliberate
    exceptions are listed with their reason in `ALLOWED_SHARED_NAMES` in
@@ -132,13 +130,13 @@ whether it exists:
 | Filling ghost cells | `BoundaryConditionSet` of `Dirichlet1D` / `Neumann1D` / `Periodic1D` / …; `enforce_periodic`, `zero_gradient_boundaries`, `no_slip_boundaries`, `wall_boundaries` |
 | Land / ocean masks, coastal stencil fallback | `Mask2D.from_mask` (or `from_center`, `from_u_face`, …), `mask.get_adaptive_masks`, `StencilCapability2D` |
 | Area / volume integrals and masked means | `area_sum`, `area_mean`, `volume_mean`, `masked_mean`, `masked_moments` (grid-polymorphic; `cartesian_*` / `spherical_*` explicit) |
-| A Poisson / Helmholtz solve | `solve_helmholtz_dst` / `_dct` / `_fft` (spectraldiffx) on a rectangle; `build_capacitance_solver`, `solve_cg` + `make_preconditioner`, or `build_multigrid_solver` on a masked domain; the one-call wrappers `streamfunction_from_vorticity`, `pressure_from_divergence`, `pv_inversion` live in sesmax-core (`sesmax_core.gfd`) |
+| A Poisson / Helmholtz solve | `solve_helmholtz_dst` / `_dct` / `_fft` (spectraldiffx) on a rectangle; `build_capacitance_solver`, gaussx's CG (`gaussx.linear_solve_with_info` with `gaussx.CGSolver`) with `make_spectral_preconditioner` or `build_multigrid_solver(...).as_preconditioner()`, or `build_multigrid_solver` on its own on a masked domain; the one-call wrappers `streamfunction_from_vorticity`, `pressure_from_divergence`, `pv_inversion` live in sesmax-core (`sesmax_core.gfd`) |
 | A DCT / DST | `dct`, `dst`, `dctn`, … (spectraldiffx, scipy's unnormalised convention) |
 | A tridiagonal (Thomas) solve | `solve_tridiagonal`, `solve_tridiagonal_batched` (gaussx) |
-| A CG loop or a Nyström preconditioner | `solve_cg`, `make_nystrom_preconditioner`, `make_spectral_preconditioner`, `make_multigrid_preconditioner` |
+| A CG loop or a Nyström preconditioner | `gaussx.linear_solve_with_info` with `gaussx.CGSolver`, `gaussx.NystromPreconditioner`, `make_spectral_preconditioner`, `MultigridSolver.as_preconditioner()` |
 | An RK / multistep / IMEX time loop | `integrix.march`: `rk3_ssp_step`, `ab2_step`, `imex_ssp2_step`, …, the diffrax solvers (with `sesmax_core.solve_pde.solve_ocean_pde` for a tendency BC), or `AB2Solver` / `LeapfrogRAFSolver` / `SplitExplicitRKSolver` with `integrix.march.run` |
-| Applying a 2-D operator to every layer | `multilayer(fn)`; vertical modes with `decompose_vertical_modes`, `layer_to_mode` |
-| Wind stress, bottom drag, sponge damping | `WindStress2D`, `LinearDrag2D`, `QuadraticDrag2D`, `RayleighDamping2D` (and `3D`), composed with `ForcingSum` / `ForcingProduct` |
+| Applying a 2-D operator to every layer | `jax.vmap(fn)` (or `sesmax_core.vertical.multilayer`); vertical modes with `sesmax_core.vertical.decompose_vertical_modes`, `layer_to_mode` |
+| Wind stress, bottom drag, sponge damping | `sesmax_core.forcing`: `WindStress2D`, `LinearDrag2D`, `QuadraticDrag2D`, `RayleighDamping2D` (and `3D`), composed with `ForcingSum` / `ForcingProduct` |
 | `jnp.abs` / `jnp.maximum` / `jnp.clip` on a path you differentiate | `smooth_abs`, `smooth_max`, `smooth_clamp` |
 | Golden-output or input fixtures in a test | `tests/fixtures/inputs.py` (`make_grid_2d`, `make_mask_2d`, `make_h_field_2d`, …), `tests/fixtures/_helpers.py` (`assert_matches_golden`) |
 
@@ -167,7 +165,7 @@ The long form, with figures, is in `docs/cgrid_discretization.md`,
   - `X[j, i]` → NE corner `(j+1/2, i+1/2)`
 - In 3-D only the horizontal axes are staggered; `k = 0` and `k = Nz-1` are
   ghost slabs. Multilayer fields `[nl, Ny, Nx]` have **no** ghost layers:
-  lift a 2-D operator with `multilayer` rather than using a `3D` operator
+  lift a 2-D operator with `jax.vmap` rather than using a `3D` operator
   (`docs/multilayer_vs_3d.md`).
 
 All four types share the `[Ny, Nx]` shape, but the meaning of the ghost ring
@@ -287,7 +285,7 @@ apply BCs to intermediate fields before chaining operators.
   `Diffusion2D`.
 - Where land may hold `NaN` (e.g. `Mask2D.from_center`), zero the dry
   inputs with `jnp.where` before any stencil reads them **and** mask the
-  outputs with `jnp.where` (`forcing/_utils.mask_where`): multiplying by a
+  outputs with `jnp.where`: multiplying by a
   float mask keeps `NaN * 0 = NaN`, and masking only the output still
   leaves a `NaN` gradient at the dry points.
 - Branch on an optional mask with `if mask is not None:`, never `if mask:`
@@ -321,21 +319,22 @@ apply BCs to intermediate fields before chaining operators.
 
 - Rectangular spectral solves come from spectraldiffx; finitevolX re-exports
   them. Masked domains use the capacitance method, preconditioned CG
-  (`solve_cg`) or multigrid; `docs/solver_comparison.md` says which when.
+  (gaussx's) or multigrid; `docs/solver_comparison.md` says which when.
 - Sign convention: the Helmholtz operator `(∇² − λ)` with `λ ≥ 0` is
-  negative (semi)definite. A matvec passed to `solve_cg` must be that
+  negative (semi)definite. A matvec passed to gaussx's CG must be that
   operator; a preconditioner approximates its (negative) inverse.
-- Report convergence, don't assume it: `solve_cg` returns `CGInfo`
-  (`iterations`, `residual_norm`, `converged`); check `converged` in tests.
-  `solve_cg` returns rather than raises when CG does not converge
-  (`throw=False`); the `method="cg"` path of the convenience wrappers
-  (now in sesmax-core) discards `CGInfo` and raises instead, so call
-  `solve_cg` directly when you want to inspect convergence.
-- Randomised construction takes a `key` (`make_nystrom_preconditioner`).
+- Report convergence, don't assume it: `gaussx.linear_solve_with_info`
+  returns `(x, info)` with `info.iterations`, `info.residual_norm` and
+  `info.converged`; check `converged` in tests. gaussx solves `(−A) x = −b`,
+  so build the operator with `gaussx.as_linear_operator(matvec,
+  in_structure=jax.ShapeDtypeStruct(b.shape, b.dtype), negative_definite=True)`
+  and pass the preconditioner as `lambda r: −M(r)`. `gaussx.CGSolver` raises
+  when CG does not converge unless it is built with `throw=False`.
+- Randomised construction takes a `key` (`gaussx.randomized_nystrom`).
 - Pre-build what depends only on the geometry (`build_capacitance_solver`,
   `build_multigrid_solver`) and reuse it across right-hand sides.
 
-### 6. Time integration, forcing and units
+### 6. Time integration and units
 
 - A step function is pure and works on any pytree state. The explicit RK
   steps are `step(state, rhs_fn, dt) -> state`; the others take what their
@@ -345,16 +344,10 @@ apply BCs to intermediate fields before chaining operators.
 - A diffrax solver subclasses `dfx.AbstractERK` with a `ButcherTableau`
   when it is an explicit Runge–Kutta scheme (`RK3SSP`, `SSP_RK104`, …),
   `dfx.AbstractRungeKutta` + `dfx.AbstractImplicitSolver` for IMEX
-  (`IMEX_SSP2`), or implements `dfx.AbstractSolver` (`ForwardEulerDfx`,
-  `SemiLagrangianSolver`). Schemes that do not fit `diffeqsolve` are
+  (`IMEX_SSP2`), or implements `dfx.AbstractSolver` (`ForwardEulerDfx`). Schemes that do not fit `diffeqsolve` are
   `eqx.Module`s with their own `step` (plus an `init` that bootstraps the
   history for `AB2Solver` and `LeapfrogRAFSolver`; `SplitExplicitRKSolver`
   substeps the fast mode).
-- A forcing subclasses `AbstractForcing`; its `__call__` returns a tendency
-  (an array or a tuple such as `(du, dv)`) with its own physics-specific
-  arguments. Forcings are time-agnostic and compose with `ForcingSum`,
-  `ForcingProduct` and `TimeVaryingForcing` inside the RHS function. The
-  core math lives in a functional primitive (`forcing/functional.py`).
 - **Operators are unit-agnostic.** Physical constants (the geophysix
   records `SPHERE`, `WGS84`, `STANDARD`, and the deprecated `GRAVITY`,
   `R_EARTH`, `OMEGA`, `RHO`, `DEG2M`) appear only as overridable parameter
@@ -373,7 +366,7 @@ apply BCs to intermediate fields before chaining operators.
   field's dtype (`_metric_like`).
 - Divisions and square roots that can hit zero are guarded with
   `jnp.where` on the argument as well as the result
-  (`forcing/_utils.safe_speed`, `safe_denominator`), so the gradient stays
+  (a safe speed or a safe denominator), so the gradient stays
   finite too. Spherical divisions by `cos(lat)` go through
   `operators/_utils._safe_div_cos`, which returns `NaN` (not `inf`) at
   pole points, where the metric is degenerate.
@@ -408,7 +401,7 @@ docstring before changing what it checks.
 | `tests/test_open_walls.py`, conservation tests in `test_advection.py`, `test_jacobian.py`, `test_momentum.py`, `test_diagnostics.py` | Mass / energy / enstrophy conservation of the flux-form and Arakawa schemes, including `wall="open"` |
 | `tests/test_stencils.py`, `tests/test_ghost.py`, `tests/test_grid.py`, `tests/test_cgrid_mask.py` | Raw stencil slices, the ghost-ring helpers, grid and mask construction |
 | `tests/test_stencil_lowering.py` | The performance rewrites equal their composed forms, and their VJPs have one `pad` per distinct offset (a JAX-level check, no timing) |
-| `tests/test_elliptic*.py`, `tests/test_multigrid.py`, `tests/test_inhomogeneous.py`, `tests/test_solver_deprecations.py` | Solvers against analytic solutions, preconditioner benefit, known-value lifting, the deprecated wrapper names |
+| `tests/test_elliptic*.py`, `tests/test_multigrid.py`, `tests/test_inhomogeneous.py`, `tests/test_solver_deprecations.py` | Solvers against analytic solutions, preconditioner benefit, known-value lifting, that the moved and removed names raise `AttributeError` |
 | `tests/test_timestepping*.py`, `tests/test_diffrax_solvers.py` | Convergence order and accuracy of the step functions and the diffrax solvers; the pure steps match their diffrax twins (`TestPureFunctionalVsDiffrax`) |
 | `tests/test_scripts.py` | The example models in `scripts/` run stably on small grids |
 | `tests/test_capabilities.py` | `docs/capabilities.md` is current; no name shadows a spectraldiffx / gaussx name with a different object |
@@ -426,7 +419,6 @@ agent can read and follow them):
 | Add a raw stencil, functional helper or mask-aware class operator (difference, interpolation, vorticity, diffusion, diagnostic, spherical) | `add-stencil-operator` |
 | Add a reconstruction scheme, WENO variant, flux limiter or face flux | `add-advection-scheme` |
 | Add a boundary-condition atom, BC set or ghost-ring filler | `add-boundary-condition` |
-| Add a forcing term (wind, drag, damping, relaxation) | `add-forcing` |
 | Add an elliptic solver path, preconditioner or multigrid option | `add-elliptic-solver` |
 | Add a time integrator (step function and diffrax solver) | `add-time-integrator` |
 | Add or update an example notebook | `add-notebook` |
@@ -603,12 +595,12 @@ Two tools build one site (`docs/README.md` has the details): mystmd builds the t
 |---|---|---|
 | Grid, staggering, ghost cells | `docs/cgrid_discretization.md` | `docs/api/grids.md` |
 | Masks | `docs/masks.md` | `docs/api/masks.md` |
-| Multilayer vs 3-D | `docs/multilayer_vs_3d.md` | `docs/api/vertical_modes.md` |
+| Multilayer vs 3-D | `docs/multilayer_vs_3d.md` | |
 | Raw stencils, the derivative stack | `docs/stencils.md` | `docs/api/stencils.md` |
 | Difference / interpolation | `docs/difference.md`, `docs/interpolation.md` | `docs/api/difference.md`, `docs/api/interpolation.md` |
 | Advection and reconstruction | `docs/advection.md` | `docs/api/advection.md`, `docs/api/reconstruction.md` |
 | Boundary conditions | `docs/boundary_conditions.md` | `docs/api/boundary_conditions.md` |
-| Divergence, vorticity, diffusion, Coriolis, forcing, momentum, diagnostics | `docs/spatial_operators.md` | `docs/api/{divergence,vorticity,diffusion,coriolis,forcing,momentum,diagnostics}.md` |
+| Divergence, vorticity, diffusion, Coriolis, momentum, diagnostics | `docs/spatial_operators.md` | `docs/api/{divergence,vorticity,diffusion,coriolis,momentum,diagnostics}.md` |
 | Time integration | `docs/time_integration.md`, `docs/time_integration_usage.md` | `docs/api/time_integration.md` |
 | Elliptic solvers | `docs/elliptic_solvers.md`, `docs/elliptic_solvers_usage.md`, `docs/solver_comparison.md` | `docs/api/{elliptic,spectral_solvers,spectral_transforms,capacitance,iterative}.md` |
 | Multigrid | `docs/multigrid_solver.md`, `docs/multigrid_solver_usage.md` | `docs/api/multigrid.md` |

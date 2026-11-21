@@ -17,7 +17,6 @@ from gridax_jax import (
     LeapfrogRAFSolver,
     RK2Heun,
     RK4Classic,
-    SemiLagrangianSolver,
     SplitExplicitRKSolver,
 )
 import jax
@@ -410,62 +409,6 @@ class TestSplitExplicitRKSolver:
 
 
 # ---------------------------------------------------------------------------
-# SemiLagrangianSolver (diffrax interface)
-# ---------------------------------------------------------------------------
-
-
-class TestSemiLagrangianSolverDfx:
-    def test_instantiation(self):
-        """SemiLagrangianSolver can be instantiated with different orders."""
-        solver = SemiLagrangianSolver(interpolation_order=1)
-        assert solver.interpolation_order == 1
-
-    def test_direct_step(self):
-        """Test the step method directly (bypassing diffeqsolve)."""
-        nx, ny = 32, 32
-        x = jnp.arange(nx, dtype=jnp.float64)
-        y = jnp.arange(ny, dtype=jnp.float64)
-        X, Y = jnp.meshgrid(x, y, indexing="ij")
-        X, Y = X.T, Y.T
-        field = jnp.exp(-((X - 16) ** 2 + (Y - 16) ** 2) / 50.0)
-
-        # Use a simple namespace as the term so that .vf can return (u, v)
-        # without ODETerm's pytree-structure check.
-        class _VelocityTerm:
-            def vf(self, t, y, args):
-                return jnp.zeros_like(y), jnp.zeros_like(y)
-
-        solver = SemiLagrangianSolver(interpolation_order=1)
-        y1, _, _, _, result = solver.step(
-            _VelocityTerm(), 0.0, 0.1, field, None, None, False
-        )
-        np.testing.assert_allclose(y1, field, atol=1e-10)
-        assert result == dfx.RESULTS.successful
-
-    def test_direct_step_uniform_advection(self):
-        """Uniform velocity should shift the field."""
-        nx, ny = 32, 32
-        x = jnp.arange(nx, dtype=jnp.float64)
-        y = jnp.arange(ny, dtype=jnp.float64)
-        X, Y = jnp.meshgrid(x, y, indexing="ij")
-        X, Y = X.T, Y.T
-        field = jnp.exp(-((X - 16) ** 2 + (Y - 16) ** 2) / 50.0)
-
-        class _VelocityTerm:
-            def vf(self, t, y, args):
-                # 3 grid cells/sec in x, 0 in y
-                return 3.0 * jnp.ones_like(y), jnp.zeros_like(y)
-
-        solver = SemiLagrangianSolver(interpolation_order=1)
-        y1, _, _, _, result = solver.step(
-            _VelocityTerm(), 0.0, 1.0, field, None, None, False
-        )
-        shifted = jnp.roll(field, 3, axis=1)
-        np.testing.assert_allclose(y1, shifted, atol=1e-10)
-        assert result == dfx.RESULTS.successful
-
-
-# ---------------------------------------------------------------------------
 # Butcher tableau consistency checks
 # ---------------------------------------------------------------------------
 
@@ -642,39 +585,8 @@ class TestDiffeqsolveProtocol:
         # embedded first-order estimate at rtol 1e-6: ~6e-5 relative global error
         np.testing.assert_allclose(sol.ys[0], math.exp(-11.0), rtol=1e-3)
 
-    def test_semi_lagrangian_in_diffeqsolve(self):
-        """SemiLagrangianTerm + SaveAt(ts): integer shifts per step are exact."""
-        from gridax_jax import SemiLagrangianTerm
-
-        ny, nx = 8, 16
-        y0 = jnp.sin(2 * jnp.pi * jnp.arange(nx) / nx)[None, :] * jnp.ones((ny, 1))
-        # u = 2 grid cells per unit time, dt = 0.5 -> one cell per step
-        term = SemiLagrangianTerm(
-            lambda t, y, a: (jnp.full_like(y, 2.0), jnp.zeros_like(y))
-        )
-        solver = SemiLagrangianSolver()
-        assert solver.order(term) == 1
-        sol = dfx.diffeqsolve(
-            term, solver, 0.0, 2.0, 0.5, y0, saveat=dfx.SaveAt(ts=jnp.array([1.0, 2.0]))
-        )
-        np.testing.assert_allclose(sol.ys[0], jnp.roll(y0, 2, axis=1), atol=1e-12)
-        np.testing.assert_allclose(sol.ys[1], jnp.roll(y0, 4, axis=1), atol=1e-12)
-
     def test_solvers_pass_through_jax_jit(self):
         """Static int fields: the solver objects can be jax.jit arguments."""
-        from gridax_jax import SemiLagrangianTerm
-
-        @jax.jit
-        def run_sl(solver, y0):
-            term = SemiLagrangianTerm(
-                lambda t, y, a: (jnp.ones_like(y), jnp.zeros_like(y))
-            )
-            return dfx.diffeqsolve(term, solver, 0.0, 1.0, 1.0, y0).ys
-
-        y0 = jnp.arange(16.0).reshape(4, 4)
-        np.testing.assert_allclose(
-            run_sl(SemiLagrangianSolver(), y0)[0], jnp.roll(y0, 1, axis=1)
-        )
 
         @jax.jit
         def run_split(solver, y3, y2):

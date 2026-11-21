@@ -1,8 +1,9 @@
-"""The generic CG solve and preconditioner factories are deprecated (#474).
+"""The solver names that moved to gaussx and sesmax-core are gone.
 
 CG, its report and the multigrid and Nyström preconditioners are gaussx's
-(jejjohnson/geostack#291, rule 1). For one release ``gridax_jax.<name>``
-still works, warns, and names the gaussx call; the object is unchanged.
+(#474); the forcing operators, the vertical modes, ``multilayer`` and the
+barotropic filter are sesmax-core's (#422). The deprecation window is over:
+``gridax_jax.<name>`` raises ``AttributeError``.
 """
 
 from __future__ import annotations
@@ -12,19 +13,9 @@ import warnings
 
 import gaussx
 import gridax_jax
-from gridax_jax import _GAUSSX_SOLVES
 import jax.numpy as jnp
 import numpy as np
 import pytest
-
-
-@pytest.mark.parametrize("name", sorted(_GAUSSX_SOLVES))
-def test_name_warns_and_names_gaussx(name: str) -> None:
-    module, _ = _GAUSSX_SOLVES[name]
-    with pytest.warns(DeprecationWarning, match=r"gaussx\.") as record:
-        obj = getattr(gridax_jax, name)
-    assert f"gridax_jax.{name} is deprecated" in str(record[0].message)
-    assert obj is getattr(importlib.import_module(module), name)
 
 
 def test_gridax_jax_imports_without_warning() -> None:
@@ -76,6 +67,55 @@ def test_t_point_pieces_are_public(name: str) -> None:
 )
 def test_moved_to_sesmax_core_and_gone(name: str) -> None:
     # sesmax_core.gfd and sesmax_core.solve_pde own them; gridax keeps no alias
+    assert name not in gridax_jax.__all__
+    with pytest.raises(AttributeError):
+        getattr(gridax_jax, name)
+
+
+REMOVED_NAMES = [
+    # gaussx (#474)
+    "solve_cg",
+    "CGInfo",
+    "make_preconditioner",
+    "make_nystrom_preconditioner",
+    "make_multigrid_preconditioner",
+    "make_gaussx_multigrid_preconditioner",
+    # sesmax_core.forcing (#422)
+    "AbstractForcing",
+    "ForcingSum",
+    "ForcingProduct",
+    "TimeVaryingForcing",
+    "LinearDrag2D",
+    "LinearDrag3D",
+    "QuadraticDrag2D",
+    "QuadraticDrag3D",
+    "RayleighDamping2D",
+    "RayleighDamping3D",
+    "WindStress2D",
+    "WindStress3D",
+    "WindCurl2D",
+    "linear_drag_tendency",
+    "quadratic_drag_tendency",
+    "rayleigh_tendency",
+    "wind_stress_tendency",
+    "linear_drag",
+    "rayleigh_relaxation",
+    # sesmax_core.vertical (#422)
+    "build_coupling_matrix",
+    "decompose_vertical_modes",
+    "layer_to_mode",
+    "mode_to_layer",
+    "multilayer",
+    "barotropic_filter",
+    # integrix.march (#476)
+    "semi_lagrangian_step",
+    "SemiLagrangianSolver",
+    "SemiLagrangianTerm",
+]
+
+
+@pytest.mark.parametrize("name", REMOVED_NAMES)
+def test_removed_names_raise_attribute_error(name: str) -> None:
     assert name not in gridax_jax.__all__
     with pytest.raises(AttributeError):
         getattr(gridax_jax, name)

@@ -238,8 +238,6 @@ def velocity(t, p):
 new_field = im.semi_lagrangian_step(field.ravel(), nodes, velocity, readout, t, dt).reshape(field.shape)
 ```
 
-The old `gridax_jax.semi_lagrangian_step(field, u, v, dx, dy, dt)` still works for one release and warns; with `iterations=0`, a linear read-out and the velocity at the nodes, the integrix call reproduces it to rounding.
-
 ---
 
 ## Diffrax Integration (Advanced)

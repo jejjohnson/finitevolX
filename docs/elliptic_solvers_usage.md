@@ -12,6 +12,7 @@ defines.
 The fastest way to solve an elliptic problem on a rectangle: slice the unknowns of the field you solve for, call the spectral solver, and embed the result in zeros.
 
 ```python
+import gaussx
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -100,11 +101,15 @@ domain = fvx.SolveDomain(mask, known_mask=obs)
 lifter = fvx.KnownValueLifting(domain, dx, dy, lambda_=lambda_)
 eff = domain.effective_mask.astype(float)
 A = lambda x: fvx.masked_laplacian(x, eff, dx, dy, lambda_=lambda_)
+A_op = gaussx.as_linear_operator(
+    A, in_structure=jax.ShapeDtypeStruct(eff.shape, eff.dtype), negative_definite=True
+)
+cg = gaussx.CGSolver(rtol=1e-10, atol=1e-10, max_steps=2000)
 
 # Per step (JIT-friendly): correct, solve, reconstruct
 known_values = jnp.where(obs, values, g)
 rhs_corrected, value_lift = lifter.preprocess(zeta, known_values)
-psi_hom, info = fvx.solve_cg(A, rhs_corrected, rtol=1e-10, atol=1e-10)
+psi_hom, info = gaussx.linear_solve_with_info(A_op, rhs_corrected, solver=cg)
 psi = lifter.postprocess(psi_hom * eff, value_lift)
 ```
 
@@ -116,9 +121,10 @@ For **multigrid**, build the hierarchy on the same effective mask and use it as 
 mg = fvx.build_multigrid_solver(
     np.asarray(domain.effective_mask, dtype=float), dx, dy, lambda_=lambda_
 )
-psi_hom, info = fvx.solve_cg(
-    A, rhs_corrected, preconditioner=fvx.make_multigrid_preconditioner(mg),
-    rtol=1e-10, atol=1e-10,
+# gaussx solves (-A) x = -b, so its preconditioner is -M^-1 (one V-cycle from zero)
+pre = lambda r: -mg.v_cycle(jnp.zeros_like(r), r)
+psi_hom, info = gaussx.linear_solve_with_info(
+    A_op, rhs_corrected, solver=cg, preconditioner=pre
 )
 ```
 
@@ -237,14 +243,8 @@ rectangular solves plus an $O(N_c^2)$ back-substitution.
 
 ## Conjugate Gradient Solver
 
-:::{note}
-`solve_cg`, `CGInfo` and the multigrid and Nyström preconditioner factories are deprecated (#474): CG is gaussx's, and the examples below keep working for one release with a `DeprecationWarning`. The gaussx call is
-`x, info = gaussx.linear_solve_with_info(gaussx.as_linear_operator(lambda v: A(v.reshape(shape)).ravel(), shape=(n, n), negative_definite=True), rhs.ravel(), solver=gaussx.CGSolver(rtol=1e-8, atol=1e-8), preconditioner=pre)`,
-whose `info` (a `gaussx.SolveInfo`) has the same `iterations`, `residual_norm` and `converged`; for a multigrid preconditioner, `pre = fvx.build_multigrid_solver(...).as_preconditioner()`.
-:::
-
 For domains where the capacitance matrix is too large, use the
-preconditioned CG solver.
+preconditioned CG solver, which is gaussx's (`gaussx.linear_solve_with_info` with `gaussx.CGSolver`).
 
 ### Basic Usage
 
@@ -256,41 +256,43 @@ rhs = zeta * psi_mask
 def A(x):
     return fvx.masked_laplacian(x, psi_mask, dx, dy, lambda_=lambda_)
 
-# Solve with a spectral preconditioner
-psi, info = fvx.solve_cg(
-    A, rhs,
-    preconditioner=fvx.make_spectral_preconditioner(dx, dy, lambda_=lambda_, bc="fft"),
-    rtol=1e-8,
-    atol=1e-8 * float(jnp.max(jnp.abs(rhs))),
+# gaussx solves (-A) x = -b, so a preconditioner approximating A^-1 is passed as -M^-1
+A_op = gaussx.as_linear_operator(
+    A, in_structure=jax.ShapeDtypeStruct(rhs.shape, rhs.dtype), negative_definite=True
+)
+spectral = fvx.make_spectral_preconditioner(dx, dy, lambda_=lambda_, bc="fft")
+psi, info = gaussx.linear_solve_with_info(
+    A_op,
+    rhs,
+    solver=gaussx.CGSolver(
+        rtol=1e-8, atol=1e-8 * float(jnp.max(jnp.abs(rhs))), max_steps=500
+    ),
+    preconditioner=lambda r: -spectral(r),
 )
 psi = psi * psi_mask  # zero out land points
 ```
 
 Scale `atol` to the right-hand side as above rather than passing
-`atol=0.0`: lineax's stopping rule divides each residual entry by
+`atol=0.0`: the stopping rule divides each residual entry by
 `atol + rtol |rhs_i|`, which is `0` where the masked right-hand side is
-zero, and the resulting `NaN` stops CG after one iteration (`solve_cg` then
-reports `converged=False`).
+zero, and the resulting `NaN` stops CG after one iteration.
 
 ### Convergence Info
 
-`solve_cg` returns a `CGInfo` named tuple:
+`gaussx.linear_solve_with_info` returns `(x, info)`:
 
 ```python
-psi, info = fvx.solve_cg(A, rhs)
+psi, info = gaussx.linear_solve_with_info(A_op, rhs, solver=gaussx.CGSolver(throw=False))
 print(f"Converged: {info.converged}")
 print(f"Iterations: {info.iterations}")
 print(f"Residual norm: {info.residual_norm:.2e}")
 ```
 
-`solve_cg` does not raise when CG fails (pass `throw=True` for that):
+`gaussx.CGSolver` raises when CG fails unless you pass `throw=False`:
 hitting `max_steps`, an indefinite operator (`lambda_ < 0`) or a
-preconditioner of the wrong sign all return `converged=False`.
-`converged` is checked on the explicit residual of the un-preconditioned
-system, `max|rhs - A(x)| <= atol + rtol max|rhs|`, and `residual_norm` is
-the L2 norm of that residual. The solve is differentiable with respect to
-`lambda_` and `dx`, also with a preconditioner built from them. Its output
-can be non-zero on land (the spectral preconditioners ignore the mask), so
+preconditioner of the wrong sign all give `converged=False`.
+The solve is differentiable with respect to `lambda_` and `dx`.
+Its output can be non-zero on land (the spectral preconditioners ignore the mask), so
 multiply by the mask as above; the wrappers do.
 
 ### Preconditioners
@@ -313,10 +315,9 @@ at 128²–256² (see the [Solver Comparison](solver_comparison.md)).
 ::::{tab-item} Nyström (operator-only)
 
 ```python
-M_inv = fvx.make_nystrom_preconditioner(
-    A, shape=(Ny, Nx), rank=100, key=jax.random.PRNGKey(0)
-)
-psi, info = fvx.solve_cg(A, rhs, preconditioner=M_inv, rtol=1e-8)
+# gaussx owns it: a randomised Nyström approximation of the operator, then
+# gaussx.NystromPreconditioner on its basis, eigenvalues and shift
+lowrank = gaussx.randomized_nystrom(A_op, rank=100, key=jax.random.PRNGKey(0))
 ```
 
 Builds a low-rank approximate inverse by probing the operator with
@@ -337,8 +338,9 @@ known only through `matvec`).
 
 ```python
 mg = fvx.build_multigrid_solver(mask, dx, dy, lambda_=lambda_)  # coeff= for c(x, y)
-M_inv = fvx.make_multigrid_preconditioner(mg)
-psi, info = fvx.solve_cg(A, rhs, preconditioner=M_inv, rtol=1e-8)
+pre = mg.as_preconditioner()  # a gaussx.MultigridPreconditioner, on flat vectors
+# pass it to gaussx.linear_solve_with_info(..., solver=gaussx.CGSolver(...), preconditioner=pre)
+# on the flat finest operator pre.levels[0].operator
 ```
 
 A single multigrid V-cycle as an approximate inverse.  Captures both
@@ -348,19 +350,6 @@ exactly `masked_laplacian` on the same mask.  CG needs 5–7 iterations
 at 128² and 256² on a rectangle and an island basin, independent of the
 grid size.
 ::::
-::::{tab-item} Factory (dispatches by name)
-
-```python
-# Dispatches to spectral, nystrom, or multigrid
-M_inv = fvx.make_preconditioner("spectral", dx=dx, dy=dy, lambda_=lambda_)
-M_inv = fvx.make_preconditioner(
-    "nystrom", matvec=A, shape=(Ny, Nx), key=jax.random.PRNGKey(0)
-)
-M_inv = fvx.make_preconditioner("multigrid", mg_solver=mg)
-```
-
-Convenient when the preconditioner choice is a configurable parameter.
-::::
 ::::{tab-item} Custom
 
 ```python
@@ -368,7 +357,10 @@ def my_preconditioner(r):
     """Any callable (Ny, Nx) -> (Ny, Nx) that approximates A^{-1}."""
     return -r / (2 / dx**2 + 2 / dy**2 + lambda_)  # Jacobi: 1 / diag(A)
 
-psi, info = fvx.solve_cg(A, rhs, preconditioner=my_preconditioner)
+psi, info = gaussx.linear_solve_with_info(
+    A_op, rhs, solver=gaussx.CGSolver(throw=False),
+    preconditioner=lambda r: -my_preconditioner(r),
+)
 ```
 ::::
 :::::

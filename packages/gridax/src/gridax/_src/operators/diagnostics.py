@@ -420,13 +420,14 @@ def qg_potential_vorticity(
 
     This computes the per-layer (barotropic) QG PV for a single ``[Ny, Nx]``
     streamfunction.  For multi-layer QG, lift this function with
-    :func:`~finitevolx.multilayer` and subtract the cross-layer stretching
+    ``jax.vmap`` and subtract the cross-layer stretching
     term separately::
 
-        from gridax_jax import multilayer, qg_potential_vorticity
+        import jax
+        from gridax_jax import qg_potential_vorticity
 
         # Per-layer PV (vmapped over the layer axis)
-        q = multilayer(lambda p: qg_potential_vorticity(p, f0, beta, dx, dy, y, y0))(
+        q = jax.vmap(lambda p: qg_potential_vorticity(p, f0, beta, dx, dy, y, y0))(
             psi
         )  # psi: [nl, Ny, Nx] -> q: [nl, Ny, Nx]
 
@@ -476,7 +477,7 @@ def stretching_term(
     across layers.  This is a cross-layer operation and cannot be vmapped;
     it should be used alongside :func:`qg_potential_vorticity` (which
     handles the per-layer Laplacian + beta terms via
-    :func:`~finitevolx.multilayer`).
+    ``jax.vmap``).
 
     Parameters
     ----------

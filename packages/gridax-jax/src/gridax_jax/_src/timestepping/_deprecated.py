@@ -6,10 +6,7 @@ interfaces there, so ``finitevolx.<name>`` returns the integrix object itself.
 ``AB2Solver``, ``LeapfrogRAFSolver`` and ``SplitExplicitRKSolver`` have a new
 interface in integrix (``integrix.march.AbstractStepper``s run by
 ``integrix.march.run``), so the classes below keep finitevolX's old call
-shapes and delegate their arithmetic to the integrix steppers. The
-semi-Lagrangian scheme was rewritten in integrix (#476) with a new interface
-(N points, a velocity sampler and a functax read-out), so its old names return
-finitevolX's own implementation until it is removed.
+shapes and delegate their arithmetic to the integrix steppers.
 """
 
 from __future__ import annotations
@@ -20,8 +17,6 @@ import warnings
 import equinox as eqx
 import integrix.march as ixm
 from jaxtyping import PyTree
-
-from gridax_jax._src.timestepping import semi_lagrangian as _semi_lagrangian
 
 #: Names finitevolX re-exports unchanged from :mod:`integrix.march`.
 MOVED: tuple[str, ...] = (
@@ -64,38 +59,19 @@ ADAPTED: dict[str, str] = {
 }
 
 
-#: The semi-Lagrangian names, now in integrix with a new interface, and it.
-SEMI_LAGRANGIAN: dict[str, str] = {
-    "semi_lagrangian_step": (
-        "integrix.march.semi_lagrangian_step(q.ravel(), nodes, velocity, readout,"
-        " t, dt) with nodes = gridax.t_point_coordinates(grid), velocity(t, x) at"
-        " N points and a functax plan as the read-out"
-    ),
-    "SemiLagrangianSolver": (
-        "integrix.march.SemiLagrangianSolver(nodes, readout) with"
-        " integrix.march.SemiLagrangianTerm(velocity)"
-    ),
-    "SemiLagrangianTerm": (
-        "integrix.march.SemiLagrangianTerm(velocity), whose velocity(t, x) takes"
-        " N points"
-    ),
-}
-
-
 def deprecated_stepper(name: str) -> object:
     """Return the object behind a deprecated ``finitevolx.<name>``, warning once per call site.
 
     Parameters
     ----------
     name : str
-        One of :data:`MOVED`, :data:`ADAPTED` or :data:`SEMI_LAGRANGIAN`.
+        One of :data:`MOVED` or :data:`ADAPTED`.
 
     Returns
     -------
     object
         ``integrix.march.<name>`` for a name in :data:`MOVED`; the adapter
-        class of this module for a name in :data:`ADAPTED`; finitevolX's own
-        semi-Lagrangian object for a name in :data:`SEMI_LAGRANGIAN`.
+        class of this module for a name in :data:`ADAPTED`.
     """
     if name in MOVED:
         message = (
@@ -105,13 +81,6 @@ def deprecated_stepper(name: str) -> object:
             f" (`from integrix.march import {name}`)."
         )
         obj = getattr(ixm, name)
-    elif name in SEMI_LAGRANGIAN:
-        message = (
-            f"gridax_jax.{name} (formerly finitevolx.{name}) is deprecated and will"
-            " be removed in the next"
-            f" release: use {SEMI_LAGRANGIAN[name]}."
-        )
-        obj = getattr(_semi_lagrangian, name)
     else:
         message = (
             f"gridax_jax.{name} (formerly finitevolx.{name}) is deprecated and will"

@@ -22,7 +22,7 @@ confused** because their ghost-cell conventions are opposite.
 
 ---
 
-## Multilayer: `multilayer(fn)`
+## Multilayer: `jax.vmap`
 
 ### Concept
 
@@ -34,10 +34,10 @@ holds a real physical field.
 
 The JAX-idiomatic way to apply any 2D horizontal operator to all layers at
 once is `jax.vmap`, which vectorises the call over the leading axis without
-any overhead.  `finitevolX` exposes this pattern through the
-`multilayer` helper:
+any overhead.  (`sesmax_core.vertical.multilayer` is a thin `eqx.filter_vmap` wrapper over the same pattern.)
 
 ```python
+import jax
 import jax.numpy as jnp
 import gridax_jax as fvx
 
@@ -48,7 +48,7 @@ nl = 3                                     # number of layers
 h = jnp.ones((nl, grid.Ny, grid.Nx))      # [nl, Ny, Nx]
 
 # Apply diff_x_T_to_U to every layer in one vectorised call
-dh_dx = fvx.multilayer(diff2d.diff_x_T_to_U)(h)   # shape [nl, Ny, Nx]
+dh_dx = jax.vmap(diff2d.diff_x_T_to_U)(h)   # shape [nl, Ny, Nx]
 ```
 
 For operators that take multiple arguments (e.g., `divergence`), pass the
@@ -59,12 +59,12 @@ over the leading axis independently:
 u = jnp.ones((nl, grid.Ny, grid.Nx))
 v = jnp.ones((nl, grid.Ny, grid.Nx))
 
-div = fvx.multilayer(diff2d.divergence)(u, v)
+div = jax.vmap(diff2d.divergence)(u, v)
 ```
 
-### What `multilayer` does
+### What `jax.vmap` does here
 
-- Wraps `fn` with `jax.vmap`, batching over the **first** axis.
+- Batches `fn` over the **first** axis.
 - The 2D stencil (ghost-cell ring, interior writes) is completely unchanged.
 - **All** `nl` slices are processed; there is no "outer ghost layer" concept.
 
@@ -98,7 +98,7 @@ dh_dx = diff3d.diff_x_T_to_U(h)
 
 ## Key Differences at a Glance
 
-| Property | `multilayer(fn)` | `Difference3D` |
+| Property | `jax.vmap(fn)` | `Difference3D` |
 |---|---|---|
 | Leading axis meaning | Layer / mode index | Vertical *z* dimension |
 | Ghost layers at k=0, k=N-1 | ❌ None — all slices are real | ✅ Required — top/bottom are ghost shells |
@@ -115,6 +115,7 @@ Although the two approaches differ at the boundary layers, they produce
 z-levels:
 
 ```python
+import jax
 import jax.numpy as jnp
 import numpy as np
 import gridax_jax as fvx
@@ -130,7 +131,7 @@ h = jnp.arange(Nz * grid3d.Ny * grid3d.Nx, dtype=float).reshape(
     Nz, grid3d.Ny, grid3d.Nx
 )
 
-ml_result = fvx.multilayer(diff2d.diff_x_T_to_U)(h)
+ml_result = jax.vmap(diff2d.diff_x_T_to_U)(h)
 d3_result = diff3d.diff_x_T_to_U(h)
 
 # Interior z-levels AND horizontal interior agree exactly
@@ -144,7 +145,7 @@ np.testing.assert_allclose(
 print(d3_result[0].max())    # 0.0
 print(d3_result[-1].max())   # 0.0
 
-# multilayer: k=0, k=5 are real (non-zero) layers
+# vmap over layers: k=0, k=5 are real (non-zero) layers
 print(ml_result[0].max())    # non-zero
 print(ml_result[-1].max())   # non-zero
 ```
@@ -153,7 +154,7 @@ print(ml_result[-1].max())   # non-zero
 
 ## Summary
 
-- Use **`multilayer(fn)`** when your leading axis indexes independent
+- Use **`jax.vmap(fn)`** when your leading axis indexes independent
   physical layers or modes.  Every layer is real; `jax.vmap` is the
   correct, efficient way to batch over them.
 - Use **`Difference3D`** when your leading axis is a spatial vertical

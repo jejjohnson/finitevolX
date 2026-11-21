@@ -20,7 +20,6 @@ from gridax._src.operators.diagnostics import (
 )
 from gridax._src.operators.difference import Difference2D
 from gridax._src.operators.jacobian import arakawa_jacobian
-from gridax_jax._src.vertical.multilayer import multilayer
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -310,14 +309,14 @@ class TestQGPotentialVorticity:
         np.testing.assert_allclose(result[1:-1, 1:-1], 2.0 * c / f0, rtol=1e-5)
 
     def test_multilayer_output_shape(self, grid2d):
-        """Multi-layer psi [nl, Ny, Nx] via multilayer() returns [nl, Ny, Nx]."""
+        """Multi-layer psi [nl, Ny, Nx] via jax.vmap() returns [nl, Ny, Nx]."""
         nl = 3
         psi = jnp.zeros((nl, grid2d.Ny, grid2d.Nx))
         y = jnp.broadcast_to(
             jnp.arange(grid2d.Ny, dtype=float)[:, None] * grid2d.dy,
             (grid2d.Ny, grid2d.Nx),
         )
-        qg_pv = multilayer(
+        qg_pv = jax.vmap(
             lambda p: qg_potential_vorticity(
                 p, f0=1e-4, beta=1e-11, dx=grid2d.dx, dy=grid2d.dy, y=y, y0=0.0
             )
@@ -337,7 +336,7 @@ class TestQGPotentialVorticity:
         # A is diagonal: A @ psi gives a * psi per layer
         a_val = 0.1
         A = a_val * jnp.eye(nl)
-        qg_pv = multilayer(
+        qg_pv = jax.vmap(
             lambda p: qg_potential_vorticity(
                 p, f0=f0, beta=0.0, dx=grid2d.dx, dy=grid2d.dy, y=y, y0=0.0
             )
@@ -353,7 +352,7 @@ class TestQGPotentialVorticity:
         psi = jnp.ones((nl, grid2d.Ny, grid2d.Nx))
         y = jnp.zeros((grid2d.Ny, grid2d.Nx))
         A = 0.01 * jnp.eye(nl)
-        qg_pv = multilayer(
+        qg_pv = jax.vmap(
             lambda p: qg_potential_vorticity(
                 p, f0=1.0, beta=0.0, dx=grid2d.dx, dy=grid2d.dy, y=y, y0=0.0
             )
@@ -366,7 +365,7 @@ class TestQGPotentialVorticity:
             np.testing.assert_allclose(result[layer, :, -1], 0.0, atol=1e-10)
 
     def test_multilayer_laplacian_per_layer(self, grid2d):
-        """Each layer gets its own Laplacian via multilayer(); no stretching."""
+        """Each layer gets its own Laplacian via jax.vmap(); no stretching."""
         f0, beta, y0 = 1.0, 0.0, 0.0
         x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
         y_arr = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
@@ -375,7 +374,7 @@ class TestQGPotentialVorticity:
         psi_0 = 0.5 * X**2
         psi_1 = 0.5 * Y**2
         psi = jnp.stack([psi_0, psi_1], axis=0)
-        qg_pv = multilayer(
+        qg_pv = jax.vmap(
             lambda p: qg_potential_vorticity(
                 p, f0=f0, beta=beta, dx=grid2d.dx, dy=grid2d.dy, y=Y, y0=y0
             )

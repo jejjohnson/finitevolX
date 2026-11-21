@@ -66,7 +66,8 @@ list grouped by module, plus spectraldiffx and gaussx.
      `finitevolx.area_sum`, `finitevolx.area_mean`, `finitevolx.masked_mean`;
    - a DST / DCT / FFT Poisson or Helmholtz solver, a CG loop, a capacitance
      or multigrid solver → `finitevolx.solve_helmholtz_dst`,
-     `finitevolx.solve_cg`, `finitevolx.build_capacitance_solver`,
+     `gaussx.linear_solve_with_info` with `gaussx.CGSolver`,
+     `finitevolx.build_capacitance_solver`,
      `finitevolx.build_multigrid_solver`; the one-call inversions are
      `sesmax_core.gfd.streamfunction_from_vorticity` / `pv_inversion`,
      which moved from finitevolX;

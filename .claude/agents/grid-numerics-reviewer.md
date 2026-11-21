@@ -30,7 +30,7 @@ the forward / backward asymmetry in contract 1 above all) and
    `[1:-1, 2:-2, 2:-2]`) with a zero ring; a chained backward operator
    reading a west / south ghost that no BC has filled; a 3-D operator
    touching the `k = 0` / `k = Nz-1` slabs; a multilayer field pushed
-   through a `3D` operator (or a 3-D field through `multilayer`);
+   through a `3D` operator (or a 3-D field through a layer `vmap`);
    `wall="open"` combined with a mask.
 3. **Masks.** The output masked with the mask of **its own** stagger
    (`h` / `u` / `v` / `xy_corner_strict`); `mask=None` must give the old
@@ -58,9 +58,9 @@ the forward / backward asymmetry in contract 1 above all) and
 7. **Time stepping and solvers.** A stated order or SSP coefficient that the
    tableau does not have; a time step chosen without regard to the CFL /
    diffusive limit (`dt ≲ dx / |u|`, `dt ≲ dx² / (4κ)`; on the sphere
-   `min_cell_width`); a matvec for `solve_cg` that is not the negative
+   `min_cell_width`); a matvec for `gaussx.CGSolver` that is not the negative
    (semi)definite `(∇² − λ)` with `λ ≥ 0`; a preconditioner with the wrong
-   sign; an unconverged `CGInfo` ignored; a Neumann / periodic Poisson
+   sign (gaussx wants `−M⁻¹`); an unconverged `info.converged` ignored; a Neumann / periodic Poisson
    right-hand side whose mean is not removed (the solvers return the
    zero-mean gauge).
 8. **JAX.** Python `if` / `bool()` / `float()` / `.item()` / `np.asarray` on

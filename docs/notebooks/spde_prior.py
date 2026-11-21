@@ -233,4 +233,4 @@ plt.show()
 #   gaussx's Kalman primitives.
 # - Swap $\nabla^2_h$ for an anisotropic or variable-coefficient operator
 #   (e.g. `MultigridSolver` with face coefficients) and solve with
-#   `gaussx.CGSolver(preconditioner=fvx.make_gaussx_multigrid_preconditioner(mg))`.
+#   `gaussx.CGSolver(preconditioner=mg.as_preconditioner())`.

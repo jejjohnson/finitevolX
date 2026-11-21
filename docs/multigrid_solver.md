@@ -227,8 +227,7 @@ bottom solve and as many pre- as post-smoothing sweeps (`n_pre == n_post`,
 the default), one V-cycle from a zero guess, $r \mapsto
 \texttt{v\_cycle}(0, r)$, is a symmetric linear operator: $\langle M r_1,
 r_2\rangle = \langle r_1, M r_2\rangle$ to round-off.  That is what CG needs
-from a preconditioner; `make_multigrid_preconditioner` refuses a solver with
-`n_pre != n_post`.
+from a preconditioner, so build the solver with `n_pre == n_post` when it is used with CG.
 
 ---
 
@@ -360,8 +359,8 @@ when:
 - You want to combine multigrid's coarse-grid correction with CG's
   global optimality.
 
-`make_multigrid_preconditioner` wraps one V-cycle as a closure compatible
-with `solve_cg`; the V-cycle is symmetric (see above), as CG requires.  On a
+`MultigridSolver.as_preconditioner()` wraps one V-cycle as a `gaussx.MultigridPreconditioner`
+for `gaussx.CGSolver`; the V-cycle is symmetric (see above), as CG requires.  On a
 circular basin with $\lambda = 4$ and `rtol=1e-8`, CG then takes 6
 iterations at both $128^2$ and $256^2$, against 33 and 47 with the FFT
 spectral preconditioner.
@@ -441,7 +440,7 @@ Is the domain simple with small N_b?
 └── No (complex domain, poor convergence) ↓
 
 Default → Multigrid-preconditioned CG
-          make_multigrid_preconditioner() + solve_cg()
+          mg.as_preconditioner() + gaussx.CGSolver
 ```
 
 ---

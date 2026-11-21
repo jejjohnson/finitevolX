@@ -87,5 +87,5 @@ in the repository: the module map, the boundaries with spectraldiffx and
 gaussx, "reuse before you write", the C-grid, operator, mask,
 boundary-condition, solver and unit contracts and the tests that enforce
 them, and recipe skills for adding stencil operators, advection schemes,
-boundary conditions, forcing terms, elliptic solvers, time integrators and
+boundary conditions, elliptic solvers, time integrators and
 notebooks.

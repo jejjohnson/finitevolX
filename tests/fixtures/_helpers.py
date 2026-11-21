@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import gaussx
+import jax
 import numpy as np
 
 _GOLDEN_DIR = Path(__file__).parent / "golden"
@@ -121,3 +123,31 @@ def save_golden(operator: str, method: str, variant: str, value) -> Path:
         kwargs = {"out": np.asarray(value)}
     np.savez(path, **kwargs)
     return path
+
+
+def cg_solve(
+    matvec,
+    rhs,
+    preconditioner=None,
+    rtol: float = 1e-6,
+    atol: float = 1e-6,
+    max_steps: int = 500,
+):
+    """Preconditioned CG on a negative-definite ``matvec`` through gaussx.
+
+    ``preconditioner`` approximates ``A^-1`` (negative); gaussx solves
+    ``(-A) x = -b``, so it is handed ``-M``. Returns ``(x, info)`` with
+    ``info.iterations``, ``info.residual_norm`` and ``info.converged``.
+    """
+    operator = gaussx.as_linear_operator(
+        matvec,
+        in_structure=jax.ShapeDtypeStruct(rhs.shape, rhs.dtype),
+        negative_definite=True,
+    )
+    pc = None if preconditioner is None else (lambda r: -preconditioner(r))
+    return gaussx.linear_solve_with_info(
+        operator,
+        rhs,
+        solver=gaussx.CGSolver(rtol=rtol, atol=atol, max_steps=max_steps, throw=False),
+        preconditioner=pc,
+    )

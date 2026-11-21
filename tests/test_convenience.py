@@ -20,7 +20,6 @@ from gridax._src.operators.diagnostics import (
 )
 from gridax._src.operators.difference import Difference2D
 from gridax_jax._src.utils.constants import GRAVITY, OMEGA, R_EARTH
-from gridax_jax._src.vertical.multilayer import multilayer
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -207,7 +206,7 @@ class TestPotentialVorticityMultilayer:
 
     @pytest.mark.slow
     def test_matches_manual_composition(self, grid2d):
-        """Must match multilayer(qg_pv)(psi) - f0 * stretching_term(A, psi)."""
+        """Must match jax.vmap(qg_pv)(psi) - f0 * stretching_term(A, psi)."""
         nl = 2
         f0, beta, y0 = 2.0, 1e-11, 0.5
         y = jnp.broadcast_to(
@@ -223,7 +222,7 @@ class TestPotentialVorticityMultilayer:
         )
 
         # Manual composition
-        qg_pv = multilayer(
+        qg_pv = jax.vmap(
             lambda p: qg_potential_vorticity(p, f0, beta, grid2d.dx, grid2d.dy, y, y0)
         )
         expected = qg_pv(psi) - f0 * stretching_term(A, psi)
@@ -266,7 +265,7 @@ class TestPotentialVorticityMultilayer:
         result = potential_vorticity_multilayer(
             psi, A, f0=f0, beta=beta, dx=grid2d.dx, dy=grid2d.dy, y=y, y0=y0
         )
-        qg_pv = multilayer(
+        qg_pv = jax.vmap(
             lambda p: qg_potential_vorticity(p, f0, beta, grid2d.dx, grid2d.dy, y, y0)
         )
         expected = qg_pv(psi)

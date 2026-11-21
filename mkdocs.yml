@@ -69,7 +69,6 @@ nav:
       - Grids: grids.md
       - Analysis kernels (gridax): analysis.md
       - Masks: masks.md
-      - Vertical modes: vertical_modes.md
   - Stencils and operators:
       - Raw stencils: stencils.md
       - Difference: difference.md
@@ -78,7 +77,6 @@ nav:
       - Vorticity: vorticity.md
       - Diffusion: diffusion.md
       - Coriolis: coriolis.md
-      - Forcing: forcing.md
       - Momentum advection: momentum.md
       - Diagnostics: diagnostics.md
   - Advection:

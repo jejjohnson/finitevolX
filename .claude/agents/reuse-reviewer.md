@@ -23,9 +23,7 @@ in `AGENTS.md`.
    - `docs/capabilities.md` — every name in `gridax_jax.__all__` grouped by
      defining module, then the spectraldiffx and gaussx sections;
    - the shared private helpers: `operators/_ghost.py` (`interior`,
-     `zero_z_ghosts`); `operators/_utils._safe_div_cos`; `forcing/_utils.py`
-     (`interior_or_scalar`, `on_face_interior`, `safe_speed`,
-     `safe_denominator`, `mask_where`); `boundary/bc_1d.py`
+     `zero_z_ghosts`); `operators/_utils._safe_div_cos`; `boundary/bc_1d.py`
      (`_adjacent_interior`, `_opposite_interior`, `_normal_spacing`,
      `_set_face`); `advection/flux.narrow_mask_hierarchy`;
      `advection/reconstruction._get_limiter`; `mask/utils.py` (`pool_bool`,
@@ -58,11 +56,12 @@ in `AGENTS.md`.
      sesmax-core, the wrappers `streamfunction_from_vorticity` /
      `pv_inversion` (`sesmax_core.gfd`);
    - a Thomas algorithm → `solve_tridiagonal` (gaussx); a CG loop →
-     `solve_cg`; a preconditioner → `make_preconditioner`; a Nyström or
-     low-rank approximation → gaussx;
+     `gaussx.linear_solve_with_info` with `gaussx.CGSolver`; a multigrid
+     preconditioner → `MultigridSolver.as_preconditioner()`; a Nyström or
+     low-rank approximation → `gaussx.NystromPreconditioner`;
    - an RK / Adams–Bashforth / leapfrog loop → the step functions or the
      diffrax solvers, and `sesmax_core.solve_pde.solve_ocean_pde`;
-   - a `vmap` over layers of a 2-D operator → `multilayer`;
+   - a `vmap` over layers of a 2-D operator → `jax.vmap` (or `sesmax_core.vertical.multilayer`);
    - `jnp.abs` / `jnp.maximum` / `jnp.clip` on a differentiated path →
      `smooth_abs`, `smooth_max`, `smooth_clamp`;
    - a public name that duplicates another public name (here or upstream)

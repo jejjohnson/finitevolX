@@ -155,7 +155,7 @@ relative to the grid spacing (e.g., atmospheric models, ECMWF IFS).
 The trade-off is that interpolation introduces numerical diffusion, and
 monotonicity/conservation requires additional corrections.
 
-The scheme lives in `integrix.march` (`semi_lagrangian_step`, `SemiLagrangianSolver`), with a second-order midpoint trajectory and the read-out a functax plan, so a cubic B-spline read-out keeps a translated Gaussian's peak at 0.997 where the old linear one kept 0.552. The `gridax_jax` names are deprecated for one release.
+The scheme lives in `integrix.march` (`semi_lagrangian_step`, `SemiLagrangianSolver`), with a second-order midpoint trajectory and the read-out a functax plan, so a cubic B-spline read-out keeps a translated Gaussian's peak at 0.997 where the old linear one kept 0.552.
 
 ---
 

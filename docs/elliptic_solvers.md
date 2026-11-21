@@ -324,17 +324,10 @@ Is the operator close to the rectangular constant-coefficient one?
 └── Operator-only access → Nyström preconditioner (rank 30–100)
 ```
 
-#### Factory Function
+#### Where the preconditioners live
 
-`make_preconditioner` dispatches to any of the three preconditioners based
-on a string key, which is convenient when the preconditioner choice is
-configurable:
-
-```python
-pc = fvx.make_preconditioner("spectral", dx=dx, dy=dy, lambda_=1.0)
-pc = fvx.make_preconditioner("nystrom", matvec=A, shape=(64, 64), rank=50)
-pc = fvx.make_preconditioner("multigrid", mg_solver=mg)
-```
+`make_spectral_preconditioner` is finitevolX's.
+The multigrid preconditioner is `build_multigrid_solver(...).as_preconditioner()` (a `gaussx.MultigridPreconditioner`) and the Nyström one is `gaussx.NystromPreconditioner`; both go to `gaussx.CGSolver(preconditioner=...)`.
 
 ---
 
@@ -377,7 +370,7 @@ Fixed mask and λ, many solves, setup affordable (N_b up to ~1000)?
 └── No (mask or λ changes, very long coastline) ↓
 
 Default → Use CG (method="cg")
-          with preconditioner=make_multigrid_preconditioner(mg)
+          with the preconditioner mg.as_preconditioner()
           (the default spectral preconditioner needs no setup but
           3–13× more iterations)
 ```

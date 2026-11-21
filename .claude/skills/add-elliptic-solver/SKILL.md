@@ -1,6 +1,6 @@
 ---
 name: add-elliptic-solver
-description: Add or extend an elliptic (Poisson / Helmholtz) solver path in finitevolX — a preconditioner for solve_cg, a multigrid option, or known-value / boundary-condition handling — while delegating spectral solves to spectraldiffx and structured linear algebra to gaussx and lineax. Use when asked to add, port or fix a Poisson, Helmholtz, PV-inversion, pressure or streamfunction solve, a CG preconditioner or a multigrid feature in gridax_jax/_src/solvers.
+description: Add or extend an elliptic (Poisson / Helmholtz) solver path in finitevolX — a spectral or multigrid preconditioner for gaussx's CG, a multigrid option, or known-value / boundary-condition handling — while delegating spectral solves to spectraldiffx and structured linear algebra and CG to gaussx. Use when asked to add, port or fix a Poisson, Helmholtz, PV-inversion, pressure or streamfunction solve, a CG preconditioner or a multigrid feature in gridax_jax/_src/solvers.
 ---
 
 # Add an elliptic solver path
@@ -13,27 +13,25 @@ Read contract 5 (solvers) in `AGENTS.md`, then `docs/elliptic_solvers.md`,
 | You need… | It lives in |
 |---|---|
 | A rectangular spectral solve, a new transform type, new eigenvalues, a capacitance-method change | **spectraldiffx** (finitevolX re-exports it from `solvers/spectral.py` / `spectral_transforms.py`): propose it upstream, then bump the pin (`bump-upstream-pins` skill) |
-| A tridiagonal / Kronecker / low-rank solve, a Nyström-style preconditioner | **gaussx** (finitevolX re-exports or wraps it: `solvers/tridiagonal.py`, `make_nystrom_preconditioner`) |
+| A tridiagonal / Kronecker / low-rank solve, a Nyström-style preconditioner | **gaussx** (finitevolX re-exports `solvers/tridiagonal.py`; CG is `gaussx.linear_solve_with_info` with `gaussx.CGSolver`, and the Nyström preconditioner is `gaussx.NystromPreconditioner`) |
 | A masked-domain solve on the C-grid, a preconditioner adapted to the finitevolX sign convention, multigrid | here, in `gridax_jax/_src/solvers/` |
 | A one-call inversion (`streamfunction_from_vorticity`, `pressure_from_divergence`, `pv_inversion`), a new `method=` option on them, known-value or `BoundaryConditionSet` handling for them | **sesmax-core** (`sesmax_core.gfd`; the `gridax_jax` names are deprecated, jejjohnson/sesmax#126): propose it there, built from the public pieces here |
 
-Search `docs/capabilities.md` first: `solve_cg` + `masked_laplacian` (and the
+Search `docs/capabilities.md` first: `masked_laplacian` (and the
 T-point `masked_neumann_laplacian`, `masked_face_dirichlet_laplacian`,
-`wet_components`, `project_zero_mean`), the
-`make_*_preconditioner` family and `make_preconditioner`,
+`wet_components`, `project_zero_mean`), `make_spectral_preconditioner`,
 `build_capacitance_solver`, `build_multigrid_solver` / `MultigridSolver`,
 the lifting tools `boundary_ring` / `SolveDomain` / `KnownValueLifting`.
 
 ## 2. Write it (`gridax_jax/_src/solvers/`)
 
 - **Sign convention.** The operator is `(∇² − λ)` with `λ ≥ 0`: negative
-  (semi)definite. A matvec for `solve_cg` implements that operator; a
-  preconditioner approximates its negative inverse (`solve_cg` negates it
-  for lineax; `make_nystrom_preconditioner` probes `−A` for gaussx).
-- **A preconditioner** goes in `preconditioners.py`, returns
-  `M_inv(r: [Ny, Nx]) -> [Ny, Nx]`, and gets a `kind=` branch (and its
-  required-argument check) in `make_preconditioner`. Randomised ones take a
-  `key`.
+  (semi)definite. A matvec for `gaussx.CGSolver` implements that operator; a
+  preconditioner approximates its negative inverse, and gaussx solves
+  `(−A) x = −b`, so the caller passes `lambda r: −M(r)`.
+- **A preconditioner** goes in `preconditioners.py` and returns
+  `M_inv(r: [Ny, Nx]) -> [Ny, Nx]`. Randomised ones take a `key`; a generic
+  one belongs in gaussx.
 - **The one-call wrappers** live in sesmax-core now; the private copies in
   `elliptic.py` (`_solve_dispatch`, `_resolve_bc`) only back the deprecated
   `gridax_jax` names for one release, so do not extend them.
@@ -50,8 +48,8 @@ the lifting tools `boundary_ring` / `SolveDomain` / `KnownValueLifting`.
 - **Precompute** geometry once, with NumPy on concrete values
   (`build_*` functions); the returned object is an `eqx.Module` that runs
   under `jit` / `vmap` / `grad`.
-- **Convergence**: iterative paths return or check `CGInfo.converged`;
-  never a Python loop on a traced residual (lineax's CG iterates in a
+- **Convergence**: iterative paths return or check `info.converged` (`gaussx.linear_solve_with_info`);
+  never a Python loop on a traced residual (gaussx's CG iterates in a
   `lax.while_loop`; `MultigridSolver` runs a fixed number of V-cycles in a
   `lax.fori_loop`).
 - No physical constants inside expressions (`tests/test_scale_covariance.py`
@@ -69,8 +67,7 @@ solver type, a row in `docs/solver_comparison.md`; `make capabilities`.
 - Against an analytic solution (a sine mode of the Dirichlet Laplacian, a
   cosine mode for Neumann) or a dense reference on a small grid; residual
   of the discrete operator.
-- `tests/test_elliptic.py` (CG, preconditioners — fewer iterations than no
-  preconditioner, `TestNystromPreconditioner` for keyed construction —
+- `tests/test_elliptic.py` (the spectral preconditioner,
   masked Laplacian, capacitance, `vmap`),
   `tests/test_inhomogeneous.py`, `tests/test_multigrid.py` (V-cycle
   convergence, preconditioner, JAX compatibility, implicit

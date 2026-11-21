@@ -1,23 +1,18 @@
-"""Tests for CG, preconditioners, masked Laplacian, and vmap integration.
+"""Tests for the spectral preconditioner, masked Laplacian, and vmap integration.
 
 Spectral solver correctness, eigenvalue, and capacitance build/solve tests
 are covered by spectraldiffx and omitted here.  This file tests finitevolX's
-own CG solver, preconditioners, masked Laplacian, vmap integration, and
+own spectral preconditioner, masked Laplacian, vmap integration, and
 the re-export smoke tests.
 """
 
 from __future__ import annotations
 
-import equinox as eqx
 from gridax_jax._src.solvers.elliptic import (
     CapacitanceSolver,
-    CGInfo,
     build_capacitance_solver,
-    fft_eigenvalues,
-    make_nystrom_preconditioner,
     make_spectral_preconditioner,
     masked_laplacian,
-    solve_cg,
     solve_helmholtz_dct,
     solve_helmholtz_dst,
     solve_helmholtz_fft,
@@ -29,6 +24,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+
+from tests.fixtures._helpers import cg_solve
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -230,411 +227,30 @@ class TestSpectralReexports:
 
 
 # ---------------------------------------------------------------------------
-# Preconditioned Conjugate Gradient
+# Spectral preconditioner
 # ---------------------------------------------------------------------------
 
 
-class TestSolveCG:
-    @pytest.mark.slow
-    def test_helmholtz_fft_exact(self, periodic_grid):
-        """CG with spectral preconditioner solves Helmholtz on periodic grid."""
-        Ny, Nx, dx, dy = periodic_grid
-        lam = 1.0
-        j = jnp.arange(Ny)[:, None]
-        i = jnp.arange(Nx)[None, :]
-        psi_ref = jnp.cos(2 * jnp.pi * i / Nx) + jnp.cos(2 * jnp.pi * j / Ny)
-        eigx = fft_eigenvalues(Nx, dx)
-        eigy = fft_eigenvalues(Ny, dy)
-        rhs = (eigx[1] - lam) * jnp.cos(2 * jnp.pi * i / Nx) * jnp.ones((Ny, 1)) + (
-            eigy[1] - lam
-        ) * jnp.cos(2 * jnp.pi * j / Ny) * jnp.ones((1, Nx))
-
-        def A(psi):
-            eig2d = eigy[:, None] + eigx[None, :] - lam
-            return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
-
-        M_inv = make_spectral_preconditioner(dx, dy, lambda_=lam, bc="fft")
-        psi, info = solve_cg(A, rhs, preconditioner=M_inv, rtol=1e-10, atol=1e-10)
-        assert info.converged
-        np.testing.assert_allclose(np.array(psi), np.array(psi_ref), atol=1e-8)
-
-    def test_returns_cg_info(self, periodic_grid):
-        Ny, Nx, dx, dy = periodic_grid
-        lam = 1.0
-        eigx = fft_eigenvalues(Nx, dx)
-        eigy = fft_eigenvalues(Ny, dy)
-
-        def A(psi):
-            eig2d = eigy[:, None] + eigx[None, :] - lam
-            return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
-
-        _, info = solve_cg(A, jnp.ones((Ny, Nx)), rtol=1e-6, atol=1e-6)
-        assert isinstance(info, CGInfo)
-        assert info.iterations >= 0
-        assert info.residual_norm >= 0.0
-
-    @pytest.mark.slow
-    def test_preconditioner_reduces_iterations(self, periodic_grid):
-        """Spectral preconditioner should not require more iters than unpreconditioned."""
-        Ny, Nx, dx, dy = periodic_grid
-        lam = 1.0
-        eigx = fft_eigenvalues(Nx, dx)
-        eigy = fft_eigenvalues(Ny, dy)
-        rhs = jnp.sin(jnp.arange(Ny, dtype=float)[:, None] / Ny) * jnp.cos(
-            jnp.arange(Nx, dtype=float)[None, :] / Nx
-        )
-
-        def A(psi):
-            eig2d = eigy[:, None] + eigx[None, :] - lam
-            return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
-
-        _, info_no_pre = solve_cg(A, rhs, rtol=1e-8, atol=1e-8, max_steps=200)
-        M_inv = make_spectral_preconditioner(dx, dy, lambda_=lam, bc="fft")
-        _, info_pre = solve_cg(
-            A, rhs, preconditioner=M_inv, rtol=1e-8, atol=1e-8, max_steps=200
-        )
-        assert info_pre.iterations <= info_no_pre.iterations + 5
-
-    def test_identity_preconditioner(self, periodic_grid):
-        """None preconditioner (identity) still converges."""
-        Ny, Nx, dx, dy = periodic_grid
-        lam = 1.0
-        eigx = fft_eigenvalues(Nx, dx)
-        eigy = fft_eigenvalues(Ny, dy)
-        rhs = jnp.ones((Ny, Nx))
-
-        def A(psi):
-            eig2d = eigy[:, None] + eigx[None, :] - lam
-            return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
-
-        _psi, info = solve_cg(A, rhs, preconditioner=None, rtol=1e-8, atol=1e-8)
-        assert info.converged
-
-    def test_make_spectral_preconditioner_invalid_bc(self, periodic_grid):
+class TestSpectralPreconditioner:
+    def test_invalid_bc(self, periodic_grid):
         _Ny, _Nx, dx, dy = periodic_grid
         with pytest.raises(ValueError, match="bc must be"):
             make_spectral_preconditioner(dx, dy, bc="invalid")
 
-
-class TestSolveCGFloat32:
-    """Default tolerances must be reachable in float32 (gaussx gh-639).
-
-    lineax's CG checks ``|r_i| <= atol + rtol |b_i|`` entrywise; with a fixed
-    ``atol = 1e-6`` the zero-``rhs`` cells (land, ghost ring) must reach an
-    absolute residual below float32's rounding floor for an elliptic
-    ``rhs ~ 1/dx²``, so CG never converged (unpreconditioned) or diverged
-    (spectral preconditioner on a 64² basin).
-    """
-
-    @staticmethod
-    def _basin(n: int):
-        dx = 1.0 / n
-        mask = jnp.zeros((n, n), jnp.float32).at[2:-2, 2:-2].set(1.0)
-        j = jnp.arange(n)[:, None]
-        i = jnp.arange(n)[None, :]
-        psi = jnp.sin(jnp.pi * j / n) * jnp.sin(2 * jnp.pi * i / n) * mask
-        psi = psi.astype(jnp.float32)
+    def test_dst_preconditioner_solves_full_mask_in_one_step(self):
+        """On a full mask the DST preconditioner is the exact inverse."""
+        n = 10
+        dx = dy = 1.0 / (n + 1)
+        mask = jnp.ones((n, n))
 
         def A(x):
-            return masked_laplacian(x, mask, dx, dx, lambda_=0.0)
+            return masked_laplacian(x, mask, dx, dy, lambda_=2.0)
 
-        return A, psi, mask, dx
-
-    @pytest.mark.slow
-    @pytest.mark.parametrize("precondition", [False, True])
-    def test_default_tolerances_converge(self, precondition):
-        A, psi, mask, dx = self._basin(64)
-        rhs = A(psi)  # [Ny, Nx], float32, |rhs| ~ 1/dx²
-        pc = make_spectral_preconditioner(dx, dx, bc="fft") if precondition else None
-        x, info = solve_cg(A, rhs, preconditioner=pc, max_steps=2000)
-        assert x.dtype == jnp.float32
+        rhs = jax.random.normal(jax.random.PRNGKey(0), (n, n))
+        pc = make_spectral_preconditioner(dx, dy, 2.0, bc="dst")
+        x, info = cg_solve(A, rhs, preconditioner=pc, rtol=1e-10, atol=1e-10)
         assert bool(info.converged)
-        # Effective atol is √ε_f32 · max|rhs| ≈ 3.5e-4 · max|rhs|: the relative
-        # residual lands at that level, and the wet-cell error with it.
-        rel = float(jnp.linalg.norm(A(x) - rhs) / jnp.linalg.norm(rhs))
-        assert rel < 1e-3
-        err = float(jnp.max(jnp.abs((x - psi) * mask)))
-        assert err < 1e-2
-
-    @pytest.mark.slow
-    def test_amplitude_invariant(self):
-        """Rescaling the rhs rescales the solution and leaves the iterations."""
-        A, psi, _mask, _dx = self._basin(32)
-        rhs = A(psi)
-        x1, info1 = solve_cg(A, rhs, max_steps=2000)
-        x2, info2 = solve_cg(A, 1e-4 * rhs, max_steps=2000)
-        assert bool(info1.converged) and bool(info2.converged)
-        assert int(info1.iterations) == int(info2.iterations)
-        np.testing.assert_allclose(
-            np.asarray(1e4 * x2), np.asarray(x1), rtol=1e-3, atol=1e-5
-        )
-
-    def test_unconverged_is_reported_not_raised(self):
-        A, psi, _mask, _dx = self._basin(32)
-        _x, info = solve_cg(A, A(psi), max_steps=2)
-        assert not bool(info.converged)
-        assert int(info.iterations) == 2
-
-    def test_float64_default_unchanged(self, periodic_grid):
-        """Float64 keeps the historical atol = 1e-6 with no rescaling."""
-        Ny, Nx, dx, dy = periodic_grid
-        lam = 1.0
-        eigx = fft_eigenvalues(Nx, dx)
-        eigy = fft_eigenvalues(Ny, dy)
-        rhs = jnp.ones((Ny, Nx))
-
-        def A(psi):
-            eig2d = eigy[:, None] + eigx[None, :] - lam
-            return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
-
-        x_default, info_default = solve_cg(A, rhs)
-        x_explicit, info_explicit = solve_cg(A, rhs, atol=1e-6)
-        np.testing.assert_array_equal(np.asarray(x_default), np.asarray(x_explicit))
-        assert int(info_default.iterations) == int(info_explicit.iterations)
-
-
-class TestSolveCGDiagnostics:
-    """``CGInfo`` reports failure instead of raising or claiming success (#307),
-    and the preconditioned solve differentiates w.r.t. ``lambda_`` / ``dx``."""
-
-    N = 16
-    LAM = 4.0
-
-    @classmethod
-    def _basin(cls, lam=None, dx=None):
-        n = cls.N
-        lam = cls.LAM if lam is None else lam
-        dx = 1.0 / n if dx is None else dx
-        mask = jnp.zeros((n, n)).at[2:-2, 2:-2].set(1.0)  # [Ny, Nx]
-        j = jnp.arange(n)[:, None]
-        i = jnp.arange(n)[None, :]
-        psi = jnp.sin(jnp.pi * j / n) * jnp.sin(2 * jnp.pi * i / n) * mask
-
-        def A(x):
-            return masked_laplacian(x, mask, dx, dx, lambda_=lam)
-
-        return A, psi, mask, dx
-
-    def test_max_steps_reports_not_raises(self):
-        A, psi, _mask, _dx = self._basin()
-        _x, info = solve_cg(A, A(psi), max_steps=3)
-        assert not bool(info.converged)
-        assert int(info.iterations) == 3
-
-    def test_throw_raises_under_jit(self):
-        A, psi, _mask, _dx = self._basin()
-
-        @jax.jit
-        def f(rhs):
-            return solve_cg(A, rhs, max_steps=3, throw=True)[0]
-
-        # Eagerly eqx.error_if raises EquinoxRuntimeError; under jit the
-        # runtime check surfaces as JaxRuntimeError with the same message.
-        with pytest.raises(
-            (eqx.EquinoxRuntimeError, jax.errors.JaxRuntimeError),
-            match="did not converge",
-        ):
-            jax.block_until_ready(f(A(psi)))
-
-    def test_throw_passes_when_converged(self):
-        A, psi, _mask, _dx = self._basin()
-        x, info = solve_cg(A, A(psi), throw=True)
-        assert bool(info.converged)
-        np.testing.assert_allclose(np.asarray(x), np.asarray(psi), atol=1e-6)
-
-    def test_indefinite_operator_not_converged(self):
-        # λ < 0 makes A and its FFT preconditioner indefinite: lineax exits
-        # after 0-1 iterations with |r|/|b| ≈ 0.9-1 and used to say "success".
-        lam = -50.0
-        A, psi, _mask, dx = self._basin(lam=lam)
-        rhs = A(psi)
-        pc = make_spectral_preconditioner(dx, dx, lambda_=lam, bc="fft")
-        _x, info = solve_cg(A, rhs, preconditioner=pc)
-        assert not bool(info.converged)
-        assert float(info.residual_norm) > 0.5 * float(jnp.linalg.norm(rhs))
-
-    def test_wrong_sign_preconditioner_not_converged(self):
-        A, psi, _mask, dx = self._basin()
-        pc = make_spectral_preconditioner(dx, dx, lambda_=self.LAM, bc="fft")
-        _x, info = solve_cg(A, A(psi), preconditioner=lambda r: -pc(r))
-        assert not bool(info.converged)
-
-    def test_residual_norm_is_explicit_residual(self):
-        A, psi, _mask, dx = self._basin()
-        rhs = A(psi)
-        pc = make_spectral_preconditioner(dx, dx, lambda_=self.LAM, bc="fft")
-        x, info = solve_cg(A, rhs, preconditioner=pc)
-        assert bool(info.converged)
-        np.testing.assert_allclose(
-            float(info.residual_norm), float(jnp.linalg.norm(rhs - A(x))), rtol=1e-12
-        )
-
-    @staticmethod
-    def _assert_grad_matches_fd(grad_loss, fd_loss, p0):
-        # Central FD truncation error is O(h²) ≈ 1e-10 relative at h = 1e-5 p0.
-        g = float(jax.grad(grad_loss)(p0))
-        h = 1e-5 * p0
-        fd = float((fd_loss(p0 + h) - fd_loss(p0 - h)) / (2 * h))
-        assert g == pytest.approx(fd, rel=1e-6)
-
-    def _loss(self, wrt, solve):
-        """Scalar loss Σ ψ², with ψ = solve(lam, dx) and p one of (λ, dx)."""
-        _A, _psi, _mask, dx0 = self._basin()
-
-        def loss(p):
-            lam, dx = (p, dx0) if wrt == "lambda_" else (self.LAM, p)
-            return jnp.sum(solve(lam, dx) ** 2)
-
-        return loss, (self.LAM if wrt == "lambda_" else dx0)
-
-    @pytest.mark.slow
-    @pytest.mark.parametrize("wrt", ["lambda_", "dx"])
-    def test_grad_through_preconditioned_solve_cg(self, wrt):
-        _A, psi, mask, _dx = self._basin()
-
-        def solve(lam, dx):
-            def A(x):
-                return masked_laplacian(x, mask, dx, dx, lambda_=lam)
-
-            pc = make_spectral_preconditioner(dx, dx, lambda_=lam, bc="fft")
-            # rtol = atol = 1e-12: the FD of the solve itself is then exact
-            # to ~1e-10, far below the 1e-6 check.
-            x, _info = solve_cg(A, psi, preconditioner=pc, rtol=1e-12, atol=1e-12)
-            return x * mask
-
-        loss, p0 = self._loss(wrt, solve)
-        self._assert_grad_matches_fd(loss, loss, p0)
-
-
-# ---------------------------------------------------------------------------
-# Nyström preconditioner
-# ---------------------------------------------------------------------------
-
-
-class TestNystromPreconditioner:
-    @pytest.mark.slow
-    def test_output_shape_and_dtype(self, periodic_grid):
-        """Preconditioner preserves shape and dtype."""
-        Ny, Nx, dx, dy = periodic_grid
-        lam = 1.0
-        eigx = fft_eigenvalues(Nx, dx)
-        eigy = fft_eigenvalues(Ny, dy)
-
-        def A(psi):
-            eig2d = eigy[:, None] + eigx[None, :] - lam
-            return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
-
-        M_inv = make_nystrom_preconditioner(A, (Ny, Nx), rank=20)
-        r = jnp.ones((Ny, Nx))
-        out = M_inv(r)
-        assert out.shape == (Ny, Nx)
-        assert out.dtype == r.dtype
-
-    @pytest.mark.slow
-    def test_deterministic_with_fixed_key(self, periodic_grid):
-        """Same key produces identical preconditioners."""
-        Ny, Nx, dx, dy = periodic_grid
-        lam = 1.0
-        eigx = fft_eigenvalues(Nx, dx)
-        eigy = fft_eigenvalues(Ny, dy)
-
-        def A(psi):
-            eig2d = eigy[:, None] + eigx[None, :] - lam
-            return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
-
-        key = jax.random.PRNGKey(42)
-        M1 = make_nystrom_preconditioner(A, (Ny, Nx), rank=10, key=key)
-        M2 = make_nystrom_preconditioner(A, (Ny, Nx), rank=10, key=key)
-        r = jnp.sin(jnp.arange(Ny, dtype=float)[:, None]) * jnp.cos(
-            jnp.arange(Nx, dtype=float)[None, :]
-        )
-        np.testing.assert_allclose(np.array(M1(r)), np.array(M2(r)), atol=1e-14)
-
-    @pytest.mark.slow
-    def test_usable_as_cg_preconditioner(self, periodic_grid):
-        """Nyström preconditioner can be used with solve_cg and produces correct results."""
-        Ny, Nx, dx, dy = periodic_grid
-        lam = 1.0
-        eigx = fft_eigenvalues(Nx, dx)
-        eigy = fft_eigenvalues(Ny, dy)
-
-        j = jnp.arange(Ny)[:, None]
-        i = jnp.arange(Nx)[None, :]
-        psi_exact = jnp.cos(2 * jnp.pi * i / Nx) + jnp.cos(2 * jnp.pi * j / Ny)
-
-        def A(psi):
-            eig2d = eigy[:, None] + eigx[None, :] - lam
-            return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
-
-        rhs = A(psi_exact)
-
-        M_inv = make_nystrom_preconditioner(A, (Ny, Nx), rank=Ny * Nx)
-        psi, info = solve_cg(
-            A, rhs, preconditioner=M_inv, rtol=1e-8, atol=1e-8, max_steps=200
-        )
-        assert info.converged
-        np.testing.assert_allclose(np.array(psi), np.array(psi_exact), atol=1e-6)
-
-    @pytest.mark.slow
-    def test_low_rank_converges(self, periodic_grid):
-        """Low-rank Nyström preconditioner must still converge (regression #187).
-
-        When rank << n, the old implementation mapped directions outside the
-        captured subspace to zero, causing CG to falsely report convergence
-        while the true relative residual remained ~1.0.
-        """
-        Ny, Nx, dx, dy = periodic_grid
-        lam = 4.0
-        eigx = fft_eigenvalues(Nx, dx)
-        eigy = fft_eigenvalues(Ny, dy)
-
-        j = jnp.arange(Ny)[:, None]
-        i = jnp.arange(Nx)[None, :]
-        rhs = jnp.sin(jnp.pi * (j + 1) / (Ny + 1)) * jnp.sin(
-            jnp.pi * (i + 1) / (Nx + 1)
-        )
-
-        def A(psi):
-            eig2d = eigy[:, None] + eigx[None, :] - lam
-            return jnp.real(jnp.fft.ifft2(eig2d * jnp.fft.fft2(psi)))
-
-        M_inv = make_nystrom_preconditioner(A, (Ny, Nx), rank=50)
-        psi, _info = solve_cg(
-            A, rhs, preconditioner=M_inv, rtol=1e-6, atol=1e-6, max_steps=500
-        )
-        # The actual residual must be small, not ~1.0
-        r = rhs - A(psi)
-        rel_res = float(jnp.linalg.norm(r)) / float(jnp.linalg.norm(rhs))
-        assert rel_res < 1e-3, f"Relative residual {rel_res:.2e} too large"
-
-    @pytest.mark.slow
-    def test_low_rank_with_masked_laplacian(self):
-        """Nyström preconditioner works on masked-domain problems (#187)."""
-        Ny, Nx = 32, 32
-        dx, dy = 1.0 / Nx, 1.0 / Ny
-        lam = 4.0
-        # Non-trivial mask: 4-cell land border (rectangular basin)
-        mask = jnp.zeros((Ny, Nx))
-        mask = mask.at[4:-4, 4:-4].set(1.0)
-
-        def A(x):
-            return masked_laplacian(x, mask, dx, dy, lambda_=lam)
-
-        j = jnp.arange(Ny)[:, None]
-        i = jnp.arange(Nx)[None, :]
-        rhs = (
-            jnp.sin(jnp.pi * (j + 1) / (Ny + 1))
-            * jnp.sin(jnp.pi * (i + 1) / (Nx + 1))
-            * mask
-        )
-
-        M_inv = make_nystrom_preconditioner(A, (Ny, Nx), rank=50)
-        psi, _info = solve_cg(
-            A, rhs, preconditioner=M_inv, rtol=1e-6, atol=1e-6, max_steps=500
-        )
-        r = rhs - A(psi)
-        rel_res = float(jnp.linalg.norm(r)) / float(jnp.linalg.norm(rhs))
-        assert rel_res < 1e-3, f"Relative residual {rel_res:.2e} too large"
+        np.testing.assert_allclose(A(x), rhs, atol=1e-8)
 
 
 # ---------------------------------------------------------------------------

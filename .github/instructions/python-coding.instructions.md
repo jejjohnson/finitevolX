@@ -12,7 +12,7 @@ applyTo: "packages/**/*.py,finitevolx/**/*.py,tests/**/*.py,scripts/**/*.py"
 - Built-in generics: `list[int]`, `dict[str, Any]` not `List[int]`, `Dict[str, Any]`
 - `pathlib.Path` over `os.path`
 - f-strings for string formatting
-- `equinox.Module` for grids, masks, operators, boundary conditions, forcings and solvers (immutable pytrees; a dataclass is not one); `NamedTuple` for small results such as `CGInfo`
+- `equinox.Module` for grids, masks, operators, boundary conditions and solvers (immutable pytrees; a dataclass is not one); `NamedTuple` for small results
 - `Enum` for fixed sets of constants
 - Context managers (`with` statements) for resource handling
 - Specific exception types (never bare `except:`)
