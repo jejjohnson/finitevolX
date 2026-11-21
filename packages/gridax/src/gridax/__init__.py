@@ -20,8 +20,11 @@ or any other backend, in one derivative stack of four layers (``docs/stencils.md
   :func:`gridax.advection.reconstruct` (which also takes a mask).
 - Layer 3, class operators that carry a grid and a mask: ``Difference2D``,
   ``Advection2D``, ``Diffusion2D``, … (the C-grid operators, advection,
-  diffusion and boundary conditions live here, in gridax; the solvers and the
-  time-stepping glue are in gridax-jax).
+  diffusion and boundary conditions live here, in gridax).
+
+The solvers are :mod:`gridax.solvers` (the ``jax`` extra) and the pipekit
+operators :mod:`gridax.pipekit` (the ``pipekit`` extra); ``import gridax``
+imports neither.
 """
 
 from gridax._src.advection.advection import (

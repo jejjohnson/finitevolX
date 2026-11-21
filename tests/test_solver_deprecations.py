@@ -3,7 +3,7 @@
 CG, its report and the multigrid and Nyström preconditioners are gaussx's
 (#474); the forcing operators, the vertical modes, ``multilayer`` and the
 barotropic filter are sesmax-core's (#422); the time steppers are integrix.march's; the constants, the Coriolis helpers and the linear equation of state are geophysix's (#446). The deprecation window is over:
-``gridax_jax.<name>`` raises ``AttributeError``.
+``gridax.<name>`` and ``gridax.solvers.<name>`` raise ``AttributeError``.
 """
 
 from __future__ import annotations
@@ -12,23 +12,31 @@ import importlib
 import warnings
 
 import gaussx
-import gridax_jax
+import gridax
+import gridax.solvers as gs
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
 
-def test_gridax_jax_imports_without_warning() -> None:
+def test_gridax_solvers_imports_without_warning() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        importlib.reload(gridax_jax)
+        importlib.reload(gs)
+
+
+def _assert_gone(name: str) -> None:
+    for module in (gridax, gs):
+        assert name not in module.__all__
+        with pytest.raises(AttributeError):
+            getattr(module, name)
 
 
 def test_as_preconditioner_is_a_gaussx_multigrid_preconditioner() -> None:
     n = 16
     mask = np.zeros((n + 2, n + 2))
     mask[1:-1, 1:-1] = 1.0
-    solver = gridax_jax.build_multigrid_solver(mask, 1.0 / n, 1.0 / n, lambda_=4.0)
+    solver = gs.build_multigrid_solver(mask, 1.0 / n, 1.0 / n, lambda_=4.0)
     pre = solver.as_preconditioner()
     assert isinstance(pre, gaussx.MultigridPreconditioner)
     rhs = jnp.asarray(np.random.default_rng(0).standard_normal(mask.shape) * mask)
@@ -52,8 +60,8 @@ def test_as_preconditioner_is_a_gaussx_multigrid_preconditioner() -> None:
     ],
 )
 def test_t_point_pieces_are_public(name: str) -> None:
-    assert name in gridax_jax.__all__
-    assert callable(getattr(gridax_jax, name))
+    assert name in gs.__all__
+    assert callable(getattr(gs, name))
 
 
 @pytest.mark.parametrize(
@@ -67,9 +75,7 @@ def test_t_point_pieces_are_public(name: str) -> None:
 )
 def test_moved_to_sesmax_core_and_gone(name: str) -> None:
     # sesmax_core.gfd and sesmax_core.solve_pde own them; gridax keeps no alias
-    assert name not in gridax_jax.__all__
-    with pytest.raises(AttributeError):
-        getattr(gridax_jax, name)
+    _assert_gone(name)
 
 
 REMOVED_NAMES = [
@@ -159,8 +165,6 @@ REMOVED_NAMES = [
     ],
 )
 def test_names_moved_to_geophysix_are_gone_from_gridax(name: str) -> None:
-    import gridax
-
     assert name not in gridax.__all__
     with pytest.raises(AttributeError):
         getattr(gridax, name)
@@ -168,6 +172,4 @@ def test_names_moved_to_geophysix_are_gone_from_gridax(name: str) -> None:
 
 @pytest.mark.parametrize("name", REMOVED_NAMES)
 def test_removed_names_raise_attribute_error(name: str) -> None:
-    assert name not in gridax_jax.__all__
-    with pytest.raises(AttributeError):
-        getattr(gridax_jax, name)
+    _assert_gone(name)

@@ -5,20 +5,20 @@ JAX-compatible DCT and DST transforms (types I–IV), re-exported from
 
 ## Discrete Cosine Transform
 
-::: gridax_jax.dct
+::: gridax.solvers.dct
 
-::: gridax_jax.dctn
+::: gridax.solvers.dctn
 
-::: gridax_jax.idct
+::: gridax.solvers.idct
 
-::: gridax_jax.idctn
+::: gridax.solvers.idctn
 
 ## Discrete Sine Transform
 
-::: gridax_jax.dst
+::: gridax.solvers.dst
 
-::: gridax_jax.dstn
+::: gridax.solvers.dstn
 
-::: gridax_jax.idst
+::: gridax.solvers.idst
 
-::: gridax_jax.idstn
+::: gridax.solvers.idstn

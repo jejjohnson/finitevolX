@@ -9,7 +9,7 @@ Covers:
 
 from __future__ import annotations
 
-from gridax_jax import (
+from gridax import (
     Advection2D,
     CartesianGrid2D,
     Mask2D,

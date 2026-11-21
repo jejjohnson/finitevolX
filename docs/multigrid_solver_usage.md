@@ -12,7 +12,8 @@ differentiable solves.
 import jax
 import jax.numpy as jnp
 import numpy as np
-import gridax_jax as fvx
+import gridax as fvx
+import gridax.solvers as gs
 
 jax.config.update("jax_enable_x64", True)
 
@@ -22,7 +23,7 @@ dx, dy = 1.0 / Nx, 1.0 / Ny
 mask = np.ones((Ny, Nx))  # rectangular domain
 
 # 2. Build the solver (offline, once)
-solver = fvx.build_multigrid_solver(mask, dx, dy, lambda_=10.0)
+solver = gs.build_multigrid_solver(mask, dx, dy, lambda_=10.0)
 
 # 3. Solve (online, JIT-compilable)
 rhs = jnp.sin(jnp.pi * jnp.arange(Ny)[:, None] / Ny) * \
@@ -43,7 +44,7 @@ once; the returned solver is then cheap to call repeatedly.
 
 ```python
 mask = np.ones((64, 64))
-solver = fvx.build_multigrid_solver(mask, dx, dy, lambda_=10.0)
+solver = gs.build_multigrid_solver(mask, dx, dy, lambda_=10.0)
 ```
 
 ### Masked (Irregular) Domain
@@ -53,7 +54,7 @@ solver = fvx.build_multigrid_solver(mask, dx, dy, lambda_=10.0)
 Y, X = np.mgrid[:64, :64]
 mask = ((X - 32)**2 + (Y - 32)**2 < 28**2).astype(float)
 
-solver = fvx.build_multigrid_solver(mask, dx, dy, lambda_=10.0)
+solver = gs.build_multigrid_solver(mask, dx, dy, lambda_=10.0)
 u = solver(rhs * jnp.array(mask))  # zero RHS outside domain
 ```
 
@@ -62,20 +63,20 @@ u = solver(rhs * jnp.array(mask))  # zero RHS outside domain
 ```python
 cgrid_mask = fvx.Mask2D.from_mask(ocean_mask)
 # psi at X points (xy_corner_strict), psi = 0 on the coast: the default
-solver = fvx.build_multigrid_solver(cgrid_mask, dx, dy, lambda_=10.0)
+solver = gs.build_multigrid_solver(cgrid_mask, dx, dy, lambda_=10.0)
 ```
 
 ### Boundary Condition
 
 `bc="dirichlet"` (the default) takes the value beyond every wet–dry face
 as zero: the streamfunction problem, the same operator as
-`fvx.masked_laplacian`. `bc="neumann"` puts no flux through wet–dry faces:
+`gs.masked_laplacian`. `bc="neumann"` puts no flux through wet–dry faces:
 the pressure / free-surface problem on the T-point mask.
 
 ```python
 # Pressure at T points, zero normal flux at the coast.  At lambda_ = 0 the
 # solution is returned in the zero-mean gauge on each wet component.
-p_solver = fvx.build_multigrid_solver(
+p_solver = gs.build_multigrid_solver(
     np.asarray(cgrid_mask.h, dtype=float), dx, dy, lambda_=0.0, bc="neumann"
 )
 ```
@@ -86,7 +87,7 @@ p_solver = fvx.build_multigrid_solver(
 # Spatially varying diffusivity
 coeff = 1.0 + 0.5 * np.sin(2 * np.pi * X / 64)
 
-solver = fvx.build_multigrid_solver(
+solver = gs.build_multigrid_solver(
     mask, dx, dy,
     lambda_=10.0,
     coeff=coeff,
@@ -97,7 +98,7 @@ u = solver(rhs)
 ### Controlling the Hierarchy
 
 ```python
-solver = fvx.build_multigrid_solver(
+solver = gs.build_multigrid_solver(
     mask, dx, dy,
     lambda_=10.0,
     n_levels=3,     # number of grid levels (default: auto)
@@ -159,7 +160,7 @@ A single multigrid V-cycle makes an excellent preconditioner for CG, especially 
 import gaussx
 
 # Build the hierarchy (offline, once) and hand it to gaussx
-mg_solver = fvx.build_multigrid_solver(
+mg_solver = gs.build_multigrid_solver(
     mask, dx, dy, lambda_=10.0, coeff=coeff
 )
 pre = mg_solver.as_preconditioner()   # gaussx.MultigridPreconditioner
@@ -176,7 +177,7 @@ u = x.reshape(mask.shape) * mask_jnp
 print(f"Converged in {int(info.iterations)} iterations")  # 5 on a 34² basin, 124 without
 ```
 
-`fvx.multigrid_levels(mask, dx, dy, ...)` returns the same levels as a tuple of `gaussx.MultigridLevel`, for `gaussx.MultigridSolver(levels)` or a hierarchy of your own; it leaves the coarsest solve to gaussx's dense default.
+`gs.multigrid_levels(mask, dx, dy, ...)` returns the same levels as a tuple of `gaussx.MultigridLevel`, for `gaussx.MultigridSolver(levels)` or a hierarchy of your own; it leaves the coarsest solve to gaussx's dense default.
 
 ---
 
@@ -202,7 +203,7 @@ log_coeff = jnp.zeros((Ny, Nx))  # learnable, initialised to c=1
 
 def forward(log_coeff, rhs):
     coeff = jnp.exp(log_coeff)
-    solver = fvx.build_multigrid_solver(
+    solver = gs.build_multigrid_solver(
         mask, dx, dy, lambda_=10.0, coeff=np.asarray(coeff)
     )
     return solver(rhs)
@@ -280,7 +281,7 @@ u_batch = batch_solve(solver, rhs_batch)  # (3, Ny, Nx)
 :::{tip} Quick convergence check
 ```python
 u = solver(rhs)
-from gridax_jax._src.solvers.multigrid import _apply_operator
+from gridax._src.solvers.multigrid import _apply_operator
 residual = jnp.linalg.norm(rhs - _apply_operator(u, solver.levels[0]))
 print(f"Residual norm: {residual:.2e}")
 ```

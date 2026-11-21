@@ -49,9 +49,9 @@ step-by-step.
 
 ## 3. Export and document
 
-- `packages/gridax-jax/src/gridax_jax/__init__.py`: import, and add the name to `__all__` in its
+- `packages/gridax/src/gridax/__init__.py`: import, and add the name to `__all__` in its
   logical group (e.g. under `# Difference stencils`, `# Diagnostics`).
-- `::: finitevolx.NewName` on the matching `docs/api/*.md` page; a
+- `::: gridax.NewName` on the matching `docs/api/*.md` page; a
   paragraph (formula, stagger, ghost cells read) on the theory page.
 - `make capabilities`.
 

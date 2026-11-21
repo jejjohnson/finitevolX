@@ -100,9 +100,9 @@ def _sanitize(
 class Energetics2D:
     """Energy diagnostics at T-points on a 2-D Arakawa C-grid.
 
-    Class form of :func:`~finitevolx.kinetic_energy`,
-    :func:`~finitevolx.bernoulli_potential` and
-    :func:`~finitevolx.available_potential_energy`.  Every method returns a
+    Class form of :func:`~gridax.kinetic_energy`,
+    :func:`~gridax.bernoulli_potential` and
+    :func:`~gridax.available_potential_energy`.  Every method returns a
     T-point field with a zero ghost ring; when ``mask`` is set, inputs are
     zeroed on dry interior cells first and dry T-cells are zeroed last (via
     ``jnp.where(mask.h, ...)``); see the module docstring.
@@ -251,10 +251,10 @@ class Energetics2D:
 class Strain2D:
     """Strain diagnostics on a 2-D Arakawa C-grid.
 
-    Class form of :func:`~finitevolx.shear_strain`,
-    :func:`~finitevolx.tensor_strain`,
-    :func:`~finitevolx.strain_magnitude_squared` and
-    :func:`~finitevolx.okubo_weiss`.
+    Class form of :func:`~gridax.shear_strain`,
+    :func:`~gridax.tensor_strain`,
+    :func:`~gridax.strain_magnitude_squared` and
+    :func:`~gridax.okubo_weiss`.
 
     The shear strain lives at X-points and the tensor strain at T-points.
     :meth:`magnitude_squared` and :meth:`okubo_weiss` combine them at
@@ -326,7 +326,7 @@ class Strain2D:
         the south ghost X-row (j = 0) and west ghost X-column (i = 0), which
         read the caller's ghost u / v.  The north / east X-ghosts are
         outside the domain and stay zero.  At interior X-points this is the
-        same arithmetic as :func:`~finitevolx.shear_strain` /
+        same arithmetic as :func:`~gridax.shear_strain` /
         :meth:`~gridax.Difference2D.curl`.
 
         Under a mask only the dry *interior* corners are zeroed: the south /
@@ -479,9 +479,9 @@ class Strain2D:
 class QGPotentialVorticity2D:
     """Quasi-geostrophic potential vorticity at T-points.
 
-    Class form of :func:`~finitevolx.qg_potential_vorticity`,
-    :func:`~finitevolx.stretching_term` and
-    :func:`~finitevolx.potential_vorticity_multilayer`.  Every method
+    Class form of :func:`~gridax.qg_potential_vorticity`,
+    :func:`~gridax.stretching_term` and
+    :func:`~gridax.potential_vorticity_multilayer`.  Every method
     returns a T-point field (``[Ny, Nx]`` for one layer, ``[nl, Ny, Nx]``
     for the multilayer methods); when ``mask`` is set, dry T-cells are
     zeroed via ``jnp.where(mask.h, ...)`` (post-compute, Pattern 1 in
@@ -600,7 +600,7 @@ class QGPotentialVorticity2D:
         q[k, j, i] = lap_psi[k, j, i] / f0 + beta * (y[j, i] - y0) / f0
                    - f0 * sum_m A[k, m] * psi[m, j, i]
 
-        ``A`` is the raw :func:`~finitevolx.build_coupling_matrix` output
+        ``A`` is the raw :func:`~sesmax_core.vertical.build_coupling_matrix` output
         (s^2/m^2); ``f0 * A . psi`` is dimensionless, so do not
         pre-multiply ``A`` by ``f0``.
 

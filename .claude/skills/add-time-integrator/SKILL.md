@@ -1,11 +1,11 @@
 ---
 name: add-time-integrator
-description: Add a time-integration scheme to finitevolX — a pure functional step (explicit RK, multistep, IMEX, split-explicit, semi-Lagrangian) and its diffrax solver form (a Butcher-tableau AbstractERK, an AbstractSolver, or an eqx.Module with init / step for schemes that do not fit diffeqsolve) — with convergence-order tests and docs. Use when asked to add, port or implement a time stepper, Runge–Kutta scheme, multistep / leapfrog scheme, IMEX or split-explicit integrator in gridax_jax/_src/timestepping.
+description: Add a time-integration scheme to finitevolX — a pure functional step (explicit RK, multistep, IMEX, split-explicit, semi-Lagrangian) and its diffrax solver form (a Butcher-tableau AbstractERK, an AbstractSolver, or an eqx.Module with init / step for schemes that do not fit diffeqsolve) — with convergence-order tests and docs. Use when asked to add, port or implement a time stepper, Runge–Kutta scheme, multistep / leapfrog scheme, IMEX or split-explicit integrator in gridax.
 ---
 
 # Add a time integrator
 
-The generic time steppers (explicit RK, multistep, IMEX, split-explicit, their diffrax solvers and the `AbstractStepper`s) now live in integrix (`integrix.march`), and their `finitevolx.*` names are deprecated aliases for one release. Add a generic scheme to integrix, not here; this recipe applies only to schemes tied to the C-grid. The semi-Lagrangian scheme is `integrix.march.semi_lagrangian_step` (with `gridax.t_point_coordinates` for its nodes).
+The generic time steppers (explicit RK, multistep, IMEX, split-explicit, their diffrax solvers and the `AbstractStepper`s) now live in integrix (`integrix.march`), and gridax keeps no alias for them. Add a generic scheme to integrix, not here; this recipe applies only to schemes tied to the C-grid. The semi-Lagrangian scheme is `integrix.march.semi_lagrangian_step` (with `gridax.t_point_coordinates` for its nodes).
 
 Read contract 6 (time integration) in `AGENTS.md`, then
 `docs/time_integration.md` and `docs/time_integration_usage.md`.
@@ -48,9 +48,9 @@ belongs there, not here. finitevolX adds the schemes ocean models need
 
 ## 3. Export and document
 
-`packages/gridax-jax/src/gridax_jax/__init__.py` (import + `__all__` under `# Time integration —
+`packages/gridax/src/gridax/__init__.py` (import + `__all__` under `# Time integration —
 pure functional` or `# Time integration — diffrax solvers`),
-`::: finitevolx.NewScheme` on `docs/api/time_integration.md`, the scheme on
+`::: gridax.NewScheme` on `docs/api/time_integration.md`, the scheme on
 `docs/time_integration.md` and a usage snippet on
 `docs/time_integration_usage.md`; `make capabilities`.
 

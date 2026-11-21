@@ -9,8 +9,8 @@ applies; gaussx's structured primitives then hold exactly.
 from __future__ import annotations
 
 import gaussx
-from gridax_jax import (
-    Mask2D,
+from gridax import Mask2D
+from gridax.solvers import (
     dctn,
     helmholtz_operator,
     masked_helmholtz_operator,

@@ -34,7 +34,7 @@ import jax
 
 jax.config.update("jax_enable_x64", True)
 
-import gridax_jax as fvx
+import gridax as fvx
 from integrix.march import rk3_ssp_step
 import jax.numpy as jnp
 import numpy as np

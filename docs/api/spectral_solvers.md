@@ -14,26 +14,26 @@ you from the full `[Ny, Nx]` array; see the
 
 ## DST-I (Dirichlet BCs)
 
-::: gridax_jax.solve_poisson_dst
+::: gridax.solvers.solve_poisson_dst
 
-::: gridax_jax.solve_helmholtz_dst
+::: gridax.solvers.solve_helmholtz_dst
 
 ## DCT-II (Neumann BCs)
 
-::: gridax_jax.solve_poisson_dct
+::: gridax.solvers.solve_poisson_dct
 
-::: gridax_jax.solve_helmholtz_dct
+::: gridax.solvers.solve_helmholtz_dct
 
 ## FFT (Periodic BCs)
 
-::: gridax_jax.solve_poisson_fft
+::: gridax.solvers.solve_poisson_fft
 
-::: gridax_jax.solve_helmholtz_fft
+::: gridax.solvers.solve_helmholtz_fft
 
 ## Eigenvalue Helpers
 
-::: gridax_jax.dst1_eigenvalues
+::: gridax.solvers.dst1_eigenvalues
 
-::: gridax_jax.dct2_eigenvalues
+::: gridax.solvers.dct2_eigenvalues
 
-::: gridax_jax.fft_eigenvalues
+::: gridax.solvers.fft_eigenvalues

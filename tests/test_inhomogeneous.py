@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import gridax_jax as fvx
-from gridax_jax._src.solvers.inhomogeneous import (
+import gridax as fvx
+from gridax._src.solvers.inhomogeneous import (
     KnownValueLifting,
     SolveDomain,
     boundary_ring,
     coast_ring,
 )
+import gridax.solvers as gs
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -127,7 +128,7 @@ class TestCoastRing:
 
     def test_x_basin_is_the_cgrid_wall(self):
         """For psi on a from_interior rectangle: X rows / columns 0 and N-2."""
-        from gridax_jax import Mask2D
+        from gridax import Mask2D
 
         m = np.zeros((7, 9), dtype=bool)
         m[1:-1, 1:-1] = True
@@ -276,9 +277,7 @@ class TestKnownValueLifting:
 
         # Exact RHS: (∇² - λ)ψ on the wet cells, the stencil reading ψ on the coast
         ones = jnp.ones_like(mask)
-        rhs_exact = (
-            fvx.masked_laplacian(psi_exact, ones, dx, dy, lambda_=lambda_) * mask
-        )
+        rhs_exact = gs.masked_laplacian(psi_exact, ones, dx, dy, lambda_=lambda_) * mask
 
         # Known values on the coast ring: exact solution values
         known_values = jnp.where(domain.coast_ring, psi_exact, 0.0)
@@ -290,7 +289,7 @@ class TestKnownValueLifting:
         eff_mask_f = domain.effective_mask.astype(jnp.float64)
 
         def matvec(x):
-            return fvx.masked_laplacian(x, eff_mask_f, dx, dy, lambda_=lambda_)
+            return gs.masked_laplacian(x, eff_mask_f, dx, dy, lambda_=lambda_)
 
         psi_hom, _info = cg_solve(
             matvec, rhs_corrected, rtol=1e-10, atol=1e-10, max_steps=2000
@@ -337,7 +336,7 @@ class TestKnownValueLifting:
         eff_mask_f = domain.effective_mask.astype(jnp.float64)
 
         def matvec(x):
-            return fvx.masked_laplacian(x, eff_mask_f, dx, dy, lambda_=0.0)
+            return gs.masked_laplacian(x, eff_mask_f, dx, dy, lambda_=0.0)
 
         psi_hom, _ = cg_solve(matvec, rhs_corrected, rtol=1e-10, atol=1e-10)
         psi_hom = psi_hom * eff_mask_f

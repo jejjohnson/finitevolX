@@ -4,28 +4,28 @@ Boundary condition primitives and helpers for staggered C-grid fields.
 
 ## BC Atoms (1-D)
 
-::: gridax_jax.Dirichlet1D
+::: gridax.Dirichlet1D
 
-::: gridax_jax.Neumann1D
+::: gridax.Neumann1D
 
-::: gridax_jax.Periodic1D
+::: gridax.Periodic1D
 
-::: gridax_jax.Reflective1D
+::: gridax.Reflective1D
 
-::: gridax_jax.Slip1D
+::: gridax.Slip1D
 
-::: gridax_jax.Outflow1D
+::: gridax.Outflow1D
 
-::: gridax_jax.Sponge1D
+::: gridax.Sponge1D
 
 ## BC Composition
 
-::: gridax_jax.BoundaryConditionSet
+::: gridax.BoundaryConditionSet
 
-::: gridax_jax.FieldBCSet
+::: gridax.FieldBCSet
 
 ## Helpers
 
-::: gridax_jax.enforce_periodic
+::: gridax.enforce_periodic
 
-::: gridax_jax.pad_interior
+::: gridax.pad_interior

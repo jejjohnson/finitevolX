@@ -26,6 +26,26 @@ dependencies = [
     "geophysix>=0.0.3",
 ]
 
+[project.optional-dependencies]
+# `gridax.solvers`: the spectral, capacitance, masked-operator and multigrid
+# solvers. `import gridax` never imports these.
+jax = [
+    "jax>=0.4.38",
+    "jaxlib>=0.4.38",
+    "equinox>=0.11.0",
+    "lineax>=0.1.0",
+    "gaussx>=0.8.1",
+    "spectraldiffx>=0.1.2",
+]
+# `gridax.pipekit`: the Tier-B pipekit Operators over the C-grid primitives;
+# `ExplicitStep` steps with integrix.march.
+pipekit = [
+    "gridax[jax]",
+    "pipekit-ops",
+    "pipekit-jax",
+    "integrix>=0.0.9",
+]
+
 [project.urls]
 Repository = "https://github.com/jejjohnson/gridax"
 
@@ -42,5 +62,11 @@ testpaths = ["tests"]
 addopts = "--strict-markers"
 
 [tool.uv.sources]
-# not on PyPI yet (#426); the workspace root pins the same tag
+# None of these is on PyPI yet (#426); the workspace root pins the same tags.
 geophysix = { git = "https://github.com/jejjohnson/geophysix", tag = "v0.0.3" }
+spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "0.1.2" }
+gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.8.1" }
+integrix = { git = "https://github.com/jejjohnson/integrix", tag = "v0.0.9" }
+pipekit-ops = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-ops", tag = "pipekit-ops-v0.2.1" }
+pipekit-cycle = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-cycle", tag = "pipekit-ops-v0.2.1" }
+pipekit-jax = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-jax", tag = "pipekit-ops-v0.2.1" }

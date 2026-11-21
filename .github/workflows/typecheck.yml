@@ -19,7 +19,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Install dependencies
-        run: uv sync --extra dev --extra pipekit
+        run: uv sync --extra dev
 
       - name: Type check
-        run: uv run ty check packages/gridax-jax/src packages/gridax/src finitevolx
+        run: uv run ty check packages/gridax/src

@@ -48,7 +48,6 @@ from typing import Literal
 
 import equinox as eqx
 import gaussx
-from gridax import Mask2D
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Int
@@ -57,7 +56,8 @@ import numpy as np
 from scipy import linalg, sparse
 from scipy.sparse import csgraph
 
-from gridax_jax._src.solvers.iterative import project_zero_mean, wet_components
+from gridax import Mask2D
+from gridax._src.solvers.iterative import project_zero_mean, wet_components
 
 # Stencil offsets (dj, di): the finest operator is 5-point, the Galerkin
 # coarse operators are 9-point.
@@ -1081,7 +1081,7 @@ def build_multigrid_solver(
 
     * ``"dirichlet"`` (default): ``u = 0`` on the dry neighbour, the face
       keeps its coefficient.  With ``coeff=None`` the finest-level operator
-      is exactly :func:`~finitevolx.masked_laplacian` with dry neighbours
+      is exactly :func:`~gridax.solvers.masked_laplacian` with dry neighbours
       zero — the streamfunction problem, ``psi = 0`` on the wall / coast
       X nodes of ``Mask2D.xy_corner_strict``.  Non-singular for every
       ``lambda_ >= 0``.

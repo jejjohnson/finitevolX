@@ -26,7 +26,7 @@
 #    C-grid.
 # 2. How **upwind**, **TVD**, and **WENO** reconstruction schemes differ in
 #    practice.
-# 3. How to use `finitevolx.Advection1D` with different `method` options.
+# 3. How to use `gridax.Advection1D` with different `method` options.
 #
 # > **Prerequisites** — read the
 # > [Advection Theory](../advection.md) page for the mathematical
@@ -126,7 +126,7 @@ import numpy as np
 
 jax.config.update("jax_enable_x64", True)
 
-import gridax_jax as fvx
+import gridax as fvx
 from integrix.march import rk3_ssp_step
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "advection_1d_schemes"

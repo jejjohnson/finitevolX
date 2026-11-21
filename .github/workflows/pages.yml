@@ -35,7 +35,7 @@ jobs:
         run: npm install -g mystmd
 
       - name: Install docs dependencies
-        run: uv sync --extra docs --extra pipekit
+        run: uv sync --extra docs
 
       # BASE_URL is the project-pages subpath. mystmd prepends it to its own
       # links, and scripts/build_docs.py uses it when rewriting the API
@@ -43,7 +43,7 @@ jobs:
       - name: Build and verify the documentation site
         env:
           BASE_URL: /${{ github.event.repository.name }}
-        run: uv run --extra docs --extra pipekit python scripts/build_docs.py
+        run: uv run --extra docs python scripts/build_docs.py
 
       - uses: actions/configure-pages@v6
 

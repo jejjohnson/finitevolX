@@ -142,7 +142,7 @@ class TestUpwindFluxBasic:
             )
 
     def test_top_level_import(self):
-        from gridax_jax import upwind_flux as uf
+        from gridax import upwind_flux as uf
 
         assert uf is not None
 

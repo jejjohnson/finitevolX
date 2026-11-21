@@ -1,4 +1,4 @@
-"""Diagnostic, reduction and time-step operators of `finitevolx.pipekit`."""
+"""Diagnostic, reduction and time-step operators of `gridax.pipekit`."""
 
 from __future__ import annotations
 
@@ -7,9 +7,9 @@ import pytest
 pytest.importorskip("pipekit_jax")
 
 import equinox as eqx
-import gridax_jax as fvx
-from gridax_jax import pipekit as fp
-from gridax_jax.pipekit.testing import check_operator
+import gridax as fvx
+from gridax import pipekit as fp
+from gridax.pipekit.testing import check_operator
 from integrix.march import rk4_step
 import jax
 import jax.numpy as jnp

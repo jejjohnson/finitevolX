@@ -458,7 +458,7 @@ class TestSphericalTelescoping:
     def test_divergence_zonally_periodic(self):
         """``Σ A · SphericalDivergence2D(u, v)`` over the interior: the metric
         is self-consistent (#297 audit), so this is rounding."""
-        from gridax_jax import SphericalDivergence2D
+        from gridax import SphericalDivergence2D
 
         grid, (_, u, v), _ = _periodic_setup(halo=1)
         div = SphericalDivergence2D(grid=grid)(u, v)
@@ -466,7 +466,7 @@ class TestSphericalTelescoping:
         assert abs(_relative_net(area, div)) < TELESCOPE_RTOL
 
     def test_divergence_zero_boundary_velocity(self):
-        from gridax_jax import SphericalDivergence2D
+        from gridax import SphericalDivergence2D
 
         grid, (_, u, v), _ = _periodic_setup(halo=1)
         u = u.at[:, 0].set(0.0).at[:, -2].set(0.0)  # west / east wall faces

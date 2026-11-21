@@ -71,7 +71,7 @@ import numpy as np
 
 jax.config.update("jax_enable_x64", True)
 
-import gridax_jax as fvx
+import gridax as fvx
 from integrix.march import heun_step
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "images" / "shallow_water"
@@ -595,7 +595,7 @@ plt.show()
 # | New operator | -- | `Advection2D` |
 # | Computational cost | lower | higher (advection + gradients) |
 #
-# ### finitevolx API Reference
+# ### gridax API Reference
 #
 # | Class / Function | Role in this notebook |
 # |-----------------|----------------------|

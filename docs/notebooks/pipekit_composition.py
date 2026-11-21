@@ -18,11 +18,11 @@
 # finitevolX ships two tiers of the same operators:
 #
 # ```
-# Tier A  finitevolx                 Difference2D(grid).diff_x_T_to_U(h)
+# Tier A  gridax                     Difference2D(grid).diff_x_T_to_U(h)
 #         arrays in, arrays out      eqx.Module / pure function, no config
 #                 │
 #                 ▼
-# Tier B  finitevolx.pipekit         Difference(grid=G, axis="x", src="T", dst="U")
+# Tier B  gridax.pipekit             Difference(grid=G, axis="x", src="T", dst="U")
 #         pipekit Operators          JSON config · eqx leaves · Sequential / Graph
 #                 │
 #                 ▼
@@ -41,7 +41,7 @@
 # Below we still build a model RHS as a graph, because it makes a compact,
 # checkable example.
 #
-# Install the extra: `pip install "finitevolx[pipekit]"`. Theory of the
+# Install the extra: `pip install "gridax[pipekit]"`. Theory of the
 # operators: [C-grid discretization](../cgrid_discretization.md).
 
 # %%
@@ -59,9 +59,9 @@ import matplotlib.pyplot as plt
 from pipekit_ops import Graph, Input, Operator
 from pipekit_jax import Rollout
 
-import gridax_jax as fvx
+import gridax as fvx
 from integrix.march import rk4_step
-from gridax_jax import pipekit as fp
+from gridax import pipekit as fp
 
 jax.config.update("jax_enable_x64", True)
 

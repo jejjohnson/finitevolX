@@ -17,8 +17,8 @@ which the flux is computed (the axis *perpendicular* to the face):
 
 Typical 2-D usage::
 
-    from gridax_jax import Mask2D, upwind_flux
-    from gridax_jax import Reconstruction2D, CartesianGrid2D
+    from gridax import Mask2D, upwind_flux
+    from gridax import Reconstruction2D, CartesianGrid2D
 
     grid = CartesianGrid2D.from_interior(nx_interior, ny_interior, Lx, Ly)
     recon = Reconstruction2D(grid=grid)
@@ -53,7 +53,7 @@ def narrow_mask_hierarchy(
 ) -> dict[int, Bool[Array, "..."]]:
     """Fold a wide stencil-hierarchy into a narrower one by merging oversized tiers.
 
-    The hierarchy returned by :meth:`~finitevolx.Mask2D.get_adaptive_masks`
+    The hierarchy returned by :meth:`~gridax.Mask2D.get_adaptive_masks`
     is a dict ``{size -> boolean_mask}`` where each cell is in the bucket
     corresponding to the **largest** stencil it can support.  If a caller
     wants to dispatch onto a narrower set of stencil sizes (e.g. a WENO3
@@ -154,9 +154,9 @@ def upwind_flux(
         (e.g. ``recon.upwind1_x``, ``recon.weno3_x``, ``recon.weno5_x``).
     mask_hierarchy : dict[int, Bool[Array, "..."]]
         Mutually-exclusive cell-centred boolean masks produced by
-        :meth:`~finitevolx.Mask1D.get_adaptive_masks` /
-        :meth:`~finitevolx.Mask2D.get_adaptive_masks` /
-        :meth:`~finitevolx.Mask3D.get_adaptive_masks`, keyed by the
+        :meth:`~gridax.Mask1D.get_adaptive_masks` /
+        :meth:`~gridax.Mask2D.get_adaptive_masks` /
+        :meth:`~gridax.Mask3D.get_adaptive_masks`, keyed by the
         same stencil sizes as *rec_funcs*.  At each interior cell
         exactly one mask is ``True``; land cells and cells where even the
         smallest stencil cannot be supported are ``False`` in every mask.

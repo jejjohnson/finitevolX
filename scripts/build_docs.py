@@ -434,8 +434,6 @@ def build_api() -> None:
             "run",
             "--extra",
             "docs",
-            "--extra",
-            "pipekit",
             "zensical",
             "build",
             "--strict",

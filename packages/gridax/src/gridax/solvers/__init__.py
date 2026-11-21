@@ -1,0 +1,243 @@
+"""The solvers on the C-grid: spectral, capacitance, masked operators, multigrid.
+
+Requires the ``jax`` extra (``pip install "gridax[jax]"``): this module imports
+JAX, Equinox, lineax, gaussx and spectraldiffx at load, and ``import gridax``
+never imports it.
+
+- Rectangular spectral solves and transforms, re-exported from spectraldiffx
+  (``solve_helmholtz_dst`` / ``_dct`` / ``_fft``, ``dctn``, the eigenvalues).
+- Masked domains: the capacitance method (``build_capacitance_solver``), the
+  T-point operators (``masked_laplacian``, ``masked_neumann_laplacian``,
+  ``masked_face_dirichlet_laplacian``) for gaussx's CG with
+  ``make_spectral_preconditioner``, and ``build_multigrid_solver``.
+- Known-value lifting for inhomogeneous Dirichlet values (``SolveDomain``,
+  ``KnownValueLifting``), the tridiagonal solves re-exported from gaussx, and
+  the dtype rule ``check_dtype``.
+"""
+
+from __future__ import annotations
+
+try:
+    import equinox as _equinox  # noqa: F401
+    import gaussx as _gaussx  # noqa: F401
+    import jax as _jax  # noqa: F401
+    import lineax as _lineax  # noqa: F401
+    import spectraldiffx as _spectraldiffx  # noqa: F401
+except ImportError as err:  # pragma: no cover - exercised without the extra
+    raise ImportError(
+        'gridax.solvers needs the `jax` extra: pip install "gridax[jax]"'
+    ) from err
+
+from gridax._src.solvers.dtype import (
+    check_dtype,
+)
+from gridax._src.solvers.elliptic import (
+    BoundaryCondition,
+    CapacitanceSolver,
+    DirichletHelmholtzSolver2D,
+    MixedBCHelmholtzSolver2D,
+    MixedBCHelmholtzSolver3D,
+    NeumannHelmholtzSolver2D,
+    RegularNeumannHelmholtzSolver2D,
+    SpectralHelmholtzSolver1D,
+    SpectralHelmholtzSolver2D,
+    SpectralHelmholtzSolver3D,
+    StaggeredDirichletHelmholtzSolver2D,
+    build_capacitance_solver,
+    dct1_eigenvalues,
+    dct1_eigenvalues_ps,
+    dct2_eigenvalues,
+    dct2_eigenvalues_ps,
+    dct3_eigenvalues,
+    dct3_eigenvalues_ps,
+    dct4_eigenvalues,
+    dct4_eigenvalues_ps,
+    dst1_eigenvalues,
+    dst1_eigenvalues_ps,
+    dst2_eigenvalues,
+    dst2_eigenvalues_ps,
+    dst3_eigenvalues,
+    dst3_eigenvalues_ps,
+    dst4_eigenvalues,
+    dst4_eigenvalues_ps,
+    fft_eigenvalues,
+    fft_eigenvalues_ps,
+    make_spectral_preconditioner,
+    masked_laplacian,
+    modify_rhs_1d,
+    modify_rhs_2d,
+    modify_rhs_3d,
+    solve_helmholtz_2d,
+    solve_helmholtz_3d,
+    solve_helmholtz_dct,
+    solve_helmholtz_dct1,
+    solve_helmholtz_dct1_1d,
+    solve_helmholtz_dct1_3d,
+    solve_helmholtz_dct2,
+    solve_helmholtz_dct2_1d,
+    solve_helmholtz_dct2_3d,
+    solve_helmholtz_dst,
+    solve_helmholtz_dst1,
+    solve_helmholtz_dst1_1d,
+    solve_helmholtz_dst1_3d,
+    solve_helmholtz_dst2,
+    solve_helmholtz_dst2_1d,
+    solve_helmholtz_dst2_3d,
+    solve_helmholtz_fft,
+    solve_helmholtz_fft_1d,
+    solve_helmholtz_fft_3d,
+    solve_poisson_2d,
+    solve_poisson_3d,
+    solve_poisson_dct,
+    solve_poisson_dct1,
+    solve_poisson_dct1_1d,
+    solve_poisson_dct1_3d,
+    solve_poisson_dct2,
+    solve_poisson_dct2_1d,
+    solve_poisson_dct2_3d,
+    solve_poisson_dst,
+    solve_poisson_dst1,
+    solve_poisson_dst1_1d,
+    solve_poisson_dst1_3d,
+    solve_poisson_dst2,
+    solve_poisson_dst2_1d,
+    solve_poisson_dst2_3d,
+    solve_poisson_fft,
+    solve_poisson_fft_1d,
+    solve_poisson_fft_3d,
+)
+from gridax._src.solvers.inhomogeneous import (
+    KnownValueLifting,
+    SolveDomain,
+    boundary_ring,
+    coast_ring,
+)
+from gridax._src.solvers.iterative import (
+    masked_face_dirichlet_laplacian,
+    masked_neumann_laplacian,
+    project_zero_mean,
+    wet_components,
+)
+from gridax._src.solvers.linear_operators import (
+    helmholtz_operator,
+    masked_helmholtz_operator,
+)
+from gridax._src.solvers.multigrid import (
+    MultigridSolver,
+    build_multigrid_solver,
+    multigrid_levels,
+)
+from gridax._src.solvers.spectral_transforms import (
+    dct,
+    dctn,
+    dst,
+    dstn,
+    idct,
+    idctn,
+    idst,
+    idstn,
+)
+from gridax._src.solvers.tridiagonal import (
+    solve_tridiagonal,
+    solve_tridiagonal_batched,
+)
+
+__all__ = [
+    "BoundaryCondition",
+    "CapacitanceSolver",
+    "DirichletHelmholtzSolver2D",
+    "KnownValueLifting",
+    "MixedBCHelmholtzSolver2D",
+    "MixedBCHelmholtzSolver3D",
+    "MultigridSolver",
+    "NeumannHelmholtzSolver2D",
+    "RegularNeumannHelmholtzSolver2D",
+    "SolveDomain",
+    "SpectralHelmholtzSolver1D",
+    "SpectralHelmholtzSolver2D",
+    "SpectralHelmholtzSolver3D",
+    "StaggeredDirichletHelmholtzSolver2D",
+    "boundary_ring",
+    "build_capacitance_solver",
+    "build_multigrid_solver",
+    "check_dtype",
+    "coast_ring",
+    "dct",
+    "dct1_eigenvalues",
+    "dct1_eigenvalues_ps",
+    "dct2_eigenvalues",
+    "dct2_eigenvalues_ps",
+    "dct3_eigenvalues",
+    "dct3_eigenvalues_ps",
+    "dct4_eigenvalues",
+    "dct4_eigenvalues_ps",
+    "dctn",
+    "dst",
+    "dst1_eigenvalues",
+    "dst1_eigenvalues_ps",
+    "dst2_eigenvalues",
+    "dst2_eigenvalues_ps",
+    "dst3_eigenvalues",
+    "dst3_eigenvalues_ps",
+    "dst4_eigenvalues",
+    "dst4_eigenvalues_ps",
+    "dstn",
+    "fft_eigenvalues",
+    "fft_eigenvalues_ps",
+    "helmholtz_operator",
+    "idct",
+    "idctn",
+    "idst",
+    "idstn",
+    "make_spectral_preconditioner",
+    "masked_face_dirichlet_laplacian",
+    "masked_helmholtz_operator",
+    "masked_laplacian",
+    "masked_neumann_laplacian",
+    "modify_rhs_1d",
+    "modify_rhs_2d",
+    "modify_rhs_3d",
+    "multigrid_levels",
+    "project_zero_mean",
+    "solve_helmholtz_2d",
+    "solve_helmholtz_3d",
+    "solve_helmholtz_dct",
+    "solve_helmholtz_dct1",
+    "solve_helmholtz_dct1_1d",
+    "solve_helmholtz_dct1_3d",
+    "solve_helmholtz_dct2",
+    "solve_helmholtz_dct2_1d",
+    "solve_helmholtz_dct2_3d",
+    "solve_helmholtz_dst",
+    "solve_helmholtz_dst1",
+    "solve_helmholtz_dst1_1d",
+    "solve_helmholtz_dst1_3d",
+    "solve_helmholtz_dst2",
+    "solve_helmholtz_dst2_1d",
+    "solve_helmholtz_dst2_3d",
+    "solve_helmholtz_fft",
+    "solve_helmholtz_fft_1d",
+    "solve_helmholtz_fft_3d",
+    "solve_poisson_2d",
+    "solve_poisson_3d",
+    "solve_poisson_dct",
+    "solve_poisson_dct1",
+    "solve_poisson_dct1_1d",
+    "solve_poisson_dct1_3d",
+    "solve_poisson_dct2",
+    "solve_poisson_dct2_1d",
+    "solve_poisson_dct2_3d",
+    "solve_poisson_dst",
+    "solve_poisson_dst1",
+    "solve_poisson_dst1_1d",
+    "solve_poisson_dst1_3d",
+    "solve_poisson_dst2",
+    "solve_poisson_dst2_1d",
+    "solve_poisson_dst2_3d",
+    "solve_poisson_fft",
+    "solve_poisson_fft_1d",
+    "solve_poisson_fft_3d",
+    "solve_tridiagonal",
+    "solve_tridiagonal_batched",
+    "wet_components",
+]

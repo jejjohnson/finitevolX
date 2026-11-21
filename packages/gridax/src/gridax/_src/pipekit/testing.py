@@ -1,4 +1,4 @@
-"""Contract check for `finitevolx.pipekit` operators."""
+"""Contract check for `gridax.pipekit` operators."""
 
 from __future__ import annotations
 

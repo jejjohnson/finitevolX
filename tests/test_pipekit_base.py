@@ -1,4 +1,4 @@
-"""Scaffolding of the `finitevolx.pipekit` operator layer (Tier B)."""
+"""Scaffolding of the `gridax.pipekit` operator layer (Tier B)."""
 
 from __future__ import annotations
 
@@ -11,14 +11,14 @@ import pytest
 pytest.importorskip("pipekit_jax")
 
 import equinox as eqx
-import gridax_jax as fvx
-from gridax_jax.pipekit import (
+import gridax as fvx
+from gridax.pipekit import (
     GridOperator,
     as_grid_spec,
     build_grid,
     over_leading,
 )
-from gridax_jax.pipekit.testing import check_operator, compiled_hlo
+from gridax.pipekit.testing import check_operator, compiled_hlo
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -123,9 +123,9 @@ def _run(code: str) -> subprocess.CompletedProcess:
     )
 
 
-def test_import_finitevolx_does_not_import_pipekit():
+def test_import_gridax_does_not_import_pipekit():
     res = _run(
-        "import sys, finitevolx; "
+        "import sys, gridax, gridax.solvers; "
         "assert not any(m.split('.')[0] in ('pipekit', 'pipekit_jax') "
         "for m in sys.modules), 'pipekit imported'"
     )
@@ -133,8 +133,6 @@ def test_import_finitevolx_does_not_import_pipekit():
 
 
 def test_missing_extra_names_it():
-    res = _run(
-        "import sys; sys.modules['pipekit_jax'] = None; import gridax_jax.pipekit"
-    )
+    res = _run("import sys; sys.modules['pipekit_jax'] = None; import gridax.pipekit")
     assert res.returncode != 0
-    assert "gridax-jax[pipekit]" in res.stderr
+    assert "gridax[pipekit]" in res.stderr

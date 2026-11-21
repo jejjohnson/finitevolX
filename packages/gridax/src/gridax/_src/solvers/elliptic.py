@@ -21,22 +21,23 @@ are ``sesmax_core.gfd``'s (#475, jejjohnson/geostack#291 rule 3).
 
 from __future__ import annotations
 
-from gridax import Mask2D
 import jax.numpy as jnp
 import numpy as np
 from spectraldiffx import CapacitanceSolver
 
+from gridax import Mask2D
+
 # Re-export from iterative module
-from gridax_jax._src.solvers.iterative import masked_laplacian  # noqa: F401
-from gridax_jax._src.solvers.linear_operators import masked_helmholtz_operator
+from gridax._src.solvers.iterative import masked_laplacian  # noqa: F401
+from gridax._src.solvers.linear_operators import masked_helmholtz_operator
 
 # Re-export from preconditioners module
-from gridax_jax._src.solvers.preconditioners import (  # noqa: F401
+from gridax._src.solvers.preconditioners import (  # noqa: F401
     make_spectral_preconditioner,
 )
 
 # Re-export from spectral module
-from gridax_jax._src.solvers.spectral import (  # noqa: F401
+from gridax._src.solvers.spectral import (  # noqa: F401
     # Types
     BoundaryCondition,
     # Solver classes
@@ -141,7 +142,7 @@ def build_capacitance_solver(
 
     The masked operator is the wet sub-block ``B[W][:, W]`` of the
     rectangular five-point operator ``B = (∇² − λ)``
-    (:func:`~finitevolx.masked_helmholtz_operator` with ``bc=base_bc``), a
+    (:func:`~gridax.solvers.masked_helmholtz_operator` with ``bc=base_bc``), a
     ``gaussx.MaskedOperator`` whose coupling set is the coast ring.  This is
     an **offline** function: it factorises the ``N_c × N_c`` capacitance
     matrix (``N_c`` = number of coast cells) with ``N_c`` rectangular solves.

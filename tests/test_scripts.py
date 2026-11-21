@@ -4,7 +4,7 @@ import importlib.util
 from pathlib import Path
 import sys
 
-from gridax_jax import CartesianGrid2D, Difference2D, Interpolation2D
+from gridax import CartesianGrid2D, Difference2D, Interpolation2D
 import jax.numpy as jnp
 import numpy as np
 import pytest

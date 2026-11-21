@@ -11,7 +11,7 @@ functional form (or documented composition) when ``mask=None``.
 
 from __future__ import annotations
 
-from gridax_jax import (
+from gridax import (
     Difference2D,
     Energetics2D,
     Interpolation2D,

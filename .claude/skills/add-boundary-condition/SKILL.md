@@ -59,8 +59,8 @@ particular coefficients, or a set of existing atoms.
 
 ## 3. Export and document
 
-`packages/gridax-jax/src/gridax_jax/__init__.py` (import + `__all__` under `# Boundary condition
-sets and 1D BCs` or `# Boundary helpers`), `::: finitevolx.NewBC` on
+`packages/gridax/src/gridax/__init__.py` (import + `__all__` under `# Boundary condition
+sets and 1D BCs` or `# Boundary helpers`), `::: gridax.NewBC` on
 `docs/api/boundary_conditions.md`, the formula on
 `docs/boundary_conditions.md`, `make capabilities`.
 

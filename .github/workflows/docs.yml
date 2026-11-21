@@ -27,13 +27,13 @@ jobs:
         run: npm install -g mystmd
 
       - name: Install docs dependencies
-        run: uv sync --extra docs --extra pipekit
+        run: uv sync --extra docs
 
       # Builds both halves, assembles them into public/, repairs the
       # cross-generator references, and fails if any internal link — in either
       # half, or crossing between them — does not resolve.
       - name: Build and verify the documentation site
-        run: uv run --extra docs --extra pipekit python scripts/build_docs.py
+        run: uv run --extra docs python scripts/build_docs.py
 
       - name: Upload site
         uses: actions/upload-artifact@v7

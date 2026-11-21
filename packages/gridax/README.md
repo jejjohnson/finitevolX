@@ -14,4 +14,4 @@ depth[:, :3] = -10.0  # a coast on the west
 mask = Mask2D.from_bathymetry(depth, min_depth=10.0)
 ```
 
-`gridax.analysis` holds the analysis kernels on collocated grids: finite differences (`difference`, `adaptive_difference`, and the 1-D / 2-D / 3-D gradient, divergence, curl and Laplacian) and axis remapping (`remap_axis`, `remap_axis_columns`). They follow the array API, so the same call runs on NumPy, JAX or any other backend and returns the input's dtype. The staggered C-grid operations (advection, diffusion, boundary conditions, solvers) are in gridax-jax, which depends on gridax.
+`gridax.analysis` holds the analysis kernels on collocated grids: finite differences (`difference`, `adaptive_difference`, and the 1-D / 2-D / 3-D gradient, divergence, curl and Laplacian) and axis remapping (`remap_axis`, `remap_axis_columns`). They follow the array API, so the same call runs on NumPy, JAX or any other backend and returns the input's dtype. The solvers are in `gridax.solvers` (`pip install "gridax[jax]"`) and the pipekit operators in `gridax.pipekit` (`pip install "gridax[pipekit]"`); `import gridax` imports neither.

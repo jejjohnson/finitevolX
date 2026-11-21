@@ -6,7 +6,7 @@ Provides the building blocks for solving elliptic PDEs with prescribed
 Where the known values sit
 --------------------------
 The prescribed values live on the **coast ring**: the dry cells 4-adjacent
-to a wet cell.  That is where :func:`~finitevolx.masked_laplacian` (and so
+to a wet cell.  That is where :func:`~gridax.solvers.masked_laplacian` (and so
 ``method="cg"``) puts its homogeneous Dirichlet wall -- for ψ on the X points
 of a ``Mask2D.xy_corner_strict`` mask, the C-grid wall nodes.  Every wet
 cell stays an unknown unless ``known_mask`` pins it.
@@ -32,11 +32,11 @@ from __future__ import annotations
 
 import equinox as eqx
 import gaussx
-from gridax import Mask2D
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 
-from gridax_jax._src.solvers.iterative import masked_laplacian
+from gridax import Mask2D
+from gridax._src.solvers.iterative import masked_laplacian
 
 # ---------------------------------------------------------------------------
 # Primitive: boundary_ring
@@ -77,7 +77,7 @@ def boundary_ring(mask: Float[Array, "Ny Nx"]) -> Bool[Array, "Ny Nx"]:
 def coast_ring(mask: Float[Array, "Ny Nx"]) -> Bool[Array, "Ny Nx"]:
     """Dry cells adjacent to at least one wet cell (the coast ring).
 
-    This is where :func:`~finitevolx.masked_laplacian` imposes its
+    This is where :func:`~gridax.solvers.masked_laplacian` imposes its
     homogeneous Dirichlet wall (a dry neighbour reads as zero), so it is
     where prescribed (known) values sit.  For ψ on a ``from_interior``
     rectangle (``Mask2D.xy_corner_strict`` wet on ``[1:-2, 1:-2]``) it is the

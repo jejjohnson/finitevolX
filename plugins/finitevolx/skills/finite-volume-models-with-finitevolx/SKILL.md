@@ -19,20 +19,17 @@ Poisson solver or an RK loop, look it up:
    installed version:
 
    ```python
+   import importlib
    import inspect
 
-   import gridax_jax
-
-   for name in finitevolx.__all__:
-       doc = (inspect.getdoc(getattr(finitevolx, name)) or "").split("\n")[0]
-       print(f"finitevolx.{name}: {doc}")
+   for module_name in ("gridax", "gridax.solvers"):
+       module = importlib.import_module(module_name)
+       for name in module.__all__:
+           doc = (inspect.getdoc(getattr(module, name)) or "").split("\n")[0]
+           print(f"{module_name}.{name}: {doc}")
    ```
 
-2. Compose what exists. finitevolX is not on PyPI:
-   `uv add "finitevolx @ git+https://github.com/jejjohnson/gridax.git"`.
-   uv also honours the release tags finitevolX pins for its two git-only
-   dependencies, spectraldiffx and gaussx; with pip, install those two from
-   GitHub at the same tags first.
+2. Compose what exists. finitevolX is now the `gridax` package: `import gridax as fvx` for the grids, masks, stencils and operators (NumPy or JAX), and `import gridax.solvers as gs` for the solvers, which need the `jax` extra. It is not on PyPI: `uv add "gridax[jax] @ git+https://github.com/jejjohnson/gridax.git#subdirectory=packages/gridax"`, with the git sources of spectraldiffx, gaussx and geophysix that `packages/gridax/pyproject.toml` lists.
 
 ## What lives where
 
@@ -48,16 +45,16 @@ Poisson solver or an RK loop, look it up:
 | Ghost cells | `fvx.BoundaryConditionSet(south=fvx.Dirichlet1D("south", 0.0), ...)`, `fvx.enforce_periodic`, `fvx.zero_gradient_boundaries`, `fvx.no_slip_boundaries`, `fvx.wall_boundaries` |
 | Diagnostics | `fvx.Energetics2D`, `fvx.Strain2D`, `fvx.QGPotentialVorticity2D`, `fvx.ArakawaJacobian2D`; `fvx.kinetic_energy`, `fvx.okubo_weiss`, `fvx.arakawa_jacobian`, … |
 | Integrals and means | `fvx.area_sum`, `fvx.area_mean`, `fvx.volume_mean`, `fvx.masked_mean` |
-| Poisson / Helmholtz | `fvx.solve_helmholtz_dst` / `_dct` / `_fft` on a rectangle (slice the unknowns, embed the result in zeros); the one-call wrappers `streamfunction_from_vorticity`, `pressure_from_divergence` and `pv_inversion` moved to `sesmax_core.gfd`; `gaussx.linear_solve_with_info` with `gaussx.CGSolver` (CG is gaussx's, with `gaussx.NystromPreconditioner` for a low-rank preconditioner and `fvx.make_spectral_preconditioner` for a spectral one), `fvx.build_capacitance_solver`, `fvx.build_multigrid_solver(...).as_preconditioner()` or `fvx.multigrid_levels` for gaussx's multigrid |
-| The Laplacian as a linear operator (GP / DA priors, log-determinants, sampling) | `fvx.helmholtz_operator(shape, dx, dy, lambda_, bc)` (a `gaussx.DiagonalizedOperator`: `gaussx.solve` / `logdet` / `sqrt` / `inv`), `fvx.masked_helmholtz_operator(mask, dx, dy, lambda_)` (a `gaussx.MaskedOperator`, capacitance solve); an SPDE / Matérn precision `τ²(κ² − ∇²)^α` from its eigenvalues; `fvx.build_multigrid_solver(...).as_preconditioner()` for `gaussx.CGSolver` |
+| Poisson / Helmholtz | `gs.solve_helmholtz_dst` / `_dct` / `_fft` on a rectangle (slice the unknowns, embed the result in zeros); the one-call wrappers `streamfunction_from_vorticity`, `pressure_from_divergence` and `pv_inversion` moved to `sesmax_core.gfd`; `gaussx.linear_solve_with_info` with `gaussx.CGSolver` (CG is gaussx's, with `gaussx.NystromPreconditioner` for a low-rank preconditioner and `gs.make_spectral_preconditioner` for a spectral one), `gs.build_capacitance_solver`, `gs.build_multigrid_solver(...).as_preconditioner()` or `gs.multigrid_levels` for gaussx's multigrid |
+| The Laplacian as a linear operator (GP / DA priors, log-determinants, sampling) | `gs.helmholtz_operator(shape, dx, dy, lambda_, bc)` (a `gaussx.DiagonalizedOperator`: `gaussx.solve` / `logdet` / `sqrt` / `inv`), `gs.masked_helmholtz_operator(mask, dx, dy, lambda_)` (a `gaussx.MaskedOperator`, capacitance solve); an SPDE / Matérn precision `τ²(κ² − ∇²)^α` from its eigenvalues; `gs.build_multigrid_solver(...).as_preconditioner()` for `gaussx.CGSolver` |
 | Forcing | moved to `sesmax_core.forcing` (#422): `WindStress2D`, `LinearDrag2D`, `QuadraticDrag2D`, `RayleighDamping2D`, combined with `ForcingSum` / `ForcingProduct` / `TimeVaryingForcing` |
 | Time stepping | `integrix.march.rk3_ssp_step(state, rhs_fn, dt)`, `integrix.march.rk4_step`, `integrix.march.ab2_step`, `integrix.march.leapfrog_raf_step`, `integrix.march.imex_ssp2_step`; diffrax solvers `integrix.march.RK3SSP`, `integrix.march.SSP_RK104`, `integrix.march.IMEX_SSP2` with `sesmax_core.solve_pde` (the former `solve_ocean_pde`, moved from finitevolX) |
 | Several layers | `sesmax_core.vertical.multilayer(op.method)` over `[nl, Ny, Nx]`; vertical modes `sesmax_core.vertical.decompose_vertical_modes`, `layer_to_mode` (moved from finitevolX, #422) |
 
 Spectral transforms and solvers come from spectraldiffx (finitevolX
 re-exports them); structured linear algebra (tridiagonal solves, Nyström
-preconditioning) comes from gaussx, and `fvx.helmholtz_operator` /
-`fvx.masked_helmholtz_operator` hand the grid's own Laplacian back to gaussx
+preconditioning) comes from gaussx, and `gs.helmholtz_operator` /
+`gs.masked_helmholtz_operator` hand the grid's own Laplacian back to gaussx
 as a structured operator (never a dense matrix).
 
 ## The rules your code must keep
@@ -96,7 +93,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-import gridax_jax as fvx
+import gridax as fvx
+import gridax.solvers as gs
 from integrix.march import rk3_ssp_step
 
 jax.config.update("jax_enable_x64", True)
@@ -117,7 +115,7 @@ div = diff.divergence(u, v)  # [Ny, Nx] at T-points
 # 3. Invert the discrete Laplacian back to ψ with the periodic (FFT) solver
 lap = diff.laplacian(psi)  # ∇²ψ at T-points, zero ghost ring
 psi_rec = jnp.zeros_like(lap).at[1:-1, 1:-1].set(
-    fvx.solve_helmholtz_fft(lap[1:-1, 1:-1], grid.dx, grid.dy)
+    gs.solve_helmholtz_fft(lap[1:-1, 1:-1], grid.dx, grid.dy)
 )  # slice the T interior, solve (zero-mean), embed in zeros
 inv_err = jnp.max(jnp.abs(psi_rec[1:-1, 1:-1] - psi[1:-1, 1:-1]))
 
@@ -162,10 +160,10 @@ tendency is exactly zero on every land cell.
 | An upwind / WENO face reconstruction and flux divergence | `fvx.Advection2D(grid=grid)(q, u, v, method="weno5")` |
 | `q[:, 0] = q[:, -2]` (periodic ghosts) and friends | `fvx.enforce_periodic(q)`, `fvx.BoundaryConditionSet.periodic()` |
 | A wet-face mask `wet[:, :-1] & wet[:, 1:]` | `fvx.Mask2D.from_mask(wet).u` |
-| `scipy.fft.dstn` Poisson solver | `fvx.solve_helmholtz_dst` (or `sesmax_core.gfd.streamfunction_from_vorticity` for the full-array one-call form) |
-| A conjugate-gradient loop on a masked basin | `gaussx.linear_solve_with_info(gaussx.as_linear_operator(matvec, shape=(n, n), negative_definite=True), rhs.ravel(), solver=gaussx.CGSolver(), preconditioner=fvx.build_multigrid_solver(...).as_preconditioner())` |
-| A dense `(N, N)` Laplacian matrix for a prior covariance, its Cholesky or log-determinant | `fvx.helmholtz_operator` / `fvx.masked_helmholtz_operator` with `gaussx.solve`, `gaussx.logdet`, `gaussx.sqrt` |
-| A Thomas algorithm for vertical diffusion | `fvx.solve_tridiagonal` |
+| `scipy.fft.dstn` Poisson solver | `gs.solve_helmholtz_dst` (or `sesmax_core.gfd.streamfunction_from_vorticity` for the full-array one-call form) |
+| A conjugate-gradient loop on a masked basin | `gaussx.linear_solve_with_info(gaussx.as_linear_operator(matvec, shape=(n, n), negative_definite=True), rhs.ravel(), solver=gaussx.CGSolver(), preconditioner=gs.build_multigrid_solver(...).as_preconditioner())` |
+| A dense `(N, N)` Laplacian matrix for a prior covariance, its Cholesky or log-determinant | `gs.helmholtz_operator` / `gs.masked_helmholtz_operator` with `gaussx.solve`, `gaussx.logdet`, `gaussx.sqrt` |
+| A Thomas algorithm for vertical diffusion | `gs.solve_tridiagonal` |
 | A hand-written RK3 / AB2 / leapfrog loop | `integrix.march.rk3_ssp_step`, `integrix.march.ab2_step`, `integrix.march.leapfrog_raf_step`, or `integrix.march.RK3SSP` with `sesmax_core.solve_pde.solve_ocean_pde` |
 | `jnp.sum(q * dx * dy)` | `fvx.area_sum(q, grid)` (excludes the ghost ring; `mask=` drops land) |
 | Kinetic energy / PV / Okubo–Weiss by hand | `fvx.Energetics2D`, `fvx.Vorticity2D`, `fvx.Strain2D` |

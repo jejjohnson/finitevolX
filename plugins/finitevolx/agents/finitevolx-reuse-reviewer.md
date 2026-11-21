@@ -20,15 +20,17 @@ can import:
 
 ```bash
 python - <<'PY'
+import importlib
 import inspect
-try:
-    import gridax_jax
-except ImportError:
-    print("# finitevolx: not installed")
-else:
-    for name in finitevolx.__all__:
-        doc = (inspect.getdoc(getattr(finitevolx, name)) or "").split("\n")[0]
-        print(f"finitevolx.{name}: {doc}")
+for module_name in ("gridax", "gridax.solvers"):
+    try:
+        module = importlib.import_module(module_name)
+    except ImportError:
+        print(f"# {module_name}: not installed")
+        continue
+    for name in module.__all__:
+        doc = (inspect.getdoc(getattr(module, name)) or "").split("\n")[0]
+        print(f"{module_name}.{name}: {doc}")
 PY
 ```
 
@@ -44,38 +46,38 @@ list grouped by module, plus spectraldiffx and gaussx.
 2. Flag, wherever they appear:
    - shifted-slice differences or averages on a staggered grid
      (`(h[1:-1, 2:] - h[1:-1, 1:-1]) / dx`, `0.5 * (u[:, 1:] + u[:, :-1])`)
-     → `finitevolx.Difference2D` / `Interpolation2D` methods or the raw
-     stencils `finitevolx.diff_x_fwd_2d`, `finitevolx.avg_x_fwd_2d`, … with
-     `finitevolx.interior`;
+     → `gridax.Difference2D` / `Interpolation2D` methods or the raw
+     stencils `gridax.diff_x_fwd_2d`, `gridax.avg_x_fwd_2d`, … with
+     `gridax.interior`;
    - ghost-cell fills (`q.at[:, 0].set(q[:, -2])`, `jnp.pad(..., mode="wrap")`)
-     → `finitevolx.enforce_periodic`, `finitevolx.zero_gradient_boundaries`,
-     `finitevolx.BoundaryConditionSet` of `finitevolx.Dirichlet1D` /
-     `finitevolx.Neumann1D` / `finitevolx.Periodic1D` atoms;
-   - wet-face masks computed by hand → `finitevolx.Mask2D.from_mask`;
+     → `gridax.enforce_periodic`, `gridax.zero_gradient_boundaries`,
+     `gridax.BoundaryConditionSet` of `gridax.Dirichlet1D` /
+     `gridax.Neumann1D` / `gridax.Periodic1D` atoms;
+   - wet-face masks computed by hand → `gridax.Mask2D.from_mask`;
    - an upwind, WENO or flux-limited advection scheme →
-     `finitevolx.Advection2D(grid, mask)(q, u, v, method=...)`,
-     `finitevolx.Reconstruction2D`, `finitevolx.upwind_flux`;
+     `gridax.Advection2D(grid, mask)(q, u, v, method=...)`,
+     `gridax.Reconstruction2D`, `gridax.upwind_flux`;
    - Laplacian diffusion, biharmonic viscosity, Coriolis, momentum
-     advection → `finitevolx.Diffusion2D`, `finitevolx.BiharmonicDiffusion2D`,
-     `finitevolx.Coriolis2D`, `finitevolx.MomentumAdvection2D`;
+     advection → `gridax.Diffusion2D`, `gridax.BiharmonicDiffusion2D`,
+     `gridax.Coriolis2D`, `gridax.MomentumAdvection2D`;
    - vorticity, divergence, kinetic energy, PV, strain, Okubo–Weiss, an
-     Arakawa Jacobian → `finitevolx.Vorticity2D`, `finitevolx.Divergence2D`,
-     `finitevolx.Energetics2D`, `finitevolx.Strain2D`,
-     `finitevolx.arakawa_jacobian`;
+     Arakawa Jacobian → `gridax.Vorticity2D`, `gridax.Divergence2D`,
+     `gridax.Energetics2D`, `gridax.Strain2D`,
+     `gridax.arakawa_jacobian`;
    - `jnp.sum(field * dx * dy)` or a cos-latitude-weighted mean →
-     `finitevolx.area_sum`, `finitevolx.area_mean`, `finitevolx.masked_mean`;
+     `gridax.area_sum`, `gridax.area_mean`, `gridax.masked_mean`;
    - a DST / DCT / FFT Poisson or Helmholtz solver, a CG loop, a capacitance
-     or multigrid solver → `finitevolx.solve_helmholtz_dst`,
+     or multigrid solver → `gridax.solvers.solve_helmholtz_dst`,
      `gaussx.linear_solve_with_info` with `gaussx.CGSolver`,
-     `finitevolx.build_capacitance_solver`,
-     `finitevolx.build_multigrid_solver`; the one-call inversions are
+     `gridax.solvers.build_capacitance_solver`,
+     `gridax.solvers.build_multigrid_solver`; the one-call inversions are
      `sesmax_core.gfd.streamfunction_from_vorticity` / `pv_inversion`,
      which moved from finitevolX;
    - a dense Laplacian / Helmholtz matrix built for a prior covariance,
-     its Cholesky, inverse or log-determinant → `finitevolx.helmholtz_operator`,
-     `finitevolx.masked_helmholtz_operator` with gaussx's structured
+     its Cholesky, inverse or log-determinant → `gridax.solvers.helmholtz_operator`,
+     `gridax.solvers.masked_helmholtz_operator` with gaussx's structured
      primitives;
-   - a Thomas algorithm → `finitevolx.solve_tridiagonal`;
+   - a Thomas algorithm → `gridax.solvers.solve_tridiagonal`;
    - an RK3 / RK4 / Adams–Bashforth / leapfrog loop →
      `integrix.march.rk3_ssp_step`, `integrix.march.rk4_step`,
      `integrix.march.ab2_step`, `integrix.march.leapfrog_raf_step`, or a diffrax
@@ -94,7 +96,7 @@ list grouped by module, plus spectraldiffx and gaussx.
    physical constant in a model meant to run nondimensionally.
 4. Check each replacement exists in the installed version (the listing
    above) and, where you can, run it against the hand-written code on a
-   small grid (`finitevolx.CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)`)
+   small grid (`gridax.CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)`)
    to confirm they agree.
 
 ## Report

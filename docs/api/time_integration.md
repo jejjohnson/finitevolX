@@ -58,7 +58,7 @@ The generic time steppers live in [integrix](https://github.com/jejjohnson/integ
 
 The T-point coordinates it takes as nodes come from gridax:
 
-::: gridax_jax.t_point_coordinates
+::: gridax.t_point_coordinates
 
 ## Diffrax Solvers
 

@@ -11,8 +11,8 @@ RESET  := \033[0m
 PYTHON = python
 ROOT = ./
 SHELL = bash
-PKGROOT = gridax_jax
-TYROOTS = packages/gridax-jax/src packages/gridax/src finitevolx
+PKGROOT = gridax
+TYROOTS = packages/gridax/src
 
 help:## Display this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -100,15 +100,15 @@ ci: ## Run all CI checks locally (lint + format + typecheck + tests)
 ##@ Documentation
 .PHONY: docs
 docs: ## Build the site (MyST prose + Zensical API) into public/ and check its links
-	@uv run --extra docs --extra pipekit python scripts/build_docs.py
+	@uv run --extra docs python scripts/build_docs.py
 
 .PHONY: docs-check
 docs-check: ## Validate the docs sources without rendering the MyST theme
-	@uv run --extra docs --extra pipekit python scripts/build_docs.py --check
+	@uv run --extra docs python scripts/build_docs.py --check
 
 .PHONY: docs-api
 docs-api: ## Build only the Zensical API reference into site/
-	@uv run --extra docs --extra pipekit zensical build --strict
+	@uv run --extra docs zensical build --strict
 
 .PHONY: docs-serve
 docs-serve: docs ## Build, then serve the assembled site at http://127.0.0.1:8000
@@ -131,6 +131,6 @@ clean: ## Remove build artifacts and cache
 .PHONY: version
 version: ## Display version information
 	@printf "$(BLUE)>>> finitevolX version information:$(RESET)\n"
-	@uv run python -c "import importlib.metadata as m; print('gridax-jax', m.version('gridax-jax'), '/ gridax', m.version('gridax'))"
+	@uv run python -c "import importlib.metadata as m; print('gridax', m.version('gridax'))"
 	@printf "$(BLUE)>>> Python version:$(RESET)\n"
 	@uv run python --version

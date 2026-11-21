@@ -9,12 +9,13 @@ Dirichlet conditions at the mask boundary and at the array edge.
 
 from __future__ import annotations
 
-from gridax import Mask2D
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Int
 import numpy as np
 from scipy import ndimage
+
+from gridax import Mask2D
 
 # ---------------------------------------------------------------------------
 # Masked Laplacian operator

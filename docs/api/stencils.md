@@ -34,62 +34,62 @@ Fourth- and sixth-order differences and averages of point values on the C-grid, 
 
 ## 1-D Difference Stencils
 
-::: gridax_jax.diff_x_fwd_1d
+::: gridax.diff_x_fwd_1d
 
-::: gridax_jax.diff_x_bwd_1d
+::: gridax.diff_x_bwd_1d
 
 ## 2-D Difference Stencils
 
-::: gridax_jax.diff_x_fwd_2d
+::: gridax.diff_x_fwd_2d
 
-::: gridax_jax.diff_y_fwd_2d
+::: gridax.diff_y_fwd_2d
 
-::: gridax_jax.diff_x_bwd_2d
+::: gridax.diff_x_bwd_2d
 
-::: gridax_jax.diff_y_bwd_2d
+::: gridax.diff_y_bwd_2d
 
 ## 3-D Difference Stencils
 
-::: gridax_jax.diff_x_fwd_3d
+::: gridax.diff_x_fwd_3d
 
-::: gridax_jax.diff_y_fwd_3d
+::: gridax.diff_y_fwd_3d
 
-::: gridax_jax.diff_x_bwd_3d
+::: gridax.diff_x_bwd_3d
 
-::: gridax_jax.diff_y_bwd_3d
+::: gridax.diff_y_bwd_3d
 
 ## 1-D Averaging Stencils
 
-::: gridax_jax.avg_x_fwd_1d
+::: gridax.avg_x_fwd_1d
 
-::: gridax_jax.avg_x_bwd_1d
+::: gridax.avg_x_bwd_1d
 
 ## 2-D Averaging Stencils (2-point)
 
-::: gridax_jax.avg_x_fwd_2d
+::: gridax.avg_x_fwd_2d
 
-::: gridax_jax.avg_y_fwd_2d
+::: gridax.avg_y_fwd_2d
 
-::: gridax_jax.avg_x_bwd_2d
+::: gridax.avg_x_bwd_2d
 
-::: gridax_jax.avg_y_bwd_2d
+::: gridax.avg_y_bwd_2d
 
 ## 2-D Averaging Stencils (4-point bilinear)
 
-::: gridax_jax.avg_xfwd_yfwd_2d
+::: gridax.avg_xfwd_yfwd_2d
 
-::: gridax_jax.avg_xbwd_ybwd_2d
+::: gridax.avg_xbwd_ybwd_2d
 
-::: gridax_jax.avg_xbwd_yfwd_2d
+::: gridax.avg_xbwd_yfwd_2d
 
-::: gridax_jax.avg_xfwd_ybwd_2d
+::: gridax.avg_xfwd_ybwd_2d
 
 ## 3-D Averaging Stencils
 
-::: gridax_jax.avg_x_fwd_3d
+::: gridax.avg_x_fwd_3d
 
-::: gridax_jax.avg_y_fwd_3d
+::: gridax.avg_y_fwd_3d
 
-::: gridax_jax.avg_x_bwd_3d
+::: gridax.avg_x_bwd_3d
 
-::: gridax_jax.avg_y_bwd_3d
+::: gridax.avg_y_bwd_3d

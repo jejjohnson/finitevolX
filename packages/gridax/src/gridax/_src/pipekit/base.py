@@ -1,4 +1,4 @@
-"""Base classes and helpers for the `finitevolx.pipekit` operator layer.
+"""Base classes and helpers for the `gridax.pipekit` operator layer.
 
 Two tiers, as in geotoolz::
 
@@ -28,10 +28,11 @@ import functools
 from typing import Any
 
 import equinox as eqx
-from gridax import CartesianGrid2D
 import jax
 from jaxtyping import Array
 from pipekit_jax import JaxOperator
+
+from gridax import CartesianGrid2D
 
 #: ``(nx_interior, ny_interior, Lx, Ly)``: the arguments of
 #: `CartesianGrid2D.from_interior`, as JSON primitives.

@@ -16,7 +16,8 @@ import gaussx
 import jax
 import jax.numpy as jnp
 import numpy as np
-import gridax_jax as fvx
+import gridax as fvx
+import gridax.solvers as gs
 
 jax.config.update("jax_enable_x64", True)
 
@@ -32,7 +33,7 @@ zeta = jnp.sin(jnp.pi * x / grid.Lx) * jnp.sin(jnp.pi * y / grid.Ly)  # [Ny, Nx]
 
 # 3. Invert for the streamfunction, psi = 0 on the C-grid wall nodes (DST-I on the X basin)
 psi = jnp.zeros_like(zeta).at[1:-2, 1:-2].set(
-    fvx.solve_helmholtz_dst1(zeta[1:-2, 1:-2], dx, dy)
+    gs.solve_helmholtz_dst1(zeta[1:-2, 1:-2], dx, dy)
 )  # [Ny, Nx]
 ```
 
@@ -83,7 +84,7 @@ $$
 $$
 
 on the remaining cells, and return $\psi = \psi_{\text{lift}} + \psi_{\text{hom}}$.
-The *coast ring* (`fvx.coast_ring(mask)`) holds the known cells: the dry cells adjacent to at least one wet cell, around the outer walls and any islands, plus any extra wet cells you mark with `known_mask`.
+The *coast ring* (`gs.coast_ring(mask)`) holds the known cells: the dry cells adjacent to at least one wet cell, around the outer walls and any islands, plus any extra wet cells you mark with `known_mask`.
 
 #### Using the lifting directly
 
@@ -97,10 +98,10 @@ obs = jnp.zeros((Ny, Nx), dtype=bool).at[20, 30].set(True).at[25, 45].set(True)
 values = jnp.zeros((Ny, Nx)).at[20, 30].set(120.0).at[25, 45].set(-50.0)
 
 # Setup (once): derived masks, then a solver on the effective domain
-domain = fvx.SolveDomain(mask, known_mask=obs)
-lifter = fvx.KnownValueLifting(domain, dx, dy, lambda_=lambda_)
+domain = gs.SolveDomain(mask, known_mask=obs)
+lifter = gs.KnownValueLifting(domain, dx, dy, lambda_=lambda_)
 eff = domain.effective_mask.astype(float)
-A = lambda x: fvx.masked_laplacian(x, eff, dx, dy, lambda_=lambda_)
+A = lambda x: gs.masked_laplacian(x, eff, dx, dy, lambda_=lambda_)
 A_op = gaussx.as_linear_operator(
     A, in_structure=jax.ShapeDtypeStruct(eff.shape, eff.dtype), negative_definite=True
 )
@@ -118,7 +119,7 @@ The solver's unknowns must be exactly `domain.effective_mask` (every wet cell no
 For **multigrid**, build the hierarchy on the same effective mask and use it as the CG preconditioner on the lifted right-hand side:
 
 ```python
-mg = fvx.build_multigrid_solver(
+mg = gs.build_multigrid_solver(
     np.asarray(domain.effective_mask, dtype=float), dx, dy, lambda_=lambda_
 )
 # gaussx solves (-A) x = -b, so its preconditioner is -M^-1 (one V-cycle from zero)
@@ -145,13 +146,13 @@ the unknowns of your staggering yourself.
 f_in = zeta[1:-2, 1:-2]  # psi's unknowns: the wet X nodes of the rectangle
 
 # Dirichlet (DST-I): ψ = 0 one node outside the input on every side
-psi_in = fvx.solve_poisson_dst(f_in, dx, dy)
+psi_in = gs.solve_poisson_dst(f_in, dx, dy)
 
 # Neumann (DCT-II): ∂p/∂n = 0 half a cell outside the input (zero-mean gauge)
-p_in = fvx.solve_poisson_dct(zeta[1:-1, 1:-1], dx, dy)  # any T-point field
+p_in = gs.solve_poisson_dct(zeta[1:-1, 1:-1], dx, dy)  # any T-point field
 
 # Periodic (FFT): doubly-periodic domain (zero-mean gauge)
-psi_per = fvx.solve_poisson_fft(f_in, dx, dy)
+psi_per = gs.solve_poisson_fft(f_in, dx, dy)
 
 # Embed in zeros: the X-point streamfunction with its wall nodes at 0
 psi = jnp.zeros_like(zeta).at[1:-2, 1:-2].set(psi_in)
@@ -161,9 +162,9 @@ psi = jnp.zeros_like(zeta).at[1:-2, 1:-2].set(psi_in)
 
 ```python
 # (∇² − λ)ψ = f with λ = 1/Rd² > 0
-psi_in = fvx.solve_helmholtz_dst(f_in, dx, dy, lambda_=lambda_)
-psi_in = fvx.solve_helmholtz_dct(f_in, dx, dy, lambda_=lambda_)
-psi_in = fvx.solve_helmholtz_fft(f_in, dx, dy, lambda_=lambda_)
+psi_in = gs.solve_helmholtz_dst(f_in, dx, dy, lambda_=lambda_)
+psi_in = gs.solve_helmholtz_dct(f_in, dx, dy, lambda_=lambda_)
+psi_in = gs.solve_helmholtz_fft(f_in, dx, dy, lambda_=lambda_)
 ```
 
 All Helmholtz solvers handle `lambda_=0` internally (via tracer-safe
@@ -175,7 +176,7 @@ lambdas = 1.0 / jnp.array([40e3, 20e3, 10e3]) ** 2
 rhs_batch = jnp.stack([f_in, 0.5 * f_in, 0.1 * f_in])
 
 psi_batch = jax.vmap(
-    lambda r, l: fvx.solve_helmholtz_dst(r, dx, dy, l)
+    lambda r, l: gs.solve_helmholtz_dst(r, dx, dy, l)
 )(rhs_batch, lambdas)
 ```
 
@@ -204,7 +205,7 @@ ocean_mask[:5, :] = ocean_mask[-5:, :] = False  # land border
 ocean_mask[:, :5] = ocean_mask[:, -5:] = False
 
 # Build solver (offline)
-solver = fvx.build_capacitance_solver(
+solver = gs.build_capacitance_solver(
     ocean_mask, dx, dy,
     lambda_=lambda_,  # Helmholtz parameter, λ ≥ 0
     base_bc="dst",    # rectangular base solver (the default)
@@ -226,7 +227,7 @@ When you have a `Mask2D`, pass it directly — the solver uses its ψ
 
 ```python
 cgrid_mask = fvx.Mask2D.from_mask(ocean)
-solver = fvx.build_capacitance_solver(cgrid_mask, dx, dy, lambda_=lambda_)
+solver = gs.build_capacitance_solver(cgrid_mask, dx, dy, lambda_=lambda_)
 ```
 
 ### Online Solve
@@ -254,13 +255,13 @@ rhs = zeta * psi_mask
 
 # Define the operator: (∇² − λ) with psi = 0 on the dry neighbours
 def A(x):
-    return fvx.masked_laplacian(x, psi_mask, dx, dy, lambda_=lambda_)
+    return gs.masked_laplacian(x, psi_mask, dx, dy, lambda_=lambda_)
 
 # gaussx solves (-A) x = -b, so a preconditioner approximating A^-1 is passed as -M^-1
 A_op = gaussx.as_linear_operator(
     A, in_structure=jax.ShapeDtypeStruct(rhs.shape, rhs.dtype), negative_definite=True
 )
-spectral = fvx.make_spectral_preconditioner(dx, dy, lambda_=lambda_, bc="fft")
+spectral = gs.make_spectral_preconditioner(dx, dy, lambda_=lambda_, bc="fft")
 psi, info = gaussx.linear_solve_with_info(
     A_op,
     rhs,
@@ -301,7 +302,7 @@ multiply by the mask as above; the wrappers do.
 ::::{tab-item} Spectral (cheapest)
 
 ```python
-M_inv = fvx.make_spectral_preconditioner(
+M_inv = gs.make_spectral_preconditioner(
     dx, dy, lambda_=lambda_, bc="fft"
 )
 ```
@@ -337,7 +338,7 @@ known only through `matvec`).
 ::::{tab-item} Multigrid (most powerful)
 
 ```python
-mg = fvx.build_multigrid_solver(mask, dx, dy, lambda_=lambda_)  # coeff= for c(x, y)
+mg = gs.build_multigrid_solver(mask, dx, dy, lambda_=lambda_)  # coeff= for c(x, y)
 pre = mg.as_preconditioner()  # a gaussx.MultigridPreconditioner, on flat vectors
 # pass it to gaussx.linear_solve_with_info(..., solver=gaussx.CGSolver(...), preconditioner=pre)
 # on the flat finest operator pre.levels[0].operator
@@ -384,7 +385,7 @@ All solvers are fully compatible with `jax.jit` and `jax.vmap`.
 
 ```python
 def invert_layer(q, lam):
-    unknowns = fvx.solve_helmholtz_dst1(q[1:-2, 1:-2], dx, dy, lam)
+    unknowns = gs.solve_helmholtz_dst1(q[1:-2, 1:-2], dx, dy, lam)
     return jnp.zeros_like(q).at[1:-2, 1:-2].set(unknowns)
 
 @jax.jit
@@ -403,7 +404,7 @@ psi = invert_pv(pv, lambdas)
 # Solve the same equation for many RHS fields
 @jax.jit
 def batch_solve(rhs_batch):
-    return jax.vmap(lambda r: fvx.solve_poisson_dst(r, dx, dy))(rhs_batch)
+    return jax.vmap(lambda r: gs.solve_poisson_dst(r, dx, dy))(rhs_batch)
 
 rhs_ensemble = jnp.stack([f_in, -f_in])
 psi_batch = batch_solve(rhs_ensemble)  # (n_ensemble, Ny-3, Nx-3)
@@ -415,7 +416,7 @@ Spectral solvers are differentiable — you can backpropagate through them:
 
 ```python
 def loss(rhs):
-    psi = fvx.solve_poisson_dst(rhs, dx, dy)
+    psi = gs.solve_poisson_dst(rhs, dx, dy)
     return jnp.sum(psi ** 2)
 
 grad_rhs = jax.grad(loss)(f_in)

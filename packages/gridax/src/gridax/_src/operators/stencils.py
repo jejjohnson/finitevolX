@@ -41,24 +41,6 @@ if TYPE_CHECKING:
 else:
     Array = np.ndarray
 
-# Names of the previous API (the 2-D stencils had no rank suffix, the corner
-# averages mixed two schemes) -> the names of this module. gridax-jax serves
-# the old names as deprecated aliases for one release.
-RENAMED = {
-    "diff_x_fwd": "diff_x_fwd_2d",
-    "diff_x_bwd": "diff_x_bwd_2d",
-    "diff_y_fwd": "diff_y_fwd_2d",
-    "diff_y_bwd": "diff_y_bwd_2d",
-    "avg_x_fwd": "avg_x_fwd_2d",
-    "avg_x_bwd": "avg_x_bwd_2d",
-    "avg_y_fwd": "avg_y_fwd_2d",
-    "avg_y_bwd": "avg_y_bwd_2d",
-    "avg_xy_fwd": "avg_xfwd_yfwd_2d",
-    "avg_xy_bwd": "avg_xbwd_ybwd_2d",
-    "avg_xbwd_yfwd": "avg_xbwd_yfwd_2d",
-    "avg_xfwd_ybwd": "avg_xfwd_ybwd_2d",
-}
-
 
 def diff_x_fwd_1d(h: Float[Array, "*batch Nx"]) -> Float[Array, "*batch Nx-2"]:
     """Forward difference in x, 1-D: T (or V) → U (or X) points.

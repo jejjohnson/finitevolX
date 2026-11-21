@@ -12,9 +12,8 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "finitevolx",
     "gridax",
-    "gridax-jax",
+    "gridax-workspace",
 ]
 overrides = [
     { name = "functax", extras = ["jax"], git = "https://github.com/jejjohnson/functax?rev=v0.0.11" },
@@ -28,15 +27,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/6b/5c/685e6633917e101e5dcb62b9dd76946cbb57c26e133bae9e0cd36033c0a9/attrs-25.4.0.tar.gz", hash = "sha256:16d5969b87f0859ef33a48b35d55ac1be6e42ae49d5e853b597db70c35c57e11", size = 934251, upload-time = "2025-10-06T13:54:44.725Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3a/2a/7cc015f5b9f5db42b7d48157e23356022889fc354a2813c15934b7cb5c0e/attrs-25.4.0-py3-none-any.whl", hash = "sha256:adcf7e2a1fb3b36ac48d97835bb6d8ade15b8dcce26aba8bf1d14847b57a3373", size = 67615, upload-time = "2025-10-06T13:54:43.17Z" },
-]
-
-[[package]]
-name = "beartype"
-version = "0.22.9"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/c7/94/1009e248bbfbab11397abca7193bea6626806be9a327d399810d523a07cb/beartype-0.22.9.tar.gz", hash = "sha256:8f82b54aa723a2848a56008d18875f91c1db02c32ef6a62319a002e3e25a975f", size = 1608866, upload-time = "2025-12-13T06:50:30.72Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/71/cc/18245721fa7747065ab478316c7fea7c74777d07f37ae60db2e84f8172e8/beartype-0.22.9-py3-none-any.whl", hash = "sha256:d16c9bbc61ea14637596c5f6fbff2ee99cbe3573e46a716401734ef50c3060c2", size = 1333658, upload-time = "2025-12-13T06:50:28.266Z" },
 ]
 
 [[package]]
@@ -305,98 +295,6 @@ wheels = [
 ]
 
 [[package]]
-name = "finitevolx"
-version = "0.3.0"
-source = { editable = "." }
-dependencies = [
-    { name = "gridax" },
-    { name = "gridax-jax" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "nbstripout" },
-    { name = "pre-commit" },
-    { name = "ruff" },
-    { name = "ty" },
-]
-docs = [
-    { name = "cyclopts" },
-    { name = "jupytext" },
-    { name = "loguru" },
-    { name = "mkdocstrings", extra = ["python"] },
-    { name = "zensical" },
-]
-examples = [
-    { name = "cyclopts" },
-    { name = "loguru" },
-    { name = "matplotlib" },
-    { name = "numpy" },
-    { name = "pillow" },
-    { name = "tqdm" },
-    { name = "xarray" },
-    { name = "zarr" },
-]
-pipekit = [
-    { name = "gridax-jax", extra = ["pipekit"] },
-]
-test = [
-    { name = "coverage" },
-    { name = "matplotlib" },
-    { name = "networkx" },
-    { name = "pillow" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "pytest-pretty" },
-    { name = "pytest-xdist" },
-    { name = "xarray" },
-    { name = "zarr" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "finitevolx", extra = ["dev", "test"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "coverage", marker = "extra == 'test'", specifier = ">=7.6.0" },
-    { name = "cyclopts", marker = "extra == 'docs'", specifier = ">=4" },
-    { name = "cyclopts", marker = "extra == 'examples'", specifier = ">=2.0.0" },
-    { name = "gridax", editable = "packages/gridax" },
-    { name = "gridax-jax", editable = "packages/gridax-jax" },
-    { name = "gridax-jax", extras = ["pipekit"], marker = "extra == 'pipekit'", editable = "packages/gridax-jax" },
-    { name = "jupytext", marker = "extra == 'docs'", specifier = ">=1.16" },
-    { name = "loguru", marker = "extra == 'docs'", specifier = ">=0.7" },
-    { name = "loguru", marker = "extra == 'examples'", specifier = ">=0.7.2" },
-    { name = "matplotlib", marker = "extra == 'examples'", specifier = ">=3.9.0" },
-    { name = "matplotlib", marker = "extra == 'test'", specifier = ">=3.9.0" },
-    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=1.0.8" },
-    { name = "nbstripout", marker = "extra == 'dev'", specifier = ">=0.7.1" },
-    { name = "networkx", marker = "extra == 'test'", specifier = ">=3.3" },
-    { name = "numpy", marker = "extra == 'examples'", specifier = ">=2.0.0" },
-    { name = "pillow", marker = "extra == 'examples'", specifier = ">=11.0.0" },
-    { name = "pillow", marker = "extra == 'test'", specifier = ">=11.0.0" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3.0" },
-    { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=5.0.0" },
-    { name = "pytest-pretty", marker = "extra == 'test'", specifier = ">=1.2.0" },
-    { name = "pytest-xdist", marker = "extra == 'test'", specifier = ">=3.5.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.0" },
-    { name = "tqdm", marker = "extra == 'examples'", specifier = ">=4.66.0" },
-    { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.23" },
-    { name = "xarray", marker = "extra == 'examples'", specifier = ">=2025.1.0" },
-    { name = "xarray", marker = "extra == 'test'", specifier = ">=2025.1.0" },
-    { name = "zarr", marker = "extra == 'examples'", specifier = ">=3.1.5" },
-    { name = "zarr", marker = "extra == 'test'", specifier = ">=3.1.5" },
-    { name = "zensical", marker = "extra == 'docs'", specifier = ">=0.0.74" },
-]
-provides-extras = ["test", "dev", "examples", "pipekit", "docs"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "finitevolx", extras = ["dev", "test"] }]
-
-[[package]]
 name = "fonttools"
 version = "4.62.1"
 source = { registry = "https://pypi.org/simple" }
@@ -511,59 +409,135 @@ dependencies = [
     { name = "scipy" },
 ]
 
-[package.metadata]
-requires-dist = [
-    { name = "geophysix", git = "https://github.com/jejjohnson/geophysix?tag=v0.0.3" },
-    { name = "jaxtyping", specifier = ">=0.3.0" },
-    { name = "numpy", specifier = ">=2.0.0" },
-    { name = "scipy", specifier = ">=1.14.0" },
-]
-
-[[package]]
-name = "gridax-jax"
-version = "0.3.0"
-source = { editable = "packages/gridax-jax" }
-dependencies = [
-    { name = "beartype" },
-    { name = "diffrax" },
+[package.optional-dependencies]
+jax = [
     { name = "equinox" },
     { name = "gaussx" },
-    { name = "geophysix" },
-    { name = "gridax" },
+    { name = "jax" },
+    { name = "jaxlib" },
+    { name = "lineax" },
+    { name = "spectraldiffx" },
+]
+pipekit = [
+    { name = "equinox" },
+    { name = "gaussx" },
     { name = "integrix" },
     { name = "jax" },
     { name = "jaxlib" },
-    { name = "jaxtyping" },
     { name = "lineax" },
-    { name = "scipy" },
-    { name = "spectraldiffx" },
-]
-
-[package.optional-dependencies]
-pipekit = [
     { name = "pipekit-jax" },
     { name = "pipekit-ops" },
+    { name = "spectraldiffx" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "beartype", specifier = ">=0.20.0" },
-    { name = "diffrax", specifier = ">=0.6.0" },
-    { name = "equinox", specifier = ">=0.11.0" },
-    { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?tag=v0.8.1" },
+    { name = "equinox", marker = "extra == 'jax'", specifier = ">=0.11.0" },
+    { name = "gaussx", marker = "extra == 'jax'", git = "https://github.com/jejjohnson/gaussx?tag=v0.8.1" },
     { name = "geophysix", git = "https://github.com/jejjohnson/geophysix?tag=v0.0.3" },
-    { name = "gridax", editable = "packages/gridax" },
-    { name = "integrix", git = "https://github.com/jejjohnson/integrix?tag=v0.0.9" },
-    { name = "jax", specifier = ">=0.4.38" },
-    { name = "jaxlib", specifier = ">=0.4.38" },
+    { name = "gridax", extras = ["jax"], marker = "extra == 'pipekit'", editable = "packages/gridax" },
+    { name = "integrix", marker = "extra == 'pipekit'", git = "https://github.com/jejjohnson/integrix?tag=v0.0.9" },
+    { name = "jax", marker = "extra == 'jax'", specifier = ">=0.4.38" },
+    { name = "jaxlib", marker = "extra == 'jax'", specifier = ">=0.4.38" },
     { name = "jaxtyping", specifier = ">=0.3.0" },
-    { name = "lineax", specifier = ">=0.1.0" },
+    { name = "lineax", marker = "extra == 'jax'", specifier = ">=0.1.0" },
+    { name = "numpy", specifier = ">=2.0.0" },
     { name = "pipekit-jax", marker = "extra == 'pipekit'", git = "https://github.com/jejjohnson/pipekit?subdirectory=packages%2Fpipekit-jax&tag=pipekit-ops-v0.2.1" },
     { name = "pipekit-ops", marker = "extra == 'pipekit'", git = "https://github.com/jejjohnson/pipekit?subdirectory=packages%2Fpipekit-ops&tag=pipekit-ops-v0.2.1" },
     { name = "scipy", specifier = ">=1.14.0" },
-    { name = "spectraldiffx", git = "https://github.com/jejjohnson/spectraldiffx.git?tag=0.1.2" },
+    { name = "spectraldiffx", marker = "extra == 'jax'", git = "https://github.com/jejjohnson/spectraldiffx.git?tag=0.1.2" },
 ]
-provides-extras = ["pipekit"]
+provides-extras = ["jax", "pipekit"]
+
+[[package]]
+name = "gridax-workspace"
+version = "0.0.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "gridax", extra = ["jax", "pipekit"] },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "nbstripout" },
+    { name = "pre-commit" },
+    { name = "ruff" },
+    { name = "ty" },
+]
+docs = [
+    { name = "cyclopts" },
+    { name = "jupytext" },
+    { name = "loguru" },
+    { name = "mkdocstrings", extra = ["python"] },
+    { name = "zensical" },
+]
+examples = [
+    { name = "cyclopts" },
+    { name = "loguru" },
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "pillow" },
+    { name = "tqdm" },
+    { name = "xarray" },
+    { name = "zarr" },
+]
+test = [
+    { name = "coverage" },
+    { name = "diffrax" },
+    { name = "integrix" },
+    { name = "matplotlib" },
+    { name = "networkx" },
+    { name = "pillow" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "pytest-pretty" },
+    { name = "pytest-xdist" },
+    { name = "xarray" },
+    { name = "zarr" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "gridax-workspace", extra = ["dev", "test"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "coverage", marker = "extra == 'test'", specifier = ">=7.6.0" },
+    { name = "cyclopts", marker = "extra == 'docs'", specifier = ">=4" },
+    { name = "cyclopts", marker = "extra == 'examples'", specifier = ">=2.0.0" },
+    { name = "diffrax", marker = "extra == 'test'", specifier = ">=0.6.0" },
+    { name = "gridax", extras = ["jax", "pipekit"], editable = "packages/gridax" },
+    { name = "integrix", marker = "extra == 'test'", git = "https://github.com/jejjohnson/integrix?tag=v0.0.9" },
+    { name = "jupytext", marker = "extra == 'docs'", specifier = ">=1.16" },
+    { name = "loguru", marker = "extra == 'docs'", specifier = ">=0.7" },
+    { name = "loguru", marker = "extra == 'examples'", specifier = ">=0.7.2" },
+    { name = "matplotlib", marker = "extra == 'examples'", specifier = ">=3.9.0" },
+    { name = "matplotlib", marker = "extra == 'test'", specifier = ">=3.9.0" },
+    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=1.0.8" },
+    { name = "nbstripout", marker = "extra == 'dev'", specifier = ">=0.7.1" },
+    { name = "networkx", marker = "extra == 'test'", specifier = ">=3.3" },
+    { name = "numpy", marker = "extra == 'examples'", specifier = ">=2.0.0" },
+    { name = "pillow", marker = "extra == 'examples'", specifier = ">=11.0.0" },
+    { name = "pillow", marker = "extra == 'test'", specifier = ">=11.0.0" },
+    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0.0" },
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3.0" },
+    { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=5.0.0" },
+    { name = "pytest-pretty", marker = "extra == 'test'", specifier = ">=1.2.0" },
+    { name = "pytest-xdist", marker = "extra == 'test'", specifier = ">=3.5.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.0" },
+    { name = "tqdm", marker = "extra == 'examples'", specifier = ">=4.66.0" },
+    { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.23" },
+    { name = "xarray", marker = "extra == 'examples'", specifier = ">=2025.1.0" },
+    { name = "xarray", marker = "extra == 'test'", specifier = ">=2025.1.0" },
+    { name = "zarr", marker = "extra == 'examples'", specifier = ">=3.1.5" },
+    { name = "zarr", marker = "extra == 'test'", specifier = ">=3.1.5" },
+    { name = "zensical", marker = "extra == 'docs'", specifier = ">=0.0.74" },
+]
+provides-extras = ["test", "dev", "examples", "docs"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "gridax-workspace", extras = ["dev", "test"] }]
 
 [[package]]
 name = "griffelib"

@@ -24,7 +24,7 @@ import jax.numpy as jnp
 from pipekit_ops import Operator
 from pipekit_ops._base.operator import nested_config
 
-from gridax_jax._src.pipekit.base import FVXOperator
+from gridax._src.pipekit.base import FVXOperator
 
 #: ``scheme -> step(state, rhs_fn, dt)``. ``dt`` may be a 0-d array (a
 #: leaf): the steps only multiply by it.

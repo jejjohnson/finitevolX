@@ -10,7 +10,7 @@ units.
 Downstream non-dimensionalisation (jejjohnson/somax#170) is a
 factory-only change — models are rebuilt with ``Lx=1``, ``f0=1`` and the
 same operators — so it rests entirely on this property. Pinning it here
-means a regression fails in finitevolx rather than silently producing a
+means a regression fails in gridax rather than silently producing a
 wrong nondimensional run downstream.
 
 For an operator ``F`` of differential order ``p`` acting on fields with
@@ -87,7 +87,7 @@ from gridax._src.operators.spherical_difference import (
     SphericalDifference3D,
 )
 from gridax._src.operators.vorticity import Vorticity2D, Vorticity3D
-from gridax_jax._src.solvers.spectral import (
+from gridax._src.solvers.spectral import (
     solve_poisson_dst,
     solve_poisson_fft,
 )
@@ -801,15 +801,12 @@ AUDITED_PACKAGES = ("operators", "advection", "diffusion", "solvers")
 
 
 def _audited_modules():
-    # The operators live in gridax (array-API code) and gridax-jax (solvers,
-    # the JAX-only machinery); the audit covers both.
-    packages = pathlib.Path(__file__).resolve().parents[1] / "packages"
-    for root in (
-        packages / "gridax" / "src" / "gridax" / "_src",
-        packages / "gridax-jax" / "src" / "gridax_jax" / "_src",
-    ):
-        for package in AUDITED_PACKAGES:
-            yield from sorted((root / package).rglob("*.py"))
+    # The operators and the solvers both live in gridax/_src.
+    root = (
+        pathlib.Path(__file__).resolve().parents[1] / "packages/gridax/src/gridax/_src"
+    )
+    for package in AUDITED_PACKAGES:
+        yield from sorted((root / package).rglob("*.py"))
 
 
 #: Dotted paths of the modules the constants live in.

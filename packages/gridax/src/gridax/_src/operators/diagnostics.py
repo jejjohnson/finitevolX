@@ -423,7 +423,7 @@ def qg_potential_vorticity(
     term separately::
 
         import jax
-        from gridax_jax import qg_potential_vorticity
+        from gridax import qg_potential_vorticity
 
         # Per-layer PV (vmapped over the layer axis)
         q = jax.vmap(lambda p: qg_potential_vorticity(p, f0, beta, dx, dy, y, y0))(
@@ -741,7 +741,7 @@ def potential_vorticity_multilayer(
 
     This is the MQGeometry form ``nabla^2(psi) - f0^2 A psi + beta (y - y0)``
     divided by ``f0``.  ``A`` is the raw output of
-    :func:`~finitevolx.build_coupling_matrix` (``1 / (H g')``, units
+    :func:`~sesmax_core.vertical.build_coupling_matrix` (``1 / (H g')``, units
     s^2/m^2): ``f0 * A . psi`` is dimensionless like the other two terms,
     so callers must **not** pre-multiply ``A`` by ``f0``.
 
@@ -754,7 +754,7 @@ def potential_vorticity_multilayer(
         Streamfunction at T-points for all layers.
     A : Float[Array, "nl nl"]
         Layer coupling (stretching) matrix, the raw output of
-        :func:`~finitevolx.build_coupling_matrix` (s^2/m^2); the factor
+        :func:`~sesmax_core.vertical.build_coupling_matrix` (s^2/m^2); the factor
         ``f0`` is applied here.
     f0 : float
         Reference Coriolis parameter.

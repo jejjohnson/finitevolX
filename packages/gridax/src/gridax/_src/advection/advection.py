@@ -3,14 +3,14 @@ Advection operators for Arakawa C-grids.
 
 Computes -div(h * u_vec) at T-points using face-value reconstruction.
 
-When a :class:`~finitevolx.Mask1D` / :class:`~finitevolx.Mask2D` /
-:class:`~finitevolx.Mask3D` is supplied at construction, every method is
+When a :class:`~gridax.Mask1D` / :class:`~gridax.Mask2D` /
+:class:`~gridax.Mask3D` is supplied at construction, every method is
 land-safe: dry inputs are zeroed with ``jnp.where`` before any stencil
 reads them, the upwind reconstructions fall back to a lower-order stencil
-near irregular boundaries (using :func:`~finitevolx.upwind_flux` as the
+near irregular boundaries (using :func:`~gridax.upwind_flux` as the
 unified dispatch mechanism), and the face fluxes on every dry face
 (wet→dry and dry→dry, ``mask.u`` / ``mask.v`` false) are zeroed before the
-divergence, as in :class:`~finitevolx.Diffusion2D`.  The wet tendencies
+divergence, as in :class:`~gridax.Diffusion2D`.  The wet tendencies
 therefore never depend on the values stored on land, and no mass crosses
 the coastline.
 
@@ -109,9 +109,9 @@ def _wall_upwind_flux(
 
     For a **Dirichlet inflow** wall the ghost must therefore hold the boundary
     concentration *as a cell value* (``ghost = value``).  Note that
-    :class:`~finitevolx.Dirichlet1D` instead writes the *face* reflection
+    :class:`~gridax.Dirichlet1D` instead writes the *face* reflection
     ``2*value - interior`` (chosen so a centred stencil sees ``value`` at the
-    face — the right convention for :class:`~finitevolx.Diffusion2D`).  Pairing
+    face — the right convention for :class:`~gridax.Diffusion2D`).  Pairing
     that atom with open-mode advection makes the inflow carry
     ``2*value - interior`` rather than ``value``; fill the ghost with the
     plain boundary value when an exact advective Dirichlet inflow is required.
@@ -126,7 +126,7 @@ def _wall_upwind_flux(
 def _tier_funcs(recon: object, method: str, axis: str) -> dict[int, Callable]:
     """Stencil-width tiers ``{size: reconstruction}`` for one direction.
 
-    Size ``s`` is the tier :meth:`~finitevolx.Mask2D.get_adaptive_masks`
+    Size ``s`` is the tier :meth:`~gridax.Mask2D.get_adaptive_masks`
     assigns to an upwind cell with ``s // 2`` contiguous wet cells on each
     side (itself included), i.e. a centred footprint of ``s - 1`` cells:
     upwind1 needs 1 (size 2), upwind2 / upwind3 / WENO3 / the TVD limiters

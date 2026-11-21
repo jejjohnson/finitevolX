@@ -40,7 +40,7 @@ import statistics
 import sys
 import time
 
-import gridax_jax as fvx
+import gridax as fvx
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -212,7 +212,7 @@ def _cases(n: int, nz: int) -> list[Case]:
         Case("okubo_weiss[fn]", _okubo_weiss_fn, 2, s2),
         Case(
             "masked_laplacian",
-            _op(fvx.masked_laplacian, None, f2, 1.0, 1.0),
+            _op(gs.masked_laplacian, None, f2, 1.0, 1.0),
             1,
             s2,
         ),

@@ -9,7 +9,8 @@ DCT-II and DST-II solves on the rectangle.  The pressure solve that uses them,
 
 from __future__ import annotations
 
-import gridax_jax as fvx
+import gridax as fvx
+import gridax.solvers as gs
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -58,9 +59,9 @@ class TestNeumannOperator:
         p = (
             jnp.zeros_like(b)
             .at[1:-1, 1:-1]
-            .set(fvx.solve_helmholtz_dct2(b[1:-1, 1:-1], dx, dy, 0.0))
+            .set(gs.solve_helmholtz_dct2(b[1:-1, 1:-1], dx, dy, 0.0))
         )
-        lap = fvx.masked_neumann_laplacian(p, mask.h.astype(b.dtype), dx, dy)
+        lap = gs.masked_neumann_laplacian(p, mask.h.astype(b.dtype), dx, dy)
         b_proj = _demeaned(b, wet)  # the DCT solve drops the mean of b
         # roundoff of a 34x34 transform round trip
         np.testing.assert_allclose(np.asarray(lap)[wet], b_proj, atol=1e-12)
@@ -74,7 +75,7 @@ class TestNeumannOperator:
         for k in idx:
             e = jnp.zeros(N * N).at[k].set(1.0).reshape(N, N)
             cols.append(
-                np.asarray(fvx.masked_neumann_laplacian(e, mf, dx, dy)).ravel()[idx]
+                np.asarray(gs.masked_neumann_laplacian(e, mf, dx, dy)).ravel()[idx]
             )
         a = np.stack(cols, axis=1)
         np.testing.assert_array_equal(a, a.T)
@@ -87,7 +88,7 @@ class TestNeumannOperator:
         mask = _island_basin()
         g = fvx.CartesianGrid2D.from_interior(N - 2, N - 2, Lx=1.0, Ly=1.3)
         p = _rhs(9) * mask.h
-        lap = fvx.masked_neumann_laplacian(p, mask.h.astype(p.dtype), g.dx, g.dy)
+        lap = gs.masked_neumann_laplacian(p, mask.h.astype(p.dtype), g.dx, g.dy)
         diff = fvx.Diffusion2D(g, mask=mask)(p, 1.0)
         wet = np.asarray(mask.h) > 0.5
         np.testing.assert_allclose(
@@ -104,8 +105,8 @@ class TestNeumannOperator:
         p = (
             jnp.zeros_like(b)
             .at[1:-1, 1:-1]
-            .set(fvx.solve_helmholtz_dst2(b[1:-1, 1:-1], dx, dy, 0.0))
+            .set(gs.solve_helmholtz_dst2(b[1:-1, 1:-1], dx, dy, 0.0))
         )
-        lap = fvx.masked_face_dirichlet_laplacian(p, mask.h.astype(b.dtype), dx, dy)
+        lap = gs.masked_face_dirichlet_laplacian(p, mask.h.astype(b.dtype), dx, dy)
         # roundoff of a 34x34 transform round trip
         np.testing.assert_allclose(np.asarray(lap)[wet], np.asarray(b)[wet], atol=1e-11)

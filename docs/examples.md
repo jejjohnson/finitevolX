@@ -1,6 +1,6 @@
 # Double-Gyre Example Scripts
 
-The repository ships three example scripts that use the `finitevolx` API for
+The repository ships three example scripts that use the `gridax` API for
 spatial operators and `integrix.march.heun_step` for time integration.  Each script
 uses `xarray` for preprocessing and postprocessing, writes sampled fields to
 Zarr, and saves an animated GIF showing the field evolution over time.
