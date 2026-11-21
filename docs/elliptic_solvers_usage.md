@@ -1,7 +1,7 @@
 # Elliptic Solvers: Usage Guide
 
 This page covers practical usage of finitevolX's elliptic solver module,
-from quick-start examples to multi-layer PV inversion on masked domains.
+from quick-start examples to masked-domain solvers.
 The snippets run in order: later ones reuse the names the Quick Start
 defines.
 
@@ -9,7 +9,7 @@ defines.
 
 ## Quick Start
 
-The fastest way to solve an elliptic problem: use a convenience wrapper.
+The fastest way to solve an elliptic problem on a rectangle: slice the unknowns of the field you solve for, call the spectral solver, and embed the result in zeros.
 
 ```python
 import jax
@@ -29,13 +29,14 @@ x = jnp.arange(Nx)[None, :] * dx
 y = jnp.arange(Ny)[:, None] * dy
 zeta = jnp.sin(jnp.pi * x / grid.Lx) * jnp.sin(jnp.pi * y / grid.Ly)  # [Ny, Nx]
 
-# 3. Invert for the streamfunction, psi = 0 on the C-grid walls
-psi = fvx.streamfunction_from_vorticity(zeta, dx, dy, bc="dst")  # [Ny, Nx]
+# 3. Invert for the streamfunction, psi = 0 on the C-grid wall nodes (DST-I on the X basin)
+psi = jnp.zeros_like(zeta).at[1:-2, 1:-2].set(
+    fvx.solve_helmholtz_dst1(zeta[1:-2, 1:-2], dx, dy)
+)  # [Ny, Nx]
 ```
 
-Pass the full `[Ny, Nx]` array and get the full array back: the wrappers
-know which nodes are unknowns (see [Staggering and walls](#staggering-and-walls)),
-so do not slice the interior by hand.
+The solver treats every node it is given as an unknown, so you slice the unknowns of your staggering and embed the result (see [Staggering and walls](#staggering-and-walls)).
+The one-call inversions that do this for you (`streamfunction_from_vorticity`, `pressure_from_divergence` and `pv_inversion`) moved to sesmax-core; see below.
 
 The masked examples below use a circular basin with an island, and a
 physical Helmholtz parameter $\lambda = 1/R_d^2 > 0$:
@@ -55,289 +56,45 @@ lambda_ = 1 / Rd**2  # (∇² − λ) is negative definite for λ ≥ 0
 
 ---
 
-## Convenience Wrappers
+## One-Call Inversions (in sesmax-core)
 
-finitevolX provides three high-level wrappers that handle solver dispatch
-internally.  All three accept the same `method`, `mask`, `capacitance_solver`,
-and `preconditioner` keyword arguments.
-
-### Streamfunction from Vorticity
-
-Solves $\nabla^2 \psi - \lambda\psi = \zeta$ for ψ at X points.
-
-::::{tab-set}
-:::{tab-item} Spectral (rectangular domain)
-
-```python
-# Dirichlet BCs (ψ = 0 on the C-grid wall nodes, X index 0 and N-2) — most common
-psi = fvx.streamfunction_from_vorticity(zeta, dx, dy, bc="dst")
-
-# With a Helmholtz parameter (QG inversion, λ = 1/Rd²)
-psi = fvx.streamfunction_from_vorticity(
-    zeta, dx, dy, bc="dst", lambda_=lambda_
-)
-```
-:::
-:::{tab-item} CG (masked domain)
-
-```python
-# A Mask2D gives the psi mask xy_corner_strict: psi = 0 on the coast nodes
-psi = fvx.streamfunction_from_vorticity(
-    zeta, dx, dy, method="cg", mask=mask, lambda_=lambda_
-)
-```
-:::
-:::{tab-item} Capacitance (masked domain, fast)
-
-```python
-# One-time precomputation, for this mask and this λ
-solver = fvx.build_capacitance_solver(mask, dx, dy, lambda_=lambda_)
-
-# Reuse for many solves
-psi = fvx.streamfunction_from_vorticity(
-    zeta, dx, dy, lambda_=lambda_, method="capacitance",
-    capacitance_solver=solver,
-)
-```
-:::
-::::
-
-A plain array `mask=` is taken as the mask of the field being solved for
-(ψ: X points); a `Mask2D` supplies the right one itself.
-
-### Pressure from Divergence
-
-Solves $\nabla^2 p = \nabla \cdot \mathbf{u}$ (always Poisson, $\lambda = 0$)
-for p at T points.
-
-```python
-div_u = zeta  # any T-point field; the Neumann solve drops its mean (gauge)
-
-# Neumann BCs (∂p/∂n = 0 on the cell faces) — standard for pressure with solid walls
-p = fvx.pressure_from_divergence(div_u, dx, dy, bc="dct")
-
-# The same Neumann wall on a masked basin: zero flux through every coast face
-p = fvx.pressure_from_divergence(div_u, dx, dy, method="cg", mask=mask)
-```
-
-`bc` is honoured by every method or rejected, never ignored.  The CG wall
-is the spectral one of the same `bc`: with `method="cg"`, `bc="dct"` (the
-default) is zero flux through every wet–dry face and returns the solution
-with zero mean on each connected wet region; `bc="dst"` holds p = 0 on the
-wet–dry *faces*, half a cell out (the DST-II wall).  The default
-preconditioner is the spectral solve with the same `bc`.
-`method="capacitance"` raises for pressure (it would hold p = 0 at the dry
-cell centres, not on the faces), and so do `known_values` / `known_mask`;
-`bc="fft"` is for the rectangular spectral solve only.
+The one-call wrappers `streamfunction_from_vorticity`, `pressure_from_divergence` and `pv_inversion`, their known-value lifting and `solve_ocean_pde` moved to sesmax-core (`sesmax_core.gfd` and `sesmax_core.solve_pde`).
+The `gridax_jax` names still work for one release and warn.
+In sesmax every argument after `dy` is keyword-only (after `lambda_` for `pv_inversion`), and `method="multigrid"` is new.
+See the [elliptic inversions guide](https://jejjohnson.github.io/sesmax/elliptic-inversions/) and the [`sesmax_core.gfd` API](https://jejjohnson.github.io/sesmax/reference/gfd/).
 
 (staggering-and-walls)=
 ### Staggering and walls
 
-The wrappers know the staggering of what they solve for (ψ at X points,
-p at T points), pass only its unknowns to the transform and return them
-embedded in zeros, so the wall is the C-grid wall for every `bc` and
-`method`; see the [wall table](elliptic_solvers.md#boundary-conditions).
-
-### PV Inversion (Multi-Layer)
-
-Solves $(\nabla^2 - \lambda_k)\,\psi_k = q_k$ for each vertical mode, with
-$\lambda_k = 1/R_{d,k}^2 \ge 0$.
-
-::::{tab-set}
-:::{tab-item} Single layer
-
-```python
-pv = zeta
-psi = fvx.pv_inversion(pv, dx, dy, lambda_=lambda_, bc="dst")
-```
-:::
-:::{tab-item} Multi-layer (per-mode λ)
-
-```python
-# lambda_ array: one value per vertical mode, 1/Rd² per mode
-lambdas = 1.0 / jnp.array([40e3, 20e3, 10e3]) ** 2
-
-# pv shape: (nl, Ny, Nx) or (batch, nl, Ny, Nx)
-pv = jnp.stack([zeta, 0.5 * zeta, 0.1 * zeta])
-psi = fvx.pv_inversion(pv, dx, dy, lambda_=lambdas, bc="dst")
-```
-:::
-:::{tab-item} With vertical mode decomposition
-
-```python
-# Decompose layer PV into vertical modes
-H_layers = jnp.array([500.0, 1500.0, 3000.0])  # thicknesses [m]
-g_prime = jnp.array([9.81, 0.025, 0.0125])     # reduced gravities [m s⁻²]
-A_vert = fvx.build_coupling_matrix(H_layers, g_prime)
-radii, Cl2m, Cm2l = fvx.decompose_vertical_modes(A_vert, f0=1e-4)
-lambdas_k = 1.0 / radii**2  # 1/Rd_k² ≥ 0 per mode
-
-# Transform to mode space
-pv_layers = jnp.stack([zeta, 0.5 * zeta, 0.1 * zeta])
-pv_modes = fvx.layer_to_mode(pv_layers, Cl2m)
-
-# Invert each mode with its own λ_k
-psi_modes = fvx.pv_inversion(pv_modes, dx, dy, lambda_=lambdas_k, bc="dst")
-
-# Transform back to layer space
-psi_layers = fvx.mode_to_layer(psi_modes, Cm2l)
-```
-:::
-::::
-
+The wrappers know the staggering of what they solve for (ψ at X points, p at T points), pass only its unknowns to the transform and return them embedded in zeros, so the wall is the C-grid wall for every `bc` and `method`.
+Calling a spectral solver directly, you make the same choice by slicing; see the [wall table](elliptic_solvers.md#boundary-conditions).
 
 ### Known Boundary Values (Inhomogeneous Dirichlet)
 
-:::{tip} Tutorial
-For the full derivation — notation, the block linear system, pseudocode,
-a from-scratch NumPy implementation, convergence and gradients — see the
-[Known Boundary Values tutorial](notebooks/inhomogeneous_bcs_tutorial.ipynb).
-:::
+By default every solver assumes $\psi = 0$ on the boundary.
+When the boundary values are known but non-zero (SSH from a parent model, a tide gauge, reanalysis at an open boundary), the `known_values=` argument of the sesmax inversions handles it; the [Known Boundary Values tutorial](https://jejjohnson.github.io/sesmax/inhomogeneous-bcs-tutorial/) in sesmax derives the method and shows every solver.
 
-By default every solver assumes $\psi = 0$ on the boundary.  When the
-boundary values are known but non-zero — SSH from a parent model, a tide
-gauge, reanalysis at an open boundary — pass them as `known_values`.
-`streamfunction_from_vorticity` and `pv_inversion` accept it
-(`pressure_from_divergence` refuses it, see below):
-
-```python
-# psi rising from 0 (south) to 1e3 (north): a throughflow of 1e3 m² s⁻¹
-g = 1e3 * y / grid.Ly * jnp.ones((Ny, Nx))  # [Ny, Nx]; only the known cells are read
-psi = fvx.streamfunction_from_vorticity(
-    zeta, dx, dy, method="cg", mask=mask, known_values=g
-)
-```
-
-**Which cells are known.**  The *coast ring* — the dry cells adjacent to at
-least one wet cell, around the outer walls *and* any islands — plus any
-extra wet cells you mark with `known_mask`.  The coast is exactly where
-`method="cg"` puts its ψ = 0 wall: for ψ with a `Mask2D` it is the C-grid
-wall nodes (X rows / columns `0` and `N-2` of a rectangle).  Every wet cell
-is solved for.  The returned solution equals `known_values` exactly on the
-known cells (so ψ carries the prescribed values on the dry wall nodes);
-values of `known_values` elsewhere are ignored.  Inspect the ring with
-`fvx.coast_ring(mask)`.  The T-point `pressure_from_divergence` raises on
-known values: its Dirichlet wall is on the cell faces, while the lifting
-pins values at cell centres (the ghost cells, half a cell outside).
-
-Under the hood this is the **lifting trick**: put the known values in a
-field $\psi_{\text{lift}}$ (zero elsewhere), solve the homogeneous problem
+Under the hood this is the **lifting trick**: put the known values in a field $\psi_{\text{lift}}$ (zero elsewhere), solve the homogeneous problem
 
 $$
 (\nabla^2 - \lambda)\,\psi_{\text{hom}}
   = f - (\nabla^2 - \lambda)\,\psi_{\text{lift}}
 $$
 
-on the remaining cells, and return
-$\psi = \psi_{\text{lift}} + \psi_{\text{hom}}$.
-
-::::{tab-set}
-:::{tab-item} CG (any mask)
-
-```python
-psi = fvx.streamfunction_from_vorticity(
-    zeta, dx, dy, lambda_=lambda_, method="cg", mask=mask, known_values=g
-)
-```
-:::
-:::{tab-item} Capacitance
-
-```python
-# Build on the SAME mask: its unknowns are every wet cell with
-# psi = 0 on the coast, exactly the cells left to solve.
-solver = fvx.build_capacitance_solver(mask, dx, dy, lambda_=lambda_)
-psi = fvx.streamfunction_from_vorticity(
-    zeta, dx, dy, lambda_=lambda_, method="capacitance", mask=mask,
-    capacitance_solver=solver, known_values=g,
-)
-```
-:::
-:::{tab-item} Spectral (rectangular basin)
-
-```python
-# No mask: solves the psi basin of the rectangle -- wet X nodes
-# [1:-2, 1:-2] -- with the known values on its wall nodes (rows/columns
-# 0 and N-2).  Requires bc="dst".
-psi = fvx.streamfunction_from_vorticity(
-    zeta, dx, dy, bc="dst", lambda_=lambda_, known_values=g
-)
-```
-:::
-::::
-
-The spectral path solves exactly the problem `method="cg"` solves with the
-rectangle's `Mask2D` (its `xy_corner_strict` is wet on `[1:-2, 1:-2]`), and
-with `known_values = 0` it is the ordinary `bc="dst"` solve.
-
-#### Sparse observations: `known_mask`
-
-Interior observations are pinned the same way as the boundary ring
-(`method="cg"` only):
-
-```python
-obs = jnp.zeros((Ny, Nx), dtype=bool).at[20, 30].set(True).at[25, 45].set(True)
-values = jnp.zeros((Ny, Nx)).at[20, 30].set(120.0).at[25, 45].set(-50.0)
-
-psi = fvx.streamfunction_from_vorticity(
-    zeta, dx, dy, method="cg", mask=mask,
-    known_values=values, known_mask=obs,
-)
-# psi[20, 30] == 120.0 and psi[25, 45] == -50.0 exactly
-```
-
-#### Multi-layer PV inversion
-
-`known_values` broadcasts against `pv`: a `(Ny, Nx)` field is shared by all
-layers, an `(nl, Ny, Nx)` array gives each layer its own values.  Each
-layer's correction uses its own $\lambda_k$.
-
-```python
-psi = fvx.pv_inversion(
-    pv, dx, dy, lambda_=lambdas, method="cg", mask=mask,
-    known_values=g,   # (Ny, Nx) or (nl, Ny, Nx)
-)
-```
-
-#### Boundary conditions as a `BoundaryConditionSet`
-
-`bc` also accepts a `BoundaryConditionSet`.  Its face types choose the
-transform (all `Dirichlet1D` → `"dst"`, all zero `Neumann1D` → `"dct"`,
-all `Periodic1D` → `"fft"`), its `mask` feeds the mask-based methods, and
-non-zero `Dirichlet1D` values become known values on each face's wall
-nodes (the coast cells on the row / column just outside the wet cells: X
-rows `0` / `N-2` and columns `0` / `N-2` of a rectangle).  That needs a
-basin whose outer coast lies on the four walls (a rectangle; island coasts
-are allowed and stay at zero): on any other `Mask2D` non-zero face values
-raise, so pass `known_values` on `fvx.coast_ring(mask)` instead.  A zero face
-value can be a Python number or a concrete array (`jnp.array(0.0)`); a
-traced value cannot be inspected and counts as non-zero.
-
-```python
-rect_mask = fvx.Mask2D.from_mask(np.pad(np.ones((Ny - 2, Nx - 2), dtype=bool), 1))
-bc = fvx.BoundaryConditionSet(
-    mask=rect_mask,                              # a Mask2D, or omit for method="spectral"
-    south=fvx.Dirichlet1D("south", value=0.0),
-    north=fvx.Dirichlet1D("north", value=1e3),   # prescribed psi on the north wall
-    west=fvx.Dirichlet1D("west", value=0.0),
-    east=fvx.Dirichlet1D("east", value=0.0),
-)
-psi = fvx.streamfunction_from_vorticity(zeta, dx, dy, bc=bc, method="cg")
-```
-
-West/east win on a node shared by two faces, as when the set fills ghost
-cells.  An explicit `known_values` overrides the face values, and an
-all-zero set (`BoundaryConditionSet.closed()`) is the ordinary homogeneous
-solve.  `method="spectral"` raises on a `bc.mask` (it solves the
-rectangle), and `pressure_from_divergence` raises on non-zero
-`Dirichlet1D` faces: a T-point Dirichlet value belongs on the face, which
-the cell-centred lifting cannot reach.
+on the remaining cells, and return $\psi = \psi_{\text{lift}} + \psi_{\text{hom}}$.
+The *coast ring* (`fvx.coast_ring(mask)`) holds the known cells: the dry cells adjacent to at least one wet cell, around the outer walls and any islands, plus any extra wet cells you mark with `known_mask`.
 
 #### Using the lifting directly
 
-For your own solver or a solve loop that reuses the setup, use
-`SolveDomain` and `KnownValueLifting`:
+`SolveDomain` and `KnownValueLifting` stay in finitevolX, for your own solver or a solve loop that reuses the setup:
 
 ```python
+# Known values: psi rising from 0 (south) to 1e3 (north) on the coast ring,
+# and two interior observations (only the known cells of `known_values` are read)
+g = 1e3 * y / grid.Ly * jnp.ones((Ny, Nx))
+obs = jnp.zeros((Ny, Nx), dtype=bool).at[20, 30].set(True).at[25, 45].set(True)
+values = jnp.zeros((Ny, Nx)).at[20, 30].set(120.0).at[25, 45].set(-50.0)
+
 # Setup (once): derived masks, then a solver on the effective domain
 domain = fvx.SolveDomain(mask, known_mask=obs)
 lifter = fvx.KnownValueLifting(domain, dx, dy, lambda_=lambda_)
@@ -351,28 +108,21 @@ psi_hom, info = fvx.solve_cg(A, rhs_corrected, rtol=1e-10, atol=1e-10)
 psi = lifter.postprocess(psi_hom * eff, value_lift)
 ```
 
-The solver's unknowns must be exactly `domain.effective_mask` (every wet
-cell not in `known_mask`), with zero on the coast: build a CG operator on
-`domain.effective_mask`.
+The solver's unknowns must be exactly `domain.effective_mask` (every wet cell not in `known_mask`), with zero on the coast: build a CG operator on `domain.effective_mask`.
 
-For **multigrid**, use it as the CG preconditioner — the wrapper then does
-the lifting for you:
+For **multigrid**, build the hierarchy on the same effective mask and use it as the CG preconditioner on the lifted right-hand side:
 
 ```python
 mg = fvx.build_multigrid_solver(
     np.asarray(domain.effective_mask, dtype=float), dx, dy, lambda_=lambda_
 )
-psi = fvx.streamfunction_from_vorticity(
-    zeta, dx, dy, lambda_=lambda_, method="cg", mask=mask,
-    known_values=known_values, known_mask=obs,
-    preconditioner=fvx.make_multigrid_preconditioner(mg),
+psi_hom, info = fvx.solve_cg(
+    A, rhs_corrected, preconditioner=fvx.make_multigrid_preconditioner(mg),
+    rtol=1e-10, atol=1e-10,
 )
 ```
 
-The multigrid operator (default `bc="dirichlet"`) is `masked_laplacian`'s
-stencil with dry neighbours zero, so it is the same operator CG solves; the
-known-value lifting is done by the wrapper, so a standalone multigrid solve
-needs the lifted right-hand side.
+The multigrid operator (default `bc="dirichlet"`) is `masked_laplacian`'s stencil with dry neighbours zero, so it is the same operator CG solves.
 
 ---
 
@@ -392,12 +142,12 @@ f_in = zeta[1:-2, 1:-2]  # psi's unknowns: the wet X nodes of the rectangle
 psi_in = fvx.solve_poisson_dst(f_in, dx, dy)
 
 # Neumann (DCT-II): ∂p/∂n = 0 half a cell outside the input (zero-mean gauge)
-p_in = fvx.solve_poisson_dct(div_u[1:-1, 1:-1], dx, dy)
+p_in = fvx.solve_poisson_dct(zeta[1:-1, 1:-1], dx, dy)  # any T-point field
 
 # Periodic (FFT): doubly-periodic domain (zero-mean gauge)
 psi_per = fvx.solve_poisson_fft(f_in, dx, dy)
 
-# What streamfunction_from_vorticity(zeta, dx, dy, bc="dst") returns
+# Embed in zeros: the X-point streamfunction with its wall nodes at 0
 psi = jnp.zeros_like(zeta).at[1:-2, 1:-2].set(psi_in)
 ```
 
@@ -641,10 +391,17 @@ All solvers are fully compatible with `jax.jit` and `jax.vmap`.
 ### JIT Compilation
 
 ```python
+def invert_layer(q, lam):
+    unknowns = fvx.solve_helmholtz_dst1(q[1:-2, 1:-2], dx, dy, lam)
+    return jnp.zeros_like(q).at[1:-2, 1:-2].set(unknowns)
+
 @jax.jit
 def invert_pv(pv_field, lambdas):
-    return fvx.pv_inversion(pv_field, dx, dy, lambda_=lambdas, bc="dst")
+    return jax.vmap(invert_layer)(pv_field, lambdas)
 
+# One 1/Rd² per layer; pv is [nl, Ny, Nx]
+lambdas = 1.0 / jnp.array([40e3, 20e3, 10e3]) ** 2
+pv = jnp.stack([zeta, 0.5 * zeta, 0.1 * zeta])
 psi = invert_pv(pv, lambdas)
 ```
 

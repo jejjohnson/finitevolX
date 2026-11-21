@@ -18,7 +18,7 @@ Search `docs/capabilities.md`: the steps `euler_step`, `heun_step`,
 diffrax solvers `ForwardEulerDfx`, `RK2Heun`, `RK3SSP`, `RK4Classic`,
 `SSP_RK2`, `SSP_RK104`, `IMEX_SSP2`, `SemiLagrangianSolver`; the
 `eqx.Module` solvers `AB2Solver`, `LeapfrogRAFSolver`,
-`SplitExplicitRKSolver`; and `solve_ocean_pde`. diffrax itself ships many
+`SplitExplicitRKSolver`. `solve_ocean_pde` moved to `sesmax_core.solve_pde`. diffrax itself ships many
 more (`dfx.Tsit5`, `dfx.Dopri5`, `dfx.Kvaerno5`, …): a generic ODE scheme
 belongs there, not here. finitevolX adds the schemes ocean models need
 (SSP, multistep with filters, IMEX, split-explicit).
@@ -64,7 +64,7 @@ pure functional` or `# Time integration — diffrax solvers`),
 - `tests/test_diffrax_solvers.py`: the solver in the
   `TestDiffraxExplicitRK` / `TestDiffraxConvergence` /
   `TestDiffraxAbsoluteAccuracy` parametrisations, or a class of its own
-  (as `TestAB2Solver`); `SaveAt` and `solve_ocean_pde` if relevant.
+  (as `TestAB2Solver`); `SaveAt` if relevant.
 - IMEX / split-explicit / semi-Lagrangian: `tests/test_timestepping_imex.py`,
   `tests/test_semi_lagrangian.py`.
 - State the expected order and the tolerance's origin in a comment (e.g.

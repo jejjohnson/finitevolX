@@ -1,6 +1,6 @@
 ---
 name: add-elliptic-solver
-description: Add or extend an elliptic (Poisson / Helmholtz) solver path in finitevolX — a convenience wrapper like streamfunction_from_vorticity / pv_inversion, a new method= option on the wrappers, a preconditioner for solve_cg, a multigrid option, or known-value / boundary-condition handling — while delegating spectral solves to spectraldiffx and structured linear algebra to gaussx and lineax. Use when asked to add, port or fix a Poisson, Helmholtz, PV-inversion, pressure or streamfunction solve, a CG preconditioner or a multigrid feature in gridax_jax/_src/solvers.
+description: Add or extend an elliptic (Poisson / Helmholtz) solver path in finitevolX — a preconditioner for solve_cg, a multigrid option, or known-value / boundary-condition handling — while delegating spectral solves to spectraldiffx and structured linear algebra to gaussx and lineax. Use when asked to add, port or fix a Poisson, Helmholtz, PV-inversion, pressure or streamfunction solve, a CG preconditioner or a multigrid feature in gridax_jax/_src/solvers.
 ---
 
 # Add an elliptic solver path
@@ -14,11 +14,12 @@ Read contract 5 (solvers) in `AGENTS.md`, then `docs/elliptic_solvers.md`,
 |---|---|
 | A rectangular spectral solve, a new transform type, new eigenvalues, a capacitance-method change | **spectraldiffx** (finitevolX re-exports it from `solvers/spectral.py` / `spectral_transforms.py`): propose it upstream, then bump the pin (`bump-upstream-pins` skill) |
 | A tridiagonal / Kronecker / low-rank solve, a Nyström-style preconditioner | **gaussx** (finitevolX re-exports or wraps it: `solvers/tridiagonal.py`, `make_nystrom_preconditioner`) |
-| A masked-domain solve on the C-grid, a preconditioner adapted to the finitevolX sign convention, a one-call wrapper, multigrid | here, in `gridax_jax/_src/solvers/` |
+| A masked-domain solve on the C-grid, a preconditioner adapted to the finitevolX sign convention, multigrid | here, in `gridax_jax/_src/solvers/` |
+| A one-call inversion (`streamfunction_from_vorticity`, `pressure_from_divergence`, `pv_inversion`), a new `method=` option on them, known-value or `BoundaryConditionSet` handling for them | **sesmax-core** (`sesmax_core.gfd`; the `gridax_jax` names are deprecated, jejjohnson/sesmax#126): propose it there, built from the public pieces here |
 
-Search `docs/capabilities.md` first: the wrappers
-(`streamfunction_from_vorticity`, `pressure_from_divergence`,
-`pv_inversion`), `solve_cg` + `masked_laplacian`, the
+Search `docs/capabilities.md` first: `solve_cg` + `masked_laplacian` (and the
+T-point `masked_neumann_laplacian`, `masked_face_dirichlet_laplacian`,
+`wet_components`, `project_zero_mean`), the
 `make_*_preconditioner` family and `make_preconditioner`,
 `build_capacitance_solver`, `build_multigrid_solver` / `MultigridSolver`,
 the lifting tools `boundary_ring` / `SolveDomain` / `KnownValueLifting`.
@@ -33,20 +34,19 @@ the lifting tools `boundary_ring` / `SolveDomain` / `KnownValueLifting`.
   `M_inv(r: [Ny, Nx]) -> [Ny, Nx]`, and gets a `kind=` branch (and its
   required-argument check) in `make_preconditioner`. Randomised ones take a
   `key`.
-- **A wrapper method** goes through `_solve_dispatch` in `elliptic.py`
-  (`"spectral"`, `"cg"`, `"capacitance"`; `_METHODS` lists them). Keep the
-  wrappers' shared arguments (`bc`, `lambda_`, `mask`, `known_values`,
-  `known_mask`), and route a `BoundaryConditionSet` through `_resolve_bc`.
+- **The one-call wrappers** live in sesmax-core now; the private copies in
+  `elliptic.py` (`_solve_dispatch`, `_resolve_bc`) only back the deprecated
+  `gridax_jax` names for one release, so do not extend them.
 - **Masks**: accept a `Mask2D` or an array; a `Mask2D` contributes the
-  mask of the wrapper's staggering — `xy_corner_strict` for ψ (`"X"`),
+  mask of the field's staggering — `xy_corner_strict` for ψ (`"X"`),
   `h` for pressure (`"T"`) — cast to the rhs dtype (`_resolve_mask_arr`).
 - **Wall placement**: ψ = 0 (or a known value) sits on the coast ring, the
   dry cells 4-adjacent to the wet mask — what `masked_laplacian` imposes;
   for ψ on a rectangle, the X wall nodes `0` and `N-2`.  A spectral path
   slices the unknowns of its staggering out of the full array
   (`_SPECTRAL_STAGGERED`, `_solve_spectral`) and must converge at second
-  order against a manufactured solution
-  (`tests/test_solver_wrappers.py::TestWallPlacement`).
+  order against a manufactured solution (as the sesmax-core wrapper tests
+  do).
 - **Precompute** geometry once, with NumPy on concrete values
   (`build_*` functions); the returned object is an `eqx.Module` that runs
   under `jit` / `vmap` / `grad`.
@@ -71,9 +71,7 @@ solver type, a row in `docs/solver_comparison.md`; `make capabilities`.
   of the discrete operator.
 - `tests/test_elliptic.py` (CG, preconditioners — fewer iterations than no
   preconditioner, `TestNystromPreconditioner` for keyed construction —
-  masked Laplacian, capacitance, `vmap`), `tests/test_solver_wrappers.py`
-  (each `method=`, its required-argument errors),
-  `tests/test_elliptic_bcset.py`, `tests/test_elliptic_known_values.py`,
+  masked Laplacian, capacitance, `vmap`),
   `tests/test_inhomogeneous.py`, `tests/test_multigrid.py` (V-cycle
   convergence, preconditioner, JAX compatibility, implicit
   differentiation).
@@ -83,8 +81,7 @@ solver type, a row in `docs/solver_comparison.md`; `make capabilities`.
 ## 5. Verify
 
 ```bash
-uv run pytest -n 2 tests/test_elliptic.py tests/test_elliptic_bcset.py \
-  tests/test_elliptic_known_values.py tests/test_solver_wrappers.py \
+uv run pytest -n 2 tests/test_elliptic.py \
   tests/test_inhomogeneous.py tests/test_multigrid.py tests/test_tridiagonal.py \
   tests/test_scale_covariance.py tests/test_capabilities.py
 ```

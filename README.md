@@ -30,6 +30,7 @@
 > finitevolX is now two packages in this repository: **gridax** (`packages/gridax`, `import gridax`), the grids and land / ocean masks as NumPy data, and **gridax-jax** (`packages/gridax-jax`, `import gridax_jax`), every operation on them in JAX. `import finitevolx` still works for one 0.X release: it warns and re-exports `gridax_jax`, whose names are unchanged.
 
 ```python
+import jax.numpy as jnp
 import gridax_jax as fvx
 from integrix.march import heun_step
 
@@ -45,8 +46,10 @@ vort  = fvx.Vorticity2D(grid)
 div_uv = div(u, v)
 
 # Solve the Helmholtz equation (∇² − λ)ψ = q, λ = 1/Ld² > 0, for the
-# streamfunction (full [Ny, Nx] array in and out; ψ = 0 on the C-grid walls)
-psi = fvx.pv_inversion(q, grid.dx, grid.dy, lambda_=1/Ld**2, bc="dst")
+# streamfunction at the X points (DST-I; ψ = 0 on the C-grid walls)
+psi = jnp.zeros_like(q).at[1:-2, 1:-2].set(
+    fvx.solve_helmholtz_dst1(q[1:-2, 1:-2], grid.dx, grid.dy, lambda_=1/Ld**2)
+)
 
 # Time-step with Heun's method (RK2), from integrix
 state_next = heun_step(state, tendency_fn, dt)
@@ -97,13 +100,13 @@ Per-face composable BCs with ghost-cell enforcement:
 | **Multigrid** | Variable coefficients, any mask | O(N) per V-cycle |
 | **MG + CG** | Variable coefficients, tight tolerance | Controllable |
 
-Convenience wrappers: `streamfunction_from_vorticity`, `pressure_from_divergence`, `pv_inversion`
+The one-call inversions `streamfunction_from_vorticity`, `pressure_from_divergence` and `pv_inversion`, with their known-value lifting and `method="multigrid"`, live in sesmax-core as `sesmax_core.gfd` ([guide](https://jejjohnson.github.io/sesmax/elliptic-inversions/), [API](https://jejjohnson.github.io/sesmax/reference/gfd/)); the old `gridax_jax` names warn for one release.
 
 ### Time Integration
 
 The generic time steppers live in [integrix](https://github.com/jejjohnson/integrix) (`integrix.march`): the pure step functions `euler_step`, `heun_step`, `rk4_step`, `rk3_ssp_step`, `ab2_step`, `ab3_step`, `leapfrog_raf_step`, `imex_ssp2_step` and `split_explicit_step`, the [diffrax](https://docs.kidger.site/diffrax/) solvers `ForwardEulerDfx`, `RK2Heun`, `RK3SSP`, `RK4Classic`, `SSP_RK104`, `IMEX_SSP2` and more, and the `AB2Solver`, `LeapfrogRAFSolver` and `SplitExplicitRKSolver` steppers. Their `finitevolx.*` names are deprecated aliases for one release.
 
-finitevolX keeps the semi-Lagrangian scheme (`semi_lagrangian_step`, `SemiLagrangianSolver`) and `solve_ocean_pde`, a `diffeqsolve` wrapper that applies boundary conditions to the tendency.
+finitevolX keeps the semi-Lagrangian scheme (`semi_lagrangian_step`, `SemiLagrangianSolver`). `solve_ocean_pde`, the `diffeqsolve` wrapper that applies boundary conditions to the tendency, moved to `sesmax_core.solve_pde` ([API](https://jejjohnson.github.io/sesmax/reference/core/)), where `bc_fn=` is `tendency_bc=`; the old name warns for one release.
 
 ### Vertical Structure
 
@@ -157,8 +160,8 @@ v =  jnp.cos(jnp.pi * j / Ny) * jnp.sin(jnp.pi * i / Nx)
 zeta = vort.relative_vorticity(u, v)
 
 # 5. Invert for streamfunction: ∇²ψ = ζ
-psi = fvx.streamfunction_from_vorticity(
-    zeta[1:-1, 1:-1], grid.dx, grid.dy
+psi = jnp.zeros_like(zeta).at[1:-2, 1:-2].set(
+    fvx.solve_helmholtz_dst1(zeta[1:-2, 1:-2], grid.dx, grid.dy)
 )
 ```
 
@@ -175,10 +178,10 @@ The `docs/notebooks/` directory contains pedagogical Jupytext notebooks that bui
 | Notebook | Description | Key APIs |
 |----------|-------------|----------|
 | [Masks](docs/notebooks/demo_masks.py) | C-grid mask construction, staggered derivation, boundary classification | `Mask2D` |
-| [Elliptic Solvers](docs/notebooks/demo_solvers.py) | Spectral, capacitance, CG, multigrid on 4 geometries + inhomogeneous BCs | `solve_helmholtz_dst`, `build_capacitance_solver`, `solve_cg`, `build_multigrid_solver` |
-| [Pressure Poisson](docs/notebooks/pressure_poisson.py) | Divergence-free projection on the C-grid, DST-I vs DST-II | `Divergence2D`, `Difference2D`, `solve_poisson_dst` |
-| [Streamfunction Inversion](docs/notebooks/streamfunction_inversion.py) | X-point vs T-point placement, velocity recovery, convergence | `streamfunction_from_vorticity`, `solve_poisson_dst2` |
-| [Helmholtz Screening](docs/notebooks/helmholtz_screening.py) | QG PV inversion with screening, JIT/vmap/grad | `StaggeredDirichletHelmholtzSolver2D`, `pv_inversion` |
+| [Elliptic Solvers](docs/notebooks/demo_solvers.py) | Spectral, capacitance, CG, multigrid on 4 geometries | `solve_helmholtz_dst`, `build_capacitance_solver`, `solve_cg`, `build_multigrid_solver` |
+| [Pressure Poisson](https://jejjohnson.github.io/sesmax/pressure-poisson/) (sesmax) | Divergence-free projection on the C-grid, DST-I vs DST-II | `pressure_from_divergence` |
+| [Streamfunction Inversion](https://jejjohnson.github.io/sesmax/streamfunction-inversion/) (sesmax) | X-point vs T-point placement, velocity recovery, convergence | `streamfunction_from_vorticity` |
+| [Helmholtz Screening](https://jejjohnson.github.io/sesmax/helmholtz-screening/) (sesmax) | QG PV inversion with screening, JIT/vmap/grad | `pv_inversion` |
 
 ### Time-Dependent Models
 

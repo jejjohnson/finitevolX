@@ -95,14 +95,6 @@ project:
           children:
             - file: notebooks/demo_solvers.ipynb
               title: Elliptic solvers
-            - file: notebooks/inhomogeneous_bcs_tutorial.ipynb
-              title: Known boundary values
-            - file: notebooks/pressure_poisson.ipynb
-              title: Pressure Poisson
-            - file: notebooks/streamfunction_inversion.ipynb
-              title: Streamfunction inversion
-            - file: notebooks/helmholtz_screening.ipynb
-              title: Helmholtz screening
             - file: notebooks/spde_prior.ipynb
               title: SPDE priors with gaussx
         - title: Advection

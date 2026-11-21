@@ -43,8 +43,8 @@ the grid and mask classes of `gridax` (the mask construction helpers stay
 | Layer 3: class operators | `gridax/_src/operators/` (`difference.py`, `interpolation.py`, `divergence.py`, `vorticity.py`, `coriolis.py`, `diagnostic_operators.py`, `spherical_*.py`), `gridax/_src/advection/` (`advection.py`, `reconstruction.py`, `spherical_advection.py`), `gridax/_src/diffusion/` | `Difference*`, `Interpolation*`, `Advection*`, `Reconstruction*`, `Diffusion*`, `MomentumAdvection*`, `Vorticity*`, `Coriolis*`, `Energetics2D`, … and their `Spherical*` siblings; mask-aware through a `mask` field |
 | Boundary conditions | `gridax/_src/boundary/` | Per-face atoms `Dirichlet1D` … `Slip1D` (`bc_1d.py`), `BoundaryConditionSet` (`bc_set.py`), `FieldBCSet` (`bc_field.py`), functional ghost-ring fillers (`boundary.py`) |
 | Forcing (deprecated) | `forcing/`, `operators/relaxation.py` | `AbstractForcing`, `ForcingSum` / `ForcingProduct` / `TimeVaryingForcing` (`_base.py`); wind, drag, Rayleigh operators; `linear_drag`, `rayleigh_relaxation`. Moved to `sesmax_core.forcing` (#422); the `gridax_jax` names warn for one release, and new forcing goes to sesmax-core |
-| Solvers | `solvers/` | Spectral solvers re-exported from spectraldiffx (`spectral.py`, `spectral_transforms.py`); capacitance wrapper and the `streamfunction_from_vorticity` / `pressure_from_divergence` / `pv_inversion` wrappers (`elliptic.py`); `solve_cg` on lineax (`iterative.py`); preconditioners (`preconditioners.py`); `MultigridSolver` (`multigrid.py`); known-value lifting (`inhomogeneous.py`); tridiagonal solve re-exported from gaussx (`tridiagonal.py`) |
-| Time integration | `timestepping/` | `solve_ocean_pde` (`_solve.py`); the time steppers live in `integrix.march`, the semi-Lagrangian scheme included (#476, with `gridax.t_point_coordinates` for its nodes; `semi_lagrangian.py` is the deprecated old scheme), and their `gridax_jax.*` (formerly `finitevolx.*`) names are deprecated aliases (`_deprecated.py`, served by `__getattr__` in `gridax_jax/__init__.py`) |
+| Solvers | `solvers/` | Spectral solvers re-exported from spectraldiffx (`spectral.py`, `spectral_transforms.py`); capacitance wrapper (`elliptic.py`; the `streamfunction_from_vorticity` / `pressure_from_divergence` / `pv_inversion` wrappers moved to `sesmax_core.gfd`, and the `gridax_jax` names warn for one release, #475); `solve_cg` on lineax and the T-point `masked_laplacian`, `masked_neumann_laplacian`, `masked_face_dirichlet_laplacian`, `wet_components`, `project_zero_mean` (`iterative.py`); preconditioners (`preconditioners.py`); `MultigridSolver` (`multigrid.py`); known-value lifting (`inhomogeneous.py`); tridiagonal solve re-exported from gaussx (`tridiagonal.py`) |
+| Time integration | `timestepping/` | `solve_ocean_pde` (`_solve.py`; moved to `sesmax_core.solve_pde`, the `gridax_jax` name warns for one release, #475); the time steppers live in `integrix.march`, the semi-Lagrangian scheme included (#476, with `gridax.t_point_coordinates` for its nodes; `semi_lagrangian.py` is the deprecated old scheme), and their `gridax_jax.*` (formerly `finitevolx.*`) names are deprecated aliases (`_deprecated.py`, served by `__getattr__` in `gridax_jax/__init__.py`) |
 | Vertical (deprecated) | `vertical/`, `operators/barotropic.py` | `multilayer` (vmap a 2-D operator over layers), vertical modes (`build_coupling_matrix`, `layer_to_mode`, …), `barotropic_filter`. Moved to `sesmax_core.vertical` (#422); the `gridax_jax` names warn for one release |
 | pipekit layer (Tier B) | `pipekit/` (public: `gridax_jax/pipekit/`) | `FVXOperator` / `GridOperator` on `pipekit_jax.JaxOperator`, `GridSpec`, `over_leading`, `check_operator` (`gridax_jax.pipekit.testing`); behind the `pipekit` extra, never imported by `import gridax_jax` |
 | Shared | `gridax/_src/backend.py`, `gridax/_src/pytree.py`; constants from geophysix | the backend hooks and `pytree_dataclass` (see Boundaries); physical constants are geophysix records (`geophysix.earth.SPHERE`, `WGS84`, `geophysix.constants.STANDARD`), used as parameter defaults only (contract 6). `gridax/_src/constants.py` (`R_EARTH`, `GRAVITY`, `OMEGA`, `RHO`, `DEG2M`) is a deprecated shim of geophysix's values, and the Coriolis helpers and the linear EOS are deprecated in favour of `geophysix.rotation` and `geophysix.seawater` (#446) |
@@ -91,7 +91,7 @@ model.
 | **equinox** | The forcing operators, solvers and pipekit operators in gridax-jax are `eqx.Module`s; `eqx.filter_vmap` (`multilayer`) | Never a plain dataclass or class for anything holding arrays. In gridax (grids, masks, operators, BCs) that is a `pytree_dataclass` (`gridax/_src/pytree.py`): settings that pick a code path or a shape are `static_field()` (e.g. `Dirichlet1D.face`, the grid sizes), a hand-written `__init__` may precompute, and `__check_init__` validates. In gridax-jax it is an `eqx.Module`, with `eqx.field(static=True)` for settings. An operator holds its grid, its mask and any precomputed hierarchy as fields, built once in `__init__`. |
 | **jaxtyping** | Shape annotations (`Float[Array, "Ny Nx"]`) | Annotate public array arguments and returns; shape strings stay quoted (`UP037` and `F722` are off for that reason). They are documentation: nothing checks them at run time (beartype is a declared dependency but is not imported). |
 | **lineax** | `solve_cg` (`lx.CG` on a `FunctionLinearOperator`) | Elliptic operators here are negative (semi)definite: tag them `negative_semidefinite_tag`; a preconditioner approximates `A⁻¹` and `solve_cg` flips its sign for lineax. |
-| **diffrax** | Butcher-tableau solvers (`dfx.AbstractERK`), custom `dfx.AbstractSolver`s, `solve_ocean_pde` | A new integrator is a diffrax solver (or a pure step function); forcings live inside the vector field, not as extra diffrax terms. |
+| **diffrax** | Butcher-tableau solvers (`dfx.AbstractERK`), custom `dfx.AbstractSolver`s | A new integrator is a diffrax solver (or a pure step function); forcings live inside the vector field, not as extra diffrax terms. |
 | **spectraldiffx** | DCT / DST / FFT, spectral Poisson / Helmholtz solvers, eigenvalues, capacitance solver | Re-export or call; never re-implement a spectral solve or its eigenvalues. |
 | **gaussx** | Tridiagonal solves, Nyström preconditioning | Structured solves and low-rank preconditioners come from gaussx, not a hand-written `jnp.linalg` routine. |
 | **numpy / scipy** | Construction-time mask and multigrid precomputation | Concrete values only (see Boundaries). |
@@ -132,11 +132,11 @@ whether it exists:
 | Filling ghost cells | `BoundaryConditionSet` of `Dirichlet1D` / `Neumann1D` / `Periodic1D` / …; `enforce_periodic`, `zero_gradient_boundaries`, `no_slip_boundaries`, `wall_boundaries` |
 | Land / ocean masks, coastal stencil fallback | `Mask2D.from_mask` (or `from_center`, `from_u_face`, …), `mask.get_adaptive_masks`, `StencilCapability2D` |
 | Area / volume integrals and masked means | `area_sum`, `area_mean`, `volume_mean`, `masked_mean`, `masked_moments` (grid-polymorphic; `cartesian_*` / `spherical_*` explicit) |
-| A Poisson / Helmholtz solve | `solve_helmholtz_dst` / `_dct` / `_fft` (spectraldiffx) on a rectangle; `build_capacitance_solver`, `solve_cg` + `make_preconditioner`, or `build_multigrid_solver` on a masked domain; `streamfunction_from_vorticity`, `pressure_from_divergence`, `pv_inversion` as one-call wrappers |
+| A Poisson / Helmholtz solve | `solve_helmholtz_dst` / `_dct` / `_fft` (spectraldiffx) on a rectangle; `build_capacitance_solver`, `solve_cg` + `make_preconditioner`, or `build_multigrid_solver` on a masked domain; the one-call wrappers `streamfunction_from_vorticity`, `pressure_from_divergence`, `pv_inversion` live in sesmax-core (`sesmax_core.gfd`) |
 | A DCT / DST | `dct`, `dst`, `dctn`, … (spectraldiffx, scipy's unnormalised convention) |
 | A tridiagonal (Thomas) solve | `solve_tridiagonal`, `solve_tridiagonal_batched` (gaussx) |
 | A CG loop or a Nyström preconditioner | `solve_cg`, `make_nystrom_preconditioner`, `make_spectral_preconditioner`, `make_multigrid_preconditioner` |
-| An RK / multistep / IMEX time loop | `integrix.march`: `rk3_ssp_step`, `ab2_step`, `imex_ssp2_step`, …, the diffrax solvers with `solve_ocean_pde`, or `AB2Solver` / `LeapfrogRAFSolver` / `SplitExplicitRKSolver` with `integrix.march.run` |
+| An RK / multistep / IMEX time loop | `integrix.march`: `rk3_ssp_step`, `ab2_step`, `imex_ssp2_step`, …, the diffrax solvers (with `sesmax_core.solve_pde.solve_ocean_pde` for a tendency BC), or `AB2Solver` / `LeapfrogRAFSolver` / `SplitExplicitRKSolver` with `integrix.march.run` |
 | Applying a 2-D operator to every layer | `multilayer(fn)`; vertical modes with `decompose_vertical_modes`, `layer_to_mode` |
 | Wind stress, bottom drag, sponge damping | `WindStress2D`, `LinearDrag2D`, `QuadraticDrag2D`, `RayleighDamping2D` (and `3D`), composed with `ForcingSum` / `ForcingProduct` |
 | `jnp.abs` / `jnp.maximum` / `jnp.clip` on a path you differentiate | `smooth_abs`, `smooth_max`, `smooth_clamp` |
@@ -311,10 +311,11 @@ apply BCs to intermediate fields before chaining operators.
   wall is `Dirichlet1D(face, 0.0, point="U")` (or
   `BoundaryConditionSet.closed(point="U")`), never the T-point default,
   which leaves `U[:, Nx-2]` open.
-- The elliptic wrappers accept a `BoundaryConditionSet` as `bc=` only when
-  all four faces are `Dirichlet1D` (→ DST), zero-valued `Neumann1D` (→ DCT)
-  or `Periodic1D` (→ FFT); non-zero Dirichlet values become known values via
-  lifting (`solvers/inhomogeneous.py`).
+- The elliptic wrappers (in sesmax-core, `sesmax_core.gfd`) accept a
+  `BoundaryConditionSet` as `bc=` only when all four faces are `Dirichlet1D`
+  (→ DST), zero-valued `Neumann1D` (→ DCT) or `Periodic1D` (→ FFT); non-zero
+  Dirichlet values become known values via lifting
+  (`solvers/inhomogeneous.py`, which stays here).
 
 ### 5. Solvers
 
@@ -328,8 +329,8 @@ apply BCs to intermediate fields before chaining operators.
   (`iterations`, `residual_norm`, `converged`); check `converged` in tests.
   `solve_cg` returns rather than raises when CG does not converge
   (`throw=False`); the `method="cg"` path of the convenience wrappers
-  discards `CGInfo` and raises instead, so call `solve_cg` directly when you
-  want to inspect convergence.
+  (now in sesmax-core) discards `CGInfo` and raises instead, so call
+  `solve_cg` directly when you want to inspect convergence.
 - Randomised construction takes a `key` (`make_nystrom_preconditioner`).
 - Pre-build what depends only on the geometry (`build_capacitance_solver`,
   `build_multigrid_solver`) and reuse it across right-hand sides.
@@ -407,7 +408,7 @@ docstring before changing what it checks.
 | `tests/test_open_walls.py`, conservation tests in `test_advection.py`, `test_jacobian.py`, `test_momentum.py`, `test_diagnostics.py` | Mass / energy / enstrophy conservation of the flux-form and Arakawa schemes, including `wall="open"` |
 | `tests/test_stencils.py`, `tests/test_ghost.py`, `tests/test_grid.py`, `tests/test_cgrid_mask.py` | Raw stencil slices, the ghost-ring helpers, grid and mask construction |
 | `tests/test_stencil_lowering.py` | The performance rewrites equal their composed forms, and their VJPs have one `pad` per distinct offset (a JAX-level check, no timing) |
-| `tests/test_elliptic*.py`, `tests/test_multigrid.py`, `tests/test_solver_wrappers.py`, `tests/test_inhomogeneous.py` | Solvers against analytic solutions, preconditioner benefit, BC-set dispatch, known-value lifting |
+| `tests/test_elliptic*.py`, `tests/test_multigrid.py`, `tests/test_inhomogeneous.py`, `tests/test_solver_deprecations.py` | Solvers against analytic solutions, preconditioner benefit, known-value lifting, the deprecated wrapper names |
 | `tests/test_timestepping*.py`, `tests/test_diffrax_solvers.py` | Convergence order and accuracy of the step functions and the diffrax solvers; the pure steps match their diffrax twins (`TestPureFunctionalVsDiffrax`) |
 | `tests/test_scripts.py` | The example models in `scripts/` run stably on small grids |
 | `tests/test_capabilities.py` | `docs/capabilities.md` is current; no name shadows a spectraldiffx / gaussx name with a different object |

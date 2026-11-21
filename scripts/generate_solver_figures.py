@@ -45,6 +45,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import gridax_jax as fvx
+from gridax_jax._src.solvers.elliptic import streamfunction_from_vorticity
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.sparse as sp
@@ -231,7 +232,7 @@ def run_case(geometry: str, n: int, lam: float, repeats: int) -> tuple[list, dic
         record(
             "spectral DST",
             0.0,
-            lambda p, r: fvx.streamfunction_from_vorticity(
+            lambda p, r: streamfunction_from_vorticity(
                 r, dx, dy, bc="dst", lambda_=lam
             ),
             "direct",

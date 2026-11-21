@@ -71,14 +71,13 @@ class of its own, as `TestRobin1D` / `TestSlip1D`): the ghost value on each
 of the four faces against a hand computation with `dx != dy`, that the
 interior and the other faces are untouched, the validation error, and that
 the face-centred condition holds (e.g. `0.5 * (ghost + interior) == value`).
-`tests/test_boundary_helpers.py` for functional fillers;
-`tests/test_elliptic_bcset.py` if it interacts with the elliptic wrappers.
+`tests/test_boundary_helpers.py` for functional fillers. The elliptic wrappers that read a `BoundaryConditionSet` moved to `sesmax_core.gfd` with their tests (#475).
 
 ## 5. Verify
 
 ```bash
 uv run pytest -n 2 tests/test_boundary.py tests/test_boundary_helpers.py \
-  tests/test_elliptic_bcset.py tests/test_open_walls.py tests/test_capabilities.py
+  tests/test_open_walls.py tests/test_capabilities.py
 ```
 
 Then the `pre-pr-check` skill.

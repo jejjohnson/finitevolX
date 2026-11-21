@@ -316,7 +316,7 @@ def _resolve_mask_arr(
 #   T, fft : FFT    on [1:-1, 1:-1]  periodic, period N-2
 #
 # (Which spectraldiffx solver is which transform was checked against dense
-# operators; tests/test_solver_wrappers.py::TestWallPlacement checks the
+# operators; sesmax tests/gfd/test_inversion.py::TestWallPlacement checks the
 # second-order convergence of every combination.)
 _SPECTRAL_STAGGERED: dict[tuple[str, str], tuple[slice, Callable]] = {
     ("X", "dst"): (slice(1, -2), solve_helmholtz_dst1),

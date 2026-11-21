@@ -65,10 +65,11 @@ list grouped by module, plus spectraldiffx and gaussx.
    - `jnp.sum(field * dx * dy)` or a cos-latitude-weighted mean →
      `finitevolx.area_sum`, `finitevolx.area_mean`, `finitevolx.masked_mean`;
    - a DST / DCT / FFT Poisson or Helmholtz solver, a CG loop, a capacitance
-     or multigrid solver → `finitevolx.streamfunction_from_vorticity`,
-     `finitevolx.pv_inversion`, `finitevolx.solve_helmholtz_dst`,
+     or multigrid solver → `finitevolx.solve_helmholtz_dst`,
      `finitevolx.solve_cg`, `finitevolx.build_capacitance_solver`,
-     `finitevolx.build_multigrid_solver`;
+     `finitevolx.build_multigrid_solver`; the one-call inversions are
+     `sesmax_core.gfd.streamfunction_from_vorticity` / `pv_inversion`,
+     which moved from finitevolX;
    - a dense Laplacian / Helmholtz matrix built for a prior covariance,
      its Cholesky, inverse or log-determinant → `finitevolx.helmholtz_operator`,
      `finitevolx.masked_helmholtz_operator` with gaussx's structured
@@ -77,7 +78,7 @@ list grouped by module, plus spectraldiffx and gaussx.
    - an RK3 / RK4 / Adams–Bashforth / leapfrog loop →
      `finitevolx.rk3_ssp_step`, `finitevolx.rk4_step`,
      `finitevolx.ab2_step`, `finitevolx.leapfrog_raf_step`, or a diffrax
-     solver such as `finitevolx.RK3SSP` with `finitevolx.solve_ocean_pde`;
+     solver such as `finitevolx.RK3SSP` with `sesmax_core.solve_pde.solve_ocean_pde`;
    - wind stress, bottom drag, sponge damping → `sesmax_core.forcing`
      (`WindStress2D`, `LinearDrag2D`, `QuadraticDrag2D`, `RayleighDamping2D`),
      which took them over from finitevolX (#422).

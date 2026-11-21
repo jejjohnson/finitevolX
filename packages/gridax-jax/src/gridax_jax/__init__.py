@@ -281,17 +281,17 @@ from gridax_jax._src.solvers.elliptic import (
     solve_poisson_fft_1d,
     solve_poisson_fft_3d,
 )
-from gridax_jax._src.solvers.iterative import (
-    masked_face_dirichlet_laplacian,
-    masked_neumann_laplacian,
-    project_zero_mean,
-    wet_components,
-)
 from gridax_jax._src.solvers.inhomogeneous import (
     KnownValueLifting,
     SolveDomain,
     boundary_ring,
     coast_ring,
+)
+from gridax_jax._src.solvers.iterative import (
+    masked_face_dirichlet_laplacian,
+    masked_neumann_laplacian,
+    project_zero_mean,
+    wet_components,
 )
 from gridax_jax._src.solvers.linear_operators import (
     helmholtz_operator,

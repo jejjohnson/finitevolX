@@ -54,13 +54,14 @@ in `AGENTS.md`.
      `QGPotentialVorticity2D`, `arakawa_jacobian`, …;
    - `scipy.fft.dst` / `dct`, `jnp.fft` eigenvalue arrays, a hand-written
      spectral Poisson / Helmholtz solve → the spectraldiffx re-exports
-     (`dst`, `dct`, `solve_helmholtz_dst`, `dst1_eigenvalues`, …) or the
-     wrappers `streamfunction_from_vorticity` / `pv_inversion`;
+     (`dst`, `dct`, `solve_helmholtz_dst`, `dst1_eigenvalues`, …) or, in
+     sesmax-core, the wrappers `streamfunction_from_vorticity` /
+     `pv_inversion` (`sesmax_core.gfd`);
    - a Thomas algorithm → `solve_tridiagonal` (gaussx); a CG loop →
      `solve_cg`; a preconditioner → `make_preconditioner`; a Nyström or
      low-rank approximation → gaussx;
    - an RK / Adams–Bashforth / leapfrog loop → the step functions or the
-     diffrax solvers, `solve_ocean_pde`;
+     diffrax solvers, and `sesmax_core.solve_pde.solve_ocean_pde`;
    - a `vmap` over layers of a 2-D operator → `multilayer`;
    - `jnp.abs` / `jnp.maximum` / `jnp.clip` on a differentiated path →
      `smooth_abs`, `smooth_max`, `smooth_clamp`;

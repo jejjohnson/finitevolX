@@ -29,9 +29,6 @@ if it is almost here, extend it where it lives. Regenerate with
 | Name | Kind | What it does |
 |---|---|---|
 | `build_capacitance_solver` | function | Pre-compute the capacitance matrix and return a ready-to-use solver. |
-| `pressure_from_divergence` | function | Solve ∇²p = ∇·u for the pressure correction. |
-| `pv_inversion` | function | QG potential-vorticity inversion: solve (∇² − λ)ψ = q. |
-| `streamfunction_from_vorticity` | function | Invert the vorticity–streamfunction relation ∇²ψ − λψ = ζ. |
 
 #### Known-value lifting for inhomogeneous Dirichlet boundary conditions (`gridax_jax._src.solvers.inhomogeneous`)
 
@@ -47,8 +44,12 @@ if it is almost here, extend it where it lives. Regenerate with
 | Name | Kind | What it does |
 |---|---|---|
 | `CGInfo` | class | Convergence diagnostics returned by `solve_cg`. |
+| `masked_face_dirichlet_laplacian` | function | Masked Helmholtz operator (∇² − λ)·p with p = 0 on every coast *face*. |
 | `masked_laplacian` | function | Apply the masked discrete Helmholtz operator (∇² − λ)·ψ. |
+| `masked_neumann_laplacian` | function | Masked Helmholtz operator (∇² − λ)·p with zero flux through every coast face. |
+| `project_zero_mean` | function | Remove the wet mean of *u* on each connected wet component. |
 | `solve_cg` | function | Preconditioned Conjugate Gradient solver for symmetric linear operators. |
+| `wet_components` | function | Label the 4-connected wet components of a concrete mask (construction time). |
 
 #### The C-grid Helmholtz operator as a structured gaussx linear operator (`gridax_jax._src.solvers.linear_operators`)
 
@@ -82,12 +83,6 @@ if it is almost here, extend it where it lives. Regenerate with
 | `AB2Solver` | class | Deprecated: use ``integrix.march.AB2Solver`` with ``integrix.march.run``. |
 | `LeapfrogRAFSolver` | class | Deprecated: use ``integrix.march.LeapfrogRAFSolver`` with ``integrix.march.run``. |
 | `SplitExplicitRKSolver` | class | Deprecated: use ``integrix.march.SplitExplicitRKSolver`` with ``integrix.march.run``. |
-
-#### Convenience wrapper around `diffeqsolve` for ocean PDEs (`gridax_jax._src.timestepping._solve`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `solve_ocean_pde` | function | Integrate an ocean PDE using diffrax. |
 
 #### Semi-Lagrangian advection: a pure step and its diffrax solver (`gridax_jax._src.timestepping.semi_lagrangian`)
 
