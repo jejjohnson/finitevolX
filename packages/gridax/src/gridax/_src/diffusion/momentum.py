@@ -101,7 +101,7 @@ class MomentumAdvection2D:
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import CartesianGrid2D, MomentumAdvection2D
+    >>> from gridax import CartesianGrid2D, MomentumAdvection2D
     >>> grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> madv = MomentumAdvection2D(grid=grid)
     >>> u = jnp.zeros((grid.Ny, grid.Nx))
@@ -275,7 +275,7 @@ class MomentumAdvection3D:
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import CartesianGrid3D, MomentumAdvection3D
+    >>> from gridax import CartesianGrid3D, MomentumAdvection3D
     >>> grid = CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
     >>> madv = MomentumAdvection3D(grid=grid)
     >>> u = jnp.zeros((grid.Nz, grid.Ny, grid.Nx))

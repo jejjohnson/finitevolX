@@ -23,7 +23,7 @@ Step 2 — North-face flux at V-points (forward diff T → V)::
 
 A T-point ``κ`` field is averaged to the faces (arithmetic mean of the two
 cells, ``κ[j, i+½] = (κ[j, i] + κ[j, i+1]) / 2``), as in the Cartesian
-:class:`~finitevolx.Diffusion2D`; a scalar ``κ`` is used as is.
+:class:`~gridax.Diffusion2D`; a scalar ``κ`` is used as is.
 
 Step 3 — Tendency at T-points (backward diff of fluxes with cosφ weight on
 the meridional term)::
@@ -211,7 +211,7 @@ class SphericalDiffusion2D:
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import SphericalGrid2D, SphericalDiffusion2D
+    >>> from gridax import SphericalGrid2D, SphericalDiffusion2D
     >>> grid = SphericalGrid2D.from_interior(
     ...     nx_interior=16,
     ...     ny_interior=8,
@@ -464,7 +464,7 @@ class SphericalBiharmonicDiffusion2D:
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import SphericalGrid2D, SphericalBiharmonicDiffusion2D
+    >>> from gridax import SphericalGrid2D, SphericalBiharmonicDiffusion2D
     >>> grid = SphericalGrid2D.from_interior(
     ...     nx_interior=16,
     ...     ny_interior=10,

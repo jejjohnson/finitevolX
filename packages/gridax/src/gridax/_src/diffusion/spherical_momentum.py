@@ -23,7 +23,7 @@ only interpolation and multiplication.  What changes on a sphere is:
   ``1/(R·cos(lat_U))`` and ``∂K/∂φ`` picks up ``1/R``.
 
 At the equator (``cos(lat) = 1``) the spherical operator reduces to
-the Cartesian :class:`~finitevolx.MomentumAdvection2D` with
+the Cartesian :class:`~gridax.MomentumAdvection2D` with
 ``dx = R·dlon`` and ``dy = R·dlat``.
 """
 
@@ -91,7 +91,7 @@ class SphericalMomentumAdvection2D:
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import SphericalGrid2D, SphericalMomentumAdvection2D
+    >>> from gridax import SphericalGrid2D, SphericalMomentumAdvection2D
     >>> grid = SphericalGrid2D.from_interior(
     ...     nx_interior=16,
     ...     ny_interior=8,

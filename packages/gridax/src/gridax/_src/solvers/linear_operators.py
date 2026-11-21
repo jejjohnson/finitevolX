@@ -36,18 +36,18 @@ from __future__ import annotations
 import numbers
 
 import gaussx
-from gridax import Mask2D
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
 import lineax as lx
 import numpy as np
 
-from gridax_jax._src.solvers.spectral import (
+from gridax import Mask2D
+from gridax._src.solvers.spectral import (
     dct2_eigenvalues,
     dst1_eigenvalues,
     fft_eigenvalues,
 )
-from gridax_jax._src.solvers.spectral_transforms import dctn, dstn, idctn, idstn
+from gridax._src.solvers.spectral_transforms import dctn, dstn, idctn, idstn
 
 # ---------------------------------------------------------------------------
 # Orthonormal transform pairs (module-level so gaussx's static fields hash

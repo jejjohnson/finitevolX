@@ -56,7 +56,7 @@ def make_spectral_preconditioner(
     if bc not in {"fft", "dst", "dct"}:
         raise ValueError(f"bc must be 'fft', 'dst', or 'dct'; got {bc!r}")
 
-    from gridax_jax._src.solvers.spectral import _spectral_solve
+    from gridax._src.solvers.spectral import _spectral_solve
 
     def _preconditioner(r: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         return _spectral_solve(r, dx, dy, lambda_, bc)

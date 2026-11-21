@@ -84,6 +84,8 @@ def test_builds_without_jax():
 
 
 def test_declares_no_jax_dependency():
+    # JAX is in the `jax` and `pipekit` extras only, never a base dependency.
     requires = importlib.metadata.requires("gridax") or []
-    names = {re.split(r"[\s\[<>=!~;@(]", r, maxsplit=1)[0].lower() for r in requires}
+    base = [r for r in requires if "extra ==" not in r]
+    names = {re.split(r"[\s\[<>=!~;@(]", r, maxsplit=1)[0].lower() for r in base}
     assert not names & {"jax", "jaxlib", "equinox"}, names

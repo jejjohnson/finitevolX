@@ -157,13 +157,3 @@ def test_hooks_keep_the_jax_calls():
     assert "optimization_barrier" in jaxpr and "pad" in jaxpr
     scatter = str(jax.make_jaxpr(lambda v: backend.set_at(v, (slice(1, 3),), 1.0))(x))
     assert "scatter" in scatter or "dynamic_update_slice" in scatter
-
-
-def test_old_names_warn_and_return_the_new_functions():
-    """The pre-#435 names stay in gridax-jax for one release."""
-    gridax_jax = pytest.importorskip("gridax_jax")
-    from gridax._src.operators.stencils import RENAMED
-
-    for old, new in RENAMED.items():
-        with pytest.warns(DeprecationWarning, match=new):
-            assert getattr(gridax_jax, old) is getattr(gridax, new)

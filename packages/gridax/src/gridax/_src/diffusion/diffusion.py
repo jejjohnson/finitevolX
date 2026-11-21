@@ -47,7 +47,7 @@ The class operators :class:`Diffusion2D` / :class:`Diffusion3D` also accept
 ``wall="open"``, which additionally assembles the wall-face fluxes
 ``κ·(h_edge − h_ghost)/dx`` from the caller-filled ghost ring.  A lateral
 Dirichlet / periodic boundary applied to the ghost cells (e.g. via
-:class:`~finitevolx.BoundaryConditionSet`) then produces a diffusive flux
+:class:`~gridax.BoundaryConditionSet`) then produces a diffusive flux
 through the wall.  The flux field stays single-valued, so the tendency is
 exactly flux-conservative for a **scalar** ``kappa``.  For a
 **spatially-varying** ``kappa`` the wall-face coefficient is the mean of the
@@ -375,7 +375,7 @@ class Diffusion2D:
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import CartesianGrid2D, Diffusion2D
+    >>> from gridax import CartesianGrid2D, Diffusion2D
     >>> grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> diff_op = Diffusion2D(grid=grid)
     >>> h = jnp.ones((grid.Ny, grid.Nx))
@@ -530,7 +530,7 @@ class Diffusion3D:
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import CartesianGrid3D, Diffusion3D
+    >>> from gridax import CartesianGrid3D, Diffusion3D
     >>> grid = CartesianGrid3D.from_interior(4, 8, 8, 1.0, 1.0, 1.0)
     >>> diff_op = Diffusion3D(grid=grid)
     >>> h = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
@@ -709,7 +709,7 @@ class BiharmonicDiffusion2D:
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import CartesianGrid2D, BiharmonicDiffusion2D
+    >>> from gridax import CartesianGrid2D, BiharmonicDiffusion2D
     >>> grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> op = BiharmonicDiffusion2D(grid=grid)
     >>> h = jnp.ones((grid.Ny, grid.Nx))
@@ -804,7 +804,7 @@ class BiharmonicDiffusion3D:
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import CartesianGrid3D, BiharmonicDiffusion3D
+    >>> from gridax import CartesianGrid3D, BiharmonicDiffusion3D
     >>> grid = CartesianGrid3D.from_interior(4, 8, 8, 1.0, 1.0, 1.0)
     >>> op = BiharmonicDiffusion3D(grid=grid)
     >>> h = jnp.ones((grid.Nz, grid.Ny, grid.Nx))

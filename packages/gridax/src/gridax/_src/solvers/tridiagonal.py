@@ -13,7 +13,7 @@ Primary use cases:
 Usage example
 -------------
 >>> import jax.numpy as jnp
->>> from gridax_jax._src.solvers.tridiagonal import solve_tridiagonal
+>>> from gridax._src.solvers.tridiagonal import solve_tridiagonal
 >>> a = jnp.array([1.0, 1.0, 1.0])  # lower diagonal (n-1,)
 >>> b = jnp.array([4.0, 4.0, 4.0, 4.0])  # main diagonal  (n,)
 >>> c = jnp.array([1.0, 1.0, 1.0])  # upper diagonal (n-1,)

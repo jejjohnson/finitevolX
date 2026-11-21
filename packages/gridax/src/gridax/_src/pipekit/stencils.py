@@ -24,6 +24,10 @@ from typing import Any, ClassVar
 
 import equinox as eqx
 from geophysix.rotation import beta_plane
+import jax
+import jax.numpy as jnp
+from jaxtyping import Array, Float
+
 from gridax import Mask2D
 from gridax._src.boundary.boundary import (
     enforce_periodic,
@@ -37,11 +41,7 @@ from gridax._src.boundary.boundary import (
 from gridax._src.operators.coriolis import Coriolis2D
 from gridax._src.operators.difference import Difference2D
 from gridax._src.operators.interpolation import Interpolation2D
-import jax
-import jax.numpy as jnp
-from jaxtyping import Array, Float
-
-from gridax_jax._src.pipekit.base import FVXOperator, GridOperator
+from gridax._src.pipekit.base import FVXOperator, GridOperator
 
 Field = Float[Array, "*batch Ny Nx"]
 

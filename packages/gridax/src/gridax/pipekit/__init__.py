@@ -1,7 +1,7 @@
-"""finitevolX operators as pipekit Operators (Tier B).
+"""gridax operators as pipekit Operators (Tier B).
 
-Requires the ``pipekit`` extra (``pip install "finitevolx[pipekit]"``);
-``import finitevolx`` never imports pipekit.
+Requires the ``pipekit`` extra (``pip install "gridax[pipekit]"``);
+``import gridax`` never imports pipekit.
 
 Every operator here is a `pipekit_jax.JaxOperator`: a pipekit ``Operator``
 (JSON config, ``|`` composition, ``Sequential`` / ``Graph`` nodes) that is
@@ -16,11 +16,10 @@ try:
     import pipekit_jax as _pipekit_jax  # noqa: F401
 except ImportError as err:  # pragma: no cover - exercised without the extra
     raise ImportError(
-        "gridax_jax.pipekit needs the `pipekit` extra: "
-        'pip install "gridax-jax[pipekit]"'
+        'gridax.pipekit needs the `pipekit` extra: pip install "gridax[pipekit]"'
     ) from err
 
-from gridax_jax._src.pipekit.base import (
+from gridax._src.pipekit.base import (
     FVXOperator,
     GridOperator,
     GridSpec,
@@ -28,7 +27,7 @@ from gridax_jax._src.pipekit.base import (
     build_grid,
     over_leading,
 )
-from gridax_jax._src.pipekit.diagnostics import (
+from gridax._src.pipekit.diagnostics import (
     STRAIN_COMPONENTS,
     AvailablePE,
     DomainIntegral,
@@ -42,7 +41,7 @@ from gridax_jax._src.pipekit.diagnostics import (
     Strain,
     TotalEnergy,
 )
-from gridax_jax._src.pipekit.stencils import (
+from gridax._src.pipekit.stencils import (
     DIFFERENCES,
     GHOST_FILLERS,
     INTERPOLATIONS,
@@ -59,7 +58,7 @@ from gridax_jax._src.pipekit.stencils import (
     LinComb,
     Pick,
 )
-from gridax_jax._src.pipekit.timestep import SCHEMES, ExplicitStep
+from gridax._src.pipekit.timestep import SCHEMES, ExplicitStep
 
 __all__ = [
     # base

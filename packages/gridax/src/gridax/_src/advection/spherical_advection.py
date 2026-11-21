@@ -8,7 +8,7 @@ spherical flux-divergence::
     ∂h/∂t = − 1/(R·cosφ) · [ ∂(h·u)/∂λ + ∂(h·v·cosφ)/∂φ ]
 
 Only the final flux-divergence step differs from the Cartesian
-:class:`~finitevolx.Advection2D`.  The reconstruction stencils are
+:class:`~gridax.Advection2D`.  The reconstruction stencils are
 exactly the Cartesian ones — they take a ``Float[Array, "Ny Nx"]``
 and produce face fluxes on an Arakawa C-grid without reading any
 grid-spacing fields.  The supported ``method`` strings differ by
@@ -23,7 +23,7 @@ dimensionality, matching the corresponding Cartesian operators:
   the 3-D subset: ``'naive'``, ``'upwind1'``, ``'weno3'``,
   ``'weno5'``, ``'wenoz5'``, ``'weno7'``, ``'weno9'``, and the TVD
   limiters.  (``upwind2`` and ``upwind3`` are 2-D-only because
-  :class:`~finitevolx.Reconstruction3D` does not expose native 3-D
+  :class:`~gridax.Reconstruction3D` does not expose native 3-D
   versions of those stencils.)
 
 The spherical 2-D class mirrors the public API of :class:`Advection2D`
@@ -38,7 +38,7 @@ the Cartesian advection with ``dx = R·dlon`` and ``dy = R·dlat``.
 
 Both classes take the Cartesian ``wall="closed" | "open"`` argument with the
 same semantics.  The flux divergence telescopes against
-:func:`~finitevolx.spherical_area_weights` (``R² cos(lat_T) dlon dlat``, the
+:func:`~gridax.spherical_area_weights` (``R² cos(lat_T) dlon dlat``, the
 cell area the divergence divides by), so ``Σ A · tendency`` is the net flux
 through the faces bounding the written cells, and is zero to rounding when
 those cancel:
@@ -122,7 +122,7 @@ def _open_wall_fluxes(
     West / east faces ``fe[..., 0]`` (``i = 1/2``) and ``fe[..., -2]``
     (``i = Nx-3/2``), south / north faces ``fn[..., 0, :]`` and
     ``fn[..., -2, :]``: first-order upwind on the caller-filled ghost ring,
-    exactly as :class:`~finitevolx.Advection2D` (``_wall_upwind_flux``).
+    exactly as :class:`~gridax.Advection2D` (``_wall_upwind_flux``).
     """
     # fe[j, 1/2] = upwind(h[j, 0], h[j, 1]) · u[j, 1/2]   (west wall)
     fe = set_at(fe, np.s_[..., 0], _wall_upwind_flux(u[..., 0], h[..., 0], h[..., 1]))
@@ -264,7 +264,7 @@ class SphericalAdvection2D:
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import SphericalGrid2D, SphericalAdvection2D
+    >>> from gridax import SphericalGrid2D, SphericalAdvection2D
     >>> grid = SphericalGrid2D.from_interior(
     ...     nx_interior=16,
     ...     ny_interior=8,

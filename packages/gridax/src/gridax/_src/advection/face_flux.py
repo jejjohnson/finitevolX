@@ -2,13 +2,13 @@
 Public functional API for raw face fluxes on Arakawa C-grids.
 
 These functions expose the intermediate face-flux arrays ``(fe, fn)`` that
-:class:`~finitevolx.Advection2D` computes internally but does not return.
+:class:`~gridax.Advection2D` computes internally but does not return.
 The face fluxes are the building blocks for custom divergence operators,
 momentum advection, and RHS assembly.
 
 Typical usage::
 
-    from gridax_jax import uv_center_flux, CartesianGrid2D
+    from gridax import uv_center_flux, CartesianGrid2D
 
     grid = CartesianGrid2D.from_interior(nx, ny, Lx, Ly)
     fe, fn = uv_center_flux(h, u, v, grid)
@@ -55,7 +55,7 @@ def uv_center_flux(
 
     Returns the east-face and north-face flux arrays ``(fe, fn)`` for the
     transport of scalar *h* by velocity ``(u, v)``.  These are the same
-    intermediate quantities that :class:`~finitevolx.Advection2D` computes
+    intermediate quantities that :class:`~gridax.Advection2D` computes
     internally before taking the divergence.
 
     The advective tendency at T-points can be recovered as::
@@ -82,7 +82,7 @@ def uv_center_flux(
         ``'superbee'``, ``'mc'``.
     mask : Mask2D | None
         When provided and *method* supports mask dispatch, stencil-width
-        fallback is applied via :func:`~finitevolx.upwind_flux`.
+        fallback is applied via :func:`~gridax.upwind_flux`.
 
     Returns
     -------
@@ -194,7 +194,7 @@ def rusanov_flux(
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax_jax import rusanov_flux
+    >>> from gridax import rusanov_flux
     >>> h = jnp.ones((6, 6))
     >>> u = jnp.ones((6, 5))  # face-normal velocity on the 5 x-faces
     >>> fx = rusanov_flux(h, u, axis=-1)

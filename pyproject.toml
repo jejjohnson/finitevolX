@@ -1,51 +1,43 @@
+# The workspace root: never built or published. It holds the development
+# environment (the gridax package with both extras, plus the test, dev, docs
+# and example dependencies) and the tool config. The library is gridax
+# (packages/gridax, import gridax).
 [project]
-name = "finitevolx"
-version = "0.3.0"
-description = "Deprecated: finitevolX is now gridax-jax (import gridax_jax) on gridax."
-authors = [
-    { name = "Juan Emmanuel Johnson", email = "jemanjohnson34@gmail.com" },
-    { name = "Takaya Uchida", email = "roxyboy.guppy@gmail.com" },
-]
-license = { text = "MIT" }
-readme = "README.md"
+name = "gridax-workspace"
+version = "0.0.0"
+description = "Development workspace for gridax; not published."
 requires-python = ">=3.12,<3.14"
-keywords = ["finite-volume", "arakawa", "jax"]
-classifiers = [
-    "Topic :: Scientific/Engineering",
-    "Topic :: Software Development :: Libraries",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Operating System :: MacOS",
-    "Operating System :: POSIX :: Linux",
-    "Natural Language :: English",
-    "License :: OSI Approved :: MIT License",
-    "Intended Audience :: Science/Research",
-    "Development Status :: 2 - Pre-Alpha",
-]
-# The finitevolx distribution is a deprecated shim for one 0.X release: the
-# code is gridax-jax (packages/gridax-jax, import gridax_jax) on gridax
-# (packages/gridax, import gridax). `import finitevolx` warns and re-exports.
+classifiers = ["Private :: Do Not Upload"]
 dependencies = [
-    "gridax-jax>=0.1.0",
-    "gridax>=0.0.0",
+    "gridax[jax,pipekit]",
 ]
 
-# gaussx provides the shared solver substrate: the Nyström preconditioner and
-# the tridiagonal solve are delegated to it.
-# This repository is a uv workspace: the root project (finitevolx) and
-# packages/gridax, the NumPy-only grid and mask package it builds on.
+[tool.uv]
+package = false
+# spectraldiffx (v0.8.0 at spectraldiffx 0.1.2) and integrix (v0.6.12) pin
+# their own gaussx git tags, which uv treats as conflicting URLs for the same
+# package. Override them so gridax, spectraldiffx and integrix resolve
+# one gaussx: v0.8.1, the first release with the multigrid, known-value and
+# convergence-report solves (#474). spectraldiffx 0.1.2 is the first release
+# that runs on gaussx >= 0.7 (spectraldiffx#175).
+override-dependencies = [
+    "gaussx @ git+https://github.com/jejjohnson/gaussx@v0.8.1",
+    # spectraldiffx 0.1.2 pins functax v0.0.6 and integrix 0.0.9 pins
+    # v0.0.11; resolve the newer one, on which spectraldiffx's suite passes.
+    "functax[jax] @ git+https://github.com/jejjohnson/functax@v0.0.11",
+]
+
 [tool.uv.workspace]
-members = ["packages/gridax", "packages/gridax-jax"]
+members = ["packages/gridax"]
 
 [tool.uv.sources]
 gridax = { workspace = true }
-gridax-jax = { workspace = true }
 # geophysix owns the physical constants, Coriolis and the linear equation of state (#446).
 geophysix = { git = "https://github.com/jejjohnson/geophysix", tag = "v0.0.3" }
 spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "0.1.2" }
 gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.8.1" }
 # integrix owns the time steppers, semi-Lagrangian advection included (0.0.9).
-# Its own gaussx pin (v0.6.12) is replaced by the override below; integrix
+# Its own gaussx pin (v0.6.12) is replaced by the override above; integrix
 # does not import gaussx at run time.
 integrix = { git = "https://github.com/jejjohnson/integrix", tag = "v0.0.9" }
 # pipekit is a uv workspace: consume its packages from git subdirectories.
@@ -56,25 +48,11 @@ pipekit-ops = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "p
 pipekit-cycle = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-cycle", tag = "pipekit-ops-v0.2.1" }
 pipekit-jax = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-jax", tag = "pipekit-ops-v0.2.1" }
 
-# spectraldiffx (v0.8.0 at spectraldiffx 0.1.2) and integrix (v0.6.12) pin
-# their own gaussx git tags, which uv treats as conflicting URLs for the same
-# package. Override them so finitevolX, spectraldiffx and integrix resolve
-# one gaussx: v0.8.1, the first release with the multigrid, known-value and
-# convergence-report solves (#474). spectraldiffx 0.1.2 is the first release
-# that runs on gaussx >= 0.7 (spectraldiffx#175).
-[tool.uv]
-override-dependencies = [
-    "gaussx @ git+https://github.com/jejjohnson/gaussx@v0.8.1",
-    # spectraldiffx 0.1.2 pins functax v0.0.6 and integrix 0.0.9 pins
-    # v0.0.11; resolve the newer one, on which spectraldiffx's suite passes.
-    "functax[jax] @ git+https://github.com/jejjohnson/functax@v0.0.11",
-]
-
-[project.urls]
-Repository = "https://github.com/jejjohnson/gridax"
-
 [project.optional-dependencies]
 test = [
+    # The tests call diffrax and integrix.march directly.
+    "diffrax>=0.6.0",
+    "integrix>=0.0.9",
     "pytest>=8.3.0",
     "pytest-cov>=5.0.0",
     "pytest-pretty>=1.2.0",
@@ -102,11 +80,6 @@ examples = [
     "xarray>=2025.1.0",
     "zarr>=3.1.5",
 ]
-pipekit = [
-    # Tier-B operator layer, `gridax_jax.pipekit` (pipekit Operators over
-    # the C-grid primitives). `import gridax_jax` never imports these.
-    "gridax-jax[pipekit]",
-]
 docs = [
     # The prose half of the site (theory pages, usage guides and the example
     # notebooks) is built by mystmd, a Node CLI installed with
@@ -123,13 +96,9 @@ docs = [
     "loguru>=0.7",
 ]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
 [dependency-groups]
 dev = [
-    "finitevolx[dev,test]",
+    "gridax-workspace[dev,test]",
 ]
 
 [tool.pytest.ini_options]
@@ -215,7 +184,7 @@ skip_covered = true
 branch = true
 command_line = "--module pytest"
 data_file = "reports/.coverage"
-source = ["gridax_jax", "gridax", "finitevolx"]
+source = ["gridax"]
 
 [tool.coverage.xml]
 output = "reports/coverage.xml"
