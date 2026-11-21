@@ -95,7 +95,6 @@ project:
               title: Masks
         - title: Elliptic problems
           children:
-              title: Elliptic solvers
             - file: notebooks/spde_prior.ipynb
               title: SPDE priors with gaussx
         - title: Advection
