@@ -16,7 +16,7 @@ make docs-check    # validate the sources without rendering the MyST theme
 make docs-api      # build only the API reference into site/
 ```
 
-mystmd is a Node CLI: install it with `npm install -g mystmd`. The Python side needs the `docs` and `pipekit` extras (`uv sync --extra docs --extra pipekit`); the Make targets pass them. `.github/workflows/docs.yml` builds and checks the site on every pull request, and `.github/workflows/pages.yml` deploys `public/` from `main` with GitHub Actions.
+mystmd is a Node CLI: install it with `npm install -g mystmd`. The Python side needs the `docs` extra (`uv sync --extra docs`); the workspace root already installs gridax with both of its extras, and the Make targets pass it. `.github/workflows/docs.yml` builds and checks the site on every pull request, and `.github/workflows/pages.yml` deploys `public/` from `main` with GitHub Actions.
 
 ## The table of contents
 
