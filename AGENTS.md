@@ -37,7 +37,8 @@ the grid and mask classes of `gridax` (the mask construction helpers stay
 | Grids | `gridax/_src/grid/` | `ArakawaCGrid*` (topology) → `CurvilinearGrid*` (uniform metric) → `CartesianGrid1D/2D/3D`, `SphericalGrid2D/3D` (`base.py`, `cartesian.py`, `spherical.py`): frozen dataclasses built with NumPy, registered as JAX pytrees by `gridax/_src/pytree.py` when JAX is importable |
 | Masks | `gridax/_src/mask/` | `Mask1D/2D/3D` (`cartesian.py`), frozen NumPy dataclasses like the grids: staggered wet masks, coast classification, `StencilCapability*` (`base.py`), adaptive stencil hierarchies; numpy / scipy construction helpers (`utils.py`) |
 | Analysis kernels | `gridax/_src/analysis/` (public: `gridax.analysis`) | Finite differences on collocated grids (`difference`, `adaptive_difference`, 1-D / 2-D / 3-D gradient, divergence, curl, Laplacian) and axis remapping (`remap_axis`, `remap_axis_columns`), array-API code that runs on NumPy, JAX or any backend; the kernels behind geoops' and xrops' calculus and remap operators |
-| Layer 1: raw stencils | `gridax/_src/operators/stencils.py`, `gridax/_src/operators/_ghost.py` | `<op>_<axis>_<side>_<d>d` index arithmetic with no metric and no padding, on any backend (the old unsuffixed 2-D names are deprecated aliases in `gridax_jax`); `interior` pads a result back to the full shape |
+| Layer 0: coefficients | `gridax/_src/stencils/coefficients.py` (public: `gridax.stencils`) | `difference_offsets` / `difference_coeffs`: offsets and exact coefficients from the Taylor conditions, for point values or cell averages (`data=`), collocated or staggered (`method="staggered"`, `bias=`); `weno_stencils`, `optimal_weights`, `smoothness_matrix` (the linear parts of WENO); `nonuniform_coeffs` |
+| Layer 1: raw stencils | `gridax/_src/operators/stencils.py`, `gridax/_src/stencils/staggered.py`, `gridax/_src/operators/_ghost.py` (public: `gridax.stencils`) | `<op>_<axis>_<side>_<d>d` index arithmetic with no metric and no padding, on any backend (the old unsuffixed 2-D names are deprecated aliases in `gridax_jax`); `staggered_difference` / `staggered_average` for fourth and sixth order; `interior` pads a result back to the full shape |
 | Layer 2: functional helpers | `gridax/_src/operators/{diagnostics,jacobian,reductions}.py`, `gridax/_src/advection/{weno,linear,limiters,reconstruct_fn,face_flux,flux}.py`; in gridax-jax `operators/eos.py`, `forcing/functional.py`, … | Pure functions on arrays (`kinetic_energy`, `arakawa_jacobian`, `area_mean`, `weno_5pts`, `upwind_flux`, `linear_drag_tendency`, …); they never take a `Mask2D`, except the reductions (`area_sum`, `masked_mean`, … accept `mask=`) |
 | Layer 3: class operators | `gridax/_src/operators/` (`difference.py`, `interpolation.py`, `divergence.py`, `vorticity.py`, `coriolis.py`, `diagnostic_operators.py`, `spherical_*.py`), `gridax/_src/advection/` (`advection.py`, `reconstruction.py`, `spherical_advection.py`), `gridax/_src/diffusion/` | `Difference*`, `Interpolation*`, `Advection*`, `Reconstruction*`, `Diffusion*`, `MomentumAdvection*`, `Vorticity*`, `Coriolis*`, `Energetics2D`, … and their `Spherical*` siblings; mask-aware through a `mask` field |
 | Boundary conditions | `gridax/_src/boundary/` | Per-face atoms `Dirichlet1D` … `Slip1D` (`bc_1d.py`), `BoundaryConditionSet` (`bc_set.py`), `FieldBCSet` (`bc_field.py`), functional ghost-ring fillers (`boundary.py`) |
@@ -48,10 +49,7 @@ the grid and mask classes of `gridax` (the mask construction helpers stay
 | pipekit layer (Tier B) | `pipekit/` (public: `gridax_jax/pipekit/`) | `FVXOperator` / `GridOperator` on `pipekit_jax.JaxOperator`, `GridSpec`, `over_leading`, `check_operator` (`gridax_jax.pipekit.testing`); behind the `pipekit` extra, never imported by `import gridax_jax` |
 | Shared | `gridax/_src/backend.py`, `gridax/_src/pytree.py`; constants from geophysix | the backend hooks and `pytree_dataclass` (see Boundaries); physical constants are geophysix records (`geophysix.earth.SPHERE`, `WGS84`, `geophysix.constants.STANDARD`), used as parameter defaults only (contract 6). `gridax/_src/constants.py` (`R_EARTH`, `GRAVITY`, `OMEGA`, `RHO`, `DEG2M`) is a deprecated shim of geophysix's values, and the Coriolis helpers and the linear EOS are deprecated in favour of `geophysix.rotation` and `geophysix.seawater` (#446) |
 
-The three operator layers are the ones `docs/stencils.md` and
-`docs/masks.md` describe: Layer 1 raw stencils, Layer 2 functional helpers
-(metric-scaled, mask-free), Layer 3 class operators (the layer that
-carries a mask as a field). The forcing modules number their functional primitives
+The four layers of the derivative stack are the ones `docs/stencils.md` ("The derivative stack") and `docs/masks.md` describe: Layer 0 coefficients (numbers, no arrays), Layer 1 raw stencils, Layer 2 functional helpers (metric-scaled, mask-free; `gridax.analysis` is its collocated part, and `gridax.advection.reconstruct` its advection part, which also takes a mask), Layer 3 class operators (the layer that carries a mask as a field). A C-grid Layer 2 helper exists only when it is more than one line of Layer 1. The forcing modules number their functional primitives
 "Layer 0"; they are the same tier as Layer 2.
 
 `scripts/` holds example models (`swm_linear.py`, `shallow_water.py`,
@@ -123,11 +121,12 @@ whether it exists:
 
 | You are about to write… | Use instead |
 |---|---|
+| Hand-typed stencil weights (`-1.0 / 12.0`, a WENO table) | `gridax.stencils.difference_coeffs(offsets, n, data="point" \| "cell")`, `weno_stencils`, `optimal_weights`, `smoothness_matrix`: exact, and pinned by test |
 | `h[1:-1, 2:] - h[1:-1, 1:-1]`, `0.5 * (h[1:-1, 1:-1] + h[2:, 1:-1])` | the raw stencils `<op>_<axis>_<side>_<d>d` (`diff_x_fwd_2d`, `avg_y_bwd_3d`, `avg_xfwd_yfwd_2d`, …): they read the trailing `d` axes of `[*batch, *spatial]`, trim every spatial axis and shift along `<axis>` |
 | `out = jnp.zeros_like(h); out = out.at[1:-1, 1:-1].set(...)` | `interior(values, like)` (`ghost=2` for advection) |
 | A gradient, divergence, curl or Laplacian on the C-grid | `Difference1D/2D/3D` (`diff_x_T_to_U`, `divergence`, `curl`, `laplacian`, `grad_perp`), `Divergence2D`, `Vorticity2D`; on the sphere `SphericalDifference2D/3D`, `SphericalDivergence*`, `SphericalLaplacian*`, `SphericalVorticity*` |
 | Moving a field between T / U / V / X points | `Interpolation1D/2D/3D` (`T_to_U`, `U_to_T`, `T_to_X`, `U_to_V`, …) |
-| A flux-form advective tendency, upwind / WENO / TVD face values | `Advection1D/2D/3D(...)(h, u, v, method=...)`, `Reconstruction1D/2D/3D`, `reconstruct`, `upwind_flux`, the `weno_*` / `linear_*` stencils, the limiters `minmod` / `van_leer` / `superbee` / `mc`, `rusanov_flux` |
+| A flux-form advective tendency, upwind / WENO / TVD face values | `Advection1D/2D/3D(...)(h, u, v, method=...)`, `Reconstruction1D/2D/3D`, `gridax.advection.reconstruct(q, u, axis=, scheme=Upwind(k) \| Centred() \| WENO(k) \| TVD(limiter), mask=)`, `upwind_flux`, the `weno_*` / `linear_*` stencils, the limiters `minmod` / `van_leer` / `superbee` / `mc`, `rusanov_flux` |
 | Harmonic / biharmonic diffusion, momentum advection, Coriolis | `Diffusion2D/3D`, `BiharmonicDiffusion2D/3D`, `MomentumAdvection2D/3D`, `Coriolis2D/3D` (and `Spherical*`) |
 | Kinetic energy, PV, enstrophy, strain, Okubo–Weiss, an Arakawa Jacobian | `Energetics2D`, `Vorticity2D`, `Strain2D`, `QGPotentialVorticity2D`, `ArakawaJacobian2D`; functional `kinetic_energy`, `arakawa_jacobian`, `okubo_weiss`, … |
 | Filling ghost cells | `BoundaryConditionSet` of `Dirichlet1D` / `Neumann1D` / `Periodic1D` / …; `enforce_periodic`, `zero_gradient_boundaries`, `no_slip_boundaries`, `wall_boundaries` |
@@ -604,7 +603,7 @@ Two tools build one site (`docs/README.md` has the details): mystmd builds the t
 | Grid, staggering, ghost cells | `docs/cgrid_discretization.md` | `docs/api/grids.md` |
 | Masks | `docs/masks.md` | `docs/api/masks.md` |
 | Multilayer vs 3-D | `docs/multilayer_vs_3d.md` | `docs/api/vertical_modes.md` |
-| Raw stencils, the three layers | `docs/stencils.md` | `docs/api/stencils.md` |
+| Raw stencils, the derivative stack | `docs/stencils.md` | `docs/api/stencils.md` |
 | Difference / interpolation | `docs/difference.md`, `docs/interpolation.md` | `docs/api/difference.md`, `docs/api/interpolation.md` |
 | Advection and reconstruction | `docs/advection.md` | `docs/api/advection.md`, `docs/api/reconstruction.md` |
 | Boundary conditions | `docs/boundary_conditions.md` | `docs/api/boundary_conditions.md` |

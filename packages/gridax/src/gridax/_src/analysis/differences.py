@@ -1,6 +1,7 @@
 """Finite differences on collocated grids, on any array backend.
 
-The L1 layer of the gradient stack, moved from ``geoops.geom`` (#423): a
+The collocated part of Layer 2 of gridax's derivative stack (metric-scaled and
+mask-free), moved from ``geoops.geom`` (#423): a
 derivative along one axis (:func:`difference`, NaN propagating), its
 mask-aware twin (:func:`adaptive_difference`, the widest stencil that fits on
 valid data), and the 1-D / 2-D / 3-D gradient, divergence, curl and
@@ -11,7 +12,8 @@ Every function computes in the namespace of its input (NumPy, JAX, CuPy, or
 anything ``array-api-compat`` knows), so the result has the input's dtype and
 backend: a float64 NumPy cube stays float64 NumPy, and a JAX array runs
 under ``jax.jit``. Fields are collocated (all on the same points); a
-staggered C-grid field goes through gridax-jax instead.
+staggered C-grid field goes through the Layer 1 stencils of
+:mod:`gridax.stencils` or the ``Difference*D`` operators instead.
 """
 
 from __future__ import annotations
@@ -526,7 +528,7 @@ def adaptive_laplacian_2d(
 
 
 # ---------------------------------------------------------------------------
-# 1-D and 3-D calculus (L1). One axis at a time: `axis` with `step` or
+# 1-D and 3-D calculus (Layer 2). One axis at a time: `axis` with `step` or
 # `coords`; three axes: z (``axis=-3``, step `dz` or positions `z`), y, x.
 # ---------------------------------------------------------------------------
 

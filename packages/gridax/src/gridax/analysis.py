@@ -10,7 +10,7 @@ vertical-remap operators (#423).
   old names here (``difference_offsets``, ``difference_coeffs``,
   ``nonuniform_coeffs``, ``METHODS``, ``Method``) warn and resolve there for
   one release.
-- Differences (L1): :func:`difference` (a NaN propagates) and
+- Differences (Layer 2, metric-scaled and mask-free): :func:`difference` (a NaN propagates) and
   :func:`adaptive_difference` (the widest stencil that fits on valid data),
   and the 1-D / 2-D / 3-D gradient, divergence, curl and Laplacian built on
   them, each with an ``adaptive_`` twin.
@@ -47,7 +47,7 @@ from gridax._src.analysis.differences import (
 from gridax._src.analysis.remap import Extrapolate, remap_axis, remap_axis_columns
 
 __all__ = [
-    # Differences along one axis (L1)
+    # Differences along one axis (Layer 2)
     "difference",
     "adaptive_difference",
     # 1-D calculus

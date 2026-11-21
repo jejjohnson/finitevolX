@@ -200,22 +200,75 @@ For full details on ghost-cell layout and boundary interactions, see the
 
 ---
 
-## 4. The 3-Layer Architecture
+(derivative-stack)=
+## 4. The derivative stack
 
-`finitevolx` organises its spatial operators into three layers:
+gridax has one derivative stack for collocated and staggered fields, in four layers. The numbering is the one `docs/masks.md` and `AGENTS.md` use, with a Layer 0 below the raw stencils.
 
-| Layer | What | Example |
-|-------|------|---------|
-| **1 — Raw stencils** | Pure index arithmetic, no scaling | `diff_x_fwd_2d(h)` returns `h[j, i+1] − h[j, i]` |
-| **2 — Scaled primitives** | Layer 1 + metric scaling | `Difference2D.diff_x_T_to_U(h)` returns `diff_x_fwd_2d(h) / dx` |
-| **3 — Compound operators** | Compose Layer 2 | `Difference2D.divergence(u, v)` = `diff_x_U_to_T(u) + diff_y_V_to_T(v)` |
+| Layer | Holds | Collocated | Staggered (C-grid) |
+|---|---|---|---|
+| **0 — coefficients** | offsets and exact coefficients | `gridax.stencils.difference_offsets`, `difference_coeffs`, `nonuniform_coeffs` | the same with `method="staggered"`, `bias=` and `data="cell"`; `weno_stencils`, `optimal_weights`, `smoothness_matrix` |
+| **1 — raw stencils** | index arithmetic, no metric, no mask | applied inside Layer 2 | the 32 named stencils on this page; `staggered_difference`, `staggered_average`; the `linear_*` and `weno_*` reconstructions |
+| **2 — functional helpers** | metric-scaled, mask-free | `gridax.analysis`: `difference`, `gradient_2d`, `divergence_2d`, `curl_2d`, `laplacian_2d`, … | `diffusion_2d`, `arakawa_jacobian`, `kinetic_energy`, `shear_strain`, …; `gridax.advection.reconstruct` (with an optional mask) |
+| **3 — class operators** | carry a grid and a mask | none | `Difference2D`, `Divergence2D`, `Vorticity2D`, `Reconstruction2D`, `Advection2D`, `SphericalDifference2D`, … |
 
-**Layer 1** — the raw stencils documented here — is the foundation.
-These functions perform no metric scaling (no division by $\Delta x$,
-$R\cos\varphi\,\Delta\lambda$, etc.) and no ghost-ring padding.  They
-return interior-sized arrays that the caller can scale by any coordinate
-metric, making them reusable across Cartesian, spherical, cylindrical,
-and curvilinear coordinate systems.
+A C-grid helper exists at Layer 2 only when it is more than one line of Layer 1; the divergence and the curl are `Difference2D.divergence` and `.curl` (the free functions `divergence_2d` and `relative_vorticity_cgrid` are deprecated).
+
+### Layer 0: one solver for every stencil
+
+Write $f$ for a smooth function, $h$ for the grid step, $s_1, \dots, s_K$ for a stencil's offsets in units of $h$, $c_1, \dots, c_K$ for its coefficients and $n$ for the derivative order ($n = 0$ for a value). The stencil approximates $f^{(n)}(0) \approx h^{-n} \sum_k c_k\, \sigma_k$, where $\sigma_k$ is sample $k$, and its coefficients solve the $K$ conditions
+
+$$\sum_{k=1}^{K} c_k\, \mu_m(s_k) = n!\, \delta_{mn}, \qquad m = 0, 1, \dots, K - 1,$$ (stencil-moments)
+
+with $\delta_{mn}$ equal to 1 when $m = n$ and 0 otherwise. The moment $\mu_m(s)$ is what a sample at $s$ sees of $x^m$: $\mu_m(s) = s^m$ when the samples are point values, and the average over the unit cell centred on $s$ when they are cell averages,
+
+$$\mu_m(s) = \frac{(s + 1/2)^{m+1} - (s - 1/2)^{m+1}}{m + 1}.$$ (cell-moment)
+
+`difference_coeffs` solves {eq}`stencil-moments` in exact rational arithmetic and rounds each coefficient once to float64. Integer offsets give collocated stencils, as `gridax.analysis` uses them; half-integer offsets give staggered ones, whose result sits half a cell from every input. The C-grid stencils on this page are the two-point case, $s = (-1/2, 1/2)$:
+
+| Offsets | Samples | $n$ | Coefficients | Where |
+|---|---|---|---|---|
+| $\pm 1/2$ | point or cell | 1 | $(-1, 1)$ | `diff_*` |
+| $\pm 1/2$ | point or cell | 0 | $(1/2, 1/2)$ | `avg_*`, `linear_2pts` |
+| $\pm 1/2, \pm 3/2$ | point | 1 | $(1, -27, 27, -1)/24$ | `staggered_difference(..., accuracy=3)` |
+| $\pm 1/2, \pm 3/2$ | point | 0 | $(-1, 9, 9, -1)/16$ | `staggered_average(..., accuracy=3)` |
+| $\pm 1/2, \pm 3/2$ | cell | 0 | $(-1, 7, 7, -1)/12$ | `linear_4pts` |
+| $-5/2, \dots, 3/2$ | cell | 0 | $(2, -13, 47, 27, -3)/60$ | `linear_5pts_left`, the WENO-5 limit |
+
+Point values and cell averages give the same two-point stencils, which is why the named stencils serve both, and different ones from three samples on. Use the point weights for C-grid fields that are point values (velocities, pressure, Coriolis terms) and the cell weights for a finite-volume tracer; the wrong ones drop fourth order to second (`packages/gridax/tests/test_stencil_cell_averages.py`). The WENO sub-stencil coefficients, optimal weights and Jiang–Shu smoothness matrices of `weno.py` are generated the same way, exactly (`weno_stencils`, `optimal_weights`, `smoothness_matrix`).
+
+### Two wall rules
+
+A stencil wider than two points reads past the one-cell ghost ring on the faces next to a wall, and the two families treat those faces differently.
+
+- **Centred operators shift inwards.** `staggered_difference` and `staggered_average` keep their width and move the stencil into the domain, so a fourth-order stencil has order 3 on that face instead of dropping to 2.
+- **Upwind reconstructions narrow.** `gridax.advection.reconstruct` gives each face the widest tier of its scheme that fits (WENO-5, then WENO-3, then first-order upwind), so it never reads a cell downwind of the face. With a mask, the coast ends the tiers in the same way.
+
+### Example
+
+```python
+import gridax
+import gridax.advection as gadv
+import gridax.analysis as ga
+import gridax.stencils as gs
+
+grid = gridax.CartesianGrid2D.from_interior(60, 40, 120.0e3, 40.0e3)  # Ny, Nx = 42, 62
+
+# Layer 0: the two-point staggered stencil → (-1.0, 1.0)
+coeffs = gs.difference_coeffs(gs.difference_offsets(method="staggered"), 1)
+# Layer 1: h[j, i+1] - h[j, i], no metric → (40, 60)
+raw = gs.diff_x_fwd_2d(h)
+# Layer 1, fourth order: (h[i-1] - 27 h[i] + 27 h[i+1] - h[i+2]) / 24 → (40, 60)
+raw4 = gs.staggered_difference(h, axis="x", side="fwd", ndim=2, accuracy=3)
+# Layer 2, collocated: dh/dx on the same points → (42, 62)
+dh_dx_collocated = ga.difference(h, axis=-1, step=grid.dx)
+# Layer 2, advection: the WENO-5 flux on the east faces → (42, 62)
+flux = gadv.reconstruct(h, u, axis=-1, scheme=gadv.WENO(5))
+# Layer 3: dh/dx at U points, zeroed at dry faces → (42, 62)
+dh_dx = gridax.Difference2D(grid=grid, mask=mask).diff_x_T_to_U(h)
+```
+
+The rest of this page documents **Layer 1**, the raw stencils. They perform no metric scaling (no division by $\Delta x$, $R\cos\varphi\,\Delta\lambda$, etc.) and no ghost-ring padding, and return interior-sized arrays that the caller can scale by any coordinate metric, so they are reused across Cartesian, spherical and curvilinear coordinates.
 
 ---
 

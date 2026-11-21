@@ -196,8 +196,9 @@ functional code stays coordinate-and-mask agnostic:
 
 | Layer | Example | Mask-aware? |
 |---|---|---|
-| Layer 1 — raw stencils | `diff_x_fwd_2d`, `avg_y_bwd_2d`, … in `stencils.py` | **No** |
-| Layer 2 — functional helpers | `diffusion_2d`, `kinetic_energy`, `enstrophy`, `_geostrophic_velocity_sphere` (private), `arakawa_jacobian`, … | **No** |
+| Layer 0 — coefficients | `difference_offsets`, `difference_coeffs`, `weno_stencils`, … in `gridax.stencils` (numbers, no arrays) | **No** |
+| Layer 1 — raw stencils | `diff_x_fwd_2d`, `avg_y_bwd_2d`, `staggered_difference`, … in `gridax.stencils` | **No** |
+| Layer 2 — functional helpers | the collocated `gridax.analysis` calculus, `diffusion_2d`, `kinetic_energy`, `enstrophy`, `_geostrophic_velocity_sphere` (private), `arakawa_jacobian`, … | **No** |
 | Layer 3 — class operators | `Difference2D`, `Interpolation2D`, `Divergence2D`, `Vorticity2D`, `Coriolis2D`, `Advection2D`, `Diffusion2D`, `MomentumAdvection2D`, `Energetics2D`, `Strain2D`, `QGPotentialVorticity2D`, `ArakawaJacobian2D`, and their `1D` / `3D` / `Spherical*` siblings | **Yes**, via `self.mask` |
 
 The pointwise and stencil diagnostics below have Layer-3 class forms, so

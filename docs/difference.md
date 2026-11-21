@@ -242,6 +242,18 @@ What derivative do you need?
 └── geostrophic u, v      → diff.grad_perp(psi)
 ```
 
+The same quantities for a **collocated** field (every component on the same points, as in model output on a lat-lon grid) come from `gridax.analysis`, with the Layer 0 coefficients of `gridax.stencils` underneath:
+
+| Quantity | Staggered C-grid (`Difference2D`) | Collocated (`gridax.analysis`) |
+|---|---|---|
+| ∂h/∂x | `diff_x_T_to_U(h)` (at U) | `difference(h, axis=-1, step=dx)` |
+| ∇·(u, v) | `divergence(u, v)` (at T) | `divergence_2d(u, v, dy, dx)` |
+| ∇×(u, v) | `curl(u, v)` (at X) | `curl_2d(u, v, dy, dx)` |
+| ∇²h | `laplacian(h)` (at T) | `laplacian_2d(h, dy, dx)` |
+| Fourth-order ∂h/∂x | `staggered_difference(h, axis="x", side="fwd", ndim=2, accuracy=3) / dx` (`gridax.stencils`) | `difference(h, axis=-1, step=dx, accuracy=3)` |
+
+Note the order of the steps in `gridax.analysis` (`dy` before `dx`); without a grid object, the C-grid divergence is `interior(diff_x_bwd_2d(u) / dx + diff_y_bwd_2d(v) / dy, u)`.
+
 ---
 
 ## References

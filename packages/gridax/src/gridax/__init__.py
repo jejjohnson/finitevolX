@@ -7,11 +7,21 @@ wet / dry masks built from a T-point mask. Everything is built with NumPy
 grid a model ran on. When JAX is importable every class is also a JAX pytree,
 so grids and masks pass through ``jax.jit`` and ``jax.vmap``.
 
-:mod:`gridax.analysis` adds the backend-agnostic analysis kernels on
-collocated grids: finite differences and axis remapping, written against the
-array API so they run on NumPy, JAX or any other backend. The staggered
-C-grid operations (differences on T / U / V / X points, advection, boundary
-conditions, solvers) live in gridax-jax, which builds on this package.
+The operators are written against the array API, so they run on NumPy, JAX
+or any other backend, in one derivative stack of four layers (``docs/stencils.md``):
+
+- Layer 0, coefficients: :mod:`gridax.stencils` solves the Taylor conditions
+  exactly, for point values or cell averages, collocated or staggered.
+- Layer 1, raw stencils: the named C-grid stencils (``diff_x_fwd_2d``, …) and
+  ``staggered_difference`` / ``staggered_average`` in :mod:`gridax.stencils`;
+  the ``linear_*`` and ``weno_*`` reconstructions.
+- Layer 2, functional helpers, metric-scaled and mask-free: the collocated
+  calculus of :mod:`gridax.analysis`, the C-grid diagnostics, and
+  :func:`gridax.advection.reconstruct` (which also takes a mask).
+- Layer 3, class operators that carry a grid and a mask: ``Difference2D``,
+  ``Advection2D``, ``Diffusion2D``, … (the C-grid operators, advection,
+  diffusion and boundary conditions live here, in gridax; the solvers and the
+  time-stepping glue are in gridax-jax).
 """
 
 from gridax._src.advection.advection import (
