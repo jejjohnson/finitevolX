@@ -153,37 +153,30 @@ Differentiates through all V-cycle iterations.  O(n_cycles) memory cost.
 
 ## Multigrid as a CG Preconditioner
 
-A single multigrid V-cycle makes an excellent preconditioner for
-`solve_cg`, especially for variable-coefficient problems.  See the
-[Preconditioner Comparison](elliptic_solvers.md#preconditioners) in the
-elliptic solvers docs for a full ranking of all available preconditioners.
+A single multigrid V-cycle makes an excellent preconditioner for CG, especially for variable-coefficient problems. The V-cycle and CG are gaussx's (#474): `as_preconditioner()` hands the hierarchy to gaussx as a `gaussx.MultigridPreconditioner`, and its finest level carries the flattened operator. See the [Preconditioner Comparison](elliptic_solvers.md#preconditioners) in the elliptic solvers docs for a full ranking of all available preconditioners.
 
 ```python
-# Build solver and preconditioner
+import gaussx
+
+# Build the hierarchy (offline, once) and hand it to gaussx
 mg_solver = fvx.build_multigrid_solver(
     mask, dx, dy, lambda_=10.0, coeff=coeff
 )
-mg_precond = fvx.make_multigrid_preconditioner(mg_solver)
+pre = mg_solver.as_preconditioner()   # gaussx.MultigridPreconditioner
+A = pre.levels[0].operator            # the finest operator, [Ny*Nx], negative definite
 
-# Define the operator
+# CG preconditioned by one V-cycle; the report replaces solve_cg's CGInfo
 mask_jnp = jnp.array(mask)
-def A(x):
-    """Variable-coefficient Helmholtz operator."""
-    # For constant coeff, use masked_laplacian directly.
-    # For variable coeff, use the multigrid's internal operator.
-    from gridax_jax._src.solvers.multigrid import _apply_operator
-    return _apply_operator(x, mg_solver.levels[0])
-
-# Solve with multigrid-preconditioned CG
-u, info = fvx.solve_cg(
-    A, rhs * mask_jnp,
-    preconditioner=mg_precond,
-    rtol=1e-8,
-    atol=1e-8,
+x, info = gaussx.linear_solve_with_info(
+    A, (rhs * mask_jnp).ravel(),
+    solver=gaussx.CGSolver(rtol=1e-8, atol=1e-8),
+    preconditioner=pre,
 )
-u = u * mask_jnp
-print(f"Converged in {info.iterations} iterations")
+u = x.reshape(mask.shape) * mask_jnp
+print(f"Converged in {int(info.iterations)} iterations")  # 5 on a 34² basin, 124 without
 ```
+
+`fvx.multigrid_levels(mask, dx, dy, ...)` returns the same levels as a tuple of `gaussx.MultigridLevel`, for `gaussx.MultigridSolver(levels)` or a hierarchy of your own; it leaves the coarsest solve to gaussx's dense default. The old `fvx.make_multigrid_preconditioner` and `fvx.solve_cg` still work for one release and warn.
 
 ---
 

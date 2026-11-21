@@ -48,7 +48,7 @@ Poisson solver or an RK loop, look it up:
 | Ghost cells | `fvx.BoundaryConditionSet(south=fvx.Dirichlet1D("south", 0.0), ...)`, `fvx.enforce_periodic`, `fvx.zero_gradient_boundaries`, `fvx.no_slip_boundaries`, `fvx.wall_boundaries` |
 | Diagnostics | `fvx.Energetics2D`, `fvx.Strain2D`, `fvx.QGPotentialVorticity2D`, `fvx.ArakawaJacobian2D`; `fvx.kinetic_energy`, `fvx.okubo_weiss`, `fvx.arakawa_jacobian`, … |
 | Integrals and means | `fvx.area_sum`, `fvx.area_mean`, `fvx.volume_mean`, `fvx.masked_mean` |
-| Poisson / Helmholtz | `fvx.streamfunction_from_vorticity`, `fvx.pressure_from_divergence`, `fvx.pv_inversion` (`bc="dst"` / `"dct"` / `"fft"`; `method="cg"` / `"capacitance"` on masked domains); `fvx.solve_cg`, `fvx.make_preconditioner`, `fvx.build_capacitance_solver`, `fvx.build_multigrid_solver` |
+| Poisson / Helmholtz | `fvx.streamfunction_from_vorticity`, `fvx.pressure_from_divergence`, `fvx.pv_inversion` (`bc="dst"` / `"dct"` / `"fft"`; `method="cg"` / `"capacitance"` on masked domains); `gaussx.linear_solve_with_info` with `gaussx.CGSolver` (CG is gaussx's; `fvx.solve_cg` is deprecated), `fvx.make_preconditioner`, `fvx.build_capacitance_solver`, `fvx.build_multigrid_solver(...).as_preconditioner()` or `fvx.multigrid_levels` for gaussx's multigrid |
 | The Laplacian as a linear operator (GP / DA priors, log-determinants, sampling) | `fvx.helmholtz_operator(shape, dx, dy, lambda_, bc)` (a `gaussx.DiagonalizedOperator`: `gaussx.solve` / `logdet` / `sqrt` / `inv`), `fvx.masked_helmholtz_operator(mask, dx, dy, lambda_)` (a `gaussx.MaskedOperator`, capacitance solve); an SPDE / Matérn precision `τ²(κ² − ∇²)^α` from its eigenvalues; `fvx.make_gaussx_multigrid_preconditioner(mg)` for `gaussx.CGSolver` |
 | Forcing | moved to `sesmax_core.forcing` (#422): `WindStress2D`, `LinearDrag2D`, `QuadraticDrag2D`, `RayleighDamping2D`, combined with `ForcingSum` / `ForcingProduct` / `TimeVaryingForcing`; the `fvx.*` names warn for one release |
 | Time stepping | `fvx.rk3_ssp_step(state, rhs_fn, dt)`, `fvx.rk4_step`, `fvx.ab2_step`, `fvx.leapfrog_raf_step`, `fvx.imex_ssp2_step`; diffrax solvers `fvx.RK3SSP`, `fvx.SSP_RK104`, `fvx.IMEX_SSP2` with `fvx.solve_ocean_pde` |
@@ -162,7 +162,7 @@ tendency is exactly zero on every land cell.
 | `q[:, 0] = q[:, -2]` (periodic ghosts) and friends | `fvx.enforce_periodic(q)`, `fvx.BoundaryConditionSet.periodic()` |
 | A wet-face mask `wet[:, :-1] & wet[:, 1:]` | `fvx.Mask2D.from_mask(wet).u` |
 | `scipy.fft.dstn` Poisson solver | `fvx.streamfunction_from_vorticity(zeta, dx, dy, bc="dst")`, `fvx.solve_helmholtz_dst` |
-| A conjugate-gradient loop on a masked basin | `fvx.solve_cg(matvec, rhs, preconditioner=fvx.make_preconditioner("spectral", dx=dx, dy=dy))`, or `fvx.build_multigrid_solver` |
+| A conjugate-gradient loop on a masked basin | `gaussx.linear_solve_with_info(gaussx.as_linear_operator(matvec, shape=(n, n), negative_definite=True), rhs.ravel(), solver=gaussx.CGSolver(), preconditioner=fvx.build_multigrid_solver(...).as_preconditioner())` |
 | A dense `(N, N)` Laplacian matrix for a prior covariance, its Cholesky or log-determinant | `fvx.helmholtz_operator` / `fvx.masked_helmholtz_operator` with `gaussx.solve`, `gaussx.logdet`, `gaussx.sqrt` |
 | A Thomas algorithm for vertical diffusion | `fvx.solve_tridiagonal` |
 | A hand-written RK3 / AB2 / leapfrog loop | `fvx.rk3_ssp_step`, `fvx.ab2_step`, `fvx.leapfrog_raf_step`, or `fvx.RK3SSP` with `fvx.solve_ocean_pde` |

@@ -31,8 +31,8 @@ dependencies = [
     "scipy>=1.14.0",
     "lineax>=0.1.0",
     "diffrax>=0.6.0",
-    "spectraldiffx>=0.1.1",
-    "gaussx>=0.6.5",
+    "spectraldiffx>=0.1.2",
+    "gaussx>=0.8.1",
     "integrix>=0.0.9",
     # Grids and masks as NumPy data (packages/gridax in this workspace).
     "gridax>=0.0.0",

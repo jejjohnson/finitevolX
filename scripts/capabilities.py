@@ -80,6 +80,12 @@ UPSTREAM_BLURB = {
 # Names finitevolX shares with an upstream library for a different object,
 # and why.
 ALLOWED_SHARED_NAMES: dict[str, str] = {
+    "MultigridSolver": (
+        "finitevolX's runs n_cycles fixed V-cycles over the C-grid hierarchy"
+        " (implicit, one-step and unrolled gradients) and hands its levels to"
+        " gaussx through as_preconditioner(); gaussx's is CG preconditioned by"
+        " one V-cycle over caller-built levels (#474)"
+    ),
     # Deprecated for one release (#476): the old objects keep their old
     # interface while integrix.march holds the rewritten scheme.
     "SemiLagrangianSolver": (

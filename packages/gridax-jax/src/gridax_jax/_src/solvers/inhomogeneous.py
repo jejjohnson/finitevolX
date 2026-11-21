@@ -31,6 +31,7 @@ trick.  Sandwiches any solver with RHS correction and reconstruction.
 from __future__ import annotations
 
 import equinox as eqx
+import gaussx
 from gridax import Mask2D
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Float
@@ -203,18 +204,26 @@ def lift_rhs(
     Returns ``(rhs_corrected, value_lift)``; see
     :meth:`KnownValueLifting.preprocess`.
     """
-    value_lift = jnp.where(domain.all_known, known_values, 0.0)
-
+    shape = rhs.shape
     # The lift lives on dry coast cells, so the stencil must read it there:
-    # apply the 5-point operator without a mask (all-ones), then restrict the
-    # correction to the solve cells:
+    # the 5-point operator without a mask (all-ones), on the flattened field
+    unmasked = jnp.ones(shape, dtype=rhs.dtype)
+
+    def _matvec(v: Float[Array, " n"]) -> Float[Array, " n"]:
+        return masked_laplacian(v.reshape(shape), unmasked, dx, dy, lambda_).ravel()
+
+    operator = gaussx.as_linear_operator(
+        _matvec, shape=(rhs.size, rhs.size), dtype=rhs.dtype
+    )
+    # gaussx lifts: g~ = g on K, (b - A g~) off K (#474, gaussx#857)
+    lifted, value_lift = gaussx.lift_known_values(
+        operator, rhs.ravel(), domain.all_known.ravel(), known_values.ravel()
+    )
+    # restrict the correction to the solve cells:
     #   rhs_corrected[j, i] = f[j, i] - (A - lambda) value_lift [j, i]  on E
-    unmasked = jnp.ones(value_lift.shape, dtype=value_lift.dtype)
-    A_lift = masked_laplacian(value_lift, unmasked, dx, dy, lambda_)
+    rhs_corrected = jnp.where(domain.effective_mask, lifted.reshape(shape), 0.0)
 
-    rhs_corrected = jnp.where(domain.effective_mask, rhs - A_lift, 0.0)
-
-    return rhs_corrected, value_lift
+    return rhs_corrected, value_lift.reshape(shape)
 
 
 def reconstruct_from_lift(
