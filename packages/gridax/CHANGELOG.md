@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/jejjohnson/gridax/compare/gridax-v0.2.0...gridax-v0.3.0) (2026-11-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **gridax:** `gridax_jax` and `finitevolx` no longer exist. Import the grid, mask and operator names from `gridax`, the solver names from `gridax.solvers` (`pip install "gridax[jax]"`) and the pipekit operators from `gridax.pipekit` (`pip install "gridax[pipekit]"`). The pre-#435 raw-stencil names and `gridax_jax.divergence_2d` / `relative_vorticity_cgrid` aliases are gone.
+* **gridax:** the names above, and make_preconditioner, are gone from gridax_jax.
+
+### Code Refactoring
+
+* **gridax:** every shim for a name that moved to another repo is removed ([#482](https://github.com/jejjohnson/gridax/issues/482)) ([ecddb62](https://github.com/jejjohnson/gridax/commit/ecddb623b3c3c2d1abdfac1a5b2507b1a1049bfc))
+* **gridax:** gridax-jax folds into gridax behind the jax and pipekit extras ([#483](https://github.com/jejjohnson/gridax/issues/483)) ([5de277f](https://github.com/jejjohnson/gridax/commit/5de277fcdd42f3412262e4f37d1618f95b70bc44))
+
 ## [0.2.0](https://github.com/jejjohnson/gridax/compare/gridax-v0.1.0...gridax-v0.2.0) (2026-11-21)
 
 
