@@ -18,7 +18,7 @@ from gridax._src.operators.difference import (
     Difference2D,
     Difference3D,
 )
-from gridax._src.operators.divergence import Divergence2D, divergence_2d
+from gridax._src.operators.divergence import Divergence2D
 from gridax._src.operators.interpolation import (
     Interpolation1D,
     Interpolation2D,
@@ -277,14 +277,13 @@ class TestJitDivergence:
 
         np.testing.assert_allclose(jitted, eager, rtol=1e-7)
 
-    def test_jit_divergence_2d_functional_matches_eager(self, grid2d):
+    def test_jit_difference2d_divergence_matches_eager(self, grid2d):
         u = jnp.ones((grid2d.Ny, grid2d.Nx))
         v = jnp.ones((grid2d.Ny, grid2d.Nx))
+        diff = Difference2D(grid=grid2d)
 
-        eager = divergence_2d(u, v, dx=grid2d.dx, dy=grid2d.dy)
-        jitted = jax.jit(divergence_2d, static_argnums=(2, 3))(
-            u, v, grid2d.dx, grid2d.dy
-        )
+        eager = diff.divergence(u, v)
+        jitted = jax.jit(diff.divergence)(u, v)
 
         np.testing.assert_allclose(jitted, eager, rtol=1e-7)
 

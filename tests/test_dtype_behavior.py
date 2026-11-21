@@ -12,7 +12,7 @@ from gridax import CartesianGrid1D, CartesianGrid2D
 from gridax._src.advection.reconstruction import Reconstruction1D, Reconstruction2D
 from gridax._src.diffusion.diffusion import Diffusion2D, diffusion_2d
 from gridax._src.operators.difference import Difference1D, Difference2D
-from gridax._src.operators.divergence import Divergence2D, divergence_2d
+from gridax._src.operators.divergence import Divergence2D
 from gridax._src.operators.interpolation import Interpolation2D
 from gridax._src.operators.vorticity import Vorticity2D
 import jax.numpy as jnp
@@ -148,8 +148,8 @@ class TestFloat32Float64Agreement:
         u32 = u64.astype(jnp.float32)
         v32 = v64.astype(jnp.float32)
 
-        res64 = divergence_2d(u64, v64, dx=grid2d.dx, dy=grid2d.dy)
-        res32 = divergence_2d(u32, v32, dx=grid2d.dx, dy=grid2d.dy)
+        res64 = Difference2D(grid=grid2d).divergence(u64, v64)
+        res32 = Difference2D(grid=grid2d).divergence(u32, v32)
 
         np.testing.assert_allclose(
             res32[1:-1, 1:-1].astype(float),
@@ -285,13 +285,13 @@ class TestNoNanOnValidInputs:
         for result in [div_op(u, v), div_op.noflux(u, v)]:
             assert jnp.all(jnp.isfinite(result)), "NaN or Inf in Divergence2D output"
 
-    def test_divergence_2d_functional_no_nan(self, grid2d):
+    def test_difference2d_divergence_no_nan(self, grid2d):
         x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
         y = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
         u = jnp.broadcast_to(jnp.sin(x), (grid2d.Ny, grid2d.Nx))
         v = jnp.broadcast_to(jnp.cos(y[:, None]), (grid2d.Ny, grid2d.Nx))
-        result = divergence_2d(u, v, dx=grid2d.dx, dy=grid2d.dy)
-        assert jnp.all(jnp.isfinite(result)), "NaN or Inf in divergence_2d output"
+        result = Difference2D(grid=grid2d).divergence(u, v)
+        assert jnp.all(jnp.isfinite(result)), "NaN or Inf in the divergence"
 
     def test_diffusion2d_no_nan(self, grid2d):
         diff_op = Diffusion2D(grid=grid2d)

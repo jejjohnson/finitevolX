@@ -197,7 +197,7 @@ functional code stays coordinate-and-mask agnostic:
 | Layer | Example | Mask-aware? |
 |---|---|---|
 | Layer 1 — raw stencils | `diff_x_fwd_2d`, `avg_y_bwd_2d`, … in `stencils.py` | **No** |
-| Layer 2 — functional helpers | `_curl_2d`, `divergence_2d`, `diffusion_2d`, `kinetic_energy`, `enstrophy`, `_geostrophic_velocity_sphere` (private), `arakawa_jacobian`, … | **No** |
+| Layer 2 — functional helpers | `diffusion_2d`, `kinetic_energy`, `enstrophy`, `_geostrophic_velocity_sphere` (private), `arakawa_jacobian`, … | **No** |
 | Layer 3 — class operators | `Difference2D`, `Interpolation2D`, `Divergence2D`, `Vorticity2D`, `Coriolis2D`, `Advection2D`, `Diffusion2D`, `MomentumAdvection2D`, `Energetics2D`, `Strain2D`, `QGPotentialVorticity2D`, `ArakawaJacobian2D`, and their `1D` / `3D` / `Spherical*` siblings | **Yes**, via `self.mask` |
 
 The pointwise and stencil diagnostics below have Layer-3 class forms, so
@@ -208,7 +208,7 @@ in a masked domain you don't need to mask them by hand:
 | `kinetic_energy`, `bernoulli_potential`, `available_potential_energy` | `Energetics2D(grid, mask)` methods of the same name |
 | `shear_strain`, `tensor_strain` | `Strain2D.shear`, `Strain2D.tensor` |
 | `strain_magnitude_squared`, `okubo_weiss` | `Strain2D.magnitude_squared(u, v)`, `Strain2D.okubo_weiss(u, v)` |
-| `relative_vorticity_cgrid`, `sw_potential_vorticity` | `Vorticity2D.relative_vorticity`, `Vorticity2D.potential_vorticity` |
+| `sw_potential_vorticity` | `Vorticity2D.potential_vorticity` (the relative vorticity is `Vorticity2D.relative_vorticity` or `Difference2D.curl`) |
 | `enstrophy`, `potential_enstrophy` | `Vorticity2D.enstrophy(u, v)`, `Vorticity2D.potential_enstrophy(u, v, h, f)` |
 | `qg_potential_vorticity`, `stretching_term`, `potential_vorticity_multilayer` | `QGPotentialVorticity2D.__call__`, `.stretching`, `.multilayer` |
 | `arakawa_jacobian` | `ArakawaJacobian2D(grid, mask)` (full-shape output, zero ghost ring) |

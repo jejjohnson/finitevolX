@@ -22,7 +22,7 @@ for the stagger → mask mapping.
 | Kinetic energy | `Energetics2D.kinetic_energy` | `kinetic_energy` | T |
 | Bernoulli potential | `Energetics2D.bernoulli_potential` | `bernoulli_potential` | T |
 | Available potential energy | `Energetics2D.available_potential_energy` | `available_potential_energy` | T |
-| Relative vorticity | `Vorticity2D.relative_vorticity` | `relative_vorticity_cgrid` | X |
+| Relative vorticity | `Vorticity2D.relative_vorticity`, `Difference2D.curl` | none (`relative_vorticity_cgrid` is deprecated, #456) | X |
 | Shallow-water PV | `Vorticity2D.potential_vorticity` | `sw_potential_vorticity`¹ | X |
 | Enstrophy | `Vorticity2D.enstrophy` | `enstrophy` | X |
 | Potential enstrophy | `Vorticity2D.potential_enstrophy` | `potential_enstrophy` | X |
@@ -66,10 +66,6 @@ the vorticity they are built from.
 ### Bernoulli Potential
 
 ::: gridax_jax.bernoulli_potential
-
-### Relative Vorticity
-
-::: gridax_jax.relative_vorticity_cgrid
 
 ### Potential Vorticity
 

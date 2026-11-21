@@ -73,7 +73,7 @@ def _op(obj, attr: str | None = None, *extra, **kwargs) -> Callable:
 def _okubo_weiss_fn(u, v):
     ss = fvx.shear_strain(u, v, 1.0, 1.0)
     sn = fvx.tensor_strain(u, v, 1.0, 1.0)
-    om = fvx.relative_vorticity_cgrid(u, v, 1.0, 1.0)
+    om = fvx.interior(fvx.diff_x_fwd_2d(v) - fvx.diff_y_fwd_2d(u), u)
     return fvx.okubo_weiss(sn, ss, om)
 
 
@@ -209,12 +209,6 @@ def _cases(n: int, nz: int) -> list[Case]:
         ),
         Case("arakawa_jacobian", _op(fvx.arakawa_jacobian, None, 1.0, 1.0), 2, s2),
         Case("kinetic_energy", fvx.kinetic_energy, 2, s2),
-        Case(
-            "relative_vorticity_cgrid",
-            _op(fvx.relative_vorticity_cgrid, None, 1.0, 1.0),
-            2,
-            s2,
-        ),
         Case("okubo_weiss[fn]", _okubo_weiss_fn, 2, s2),
         Case(
             "masked_laplacian",

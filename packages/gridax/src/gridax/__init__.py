@@ -167,7 +167,6 @@ from gridax._src.operators.diagnostics import (
     potential_vorticity,
     potential_vorticity_multilayer,
     qg_potential_vorticity,
-    relative_vorticity_cgrid,
     shear_strain,
     ssh_to_streamfn,
     strain_magnitude_squared,
@@ -186,10 +185,7 @@ from gridax._src.operators.difference import (
     Difference3D,
 )
 from gridax._src.operators.differentiable import smooth_abs, smooth_clamp, smooth_max
-from gridax._src.operators.divergence import (
-    Divergence2D,
-    divergence_2d,
-)
+from gridax._src.operators.divergence import Divergence2D
 from gridax._src.operators.interpolation import (
     Interpolation1D,
     Interpolation2D,
@@ -408,7 +404,6 @@ __all__ = [
     "Interpolation3D",
     # Divergence
     "Divergence2D",
-    "divergence_2d",
     # Vorticity and PV fluxes
     "Vorticity2D",
     "Vorticity3D",
@@ -435,7 +430,6 @@ __all__ = [
     "potential_vorticity",
     "potential_vorticity_multilayer",
     "qg_potential_vorticity",
-    "relative_vorticity_cgrid",
     "shear_strain",
     "ssh_to_streamfn",
     "strain_magnitude_squared",
@@ -528,7 +522,35 @@ _MOVED_TO_GEOPHYSIX = {
 }
 
 
+# One route per C-grid calculus operation (#456): these two free functions are
+# one line of the Layer 1 stencils and repeat a Difference2D method, so they
+# warn for one release. gridax.analysis.divergence_2d is the collocated one.
+_DEPRECATED_CALCULUS = {
+    "divergence_2d": (
+        "gridax.Difference2D(grid=grid, mask=mask).divergence(u, v), or without a"
+        " grid gridax.interior(diff_x_bwd_2d(u) / dx + diff_y_bwd_2d(v) / dy, u);"
+        " gridax.analysis.divergence_2d is the collocated divergence"
+    ),
+    "relative_vorticity_cgrid": (
+        "gridax.Difference2D(grid=grid, mask=mask).curl(u, v), or without a grid"
+        " gridax.interior(diff_x_fwd_2d(v) / dx - diff_y_fwd_2d(u) / dy, u)"
+    ),
+}
+
+
 def __getattr__(name: str) -> object:
+    if name in _DEPRECATED_CALCULUS:
+        import warnings
+
+        from gridax._src.operators import diagnostics, divergence
+
+        warnings.warn(
+            f"gridax.{name} is deprecated and will be removed in the next release:"
+            f" use {_DEPRECATED_CALCULUS[name]}.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return getattr(divergence if name == "divergence_2d" else diagnostics, name)
     if name in _MOVED_TO_GEOPHYSIX:
         import warnings
 
