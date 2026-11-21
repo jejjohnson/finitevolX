@@ -25,13 +25,13 @@
 
 ---
 
-An ocean or atmosphere model on a structured grid spends much of its code on bookkeeping: which point of a cell each variable sits on, which ghost cells a stencil reads, and which faces touch land. gridax holds that bookkeeping as data, with the operators that respect it. Its central object is the Arakawa C-grid, which puts tracers at the cell centres (T points), velocities on the east and north faces (U and V points) and vorticity at the corners (X points), with one ghost ring for the boundary conditions and a land and ocean mask on every one of those points.
+An ocean or atmosphere model on a structured grid spends much of its code on bookkeeping: which point of a cell each variable sits on, which ghost cells a stencil reads, and which faces touch land. gridax holds that bookkeeping as data, with the operators that respect it. Its central object is the Arakawa C-grid. Tracers sit at the cell centres (T points), velocities on the east and north faces (U and V points) and vorticity at the corners (X points). One ghost ring holds the boundary conditions, and a land and ocean mask says which of those points are wet.
 
 ```math
 \frac{\mathrm{d}\bar{q}_{j,i}}{\mathrm{d}t} = -\frac{F^x_{j,i+1/2} - F^x_{j,i-1/2}}{\Delta x} - \frac{F^y_{j+1/2,i} - F^y_{j-1/2,i}}{\Delta y}
 ```
 
-Here $`\bar{q}_{j,i}`$ is the average of a tracer over cell $`(j, i)`$, held at the T points in an array of shape $`(N_y, N_x)`$ that includes the ghost ring, $`F^x`$ and $`F^y`$ are the fluxes through the east and north faces, held at the U and V points in arrays of the same shape, and $`\Delta x`$ and $`\Delta y`$ are the grid spacings. The flux out of one cell is the flux into its neighbour, so the total of $`\bar{q}`$ changes only through the walls. Most of gridax computes a piece of this equation: the face values that build the fluxes, the differences between them, the masks that close the dry faces and the ghost cells the walls need.
+Here $`\bar{q}_{j,i}`$ is the average of a tracer over cell $`(j, i)`$, held at the T points in an array of shape $`(N_y, N_x)`$ that includes the ghost ring. $`F^x`$ and $`F^y`$ are the fluxes through the east and north faces, held at the U and V points in arrays of the same shape, and $`\Delta x`$ and $`\Delta y`$ are the grid spacings. The flux out of one cell is the flux into its neighbour, so the total of $`\bar{q}`$ changes only through the walls. Most of gridax computes a piece of this equation: the face values that build the fluxes, the differences between them, the masks that close the dry faces and the ghost cells the walls need.
 
 ```python
 # Shapes: N_y × N_x, the interior and one ghost ring
@@ -47,7 +47,7 @@ tendency = advection(q, u, v, method="weno5")  # (N_y, N_x) → (N_y, N_x)
 budget = gridax.area_sum(tendency, grid, mask)  # (N_y, N_x) → ()
 ```
 
-None of it needs JAX. gridax is written against the [array API](https://data-apis.org/array-api/), so one function runs on [NumPy](https://numpy.org) arrays, on [JAX](https://github.com/jax-ml/jax) arrays and tracers, or on any other backend that follows the standard. Grids and masks are built with NumPy, and the masks take their dilations from [SciPy](https://scipy.org)'s `ndimage`. Physical constants are [geophysix](https://github.com/jejjohnson/geophysix) records and appear only as parameter defaults, so every operator stays unit-agnostic. When JAX is importable, every grid, mask and operator registers as a JAX pytree, so they pass through `jax.jit`, `jax.vmap` and `jax.grad`, and [jaxtyping](https://github.com/patrick-kidger/jaxtyping) annotates the shapes.
+None of it needs JAX. We write gridax against the [array API](https://data-apis.org/array-api/), so one function runs on [NumPy](https://numpy.org) arrays, on [JAX](https://github.com/jax-ml/jax) arrays and tracers, or on any other backend that follows the standard. Grids and masks are built with NumPy, and the masks take their dilations from [SciPy](https://scipy.org)'s `ndimage`. Physical constants are [geophysix](https://github.com/jejjohnson/geophysix) records and appear only as parameter defaults, so every operator stays unit-agnostic. When JAX is importable, every grid, mask and operator registers as a JAX pytree, so they pass through `jax.jit`, `jax.vmap` and `jax.grad`. [jaxtyping](https://github.com/patrick-kidger/jaxtyping) annotates the shapes.
 
 ## 🌟 Highlights
 
@@ -230,7 +230,7 @@ make docs        # the MyST site and the API reference, with every link checked
 - R. J. LeVeque, 2002. *Finite Volume Methods for Hyperbolic Problems*. Cambridge University Press.
 - G.-S. Jiang and C.-W. Shu, 1996. Efficient implementation of weighted ENO schemes. *Journal of Computational Physics*, 126, 202–228.
 - R. Borges, M. Carmona, B. Costa and W. S. Don, 2008. An improved weighted essentially non-oscillatory scheme for hyperbolic conservation laws. *Journal of Computational Physics*, 227.
-- G. Roullet and T. Gaillard, 2021. [A fast monotone discretization of the rotating shallow water equations](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2021MS002663). *Journal of Advances in Modeling Earth Systems*.
+- G. Roullet and T. Gaillard, 2021. [A fast monotone discretization of the rotating shallow water equations](https://doi.org/10.1029/2021MS002663). *Journal of Advances in Modeling Earth Systems*.
 - L. Thiry et al., 2023. [MQGeometry-1.0: a multi-layer quasi-geostrophic solver on non-rectangular geometries](https://egusphere.copernicus.org/preprints/2023/egusphere-2023-1715/). *EGUsphere preprint*.
 
 ## 📄 License
