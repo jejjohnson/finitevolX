@@ -614,6 +614,8 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 
 | Name | Kind | What it does |
 |---|---|---|
+| `Bias` | type alias | `typing.Literal['centred', 'left', 'right']` |
+| `Data` | type alias | `typing.Literal['point', 'cell']` |
 | `METHODS` | constant | `('central', 'forward', 'backward')` |
 | `Method` | type alias | `typing.Literal['central', 'forward', 'backward', 'stagger...` |
 | `avg_x_bwd_1d` | function | Backward average in x, 1-D: U (or X) → T (or V) points. |
@@ -652,6 +654,9 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `difference_offsets` | function | The offsets of one stencil, in units of the grid step. |
 | `interior` | function | Create an array shaped like ``like``, zero everywhere except the interior. |
 | `nonuniform_coeffs` | function | Stencil coefficients for points at arbitrary distances, on any backend. |
+| `optimal_weights` | function | The linear (optimal) weights that blend sub-stencils into the full one. |
+| `smoothness_matrix` | function | The Jiang–Shu smoothness indicator of one sub-stencil, as a matrix. |
+| `weno_stencils` | function | The full stencil of WENO of ``order`` and its sub-stencils, as offsets. |
 
 ### `gridax.analysis`
 

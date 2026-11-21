@@ -9,7 +9,11 @@ staggered.
   (collocated points, as :mod:`gridax.analysis` uses them) and half-integer
   offsets (``method="staggered"``, the faces of a C-grid);
   :func:`nonuniform_coeffs` solves them for arbitrary distances, on any
-  backend.
+  backend. With ``data="cell"`` the samples are cell averages instead of
+  point values, which gives the finite-volume reconstructions of advection,
+  and ``bias="left"`` or ``"right"`` gives their upwind offsets.
+  :func:`weno_stencils`, :func:`optimal_weights` and
+  :func:`smoothness_matrix` give the linear parts of WENO exactly.
 - **Layer 1, raw stencils.** The 32 named C-grid stencils
   ``<op>_<axis>_<side>_<d>d`` (``diff_x_fwd_2d``, ``avg_xfwd_yfwd_3d``, …):
   index arithmetic with no metric and no padding, and :func:`interior`, which
@@ -64,19 +68,30 @@ from gridax._src.operators.stencils import (
 )
 from gridax._src.stencils.coefficients import (
     METHODS,
+    Bias,
+    Data,
     Method,
     difference_coeffs,
     difference_offsets,
     nonuniform_coeffs,
+    optimal_weights,
+    smoothness_matrix,
+    weno_stencils,
 )
 
 __all__ = [
     # Layer 0: coefficients
     "METHODS",
     "Method",
+    "Bias",
+    "Data",
     "difference_offsets",
     "difference_coeffs",
     "nonuniform_coeffs",
+    # Layer 0: the linear parts of WENO
+    "weno_stencils",
+    "optimal_weights",
+    "smoothness_matrix",
     # Layer 1: raw C-grid stencils, 1-D
     "diff_x_fwd_1d",
     "diff_x_bwd_1d",
