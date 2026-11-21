@@ -1,10 +1,11 @@
-"""Tests for Divergence2D and divergence_2d."""
+"""Tests for Divergence2D and Difference2D.divergence, and the deprecated divergence_2d."""
 
 from __future__ import annotations
 
+import gridax
 from gridax import CartesianGrid2D
 from gridax._src.operators.difference import Difference2D
-from gridax._src.operators.divergence import Divergence2D, divergence_2d
+from gridax._src.operators.divergence import Divergence2D
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -21,22 +22,22 @@ def div_op(grid):
 
 
 # ---------------------------------------------------------------------------
-# Functional API: divergence_2d
+# Difference2D.divergence (the one route; gridax.divergence_2d is deprecated)
 # ---------------------------------------------------------------------------
 
 
-class TestDivergence2DFunctional:
+class TestDifference2DDivergence:
     def test_output_shape(self, grid):
         u = jnp.zeros((grid.Ny, grid.Nx))
         v = jnp.zeros((grid.Ny, grid.Nx))
-        result = divergence_2d(u, v, dx=grid.dx, dy=grid.dy)
+        result = Difference2D(grid=grid).divergence(u, v)
         assert result.shape == (grid.Ny, grid.Nx)
 
     def test_constant_field_zero_divergence(self, grid):
         """Constant velocity field has zero divergence."""
         u = jnp.ones((grid.Ny, grid.Nx))
         v = jnp.ones((grid.Ny, grid.Nx))
-        result = divergence_2d(u, v, dx=grid.dx, dy=grid.dy)
+        result = Difference2D(grid=grid).divergence(u, v)
         np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
 
     def test_linear_field_exact_divergence(self, grid):
@@ -46,14 +47,14 @@ class TestDivergence2DFunctional:
         y = jnp.arange(grid.Ny, dtype=float) * grid.dy
         u = jnp.broadcast_to(c * x, (grid.Ny, grid.Nx))
         v = jnp.broadcast_to(c * y[:, None], (grid.Ny, grid.Nx))
-        result = divergence_2d(u, v, dx=grid.dx, dy=grid.dy)
+        result = Difference2D(grid=grid).divergence(u, v)
         np.testing.assert_allclose(result[1:-1, 1:-1], 2.0 * c, atol=1e-8)
 
     def test_ghost_ring_is_zero(self, grid):
         """Ghost ring in the output is always zero."""
         u = jnp.ones((grid.Ny, grid.Nx))
         v = jnp.ones((grid.Ny, grid.Nx))
-        result = divergence_2d(u, v, dx=grid.dx, dy=grid.dy)
+        result = Difference2D(grid=grid).divergence(u, v)
         np.testing.assert_allclose(result[0, :], 0.0, atol=1e-10)
         np.testing.assert_allclose(result[-1, :], 0.0, atol=1e-10)
         np.testing.assert_allclose(result[:, 0], 0.0, atol=1e-10)
@@ -65,14 +66,14 @@ class TestDivergence2DFunctional:
         x = jnp.arange(grid.Nx, dtype=float) * grid.dx
         u = jnp.broadcast_to(c_x * x, (grid.Ny, grid.Nx))
         v = jnp.zeros((grid.Ny, grid.Nx))
-        result = divergence_2d(u, v, dx=grid.dx, dy=grid.dy)
+        result = Difference2D(grid=grid).divergence(u, v)
         np.testing.assert_allclose(result[1:-1, 1:-1], c_x, atol=1e-8)
 
     def test_mixed_dtype_output_uses_result_type(self, grid):
         """When u is float64 and v is float32, output dtype follows JAX promotion."""
         u = jnp.ones((grid.Ny, grid.Nx), dtype=jnp.float64)
         v = jnp.ones((grid.Ny, grid.Nx), dtype=jnp.float32)
-        result = divergence_2d(u, v, dx=grid.dx, dy=grid.dy)
+        result = Difference2D(grid=grid).divergence(u, v)
         expected_dtype = jnp.result_type(u, v)
         assert result.dtype == expected_dtype, (
             f"Expected dtype {expected_dtype}, got {result.dtype}"
@@ -115,14 +116,15 @@ class TestDivergence2DClass:
         v = jnp.broadcast_to(y[:, None], (grid.Ny, grid.Nx))
         np.testing.assert_allclose(div_op(u, v), diff.divergence(u, v), atol=1e-12)
 
-    def test_matches_functional_api(self, div_op, grid):
-        """Divergence2D.__call__ must match divergence_2d functional form."""
-        u = jnp.ones((grid.Ny, grid.Nx))
-        v = jnp.ones((grid.Ny, grid.Nx))
-        np.testing.assert_allclose(
-            div_op(u, v),
-            divergence_2d(u, v, dx=grid.dx, dy=grid.dy),
-            atol=1e-12,
+    def test_deprecated_divergence_2d_warns_and_matches(self, div_op, grid):
+        """gridax.divergence_2d warns (#456) and still equals the class, bit for bit."""
+        rng = np.random.default_rng(0)
+        u = jnp.asarray(rng.standard_normal((grid.Ny, grid.Nx)))
+        v = jnp.asarray(rng.standard_normal((grid.Ny, grid.Nx)))
+        with pytest.warns(DeprecationWarning, match="Difference2D"):
+            divergence_2d = gridax.divergence_2d
+        np.testing.assert_array_equal(
+            div_op(u, v), divergence_2d(u, v, dx=grid.dx, dy=grid.dy)
         )
 
     def test_geostrophic_velocity_nondivergent(self):

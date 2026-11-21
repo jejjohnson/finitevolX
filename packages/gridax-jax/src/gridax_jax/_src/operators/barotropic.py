@@ -30,8 +30,12 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from gridax._src.operators._ghost import interior
-from gridax._src.operators.divergence import divergence_2d
-from gridax._src.operators.stencils import diff_x_fwd_2d, diff_y_fwd_2d
+from gridax._src.operators.stencils import (
+    diff_x_bwd_2d,
+    diff_x_fwd_2d,
+    diff_y_bwd_2d,
+    diff_y_fwd_2d,
+)
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
@@ -141,8 +145,11 @@ def barotropic_filter(
     u_bt = jnp.sum(h_u * u_star, axis=layer_axis)  # (Ny, Nx) on U-faces
     v_bt = jnp.sum(h_v * v_star, axis=layer_axis)  # (Ny, Nx) on V-faces
 
-    # Divergence of the barotropic transport, scaled into the Helmholtz RHS.
-    rhs = divergence_2d(u_bt, v_bt, dx, dy) / (g * tau * dt)
+    # Divergence of the barotropic transport at T-points, scaled into the RHS:
+    #   div[j, i] = (u_bt[j, i+1/2] - u_bt[j, i-1/2]) / dx
+    #             + (v_bt[j+1/2, i] - v_bt[j-1/2, i]) / dy
+    div = interior(diff_x_bwd_2d(u_bt) / dx + diff_y_bwd_2d(v_bt) / dy, u_bt)
+    rhs = div / (g * tau * dt)
 
     # Solve the variable-coefficient Helmholtz problem for the surface mode.
     w = helm_solve(rhs)

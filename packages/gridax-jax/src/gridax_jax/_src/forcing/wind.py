@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D
 from gridax._src.operators._ghost import interior
-from gridax._src.operators.difference import _curl_2d
+from gridax._src.operators.difference import Difference2D
 from gridax._src.operators.interpolation import Interpolation2D
 import jax.numpy as jnp
 from jaxtyping import Array, Float
@@ -233,7 +233,7 @@ class WindCurl2D(AbstractForcing):
             jnp.zeros_like(tau_y).at[:-1, :].set(0.5 * (tau_y[:-1, :] + tau_y[1:, :]))
         )  # [Ny, Nx]; row Ny-1 is outside the domain
         # curl[j+1/2, i+1/2] = d(tau_y)/dx - d(tau_x)/dy  at X-points
-        curl = _curl_2d(tau_x_on_u, tau_y_on_v, self.grid.dx, self.grid.dy)
+        curl = Difference2D(grid=self.grid).curl(tau_x_on_u, tau_y_on_v)
         mx = None if self.mask is None else self.mask.xy_corner_strict
         # H on the X interior; 1 at dry corners so a zero dry thickness cannot give 0/0
         h_int = safe_denominator(interior_or_scalar(H), mx)

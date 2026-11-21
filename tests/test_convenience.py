@@ -12,13 +12,13 @@ from gridax._src.operators.diagnostics import (
     coriolis_param,
     potential_vorticity_multilayer,
     qg_potential_vorticity,
-    relative_vorticity_cgrid,
     ssh_to_streamfn,
     streamfn_to_ssh,
     stretching_term,
     sw_potential_vorticity,
     sw_potential_vorticity_multilayer,
 )
+from gridax._src.operators.difference import Difference2D
 from gridax_jax._src.utils.constants import GRAVITY, OMEGA, R_EARTH
 from gridax_jax._src.vertical.multilayer import multilayer
 import jax
@@ -321,7 +321,7 @@ class TestSWPotentialVorticity:
         result = sw_potential_vorticity(u, v, h, f, grid2d.dx, grid2d.dy)
 
         # Vorticity of solid body rotation = 2c at interior X-points
-        omega = relative_vorticity_cgrid(u, v, grid2d.dx, grid2d.dy)
+        omega = Difference2D(grid=grid2d).curl(u, v)
         # f and h are uniform so interpolation doesn't change values
         expected_pv = (omega[1:-1, 1:-1] + 1e-4) / 5.0
         np.testing.assert_allclose(result[1:-1, 1:-1], expected_pv, rtol=1e-10)

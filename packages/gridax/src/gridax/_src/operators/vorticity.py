@@ -163,7 +163,7 @@ class Vorticity2D:
 
         ens[j+1/2, i+1/2] = 1/2 * zeta[j+1/2, i+1/2]^2
 
-        Class form of ``enstrophy(relative_vorticity_cgrid(u, v, dx, dy))``.
+        Class form of ``enstrophy(Difference2D(grid).curl(u, v))``.
 
         Parameters
         ----------

@@ -57,7 +57,7 @@ exactly zero for any velocity field derived from a streamfunction via
 ### Usage
 
 ```python
-from gridax_jax import CartesianGrid2D, Divergence2D, divergence_2d
+from gridax_jax import CartesianGrid2D, Divergence2D, diff_x_bwd_2d, diff_y_bwd_2d, interior
 
 grid = CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 
@@ -65,8 +65,8 @@ grid = CartesianGrid2D.from_interior(64, 64, 1e6, 1e6)
 div_op = Divergence2D(grid=grid)
 delta = div_op(u, v)              # T-points
 
-# Functional (no grid object needed)
-delta = divergence_2d(u, v, dx=grid.dx, dy=grid.dy)
+# Without a grid object: the raw stencils and your own steps
+delta = interior(diff_x_bwd_2d(u) / grid.dx + diff_y_bwd_2d(v) / grid.dy, u)
 ```
 
 ---
@@ -421,7 +421,7 @@ Jpsi_q_int = arakawa_jacobian(psi, q, dx=grid.dx, dy=grid.dy)
 What spatial operator do you need?
 │
 ├── Divergence ∇·(u, v)
-│   └── Divergence2D  or  divergence_2d
+│   └── Divergence2D  or  Difference2D.divergence
 │
 ├── Relative vorticity ζ = ∂v/∂x − ∂u/∂y
 │   ├── Class-based → Vorticity2D.relative_vorticity

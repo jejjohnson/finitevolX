@@ -12,6 +12,7 @@ functional form (or documented composition) when ``mask=None``.
 from __future__ import annotations
 
 from gridax_jax import (
+    Difference2D,
     Energetics2D,
     Interpolation2D,
     Mask2D,
@@ -25,7 +26,6 @@ from gridax_jax import (
     potential_enstrophy,
     potential_vorticity_multilayer,
     qg_potential_vorticity,
-    relative_vorticity_cgrid,
     shear_strain,
     stretching_term,
     tensor_strain,
@@ -184,7 +184,7 @@ class TestMatchesFunctional:
         op = Vorticity2D(grid=grid)
         interp = Interpolation2D(grid=grid)
         u, v, h, f = _args("potential_enstrophy")
-        omega = relative_vorticity_cgrid(u, v, grid.dx, grid.dy)
+        omega = Difference2D(grid=grid).curl(u, v)
         np.testing.assert_array_equal(op.enstrophy(u, v), enstrophy(omega))
         q = op.potential_vorticity(u, v, h, f)
         np.testing.assert_array_equal(

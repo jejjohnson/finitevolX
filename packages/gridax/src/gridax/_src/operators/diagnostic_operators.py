@@ -327,7 +327,7 @@ class Strain2D:
         read the caller's ghost u / v.  The north / east X-ghosts are
         outside the domain and stay zero.  At interior X-points this is the
         same arithmetic as :func:`~finitevolx.shear_strain` /
-        :func:`~finitevolx.relative_vorticity_cgrid`.
+        :meth:`~gridax.Difference2D.curl`.
 
         Under a mask only the dry *interior* corners are zeroed: the south /
         west ghost corners are BC-owned and keep the values derived from

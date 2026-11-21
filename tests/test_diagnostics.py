@@ -10,7 +10,6 @@ from gridax._src.operators.diagnostics import (
     potential_enstrophy,
     potential_vorticity,
     qg_potential_vorticity,
-    relative_vorticity_cgrid,
     shear_strain,
     strain_magnitude_squared,
     stretching_term,
@@ -19,6 +18,7 @@ from gridax._src.operators.diagnostics import (
     total_enstrophy,
     vertical_velocity,
 )
+from gridax._src.operators.difference import Difference2D
 from gridax._src.operators.jacobian import arakawa_jacobian
 from gridax_jax._src.vertical.multilayer import multilayer
 import jax
@@ -539,13 +539,13 @@ class TestRelativeVorticityCgrid:
     def test_output_shape(self, grid2d):
         u = jnp.ones((grid2d.Ny, grid2d.Nx))
         v = jnp.ones((grid2d.Ny, grid2d.Nx))
-        result = relative_vorticity_cgrid(u, v, grid2d.dx, grid2d.dy)
+        result = Difference2D(grid=grid2d).curl(u, v)
         assert result.shape == (grid2d.Ny, grid2d.Nx)
 
     def test_irrotational_field(self, grid2d):
         u = jnp.ones((grid2d.Ny, grid2d.Nx))
         v = jnp.ones((grid2d.Ny, grid2d.Nx))
-        result = relative_vorticity_cgrid(u, v, grid2d.dx, grid2d.dy)
+        result = Difference2D(grid=grid2d).curl(u, v)
         np.testing.assert_allclose(result[1:-1, 1:-1], 0.0, atol=1e-10)
 
     def test_solid_body_rotation(self, grid2d):
@@ -555,7 +555,7 @@ class TestRelativeVorticityCgrid:
         y = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
         u = jnp.broadcast_to(-c * y[:, None], (grid2d.Ny, grid2d.Nx))
         v = jnp.broadcast_to(c * x, (grid2d.Ny, grid2d.Nx))
-        result = relative_vorticity_cgrid(u, v, grid2d.dx, grid2d.dy)
+        result = Difference2D(grid=grid2d).curl(u, v)
         np.testing.assert_allclose(result[1:-1, 1:-1], 2.0 * c, rtol=1e-5)
 
     def test_ghost_ring_zero(self, grid2d):
@@ -564,7 +564,7 @@ class TestRelativeVorticityCgrid:
         y = jnp.arange(grid2d.Ny, dtype=float) * grid2d.dy
         u = jnp.broadcast_to(-c * y[:, None], (grid2d.Ny, grid2d.Nx))
         v = jnp.broadcast_to(c * x, (grid2d.Ny, grid2d.Nx))
-        result = relative_vorticity_cgrid(u, v, grid2d.dx, grid2d.dy)
+        result = Difference2D(grid=grid2d).curl(u, v)
         np.testing.assert_allclose(result[0, :], 0.0, atol=1e-10)
         np.testing.assert_allclose(result[-1, :], 0.0, atol=1e-10)
 
@@ -651,7 +651,7 @@ class TestJITCompatibility:
     def test_relative_vorticity_jit(self, grid2d):
         u = jnp.ones((grid2d.Ny, grid2d.Nx))
         v = jnp.ones((grid2d.Ny, grid2d.Nx))
-        fn = lambda u, v: relative_vorticity_cgrid(u, v, grid2d.dx, grid2d.dy)
+        fn = lambda u, v: Difference2D(grid=grid2d).curl(u, v)
         result_eager = fn(u, v)
         result_jit = jax.jit(fn)(u, v)
         np.testing.assert_allclose(result_jit, result_eager, atol=1e-10)
@@ -728,3 +728,18 @@ class TestConservation:
         psi_int = psi[1:-1, 1:-1]
         energy_tendency = jnp.sum(psi_int * J) * dx * dy
         np.testing.assert_allclose(energy_tendency, 0.0, atol=1e-10)
+
+
+def test_deprecated_relative_vorticity_cgrid_warns_and_matches(grid2d):
+    """gridax.relative_vorticity_cgrid warns (#456) and equals Difference2D.curl."""
+    import gridax
+
+    rng = np.random.default_rng(0)
+    u = jnp.asarray(rng.standard_normal((grid2d.Ny, grid2d.Nx)))
+    v = jnp.asarray(rng.standard_normal((grid2d.Ny, grid2d.Nx)))
+    with pytest.warns(DeprecationWarning, match="Difference2D"):
+        relative_vorticity_cgrid = gridax.relative_vorticity_cgrid
+    np.testing.assert_array_equal(
+        Difference2D(grid=grid2d).curl(u, v),
+        relative_vorticity_cgrid(u, v, grid2d.dx, grid2d.dy),
+    )

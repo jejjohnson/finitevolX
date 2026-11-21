@@ -108,7 +108,6 @@ from gridax import (
     diff_y_fwd_2d,
     diff_y_fwd_3d,
     diffusion_2d,
-    divergence_2d,
     enforce_periodic,
     enstrophy,
     fix_boundary_corners,
@@ -139,7 +138,6 @@ from gridax import (
     pv_flux_blend,
     qg_potential_vorticity,
     reconstruct,
-    relative_vorticity_cgrid,
     rusanov_flux,
     shear_strain,
     smooth_abs,
@@ -483,7 +481,6 @@ __all__ = [
     "diffusion_2d",
     # Divergence
     "Divergence2D",
-    "divergence_2d",
     # Boundary helpers
     "enforce_periodic",
     "fix_boundary_corners",
@@ -526,7 +523,6 @@ __all__ = [
     "potential_vorticity",
     "potential_vorticity_multilayer",
     "qg_potential_vorticity",
-    "relative_vorticity_cgrid",
     "shear_strain",
     "strain_magnitude_squared",
     "stretching_term",
@@ -823,6 +819,19 @@ def __getattr__(name: str) -> object:
             stacklevel=2,
         )
         return getattr(eos if hasattr(eos, name) else diagnostics, name)
+    # The C-grid calculus free functions repeat a Difference2D method (#456).
+    if name in _gridax._DEPRECATED_CALCULUS:
+        import warnings
+
+        warnings.warn(
+            f"gridax_jax.{name} is deprecated and will be removed in the next"
+            f" release: use {_gridax._DEPRECATED_CALCULUS[name]}.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            return getattr(_gridax, name)
     # The generic time steppers moved to integrix.march; their old
     # names stay for one release and warn on access.
     if name in _MOVED_STEPPERS or name in _ADAPTED_STEPPERS:

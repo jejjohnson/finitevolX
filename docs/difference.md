@@ -107,8 +107,9 @@ $$
 $$
 
 This is the composition of two backward differences: `diff_x_U_to_T` + `diff_y_V_to_T`.
-It is available as `Difference2D.divergence(u, v)` or the standalone
-`divergence_2d(u, v, dx, dy)`.
+It is available as `Difference2D.divergence(u, v)`; without a grid object,
+write `interior(diff_x_bwd_2d(u) / dx + diff_y_bwd_2d(v) / dy, u)` (the
+standalone `divergence_2d` is deprecated, #456).
 
 ### Curl (Relative Vorticity)
 

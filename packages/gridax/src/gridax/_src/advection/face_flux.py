@@ -187,7 +187,7 @@ def rusanov_flux(
     Float[Array, "..."]
         Numerical flux on the ``N - 1`` interior faces along ``axis``.  This is
         a reduced-shape array (one fewer element along ``axis``), **not** a full
-        ghost-padded C-grid field, so :func:`divergence_2d` (which expects full
+        ghost-padded C-grid field, so :meth:`Difference2D.divergence` (which expects full
         ``[Ny, Nx]`` inputs) does not apply to it directly — take the divergence
         by differencing the faces along the same axis instead.
 
