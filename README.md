@@ -52,6 +52,8 @@ budget = gridax.area_sum(tendency, grid, mask)  # (N_y, N_x) → ()
 
 None of it needs JAX. We write gridax against the [array API](https://data-apis.org/array-api/), so one function runs on [NumPy](https://numpy.org) arrays, on [JAX](https://github.com/jax-ml/jax) arrays and tracers, or on any other backend that follows the standard. Grids and masks are built with NumPy, and the masks take their dilations from [SciPy](https://scipy.org)'s `ndimage`. Physical constants are [geophysix](https://github.com/jejjohnson/geophysix) records and appear only as parameter defaults, so every operator stays unit-agnostic. When JAX is importable, every grid, mask and operator registers as a JAX pytree, so they pass through `jax.jit`, `jax.vmap` and `jax.grad`. [jaxtyping](https://github.com/patrick-kidger/jaxtyping) annotates the shapes.
 
+<p align="center"><img src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/gridax_overview/gridax_overview.png" alt="gridax in one picture: one C-grid at the top, with its finite-volume equation, the same-index staggering of the T, U, V and X points and the mask; six operations below it, difference, advect, diffuse, rotate, fill the ghost ring and diagnose, each with its equation and its main names; gridax.stencils and gridax.analysis underneath, and NumPy, SciPy, geophysix and JAX at the bottom" width="100%"></p>
+
 ## 🌟 Highlights
 
 - 🧱 **Grids and masks as data**: `CartesianGrid1D/2D/3D` and `SphericalGrid2D/3D` add the ghost ring, and `Mask2D.from_mask` (or `Mask2D.from_bathymetry`) derives the wet T, U, V and X points, the coast classification and the stencil capability from one T-point mask, with NumPy and SciPy alone.
@@ -148,6 +150,13 @@ Every array in the block is a NumPy array, and nothing in it imports JAX. Pass `
 
 ## 🔬 What else is in the box
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/gridax_roles/gridax_roles-dark.svg">
+    <img alt="gridax's main public names on the GeoStack role ladder: the operators bound to a grid and a mask as models; the advection schemes and the boundary atoms and sets as strategies; raw stencils, collocated differences, face values, limiters, C-grid terms, diagnostics, integrals, ghost-ring fillers and smooth surrogates as primitives; the grids, masks and arrays as structures; geophysix's constants and the setup functions beside the ladder" src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/gridax_roles/gridax_roles-light.svg" width="100%">
+  </picture>
+</p>
+
 Each area links to its API page, and the [capability index](https://jejjohnson.github.io/gridax/capabilities/) lists every public name in one place. Names without a module are in the top-level `gridax` namespace.
 
 | Area | Symbols | Notes |
@@ -182,6 +191,13 @@ Each area links to its API page, and the [capability index](https://jejjohnson.g
 - **[API reference](https://jejjohnson.github.io/gridax/reference/)**: every module, with the [capability index](https://jejjohnson.github.io/gridax/capabilities/) listing each public name.
 
 ## 🧩 Ecosystem
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/gridax_ecosystem/gridax_ecosystem-dark.svg">
+    <img alt="The packages that import gridax: gridax-jax in GeoNumerics, which re-exports all of it, and sesmax-core in GeoModels, which uses the grids, masks, Interpolation2D and the raw stencils; plumax still imports the deprecated finitevolx shim, drawn dashed; gridax builds on NumPy, SciPy, jaxtyping and geophysix, and on JAX when it is installed" src="https://raw.githubusercontent.com/jejjohnson/geostack/main/docs/images/libraries/gridax_ecosystem/gridax_ecosystem-light.svg" width="100%">
+  </picture>
+</p>
 
 gridax owns the C-grid, its masks and the operators on it, and composes the rest in:
 
