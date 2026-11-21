@@ -30,8 +30,6 @@ from gridax.analysis import (
     curl_2d,
     curl_3d,
     difference,
-    difference_coeffs,
-    difference_offsets,
     divergence_1d,
     divergence_2d,
     divergence_3d,
@@ -41,8 +39,8 @@ from gridax.analysis import (
     laplacian_1d,
     laplacian_2d,
     laplacian_3d,
-    nonuniform_coeffs,
 )
+from gridax.stencils import difference_coeffs, difference_offsets, nonuniform_coeffs
 import numpy as np
 import pytest
 

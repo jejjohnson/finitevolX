@@ -614,13 +614,54 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `zero_boundaries` | function | Fill ghost ring with zeros (homogeneous Dirichlet). |
 | `zero_gradient_boundaries` | function | Fill ghost ring by copying nearest interior value (zero gradient / Neumann). |
 
+### `gridax.stencils`
+
+| Name | Kind | What it does |
+|---|---|---|
+| `METHODS` | constant | `('central', 'forward', 'backward')` |
+| `Method` | type alias | `typing.Literal['central', 'forward', 'backward', 'stagger...` |
+| `avg_x_bwd_1d` | function | Backward average in x, 1-D: U (or X) → T (or V) points. |
+| `avg_x_bwd_2d` | function | Backward average in x, 2-D: U (or X) → T (or V) points. |
+| `avg_x_bwd_3d` | function | Backward average in x, 3-D: U (or X) → T (or V) points. |
+| `avg_x_fwd_1d` | function | Forward average in x, 1-D: T (or V) → U (or X) points. |
+| `avg_x_fwd_2d` | function | Forward average in x, 2-D: T (or V) → U (or X) points. |
+| `avg_x_fwd_3d` | function | Forward average in x, 3-D: T (or V) → U (or X) points. |
+| `avg_xbwd_ybwd_2d` | function | Four-point average, bwd in x and bwd in y, 2-D: X → T points. |
+| `avg_xbwd_ybwd_3d` | function | Four-point average, bwd in x and bwd in y, 3-D: X → T points on every z-level. |
+| `avg_xbwd_yfwd_2d` | function | Four-point average, bwd in x and fwd in y, 2-D: U → V points. |
+| `avg_xbwd_yfwd_3d` | function | Four-point average, bwd in x and fwd in y, 3-D: U → V points on every z-level. |
+| `avg_xfwd_ybwd_2d` | function | Four-point average, fwd in x and bwd in y, 2-D: V → U points. |
+| `avg_xfwd_ybwd_3d` | function | Four-point average, fwd in x and bwd in y, 3-D: V → U points on every z-level. |
+| `avg_xfwd_yfwd_2d` | function | Four-point average, fwd in x and fwd in y, 2-D: T → X points. |
+| `avg_xfwd_yfwd_3d` | function | Four-point average, fwd in x and fwd in y, 3-D: T → X points on every z-level. |
+| `avg_y_bwd_2d` | function | Backward average in y, 2-D: V (or X) → T (or U) points. |
+| `avg_y_bwd_3d` | function | Backward average in y, 3-D: V (or X) → T (or U) points. |
+| `avg_y_fwd_2d` | function | Forward average in y, 2-D: T (or U) → V (or X) points. |
+| `avg_y_fwd_3d` | function | Forward average in y, 3-D: T (or U) → V (or X) points. |
+| `avg_z_bwd_3d` | function | Backward average in z, 3-D: W → T points. |
+| `avg_z_fwd_3d` | function | Forward average in z, 3-D: T → W points. |
+| `diff_x_bwd_1d` | function | Backward difference in x, 1-D: U (or X) → T (or V) points. |
+| `diff_x_bwd_2d` | function | Backward difference in x, 2-D: U (or X) → T (or V) points. |
+| `diff_x_bwd_3d` | function | Backward difference in x, 3-D: U (or X) → T (or V) points. |
+| `diff_x_fwd_1d` | function | Forward difference in x, 1-D: T (or V) → U (or X) points. |
+| `diff_x_fwd_2d` | function | Forward difference in x, 2-D: T (or V) → U (or X) points. |
+| `diff_x_fwd_3d` | function | Forward difference in x, 3-D: T (or V) → U (or X) points. |
+| `diff_y_bwd_2d` | function | Backward difference in y, 2-D: V (or X) → T (or U) points. |
+| `diff_y_bwd_3d` | function | Backward difference in y, 3-D: V (or X) → T (or U) points. |
+| `diff_y_fwd_2d` | function | Forward difference in y, 2-D: T (or U) → V (or X) points. |
+| `diff_y_fwd_3d` | function | Forward difference in y, 3-D: T (or U) → V (or X) points. |
+| `diff_z_bwd_3d` | function | Backward difference in z, 3-D: W → T points. |
+| `diff_z_fwd_3d` | function | Forward difference in z, 3-D: T → W points. |
+| `difference_coeffs` | function | The coefficients of a stencil on ``offsets``, exact, from the Taylor conditions. |
+| `difference_offsets` | function | The offsets of one stencil, in units of the grid step. |
+| `interior` | function | Create an array shaped like ``like``, zero everywhere except the interior. |
+| `nonuniform_coeffs` | function | Stencil coefficients for points at arbitrary distances, on any backend. |
+
 ### `gridax.analysis`
 
 | Name | Kind | What it does |
 |---|---|---|
 | `Extrapolate` | type alias | `typing.Literal['nan', 'nearest']` |
-| `METHODS` | constant | `('central', 'forward', 'backward')` |
-| `Method` | type alias | `typing.Literal['central', 'forward', 'backward']` |
 | `adaptive_curl_2d` | function | Mask-aware curl: `adaptive_difference` for each derivative. |
 | `adaptive_curl_3d` | function | Mask-aware 3-D curl: `adaptive_difference` for each derivative. |
 | `adaptive_difference` | function | Mask-aware finite difference: the widest stencil that fits on valid data. |
@@ -636,8 +677,6 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `curl_2d` | function | Curl2D (relative vorticity) ``∂v/∂x − ∂u/∂y`` over the last two axes. |
 | `curl_3d` | function | Curl (vorticity vector) over the last three axes; a NaN propagates. |
 | `difference` | function | Finite-difference derivative along one axis; a NaN propagates. |
-| `difference_coeffs` | function | The coefficients of a stencil on ``offsets``, from the Taylor conditions. |
-| `difference_offsets` | function | The offsets of one stencil, finitediffx's rules. |
 | `divergence_1d` | function | The 1-D divergence ``∂u/∂s`` of a flux along one axis; a NaN propagates. |
 | `divergence_2d` | function | Divergence ``∂u/∂x + ∂v/∂y`` over the last two axes; a NaN propagates. |
 | `divergence_3d` | function | Divergence ``∂u/∂x + ∂v/∂y + ∂w/∂z`` over the last three axes. |
@@ -647,7 +686,6 @@ Grids and land / ocean masks as NumPy data (packages/gridax in this repository):
 | `laplacian_1d` | function | ``∂²f/∂s²`` along one axis, a second-derivative stencil; a NaN propagates. |
 | `laplacian_2d` | function | Laplacian ``∂²f/∂x² + ∂²f/∂y²`` over the last two axes; a NaN propagates. |
 | `laplacian_3d` | function | Laplacian ``∂²f/∂x² + ∂²f/∂y² + ∂²f/∂z²``, second-derivative stencils. |
-| `nonuniform_coeffs` | function | Stencil coefficients for points at arbitrary distances, on any backend. |
 | `remap_axis` | function | Interpolate ``values`` along ``axis`` from ``source_coords`` to ``target_coords``. |
 | `remap_axis_columns` | function | Interpolate every column of ``values`` onto ``target_coords``. |
 

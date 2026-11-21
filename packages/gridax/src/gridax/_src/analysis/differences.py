@@ -5,7 +5,7 @@ derivative along one axis (:func:`difference`, NaN propagating), its
 mask-aware twin (:func:`adaptive_difference`, the widest stencil that fits on
 valid data), and the 1-D / 2-D / 3-D gradient, divergence, curl and
 Laplacian built on them. The stencils come from
-:mod:`gridax._src.analysis.stencils` (L0).
+:mod:`gridax.stencils` (Layer 0).
 
 Every function computes in the namespace of its input (NumPy, JAX, CuPy, or
 anything ``array-api-compat`` knows), so the result has the input's dtype and
@@ -17,19 +17,19 @@ staggered C-grid field goes through gridax-jax instead.
 from __future__ import annotations
 
 import functools
-from typing import Any
+from typing import Any, cast
 
 from jaxtyping import Bool, Float
 import numpy as np
 
-from gridax._src.analysis.stencils import (
+from gridax._src.pytree import array_namespace
+from gridax._src.stencils.coefficients import (
     METHODS,
     Method,
     difference_coeffs,
     difference_offsets,
     nonuniform_coeffs,
 )
-from gridax._src.pytree import array_namespace
 
 
 def difference(
@@ -94,6 +94,12 @@ def difference(
         >>> difference(z**2, coords=z, derivative=2)  # exact for a quadratic
         array([2., 2., 2., 2., 2.])
     """
+    if method == "staggered":
+        raise ValueError(
+            "difference applies collocated stencils, whose result sits on the "
+            "input points; a staggered stencil writes half a cell away, so apply "
+            "it with the C-grid stencils of gridax.stencils"
+        )
     xp = array_namespace(f)
     axis = axis % f.ndim
     if coords is not None:
@@ -1119,6 +1125,16 @@ def adaptive_laplacian_3d(
     )
 
 
+def _collocated_offsets(
+    *, derivative: int, accuracy: int, method: Method
+) -> tuple[int, ...]:
+    """Integer offsets: `difference` rejects ``"staggered"`` before it gets here."""
+    return cast(
+        "tuple[int, ...]",
+        difference_offsets(derivative=derivative, accuracy=accuracy, method=method),
+    )
+
+
 def _bounded(
     xp: Any,
     f: Any,
@@ -1130,14 +1146,14 @@ def _bounded(
 ) -> Any:
     """The stencils of ``method`` with one-sided ones where it would leave the axis."""
     size = f.shape[axis]
-    forward = difference_offsets(
+    forward = _collocated_offsets(
         derivative=derivative, accuracy=accuracy, method="forward"
     )
-    backward = difference_offsets(
+    backward = _collocated_offsets(
         derivative=derivative, accuracy=accuracy, method="backward"
     )
     if method == "central":
-        centre = difference_offsets(
+        centre = _collocated_offsets(
             derivative=derivative, accuracy=accuracy, method="central"
         )
         if size < len(centre):
@@ -1222,7 +1238,7 @@ def _periodic(
     xp: Any, f: Any, axis: int, derivative: int, accuracy: int, method: Method
 ) -> Any:
     """The ``method`` stencil at every point, reading across the seam."""
-    offsets = difference_offsets(
+    offsets = _collocated_offsets(
         derivative=derivative, accuracy=accuracy, method=method
     )
     if f.shape[axis] < len(offsets):
