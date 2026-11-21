@@ -1,6 +1,6 @@
 [project]
 name = "gridax-jax"
-version = "0.2.0"
+version = "0.3.0"
 description = "Arakawa C-grid operators in JAX: differences, advection, diffusion, boundary conditions and solvers on gridax grids."
 authors = [
     { name = "Juan Emmanuel Johnson", email = "jemanjohnson34@gmail.com" },

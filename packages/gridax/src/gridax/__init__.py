@@ -282,7 +282,7 @@ from gridax._src.operators.vorticity import (
     vorticity_flux_upwind,
 )
 
-__version__ = "0.1.0"  # x-release-please-version
+__version__ = "0.2.0"  # x-release-please-version
 
 __all__ = [
     # Grids: topology, uniform metric, concrete coordinate systems
