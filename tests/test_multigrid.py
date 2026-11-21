@@ -10,10 +10,10 @@ from gridax_jax._src.solvers.multigrid import (
     MultigridSolver,
     _apply_operator,
     _compute_n_levels,
+    _level_operator,
     _prolongate,
     _restrict,
     _transfer_operators,
-    _weighted_jacobi,
     build_multigrid_solver,
 )
 from gridax_jax._src.solvers.preconditioners import (
@@ -605,7 +605,12 @@ class TestJacobiSmoother:
         u0 = jnp.zeros((ny, nx))
 
         r_before = jnp.linalg.norm(rhs - _apply_operator(u0, level))
-        u1 = _weighted_jacobi(u0, rhs, level, omega=0.95, n_iters=10)
+        # gaussx's weighted Jacobi on the level's flattened operator (#474)
+        operator = _level_operator(level, rhs.dtype)
+        smoother = gaussx.WeightedJacobi(
+            level.inv_diagonal.ravel(), omega=0.95, sweeps=10
+        )
+        u1 = smoother(operator, u0.ravel(), rhs.ravel()).reshape(ny, nx)
         r_after = jnp.linalg.norm(rhs - _apply_operator(u1, level))
         assert float(r_after) < float(r_before)
 

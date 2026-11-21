@@ -42,8 +42,8 @@ gridax = { workspace = true }
 gridax-jax = { workspace = true }
 # geophysix owns the physical constants, Coriolis and the linear equation of state (#446).
 geophysix = { git = "https://github.com/jejjohnson/geophysix", tag = "v0.0.3" }
-spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "0.1.1" }
-gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.6.5" }
+spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "0.1.2" }
+gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.8.1" }
 # integrix owns the time steppers, semi-Lagrangian advection included (0.0.9).
 # Its own gaussx pin (v0.6.12) is replaced by the override below; integrix
 # does not import gaussx at run time.
@@ -56,16 +56,18 @@ pipekit-ops = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "p
 pipekit-cycle = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-cycle", tag = "pipekit-ops-v0.2.1" }
 pipekit-jax = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-jax", tag = "pipekit-ops-v0.2.1" }
 
-# spectraldiffx pins its own gaussx git tag (v0.1.0 at spectraldiffx 0.1.1),
-# which uv treats as a conflicting URL for the same package. Override it so
-# finitevolX and spectraldiffx resolve one gaussx. spectraldiffx 0.1.1 still
-# calls gaussx.DiagonalisedOperator, a deprecated alias in v0.6.5 that gaussx
-# 0.7.0 removes: do not move this override to gaussx >= 0.7 before a
-# spectraldiffx release renames that call. Drop the override once a
-# spectraldiffx release pins gaussx >= v0.6.5.
+# spectraldiffx (v0.8.0 at spectraldiffx 0.1.2) and integrix (v0.6.12) pin
+# their own gaussx git tags, which uv treats as conflicting URLs for the same
+# package. Override them so finitevolX, spectraldiffx and integrix resolve
+# one gaussx: v0.8.1, the first release with the multigrid, known-value and
+# convergence-report solves (#474). spectraldiffx 0.1.2 is the first release
+# that runs on gaussx >= 0.7 (spectraldiffx#175).
 [tool.uv]
 override-dependencies = [
-    "gaussx @ git+https://github.com/jejjohnson/gaussx@v0.6.5",
+    "gaussx @ git+https://github.com/jejjohnson/gaussx@v0.8.1",
+    # spectraldiffx 0.1.2 pins functax v0.0.6 and integrix 0.0.9 pins
+    # v0.0.11; resolve the newer one, on which spectraldiffx's suite passes.
+    "functax[jax] @ git+https://github.com/jejjohnson/functax@v0.0.11",
 ]
 
 [project.urls]

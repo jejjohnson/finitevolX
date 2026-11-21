@@ -11,8 +11,16 @@ on masked Arakawa C-grids.
 
 ::: gridax_jax.build_multigrid_solver
 
-## Preconditioner
+## Levels for gaussx
 
-::: gridax_jax.make_multigrid_preconditioner
+The V-cycle runs in gaussx (`gaussx.MultigridPreconditioner`, `gaussx.MultigridSolver`); finitevolX builds the levels from the mask (#474).
 
-::: gridax_jax.make_gaussx_multigrid_preconditioner
+::: gridax_jax.multigrid_levels
+
+## Deprecated preconditioner factories
+
+`make_multigrid_preconditioner` and `make_gaussx_multigrid_preconditioner` warn for one release: use `build_multigrid_solver(...).as_preconditioner()`, a `gaussx.MultigridPreconditioner`.
+
+::: gridax_jax._src.solvers.preconditioners.make_multigrid_preconditioner
+
+::: gridax_jax._src.solvers.preconditioners.make_gaussx_multigrid_preconditioner

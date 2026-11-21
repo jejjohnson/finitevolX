@@ -487,6 +487,12 @@ rectangular solves plus an $O(N_c^2)$ back-substitution.
 
 ## Conjugate Gradient Solver
 
+:::{note}
+`solve_cg`, `CGInfo` and the multigrid and Nyström preconditioner factories are deprecated (#474): CG is gaussx's, and the examples below keep working for one release with a `DeprecationWarning`. The gaussx call is
+`x, info = gaussx.linear_solve_with_info(gaussx.as_linear_operator(lambda v: A(v.reshape(shape)).ravel(), shape=(n, n), negative_definite=True), rhs.ravel(), solver=gaussx.CGSolver(rtol=1e-8, atol=1e-8), preconditioner=pre)`,
+whose `info` (a `gaussx.SolveInfo`) has the same `iterations`, `residual_norm` and `converged`; for a multigrid preconditioner, `pre = fvx.build_multigrid_solver(...).as_preconditioner()`.
+:::
+
 For domains where the capacitance matrix is too large, use the
 preconditioned CG solver.
 

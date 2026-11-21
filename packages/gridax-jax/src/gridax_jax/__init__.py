@@ -195,7 +195,6 @@ from gridax_jax._src.solvers.elliptic import (
     BoundaryCondition,
     # Capacitance
     CapacitanceSolver,
-    CGInfo,
     # Solver classes
     DirichletHelmholtzSolver2D,
     MixedBCHelmholtzSolver2D,
@@ -228,9 +227,6 @@ from gridax_jax._src.solvers.elliptic import (
     dst4_eigenvalues_ps,
     fft_eigenvalues,
     fft_eigenvalues_ps,
-    make_gaussx_multigrid_preconditioner,
-    make_multigrid_preconditioner,
-    make_nystrom_preconditioner,
     make_preconditioner,
     make_spectral_preconditioner,
     # CG solver
@@ -242,7 +238,6 @@ from gridax_jax._src.solvers.elliptic import (
     # Convenience wrappers
     pressure_from_divergence,
     pv_inversion,
-    solve_cg,
     # Generic per-axis BC solvers
     solve_helmholtz_2d,
     solve_helmholtz_3d,
@@ -303,6 +298,7 @@ from gridax_jax._src.solvers.linear_operators import (
 from gridax_jax._src.solvers.multigrid import (
     MultigridSolver,
     build_multigrid_solver,
+    multigrid_levels,
 )
 from gridax_jax._src.solvers.spectral_transforms import (
     dct,
@@ -680,6 +676,7 @@ __all__ = [
     # Multigrid Helmholtz solver
     "MultigridSolver",
     "build_multigrid_solver",
+    "multigrid_levels",
     # Tridiagonal (TDMA) solver
     "solve_tridiagonal",
     "solve_tridiagonal_batched",
@@ -791,7 +788,54 @@ _MOVED_TO_GEOPHYSIX = {
 }
 
 
+# The generic CG solve, its report and the multigrid and Nyström
+# preconditioner factories are gaussx's (#474, jejjohnson/geostack#291 rule 1).
+# The old names stay for one release and warn on access; gridax's own modules
+# import them from their private homes and do not warn.
+_GAUSSX_SOLVES: dict[str, tuple[str, str]] = {
+    "solve_cg": (
+        "gridax_jax._src.solvers.iterative",
+        "gaussx.linear_solve_with_info(gaussx.as_linear_operator(matvec,"
+        " shape=(n, n), negative_definite=True), rhs.ravel(),"
+        " solver=gaussx.CGSolver(rtol=..., atol=...), preconditioner=...), which"
+        " returns (x, gaussx.SolveInfo)",
+    ),
+    "CGInfo": (
+        "gridax_jax._src.solvers.iterative",
+        "gaussx.SolveInfo (iterations, residual_norm, converged), returned by"
+        " gaussx.linear_solve_with_info",
+    ),
+    "make_multigrid_preconditioner": (
+        "gridax_jax._src.solvers.preconditioners",
+        "build_multigrid_solver(...).as_preconditioner(), a"
+        " gaussx.MultigridPreconditioner for gaussx.CGSolver(preconditioner=...)",
+    ),
+    "make_gaussx_multigrid_preconditioner": (
+        "gridax_jax._src.solvers.preconditioners",
+        "build_multigrid_solver(...).as_preconditioner(), a"
+        " gaussx.MultigridPreconditioner",
+    ),
+    "make_nystrom_preconditioner": (
+        "gridax_jax._src.solvers.preconditioners",
+        "gaussx.NystromPreconditioner on gaussx.randomized_nystrom(operator,"
+        " rank, key=key)",
+    ),
+}
+
+
 def __getattr__(name: str) -> object:
+    if name in _GAUSSX_SOLVES:
+        import importlib
+        import warnings
+
+        module, replacement = _GAUSSX_SOLVES[name]
+        warnings.warn(
+            f"gridax_jax.{name} is deprecated and will be removed in the next"
+            f" release: use {replacement}.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return getattr(importlib.import_module(module), name)
     if name in _MOVED_TO_SESMAX:
         import importlib
         import warnings

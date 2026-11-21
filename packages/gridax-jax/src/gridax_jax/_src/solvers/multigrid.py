@@ -44,13 +44,16 @@ which wraps a single V-cycle as a preconditioner closure compatible with
 from __future__ import annotations
 
 from collections.abc import Callable
+import itertools
 from typing import Literal
 
 import equinox as eqx
+import gaussx
 from gridax import Mask2D
 import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Int
+import lineax as lx
 import numpy as np
 from scipy import linalg, sparse
 from scipy.sparse import csgraph
@@ -491,66 +494,6 @@ def _apply_operator(
     return out * mask
 
 
-def _weighted_jacobi(
-    u: Float[Array, "Ny Nx"],
-    rhs: Float[Array, "Ny Nx"],
-    level: MultigridLevel,
-    omega: float,
-    n_iters: int,
-) -> Float[Array, "Ny Nx"]:
-    r"""Weighted Jacobi smoother for the multigrid V-cycle.
-
-    Each iteration updates every cell simultaneously::
-
-        u^{k+1} = u^k + omega * D^{-1} * (rhs - A u^k)
-
-    where ``D = diag(A)`` (precomputed in ``level.inv_diagonal``) and
-    ``omega`` is the relaxation weight.  The update is equivalent to
-    solving ``D u^{k+1} = D u^k + omega * (rhs - A u^k)``.
-
-    Why weighted Jacobi works as a multigrid smoother
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Jacobi efficiently damps *high-frequency* error modes (oscillatory
-    components with wavelength ~ 2*dx) but barely touches *low-frequency*
-    modes.  This is exactly what multigrid needs: after a few Jacobi
-    sweeps the residual is smooth enough to be accurately represented on
-    the coarse grid, where those low-frequency modes become high-frequency
-    and can be damped cheaply.
-
-    The weight ``omega < 1`` under-relaxes the update so the
-    highest-frequency (checkerboard) modes are damped too; ``omega = 0.8``
-    (the default) damps the whole upper half of the 5-point spectrum by at
-    least 3/5 per sweep.
-
-    Parameters
-    ----------
-    u : Float[Array, "Ny Nx"]
-        Current solution iterate.
-    rhs : Float[Array, "Ny Nx"]
-        Right-hand side of ``A u = rhs``.
-    level : MultigridLevel
-        Operator data (includes ``inv_diagonal`` = ``D^{-1}``).
-    omega : float
-        Relaxation weight (default 0.8).
-    n_iters : int
-        Number of Jacobi sweeps.
-
-    Returns
-    -------
-    Float[Array, "Ny Nx"]
-        Smoothed solution, zeroed outside the mask.
-    """
-
-    inv_diag = level.inv_diagonal.astype(u.dtype)  # hierarchy is float64
-    mask = level.mask.astype(u.dtype)
-
-    def _step(_, u_cur: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
-        r = rhs - _apply_operator(u_cur, level)  # residual: r = f - A u
-        return (u_cur + omega * inv_diag * r) * mask
-
-    return jax.lax.fori_loop(0, n_iters, _step, u)
-
-
 def _interp_axis(v: Array, n_fine: int, axis: int) -> Array:
     """Linear interpolation between nested points along *axis* (``P0_1d v``).
 
@@ -660,6 +603,86 @@ def _restrict(
     w = _interp_axis_t(w, nx_c, axis=1)  # [Ny, Nx_c]
     w = _interp_axis_t(w, ny_c, axis=0)  # [Ny_c, Nx_c]
     return 0.25 * w * mask_coarse.astype(v.dtype)
+
+
+# ---------------------------------------------------------------------------
+# The hierarchy as gaussx levels (the V-cycle itself is gaussx's)
+# ---------------------------------------------------------------------------
+
+
+class _BottomSolve(eqx.Module):
+    """Exact solve on the coarsest level: ``u = A_c^{-1} rhs`` on its wet points."""
+
+    inverse: Float[Array, "n_wet n_wet"]
+    index: Int[Array, " n_wet"]
+
+    def __call__(self, rhs: Float[Array, " n"]) -> Float[Array, " n"]:
+        # [n_wet], the wet entries of the flattened coarse field
+        u_wet = self.inverse.astype(rhs.dtype) @ rhs[self.index]
+        # unique_indices: the scatter is then transposable (jax.linear_transpose)
+        return jnp.zeros_like(rhs).at[self.index].set(u_wet, unique_indices=True)
+
+
+def _flat(shape: tuple[int, ...], dtype: jnp.dtype | type) -> jax.ShapeDtypeStruct:
+    """The flattened structure of a ``shape`` field."""
+    return jax.ShapeDtypeStruct((int(np.prod(shape)),), dtype)
+
+
+def _level_operator(
+    level: MultigridLevel, dtype: jnp.dtype | type
+) -> lx.AbstractLinearOperator:
+    """``A`` of one level on the flattened field, negative semidefinite."""
+    shape = level.mask.shape
+
+    def _matvec(v: Float[Array, " n"]) -> Float[Array, " n"]:
+        # (A u)[j, i] = sum_k stencil[k, j, i] u[j + dj_k, i + di_k]
+        return _apply_operator(v.reshape(shape), level).ravel()
+
+    return lx.FunctionLinearOperator(
+        _matvec,
+        _flat(shape, dtype),
+        tags=(lx.symmetric_tag, lx.negative_semidefinite_tag),
+    )
+
+
+def _transfers(
+    fine: MultigridLevel, coarse: MultigridLevel, dtype: jnp.dtype | type
+) -> tuple[lx.AbstractLinearOperator, lx.AbstractLinearOperator]:
+    """``P = diag(s) P0 diag(m_c)`` and ``R = P^T / 4`` between two levels."""
+    scale = fine.prolong_scale
+    assert scale is not None
+    shape_f, shape_c = fine.mask.shape, coarse.mask.shape
+
+    def _prolong(v: Float[Array, " n_c"]) -> Float[Array, " n_f"]:
+        return _prolongate(v.reshape(shape_c), coarse.mask, scale).ravel()
+
+    def _restr(v: Float[Array, " n_f"]) -> Float[Array, " n_c"]:
+        return _restrict(v.reshape(shape_f), scale, coarse.mask).ravel()
+
+    prolongation = lx.FunctionLinearOperator(_prolong, _flat(shape_c, dtype))
+    restriction = lx.FunctionLinearOperator(_restr, _flat(shape_f, dtype))
+    return prolongation, restriction
+
+
+def _gaussx_levels(
+    levels: tuple[MultigridLevel, ...], omega: float, dtype: jnp.dtype | type
+) -> tuple[gaussx.MultigridLevel, ...]:
+    """The stencil hierarchy as ``gaussx.MultigridLevel``s, finest first."""
+    out = []
+    for fine, coarse in itertools.pairwise(levels):
+        prolongation, restriction = _transfers(fine, coarse, dtype)
+        smoother = gaussx.WeightedJacobi(
+            fine.inv_diagonal.ravel().astype(dtype), omega=omega
+        )
+        out.append(
+            gaussx.MultigridLevel(
+                _level_operator(fine, dtype), prolongation, restriction, smoother
+            )
+        )
+    out.append(
+        gaussx.MultigridLevel(_level_operator(levels[-1], dtype), None, None, None)
+    )
+    return tuple(out)
 
 
 # ---------------------------------------------------------------------------
@@ -899,48 +922,80 @@ class MultigridSolver(eqx.Module):
         self,
         u: Float[Array, "Ny Nx"],
         rhs: Float[Array, "Ny Nx"],
-        level_idx: int = 0,
     ) -> Float[Array, "Ny Nx"]:
-        """Execute a single multigrid V-cycle starting at *level_idx*.
+        """One V-cycle for ``A u = rhs`` from the iterate *u*, run by gaussx.
 
-        Algorithm::
-
-            if coarsest level:
-                return A_c^{-1} rhs                # exact bottom solve
+        The cycle is :meth:`gaussx.MultigridPreconditioner.v_cycle` over the
+        hierarchy :meth:`as_preconditioner` builds::
 
             u = jacobi(u, rhs, n_pre)             # 1. pre-smooth
-            r = rhs - A(u)                        # 2. compute residual
+            r = rhs - A(u)                        # 2. residual
             r_c = restrict(r)                     # 3. R = P^T / 4
-            e_c = v_cycle(0, r_c, level+1)        # 4. recurse on A_c = R A P
-            u = u + prolongate(e_c)               # 5. correct with coarse error
+            e_c = v_cycle(0, r_c) on A_c = R A P  # 4. recurse (exact at the bottom)
+            u = u + prolongate(e_c)               # 5. correct
             u = jacobi(u, rhs, n_post)            # 6. post-smooth
 
-        The recursion unrolls statically at JAX trace time because
-        ``level_idx`` and ``n_levels`` are Python ints (static fields).
+        For the singular Neumann problem (``lambda_ = 0``) the right-hand
+        side and the result are projected onto zero mean on each wet
+        component, so the cycle stays linear and symmetric.
 
         Parameters
         ----------
         u : Float[Array, "Ny Nx"]
-            Initial guess (typically zeros for the error equation on
-            coarse grids, or the current iterate on the fine grid).
+            Starting iterate.
         rhs : Float[Array, "Ny Nx"]
-            Right-hand side (original RHS on the fine grid, or the
-            restricted residual on coarser grids).
-        level_idx : int
-            Current level (0 = finest, n_levels-1 = coarsest).
+            Right-hand side.
 
         Returns
         -------
         Float[Array, "Ny Nx"]
-            Improved solution after one V-cycle.
+            The iterate after one V-cycle.
         """
-        # Singular Neumann problem (lambda = 0): solve in the zero-mean gauge.
-        # Projecting the input and output of the finest cycle keeps the
-        # V-cycle linear and symmetric (P V P with P an orthogonal projection).
-        if level_idx == 0 and self.null_labels is not None:
+        if self.null_labels is not None:
             rhs = self._project(rhs)
-            return self._project(self._v_cycle_from(u, rhs, level_idx))
-        return self._v_cycle_from(u, rhs, level_idx)
+        cycle = self.as_preconditioner(rhs.dtype)
+        out = cycle.v_cycle(rhs.ravel(), u.ravel().astype(rhs.dtype))
+        return out.reshape(rhs.shape)
+
+    def as_preconditioner(
+        self, dtype: jnp.dtype | type = jnp.float64
+    ) -> gaussx.MultigridPreconditioner:
+        """The hierarchy as a :class:`gaussx.MultigridPreconditioner`.
+
+        Each level's operator is the stencil of :class:`MultigridLevel` on
+        the flattened field, its transfers are the C-grid prolongation and
+        full-weighting restriction, its smoother is weighted Jacobi with
+        ``omega``, the bottom solve is the precomputed inverse on the
+        coarsest wet points, and for Neumann at ``lambda_ = 0`` the null
+        space is the constant on each wet component.  Pass it to
+        ``gaussx.CGSolver(preconditioner=...)`` or ``gaussx.linear_solve``
+        with a negative-definite operator.
+
+        Parameters
+        ----------
+        dtype : dtype
+            Dtype of the vectors the cycle will act on.
+
+        Returns
+        -------
+        gaussx.MultigridPreconditioner
+            One V-cycle, ``n_pre`` and ``n_post`` smoothing sweeps per level.
+        """
+        null_space = None
+        if self.null_labels is not None:
+            assert self.null_counts is not None
+            components = jnp.arange(1, self.null_counts.shape[0])  # [k]
+            # Z[:, k] = 1 on wet component k + 1, [Ny*Nx, k]
+            null_space = (
+                self.null_labels.ravel()[:, None] == components[None, :]
+            ).astype(dtype)
+        return gaussx.MultigridPreconditioner(
+            _gaussx_levels(self.levels, self.omega, dtype),
+            n_pre=self.n_pre,
+            n_post=self.n_post,
+            bottom_solve=_BottomSolve(self.bottom_inverse, self.bottom_index),
+            null_space=null_space,
+        )
 
     def _project(self, u: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         """Zero-mean projection on each wet component (Neumann, lambda = 0)."""
@@ -948,54 +1003,6 @@ class MultigridSolver(eqx.Module):
         return _project_zero_mean(
             u, self.levels[0].mask, self.null_labels, self.null_counts
         )
-
-    def _bottom_solve(self, rhs: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
-        """Exact solve on the coarsest level: ``u = A_c^{-1} rhs`` on wet points."""
-        flat = rhs.ravel()  # [Ny_c*Nx_c]
-        idx = self.bottom_index  # [n_wet], distinct flat indices
-        u_wet = self.bottom_inverse.astype(rhs.dtype) @ flat[idx]  # [n_wet]
-        # unique_indices: the scatter is then transposable (jax.linear_transpose)
-        u = jnp.zeros_like(flat).at[idx].set(u_wet, unique_indices=True)
-        return u.reshape(rhs.shape)
-
-    def _v_cycle_from(
-        self,
-        u: Float[Array, "Ny Nx"],
-        rhs: Float[Array, "Ny Nx"],
-        level_idx: int,
-    ) -> Float[Array, "Ny Nx"]:
-        """One V-cycle at *level_idx* without the zero-mean projection."""
-        level = self.levels[level_idx]
-
-        # --- Coarsest level: exact solve (the guess u is not needed) ---
-        if level_idx == self.n_levels - 1:
-            return self._bottom_solve(rhs)
-
-        # 1. Pre-smooth: damp high-frequency error on the current grid
-        u = _weighted_jacobi(u, rhs, level, self.omega, self.n_pre)
-
-        # 2. Compute residual: r = f - A(u)
-        #    After smoothing, r contains mostly low-frequency error that
-        #    the smoother cannot resolve at this grid resolution.
-        mask = level.mask.astype(rhs.dtype)  # the hierarchy is float64
-        r = (rhs - _apply_operator(u, level)) * mask
-
-        # 3. Restrict the residual to the coarse grid: r_c = P^T r / 4
-        coarse_level = self.levels[level_idx + 1]
-        assert level.prolong_scale is not None
-        r_coarse = _restrict(r, level.prolong_scale, coarse_level.mask)
-
-        # 4. Recurse: solve A_c e_c = r_c (A_c = R A P) for the error,
-        #    starting from zero.
-        e_coarse = self.v_cycle(jnp.zeros_like(r_coarse), r_coarse, level_idx + 1)
-
-        # 5. Prolongate the coarse correction and add it: u <- u + P e_c
-        e_fine = _prolongate(e_coarse, coarse_level.mask, level.prolong_scale)
-        u = (u + e_fine) * mask
-
-        # 6. Post-smooth: clean up high-frequency error introduced by
-        #    the coarse-to-fine interpolation
-        return _weighted_jacobi(u, rhs, level, self.omega, self.n_post)
 
     # -- Internal ------------------------------------------------------------
 
@@ -1229,3 +1236,56 @@ def build_multigrid_solver(
         null_labels=null_labels,
         null_counts=null_counts,
     )
+
+
+def multigrid_levels(
+    mask: np.ndarray | Float[Array, "Ny Nx"] | Mask2D,
+    dx: float,
+    dy: float,
+    lambda_: float = 0.0,
+    coeff: np.ndarray | Float[Array, "Ny Nx"] | None = None,
+    n_levels: int | None = None,
+    omega: float = 0.8,
+    bc: Literal["dirichlet", "neumann"] = "dirichlet",
+) -> tuple[gaussx.MultigridLevel, ...]:
+    r"""The C-grid multigrid hierarchy of a mask, as ``gaussx.MultigridLevel``\ s.
+
+    The grid-built half of a multigrid solve: the coarsened masks, the
+    5-point fine stencil of ``div(c grad u) - lambda u``, the 9-point
+    Galerkin products ``A_c = R A P``, the bilinear prolongation ``P`` and
+    the full-weighting restriction ``R = P^T / 4`` (see
+    :func:`build_multigrid_solver`), each level as a lineax operator on the
+    flattened ``[Ny, Nx]`` field with a weighted-Jacobi smoother. gaussx
+    runs the V-cycle::
+
+        levels = multigrid_levels(mask, dx, dy, lambda_=4.0)
+        pre = gaussx.MultigridPreconditioner(levels)
+
+    The coarsest level is solved by gaussx's default, a dense solve of its
+    operator; for the exact bottom inverse (and the null space of the
+    singular Neumann ``lambda_ = 0`` problem) use
+    ``build_multigrid_solver(...).as_preconditioner()``, which wraps the
+    same levels.
+
+    Parameters
+    ----------
+    mask, dx, dy, lambda_, coeff, n_levels, omega, bc
+        As in :func:`build_multigrid_solver`.
+
+    Returns
+    -------
+    tuple of gaussx.MultigridLevel
+        The levels, finest first, in the hierarchy's dtype (float64 with
+        x64 on).
+    """
+    solver = build_multigrid_solver(
+        mask,
+        dx,
+        dy,
+        lambda_=lambda_,
+        coeff=coeff,
+        n_levels=n_levels,
+        omega=omega,
+        bc=bc,
+    )
+    return _gaussx_levels(solver.levels, omega, solver.levels[0].mask.dtype)
